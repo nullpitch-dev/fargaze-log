@@ -191,7 +191,9 @@ const LogSchema = new Schema<ILog>({
   },
   purchase: [multiValueSchema],
   food: {
-    type: String,
+    type: {
+      type: String,
+    },
     carbs: String,
     fat: String,
     drinks: [foodItemSchema],
