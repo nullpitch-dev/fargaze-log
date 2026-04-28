@@ -252,12 +252,6 @@ const LogSchema = new Schema<ILog>({
   collection: 'log',
 });
 
-// Index for deduplication key
-LogSchema.index(
-  { userId: 1, 'start.datetime': 1, 'activity.category': 1, 'activity.name': 1 },
-  { unique: false }
-);
-
 // Index for time-based queries
 LogSchema.index({ userId: 1, 'start.datetime': -1 });
 

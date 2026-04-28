@@ -15,6 +15,6 @@ const ActivityMasterSchema = new Schema<IActivityMaster>({
   collection: 'activity_master',
 });
 
-ActivityMasterSchema.index({ userId: 1, name: 1 }, { unique: true });
+ActivityMasterSchema.index({ userId: 1, name: 1, category: 1 }, { unique: true });
 
 export default mongoose.models.ActivityMaster || mongoose.model<IActivityMaster>('ActivityMaster', ActivityMasterSchema);
