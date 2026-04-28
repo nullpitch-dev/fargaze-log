@@ -12,7 +12,11 @@ import Log from '../src/models/Log';
 
 // ── GOOGLE SHEETS ─────────────────────────────────────────────────────────────
 
-async function getSheetData(spreadsheetId: string, sheetName: string): Promise<any[][]> {
+async function getSheetData(
+  spreadsheetId: string,
+  sheetName: string,
+  startRow: number = 3
+): Promise<any[][]> {
   const auth = new google.auth.GoogleAuth({
     keyFile: path.join(process.cwd(), 'myfiles', process.env.GOOGLE_SERVICE_ACCOUNT_FILE!),
     scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
@@ -21,7 +25,7 @@ async function getSheetData(spreadsheetId: string, sheetName: string): Promise<a
   const sheets = google.sheets({ version: 'v4', auth: client as any });
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${sheetName}!A3:CG`,
+    range: `${sheetName}!A${startRow}:CG`,
   });
   return response.data.values || [];
 }
@@ -31,11 +35,12 @@ async function getSheetData(spreadsheetId: string, sheetName: string): Promise<a
 async function migrateSheet(
   spreadsheetId: string,
   sheetName: string,
-  userId: string
+  userId: string,
+  startRow: number = 3
 ) {
   console.log(`\n📋 Migrating sheet: ${sheetName}`);
 
-  const rows = await getSheetData(spreadsheetId, sheetName);
+  const rows = await getSheetData(spreadsheetId, sheetName, startRow);
   const shouldSkipRow = createRowFilter();
 
   let skipped = 0;
@@ -93,18 +98,18 @@ async function main() {
   const results = [];
 
   // Migrate all sheets in order
-  results.push(await migrateSheet(process.env.SPREADSHEET_ID_ARCHIVE!, '~2025', userId));
-  results.push(await migrateSheet(process.env.SPREADSHEET_ID_ARCHIVE!, '2026', userId));
+  results.push(await migrateSheet(process.env.SPREADSHEET_ID_ARCHIVE!, '~2025', userId, 4));
+  results.push(await migrateSheet(process.env.SPREADSHEET_ID_ARCHIVE!, '2026', userId), 4);
   results.push(await migrateSheet(process.env.SPREADSHEET_ID_ACTIVE!, 'History', userId));
   results.push(await migrateSheet(process.env.SPREADSHEET_ID_ACTIVE!, 'Future', userId));
   results.push(await migrateSheet(process.env.SPREADSHEET_ID_ACTIVE!, 'Active', userId));
 
   // Summary
-  const total = results.reduce((a, r) => a + r.total, 0);
-  const inserted = results.reduce((a, r) => a + r.inserted, 0);
-  const skipped = results.reduce((a, r) => a + r.skipped, 0);
-  const duplicates = results.reduce((a, r) => a + r.duplicates, 0);
-  const errors = results.reduce((a, r) => a + r.errors, 0);
+  const total = results.reduce((a, r) => a + (r.total || 0), 0);
+  const inserted = results.reduce((a, r) => a + (r.inserted || 0), 0);
+  const skipped = results.reduce((a, r) => a + (r.skipped || 0), 0);
+  const duplicates = results.reduce((a, r) => a + (r.duplicates || 0), 0);
+  const errors = results.reduce((a, r) => a + (r.errors || 0), 0);
 
   console.log('\n📊 Migration Summary:');
   console.log(`  Total rows:  ${total}`);

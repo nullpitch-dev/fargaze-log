@@ -18,6 +18,8 @@ export function parseInteger(val: string): number | null {
 // Clean string — return null if empty
 export function parseString(val: string): string | null {
   if (!val || val.trim() === '') return null;
+  if (val.trim() === '#N/A') return null;
+  if (val.trim().startsWith('#')) return null;
   return val.trim();
 }
 
@@ -152,6 +154,7 @@ export function createRowFilter() {
     const activityCategory = row[0]?.toString().trim();
     const activity = row[1]?.toString().trim();
 
+    // Check Preset BEFORE checking empty activity category
     if (activity === 'Preset') {
       presetFound = true;
       return true;
@@ -161,6 +164,11 @@ export function createRowFilter() {
     if (!activityCategory) return true;
     if (activityCategory === '#N/A') return true;
     if (activityCategory.startsWith('#')) return true;
+
+    // Skip header rows
+    if (activityCategory === 'activity category') return true;
+    if (activityCategory === 'activity') return true;
+    if (activityCategory === 'categoryLevel1') return true;
 
     return false;
   };

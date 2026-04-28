@@ -44,13 +44,26 @@ export async function migrateSheet(
 		continue;
 	 }
 
-	 try {
-		const doc = rowToDocument(row, userId);
-		docsToInsert.push(doc);
-	 } catch (error: any) {
-		result.errors++;
-		result.errorDetails.push(`Row ${i + 3}: ${error.message}`);
-	 }
+  try {
+    const doc = rowToDocument(row, userId);
+
+    // Check for #N/A in cost.category for past entries
+    const rawCostCategory = row[33]?.toString().trim();
+    const endDatetime = doc.end?.datetime;
+    const now = new Date();
+
+    if (rawCostCategory === '#N/A' && endDatetime && endDatetime < now) {
+      result.errors++;
+      result.errorDetails.push(
+        `Row ${i + startRow}: Past entry with #N/A cost category — "${doc.activity?.title}" on ${doc.start?.year}-${doc.start?.month}-${doc.start?.day}`
+      );
+      continue;
+    }
+
+    docsToInsert.push(doc);
+  } catch (error: any) {
+    result.errors++;
+    result.errorDetails.push(`Row ${i + startRow}: ${error.message}`);
   }
 
   if (docsToInsert.length > 0) {
