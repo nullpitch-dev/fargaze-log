@@ -209,22 +209,27 @@ async function main() {
   console.log('✅ Indexes synced');
 
   const userId = 'hyoje';
-
-  // Clear existing logs before re-migration
-  await Log.deleteMany({ userId });
-  console.log('🗑️  Cleared existing logs');
-
-  // Migrate supporting collections first
-  await migrateCostMaster(process.env.SPREADSHEET_ID_ACTIVE!, userId);
-  await migrateActivityMaster(process.env.SPREADSHEET_ID_ACTIVE!, userId);
-  await migrateReferenceLists(process.env.SPREADSHEET_ID_ACTIVE!, userId);
-  await migrateTimezoneMaster(process.env.SPREADSHEET_ID_ACTIVE!, userId);
-  await migrateExchangeRate(process.env.SPREADSHEET_ID_ACTIVE!, userId);
-
-  // Migrate log sheets in order
   const results = [];
-  results.push(await migrateSheet(process.env.SPREADSHEET_ID_ARCHIVE!, '~2025', userId, 4));
+
+  // ── RARELY NEEDED — uncomment when supporting collections change ──────────
+  // await migrateCostMaster(process.env.SPREADSHEET_ID_ACTIVE!, userId);
+  // await migrateActivityMaster(process.env.SPREADSHEET_ID_ACTIVE!, userId);
+  // await migrateReferenceLists(process.env.SPREADSHEET_ID_ACTIVE!, userId);
+  // await migrateTimezoneMaster(process.env.SPREADSHEET_ID_ACTIVE!, userId);
+  // await migrateExchangeRate(process.env.SPREADSHEET_ID_ACTIVE!, userId);
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // ── RARELY NEEDED — uncomment when ~2025 data needs correction ────────────
+  // await Log.deleteMany({ userId, 'start.year': { $lt: 2026 } });
+  // console.log('🗑️  Cleared ~2025 logs');
+  // results.push(await migrateSheet(process.env.SPREADSHEET_ID_ARCHIVE!, '~2025', userId, 4));
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // ── DAILY — current year archive ─────────────────────────────────────────
+  await Log.deleteMany({ userId, 'start.year': 2026 });
+  console.log('🗑️  Cleared 2026 logs');
   results.push(await migrateSheet(process.env.SPREADSHEET_ID_ARCHIVE!, '2026', userId, 4));
+  // ─────────────────────────────────────────────────────────────────────────
 
   // Summary
   const total = results.reduce((a, r) => a + (r.total || 0), 0);
