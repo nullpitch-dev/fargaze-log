@@ -16,9 +16,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
   callbacks: {
     jwt({ token, user }) {
-      console.log('jwt callback - user:', JSON.stringify(user), 'token:', JSON.stringify(token));
-      if (user?.email) {
-        token.userId = EMAIL_TO_USER_ID[user.email] ?? null;
+      const email = user?.email ?? token.email;
+      if (email && !token.userId) {
+        token.userId = EMAIL_TO_USER_ID[email as string] ?? null;
       }
       return token;
     },
