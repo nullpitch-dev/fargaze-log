@@ -13,13 +13,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   callbacks: {
-    jwt({ token, profile }) {
-      // profile is only available on first sign-in
-      console.log('jwt callback - profile email:', profile?.email, 'token.userId:', token.userId);
-      if (profile?.email) {
-        token.userId = EMAIL_TO_USER_ID[profile.email] ?? null;
+    jwt({ token, user }) {
+      // user is only available on first sign-in
+      if (user?.email) {
+        token.userId = EMAIL_TO_USER_ID[user.email] ?? null;
       }
-      // If userId already stored in token, keep it
       return token;
     },
     session({ session, token }) {
