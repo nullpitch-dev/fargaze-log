@@ -15,6 +15,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   callbacks: {
     jwt({ token, profile }) {
       // profile is only available on first sign-in
+      console.log('jwt callback - profile email:', profile?.email, 'token.userId:', token.userId);
       if (profile?.email) {
         token.userId = EMAIL_TO_USER_ID[profile.email] ?? null;
       }
