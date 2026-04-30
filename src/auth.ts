@@ -1,8 +1,6 @@
 import NextAuth from 'next-auth';
 import Google from 'next-auth/providers/google';
 
-// Maps Google email → internal userId
-// Add more entries here when onboarding new users in Phase 5
 const EMAIL_TO_USER_ID: Record<string, string> = {
   [process.env.GOOGLE_OWNER_EMAIL!]: 'hyoje',
 };
@@ -16,13 +14,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
   callbacks: {
     jwt({ token, profile }) {
+      // profile is only available on first sign-in
       if (profile?.email) {
         token.userId = EMAIL_TO_USER_ID[profile.email] ?? null;
       }
+      // If userId already stored in token, keep it
       return token;
     },
     session({ session, token }) {
-      session.user.userId = (token.userId as string) ?? null;
+      (session.user as any).userId = token.userId ?? null;
       return session;
     },
   },
