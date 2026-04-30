@@ -185,8 +185,17 @@ export async function GET(request: NextRequest) {
     },
   ];
 
-  let results = await Log.aggregate(atlasPipeline);
+  let results: any[] = [];
   let searchMode: 'atlas' | 'regex' = 'atlas';
+  let atlasError: string | null = null;
+
+  try {
+    results = await Log.aggregate(atlasPipeline);
+  } catch (err: any) {
+    atlasError = err.message;
+    searchMode = 'regex';
+  }
+
 
   // ── Regex fallback ──────────────────────────────────────────────────────────
 
@@ -235,11 +244,5 @@ export async function GET(request: NextRequest) {
     results = results.map((doc: any) => ({ ...doc, score: null }));
   }
 
-  return NextResponse.json({
-    query,
-    total: results.length,
-    searchMode,
-    results,
-    aggregations: computeAggregations(results),
-  });
+  return NextResponse.json({ query, total: results.length, searchMode, atlasError, results, aggregations });
 }
