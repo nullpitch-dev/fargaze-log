@@ -92,8 +92,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  console.log('session.user:', JSON.stringify(session.user));
-
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('q')?.trim() ?? '';
   const dateFrom = searchParams.get('dateFrom')?.trim();

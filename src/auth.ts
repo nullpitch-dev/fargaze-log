@@ -5,8 +5,6 @@ const EMAIL_TO_USER_ID: Record<string, string> = {
   [process.env.GOOGLE_OWNER_EMAIL!]: 'hyoje',
 };
 
-console.log('EMAIL_TO_USER_ID keys:', Object.keys(EMAIL_TO_USER_ID));
-
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     Google({
