@@ -509,14 +509,14 @@ export default function SearchPage() {
       {/* Aggregations */}
       {hasAggregations && (
         <div className="mb-6">
-          <p className="text-xs text-zinc-600 uppercase tracking-widest mb-3">집계</p>
+          <p className="text-xs text-zinc-400 uppercase tracking-widest mb-3">집계</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
             {Object.entries(response!.aggregations).map(([field, agg]) => (
               <div key={field} className="bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3">
-                <p className="text-xs text-zinc-500 mb-1.5">{AGG_LABELS[field] ?? field}</p>
+                <p className="text-xs text-zinc-400 mb-1.5">{AGG_LABELS[field] ?? field}</p>
                 <p className="text-sm font-medium text-zinc-100">합계 {formatAggValue(field, agg.sum)}</p>
-                <p className="text-xs text-zinc-500 mt-1">평균 {formatAggValue(field, agg.avg)} · {agg.count}건</p>
-                <p className="text-xs text-zinc-700 mt-0.5">최소 {formatAggValue(field, agg.min)} · 최대 {formatAggValue(field, agg.max)}</p>
+                <p className="text-xs text-zinc-400 mt-1">평균 {formatAggValue(field, agg.avg)} · {agg.count}건</p>
+                <p className="text-xs text-zinc-500 mt-0.5">최소 {formatAggValue(field, agg.min)} · 최대 {formatAggValue(field, agg.max)}</p>
               </div>
             ))}
           </div>
@@ -526,10 +526,10 @@ export default function SearchPage() {
       {/* Results */}
       {response && (
         <>
-          <p className="text-xs text-zinc-600 uppercase tracking-widest mb-3">
+          <p className="text-xs text-zinc-400 uppercase tracking-widest mb-3">
             {response.total}건의 결과
             {response.searchMode === 'regex' && (
-              <span className="ml-2 normal-case text-zinc-700">· 포함 검색</span>
+              <span className="ml-2 normal-case text-zinc-500">· 포함 검색</span>
             )}
           </p>
           {response.total === 0 ? (
@@ -539,13 +539,13 @@ export default function SearchPage() {
               <table className="w-full text-sm min-w-[640px]">
                 <thead>
                   <tr className="border-b border-zinc-800 bg-zinc-900">
-                    <th className="text-left px-4 py-3 text-xs text-zinc-500 font-medium w-28">날짜</th>
-                    <th className="text-left px-4 py-3 text-xs text-zinc-500 font-medium w-24">시간</th>
-                    <th className="text-left px-4 py-3 text-xs text-zinc-500 font-medium w-20">카테고리</th>
-                    <th className="text-left px-4 py-3 text-xs text-zinc-500 font-medium">활동 / 내용</th>
-                    <th className="text-left px-4 py-3 text-xs text-zinc-500 font-medium w-28">장소</th>
-                    <th className="text-right px-4 py-3 text-xs text-zinc-500 font-medium w-28">비용</th>
-                    <th className="text-right px-4 py-3 text-xs text-zinc-500 font-medium w-20">소요</th>
+                    <th className="text-left px-4 py-3 text-xs text-zinc-400 font-medium w-24">날짜</th>
+                    <th className="text-left px-4 py-3 text-xs text-zinc-400 font-medium w-20">시간</th>
+                    <th className="text-left px-4 py-3 text-xs text-zinc-400 font-medium w-16">카테고리</th>
+                    <th className="text-left px-4 py-3 text-xs text-zinc-400 font-medium">활동 / 내용</th>
+                    <th className="text-left px-4 py-3 text-xs text-zinc-400 font-medium w-24">장소</th>
+                    <th className="text-right px-4 py-3 text-xs text-zinc-400 font-medium w-24">비용</th>
+                    <th className="text-right px-4 py-3 text-xs text-zinc-400 font-medium w-16">소요</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -557,20 +557,20 @@ export default function SearchPage() {
                         i === response.results.length - 1 ? 'border-b-0' : ''
                       }`}
                     >
-                      <td className="px-4 py-3 text-zinc-400 font-mono text-xs">{formatDate(entry)}</td>
-                      <td className="px-4 py-3 text-zinc-500 text-xs">{formatTime(entry)}</td>
-                      <td className="px-4 py-3 text-zinc-500 text-xs">{entry.activity?.category ?? '—'}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2 text-zinc-400 font-mono text-xs">{formatDate(entry)}</td>
+                      <td className="px-3 py-2 text-zinc-500 text-xs">{formatTime(entry)}</td>
+                      <td className="px-3 py-2 text-zinc-500 text-xs">{entry.activity?.category ?? '—'}</td>
+                      <td className="px-3 py-2">
                         <p className="text-zinc-200 text-xs font-medium">{entry.activity?.name ?? '—'}</p>
                         {entry.activity?.title && <p className="text-zinc-500 text-xs mt-0.5">{entry.activity.title}</p>}
                         {(entry.purchase ?? []).length > 0 && (
-                          <p className="text-zinc-600 text-xs mt-0.5">
+                          <p className="text-zinc-400 text-xs mt-0.5">
                             {entry.purchase!.map(p => p.item).filter(Boolean).join(', ')}
                           </p>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-zinc-500 text-xs">{entry.location?.activity ?? '—'}</td>
-                      <td className="px-4 py-3 text-right text-xs">
+                      <td className="px-3 py-2 text-zinc-500 text-xs">{entry.location?.activity ?? '—'}</td>
+                      <td className="px-3 py-2 text-right text-xs">
                         {entry.cost?.amountKRW ? (
                           <span className="text-zinc-300">{formatKRW(entry.cost.amountKRW)}</span>
                         ) : entry.cost?.amountForeign ? (
@@ -579,7 +579,7 @@ export default function SearchPage() {
                           <span className="text-zinc-700">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-right text-xs text-zinc-500">
+                      <td className="px-3 py-2 text-right text-xs text-zinc-500">
                         {formatDuration(entry.duration?.totalSeconds)}
                       </td>
                     </tr>
