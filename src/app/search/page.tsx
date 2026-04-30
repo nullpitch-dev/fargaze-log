@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -412,7 +412,7 @@ export default function SearchPage() {
         {/* Active filters hint */}
         {query && hasActiveFilters && (
           <p className="text-xs text-zinc-500 mb-2 pl-1">
-            "{query}" + 아래 조건 적용 중
+            "{query}" + 아래 조건 적용 중ldquo;{query}"{query}" + 아래 조건 적용 중rdquo; + 아래 조건 적용 중
           </p>
         )}
 
