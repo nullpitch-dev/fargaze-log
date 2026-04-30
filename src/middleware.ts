@@ -5,20 +5,15 @@ export default auth((req) => {
   const isAuthPage = req.nextUrl.pathname.startsWith('/api/auth');
   if (isAuthPage) return NextResponse.next();
 
-  console.log('middleware auth:', JSON.stringify(req.auth?.user));
+  const user = req.auth?.user as any;
+  const userId = user?.userId;
 
-  // Not signed in at all
-  if (!req.auth) {
-    return NextResponse.redirect(new URL('/api/auth/signin', req.url));
-  }
-
-  // Signed in but no mapped userId
-  const userId = (req.auth.user as any)?.userId;
+  // Not signed in or no mapped userId — redirect to signout to clear session
   if (!userId) {
-    // Clear session and send to signin
-    const signoutUrl = new URL('/api/auth/signout', req.url);
-    signoutUrl.searchParams.set('callbackUrl', '/api/auth/signin');
-    return NextResponse.redirect(signoutUrl);
+    if (!req.auth) {
+      return NextResponse.redirect(new URL('/api/auth/signin', req.url));
+    }
+    return NextResponse.redirect(new URL('/api/auth/signout', req.url));
   }
 
   return NextResponse.next();
