@@ -5,6 +5,8 @@ const EMAIL_TO_USER_ID: Record<string, string> = {
   [process.env.GOOGLE_OWNER_EMAIL!]: 'hyoje',
 };
 
+console.log('EMAIL_TO_USER_ID keys:', Object.keys(EMAIL_TO_USER_ID));
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     Google({
@@ -14,7 +16,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
   callbacks: {
     jwt({ token, user }) {
-      // user is only available on first sign-in
+      console.log('jwt callback - user:', JSON.stringify(user), 'token:', JSON.stringify(token));
       if (user?.email) {
         token.userId = EMAIL_TO_USER_ID[user.email] ?? null;
       }
