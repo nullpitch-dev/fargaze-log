@@ -84,7 +84,18 @@ const AGG_LABELS: Record<string, string> = {
 function formatDate(entry: LogEntry): string {
   const s = entry.start;
   if (!s?.year) return '—';
-  return `${s.year}.${String(s.month ?? 1).padStart(2, '0')}.${String(s.day ?? 1).padStart(2, '0')}`;
+  const yy = String(s.year).slice(2);
+  const mm = String(s.month ?? 1).padStart(2, '0');
+  const dd = String(s.day ?? 1).padStart(2, '0');
+  return "'" + yy + '.' + mm + '.' + dd;
+}
+
+function formatDatetime(entry: LogEntry): string {
+  const date = formatDate(entry);
+  if (entry.allDay) return date + ' 하루종일';
+  const hour = entry.start?.hour;
+  if (!hour) return date;
+  return date + ' ' + hour;
 }
 
 function formatTime(entry: LogEntry): string {
@@ -97,15 +108,15 @@ function formatTime(entry: LogEntry): string {
 
 function formatDuration(seconds?: number | null): string {
   if (seconds === undefined || seconds === null) return '—';
-  if (seconds === 0) return '0분';
+  if (seconds === 0) return '0m';
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const parts = [];
-  if (d > 0) parts.push(`${d}일`);
-  if (h > 0) parts.push(`${h}시간`);
-  if (m > 0) parts.push(`${m}분`);
-  return parts.join(' ') || '1분 미만';
+  if (d > 0) parts.push(d + 'd');
+  if (h > 0) parts.push(h + 'h');
+  if (m > 0) parts.push(m + 'm');
+  return parts.join(' ') || '0m';
 }
 
 function formatKRW(amount: number): string {
@@ -539,13 +550,12 @@ export default function SearchPage() {
               <table className="w-full text-sm min-w-[640px]">
                 <thead>
                   <tr className="border-b border-zinc-800 bg-zinc-900">
-                    <th className="text-left px-4 py-3 text-xs text-zinc-400 font-medium w-24">날짜</th>
-                    <th className="text-left px-4 py-3 text-xs text-zinc-400 font-medium w-20">시간</th>
-                    <th className="text-left px-4 py-3 text-xs text-zinc-400 font-medium w-16">카테고리</th>
-                    <th className="text-left px-4 py-3 text-xs text-zinc-400 font-medium">활동 / 내용</th>
-                    <th className="text-left px-4 py-3 text-xs text-zinc-400 font-medium w-24">장소</th>
-                    <th className="text-right px-4 py-3 text-xs text-zinc-400 font-medium w-24">비용</th>
-                    <th className="text-right px-4 py-3 text-xs text-zinc-400 font-medium w-16">소요</th>
+                    <th className="text-right px-3 py-2 text-xs text-zinc-400 font-medium w-24">날짜 / 시간</th>
+                    <th className="text-left px-3 py-2 text-xs text-zinc-400 font-medium">활동 / 내용</th>
+                    <th className="text-left px-3 py-2 text-xs text-zinc-400 font-medium w-24">장소</th>
+                    <th className="text-left px-3 py-2 text-xs text-zinc-400 font-medium w-24">구매</th>
+                    <th className="text-right px-3 py-2 text-xs text-zinc-400 font-medium w-24">비용</th>
+                    <th className="text-right px-3 py-2 text-xs text-zinc-400 font-medium w-20">소요</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -557,19 +567,27 @@ export default function SearchPage() {
                         i === response.results.length - 1 ? 'border-b-0' : ''
                       }`}
                     >
-                      <td className="px-3 py-2 text-zinc-400 font-mono text-xs">{formatDate(entry)}</td>
-                      <td className="px-3 py-2 text-zinc-500 text-xs">{formatTime(entry)}</td>
-                      <td className="px-3 py-2 text-zinc-500 text-xs">{entry.activity?.category ?? '—'}</td>
+                      <td className="px-3 py-2 font-mono text-xs whitespace-nowrap text-right">
+                        <p className="text-zinc-300">{formatDate(entry)}</p>
+                        {!entry.allDay && entry.start?.hour && (
+                          <p className="text-zinc-500 mt-0.5">{entry.start.hour}</p>
+                        )}
+                        {entry.allDay && <p className="text-zinc-500 mt-0.5">하루종일</p>}
+                      </td>
                       <td className="px-3 py-2">
-                        <p className="text-zinc-200 text-xs font-medium">{entry.activity?.name ?? '—'}</p>
-                        {entry.activity?.title && <p className="text-zinc-500 text-xs mt-0.5">{entry.activity.title}</p>}
-                        {(entry.purchase ?? []).length > 0 && (
-                          <p className="text-zinc-400 text-xs mt-0.5">
-                            {entry.purchase!.map(p => p.item).filter(Boolean).join(', ')}
-                          </p>
+                        <p className="text-zinc-500 dark:text-zinc-400 text-xs">{entry.activity?.category ?? ''} · {entry.activity?.name ?? '—'}</p>
+                        {entry.activity?.title && <p className="text-zinc-800 dark:text-zinc-100 text-xs font-medium mt-0.5">{entry.activity.title}</p>}
+                        {!entry.activity?.title && <p className="text-zinc-800 dark:text-zinc-100 text-xs font-medium">{entry.activity?.name ?? '—'}</p>}
+                        {entry.activity?.additionalInfo && (
+                          <p className="text-zinc-500 dark:text-zinc-400 text-xs mt-0.5">{entry.activity.additionalInfo}</p>
                         )}
                       </td>
                       <td className="px-3 py-2 text-zinc-500 text-xs">{entry.location?.activity ?? '—'}</td>
+                      <td className="px-3 py-2 text-zinc-500 dark:text-zinc-400 text-xs">
+                        {(entry.purchase ?? []).length > 0
+                          ? entry.purchase!.map(p => p.item).filter(Boolean).join(', ')
+                          : '—'}
+                      </td>
                       <td className="px-3 py-2 text-right text-xs">
                         {entry.cost?.amountKRW ? (
                           <span className="text-zinc-300">{formatKRW(entry.cost.amountKRW)}</span>
