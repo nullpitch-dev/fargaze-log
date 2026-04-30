@@ -117,7 +117,10 @@ export async function GET(request: NextRequest) {
   }
 
   await connectDB();
-  const userId = 'hyoje';
+  const userId = (session.user as any)?.userId;
+  if (!userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+  }
 
   // ── Atlas Search ────────────────────────────────────────────────────────────
 
