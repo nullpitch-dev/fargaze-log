@@ -6,7 +6,7 @@ import {
   zipMultiValue,
   zipFoodValue,
   parsePeople,
-  parseDuration,
+  computeTotalSeconds,
 } from './transform';
 
 // Column indices (0-based)
@@ -32,11 +32,6 @@ const C = {
   END_WEEKDAY: 18,
   END_HOUR: 19,
   END_TZ_OFFSET: 20,
-  DUR_D: 21,
-  DUR_H: 22,
-  DUR_M: 23,
-  DUR_S: 24,
-  DUR_LABEL: 25,
   LOC_ACTIVITY: 26,
   LOC_ONLINE: 27,
   LOC_OTHER: 28,
@@ -119,12 +114,18 @@ export function rowToDocument(row: any[], userId: string): any {
     endHour
   );
 
-  const duration = parseDuration(
-    get(row, C.DUR_D),
-    get(row, C.DUR_H),
-    get(row, C.DUR_M),
-    get(row, C.DUR_S),
-    get(row, C.DUR_LABEL)
+  const totalSeconds = computeTotalSeconds(
+    allDay,
+    startDatetime,
+    endDatetime,
+    parseInteger(get(row, C.START_TZ_OFFSET)),
+    parseInteger(get(row, C.END_TZ_OFFSET)),
+    parseInteger(get(row, C.START_YEAR)),
+    parseInteger(get(row, C.START_MONTH)),
+    parseInteger(get(row, C.START_DAY)),
+    parseInteger(get(row, C.END_YEAR)),
+    parseInteger(get(row, C.END_MONTH)),
+    parseInteger(get(row, C.END_DAY)),
   );
 
   const purchase = zipMultiValue(
@@ -202,7 +203,9 @@ export function rowToDocument(row: any[], userId: string): any {
       hour: parseString(endHour),
       timezoneOffset: parseInteger(get(row, C.END_TZ_OFFSET)),
     },
-    duration,
+    duration: {
+      totalSeconds,
+    },
     location: {
       activity: parseString(get(row, C.LOC_ACTIVITY)),
       online: parseString(get(row, C.LOC_ONLINE)),

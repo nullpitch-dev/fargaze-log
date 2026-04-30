@@ -131,18 +131,56 @@ export function parsePeople(
 
 // ── DURATION ──────────────────────────────────────────────────────────────────
 
-export function parseDuration(d: string, h: string, m: string, s: string, label: string) {
-  // If any field contains #NUM! treat entire duration as null
-  if ([d, h, m, s].some(v => v?.includes('#NUM') || v?.includes('#DIV'))) {
-    return { days: null, hours: null, minutes: null, seconds: null, label: null };
+/**
+ * Compute duration in total seconds from start/end datetimes and their UTC offsets.
+ *
+ * UTC conversion: localDatetime - (timezoneOffset * 3600 * 1000) = UTC ms
+ *
+ * Cases:
+ *   - Normal event:        (endUTC - startUTC) in seconds
+ *   - Same start/end:      0
+ *   - allDay, single day:  null (no start or end datetime)
+ *   - allDay, multi-day:   (endDate - startDate) in seconds using date-only values
+ *   - Data error (no end): null
+ */
+export function computeTotalSeconds(
+  allDay: boolean,
+  startDatetime: Date | null,
+  endDatetime: Date | null,
+  startTimezoneOffset: number | null,
+  endTimezoneOffset: number | null,
+  startYear: number | null,
+  startMonth: number | null,
+  startDay: number | null,
+  endYear: number | null,
+  endMonth: number | null,
+  endDay: number | null,
+): number | null {
+  // All-day event
+  if (allDay) {
+    // Single all-day: no end date → null
+    if (!endYear || !endMonth || !endDay) return null;
+    // Multi-day all-day: use date-only values
+    if (!startYear || !startMonth || !startDay) return null;
+    const startMs = Date.UTC(startYear, startMonth - 1, startDay);
+    const endMs = Date.UTC(endYear, endMonth - 1, endDay);
+    const diff = endMs - startMs;
+    return diff > 0 ? diff / 1000 : 0;
   }
-  return {
-    days: parseInteger(d),
-    hours: parseInteger(h),
-    minutes: parseInteger(m),
-    seconds: parseInteger(s),
-    label: parseString(label),
-  };
+
+  // Normal event: need both timestamps
+  if (!startDatetime || !endDatetime) return null;
+
+  const startOffset = startTimezoneOffset ?? 0;
+  const endOffset = endTimezoneOffset ?? 0;
+
+  // Convert local datetime to UTC milliseconds
+  const startUTC = startDatetime.getTime() - startOffset * 3600 * 1000;
+  const endUTC = endDatetime.getTime() - endOffset * 3600 * 1000;
+
+  const diff = endUTC - startUTC;
+  if (diff < 0) return null; // data error — end before start
+  return diff / 1000;
 }
 
 // ── ROW VALIDATION ────────────────────────────────────────────────────────────

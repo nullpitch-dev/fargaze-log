@@ -30,8 +30,6 @@ async function connectDB() {
     cached.promise = mongoose.connect(MONGODB_URI, {
       autoIndex: true,  // explicit
     }).then((mongoose) => mongoose);
-      return mongoose;
-    });
   }
 
   cached.conn = await cached.promise;

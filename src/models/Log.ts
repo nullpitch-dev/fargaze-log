@@ -37,11 +37,7 @@ export interface ILog extends Document {
     timezoneOffset?: number;
   };
   duration?: {
-    days?: number;
-    hours?: number;
-    minutes?: number;
-    seconds?: number;
-    label?: string;
+    totalSeconds?: number;
   };
   location?: {
     activity?: string;
@@ -171,11 +167,7 @@ const LogSchema = new Schema<ILog>({
     timezoneOffset: Number,
   },
   duration: {
-    days: Number,
-    hours: Number,
-    minutes: Number,
-    seconds: Number,
-    label: String,
+    totalSeconds: Number,
   },
   location: {
     activity: String,
