@@ -244,5 +244,6 @@ export async function GET(request: NextRequest) {
     results = results.map((doc: any) => ({ ...doc, score: null }));
   }
 
+  const aggregations = computeAggregations(results);
   return NextResponse.json({ query, total: results.length, searchMode, atlasError, results, aggregations });
 }
