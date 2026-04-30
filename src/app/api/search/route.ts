@@ -187,12 +187,10 @@ export async function GET(request: NextRequest) {
 
   let results: any[] = [];
   let searchMode: 'atlas' | 'regex' = 'atlas';
-  let atlasError: string | null = null;
 
   try {
     results = await Log.aggregate(atlasPipeline);
   } catch (err: any) {
-    atlasError = err.message;
     searchMode = 'regex';
   }
 
@@ -245,5 +243,5 @@ export async function GET(request: NextRequest) {
   }
 
   const aggregations = computeAggregations(results);
-  return NextResponse.json({ query, total: results.length, searchMode, atlasError, results, aggregations });
+  return NextResponse.json({ query, total: results.length, searchMode, results, aggregations });
 }
