@@ -135,9 +135,9 @@ function formatAggValue(field: string, value: number): string {
 function DetailRow({ label, value }: { label: string; value?: string | number | null }) {
   if (value === null || value === undefined || value === '') return null;
   return (
-    <div className="flex gap-3 py-2 border-b border-zinc-800/50 last:border-0">
-      <span className="text-xs text-zinc-500 w-24 shrink-0 pt-0.5">{label}</span>
-      <span className="text-xs text-zinc-200 flex-1 break-words">{String(value)}</span>
+    <div className="flex gap-3 py-2 border-b border-stone-100 dark:border-zinc-800 last:border-0">
+      <span className="text-xs text-stone-500 dark:text-zinc-300 w-24 shrink-0 pt-0.5">{label}</span>
+      <span className="text-xs text-stone-700 dark:text-zinc-200 flex-1 break-words">{String(value)}</span>
     </div>
   );
 }
@@ -146,7 +146,7 @@ function DetailSection({ title, children }: { title: string; children: React.Rea
   // Only render if at least one child is non-null
   return (
     <div className="mb-5">
-      <p className="text-xs text-zinc-600 uppercase tracking-widest mb-2">{title}</p>
+      <p className="text-xs text-stone-500 dark:text-zinc-300 uppercase tracking-widest mb-2">{title}</p>
       {children}
     </div>
   );
@@ -159,28 +159,28 @@ function DetailPanel({ entry, onClose }: { entry: LogEntry; onClose: () => void 
   return (
     <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
       <div
-        className="relative w-full max-w-md bg-zinc-950 border-l border-zinc-800 overflow-y-auto shadow-2xl"
+        className="relative w-full max-w-md bg-white dark:bg-zinc-900 border-l border-stone-200 dark:border-zinc-700 overflow-y-auto shadow-2xl"
         onClick={ev => ev.stopPropagation()}
       >
         {/* Header */}
-        <div className="sticky top-0 bg-zinc-950 border-b border-zinc-800 px-5 py-4 flex items-start justify-between gap-4">
+        <div className="sticky top-0 bg-white dark:bg-zinc-900 border-b border-stone-200 dark:border-zinc-700 px-5 py-4 flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs text-zinc-500 mb-1">
+            <p className="text-xs text-stone-500 dark:text-zinc-300 mb-1">
               {s?.year && `${s.year}.${String(s.month).padStart(2,'0')}.${String(s.day).padStart(2,'0')}`}
               {s?.weekday && ` (${s.weekday})`}
               {!entry.allDay && s?.hour && ` · ${s.hour}${e?.hour ? ` → ${e.hour}` : ''}`}
               {entry.allDay && ' · 하루 종일'}
             </p>
-            <p className="text-sm font-medium text-zinc-100">
+            <p className="text-sm font-medium text-stone-800 dark:text-zinc-100">
               {entry.activity?.name ?? '—'}
             </p>
             {entry.activity?.title && (
-              <p className="text-xs text-zinc-400 mt-0.5">{entry.activity.title}</p>
+              <p className="text-xs text-stone-500 dark:text-zinc-400 mt-0.5">{entry.activity.title}</p>
             )}
           </div>
           <button
             onClick={onClose}
-            className="text-zinc-500 hover:text-zinc-200 transition-colors text-lg leading-none mt-0.5"
+            className="text-stone-500 dark:text-zinc-300 hover:text-stone-900 dark:hover:text-zinc-50 dark:text-zinc-200 transition-colors text-lg leading-none mt-0.5"
           >
             ×
           </button>
@@ -409,12 +409,12 @@ export default function SearchPage() {
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="검색어 입력…"
-            className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 text-sm"
+            className="flex-1 bg-white dark:bg-zinc-900 border border-stone-300 dark:border-zinc-600 rounded-lg px-4 py-3 text-stone-900 dark:text-zinc-50 placeholder-stone-400 focus:outline-none focus:border-stone-400 text-sm shadow-sm"
           />
           <button
             type="submit"
             disabled={loading}
-            className="px-6 py-3 bg-zinc-100 text-zinc-900 rounded-lg text-sm font-medium hover:bg-white transition-colors disabled:opacity-40 whitespace-nowrap"
+            className="px-6 py-3 bg-stone-800 dark:bg-zinc-700 text-white rounded-lg text-sm font-medium hover:bg-stone-900 dark:hover:bg-zinc-600 dark:hover:bg-zinc-700 transition-colors disabled:opacity-40 whitespace-nowrap"
           >
             {loading ? '검색 중…' : '검색'}
           </button>
@@ -422,7 +422,7 @@ export default function SearchPage() {
 
         {/* Active filters hint */}
         {query && hasActiveFilters && (
-          <p className="text-xs text-zinc-500 mb-2 pl-1">
+          <p className="text-xs text-stone-500 dark:text-zinc-300 mb-2 pl-1">
             "{query}" + 아래 조건 적용 중ldquo;{query}"{query}" + 아래 조건 적용 중rdquo; + 아래 조건 적용 중
           </p>
         )}
@@ -431,50 +431,50 @@ export default function SearchPage() {
         <button
           type="button"
           onClick={() => setShowAdvanced(v => !v)}
-          className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors flex items-center gap-1 pl-1"
+          className="text-xs text-stone-500 dark:text-zinc-300 hover:text-stone-800 dark:hover:text-zinc-100 dark:text-zinc-300 transition-colors flex items-center gap-1 pl-1"
         >
           <span>{showAdvanced ? '▾' : '▸'}</span>
           <span>상세 검색</span>
-          {hasActiveFilters && <span className="ml-1 text-zinc-400">●</span>}
+          {hasActiveFilters && <span className="ml-1 text-stone-500 dark:text-zinc-400">●</span>}
         </button>
 
         {/* Advanced panel */}
         {showAdvanced && (
-          <div className="mt-4 p-4 bg-zinc-900 border border-zinc-800 rounded-lg space-y-4">
+          <div className="mt-4 p-4 bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-700 rounded-lg space-y-4 shadow-sm">
 
             {/* Date range */}
             <div>
-              <p className="text-xs text-zinc-500 mb-2">기간</p>
+              <p className="text-xs text-stone-500 dark:text-zinc-400 mb-2">기간</p>
               <div className="flex gap-3 items-center">
                 <input
                   type="date"
                   value={dateFrom}
                   onChange={e => setDateFrom(e.target.value)}
-                  className="bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-zinc-200 text-xs focus:outline-none focus:border-zinc-500"
+                  className="bg-white dark:bg-zinc-900 border border-stone-300 dark:border-zinc-600 rounded px-3 py-2 text-stone-800 dark:text-zinc-100 text-xs focus:outline-none focus:border-stone-400"
                 />
-                <span className="text-zinc-600 text-xs">—</span>
+                <span className="text-stone-400 dark:text-zinc-500 text-xs">—</span>
                 <input
                   type="date"
                   value={dateTo}
                   onChange={e => setDateTo(e.target.value)}
-                  className="bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-zinc-200 text-xs focus:outline-none focus:border-zinc-500"
+                  className="bg-white dark:bg-zinc-900 border border-stone-300 dark:border-zinc-600 rounded px-3 py-2 text-stone-800 dark:text-zinc-100 text-xs focus:outline-none focus:border-stone-400"
                 />
                 {(dateFrom || dateTo) && (
-                  <button type="button" onClick={() => { setDateFrom(''); setDateTo(''); }} className="text-zinc-500 hover:text-zinc-300 text-xs">초기화</button>
+                  <button type="button" onClick={() => { setDateFrom(''); setDateTo(''); }} className="text-stone-500 dark:text-zinc-300 hover:text-stone-800 dark:hover:text-zinc-100 dark:text-zinc-300 text-xs">초기화</button>
                 )}
               </div>
             </div>
 
             {/* Field conditions */}
             <div>
-              <p className="text-xs text-zinc-500 mb-2">필드 조건 (AND)</p>
+              <p className="text-xs text-stone-500 dark:text-zinc-400 mb-2">필드 조건 (AND)</p>
               <div className="space-y-2">
                 {conditions.map(cond => (
                   <div key={cond.id} className="flex gap-2 items-center">
                     <select
                       value={cond.field}
                       onChange={e => updateCondition(cond.id, 'field', e.target.value)}
-                      className="bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-zinc-200 text-xs focus:outline-none focus:border-zinc-500"
+                      className="bg-white dark:bg-zinc-900 border border-stone-300 dark:border-zinc-600 rounded px-3 py-2 text-stone-800 dark:text-zinc-100 text-xs focus:outline-none focus:border-stone-400"
                     >
                       {FIELD_OPTIONS.map(opt => (
                         <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -485,12 +485,12 @@ export default function SearchPage() {
                       value={cond.value}
                       onChange={e => updateCondition(cond.id, 'value', e.target.value)}
                       placeholder="값 입력…"
-                      className="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-zinc-200 placeholder-zinc-600 text-xs focus:outline-none focus:border-zinc-500"
+                      className="flex-1 bg-white dark:bg-zinc-900 border border-stone-300 dark:border-zinc-600 rounded px-3 py-2 text-stone-800 dark:text-zinc-100 placeholder-stone-400 text-xs focus:outline-none focus:border-stone-400"
                     />
                     <button
                       type="button"
                       onClick={() => removeCondition(cond.id)}
-                      className="text-zinc-600 hover:text-zinc-300 transition-colors px-1"
+                      className="text-stone-500 dark:text-zinc-300 hover:text-stone-800 dark:hover:text-zinc-100 dark:text-zinc-300 transition-colors px-1"
                     >
                       ×
                     </button>
@@ -500,7 +500,7 @@ export default function SearchPage() {
               <button
                 type="button"
                 onClick={addCondition}
-                className="mt-2 text-xs text-zinc-500 hover:text-zinc-300 transition-colors flex items-center gap-1"
+                className="mt-2 text-xs text-stone-500 dark:text-zinc-300 hover:text-stone-900 dark:hover:text-zinc-50 dark:text-zinc-200 transition-colors flex items-center gap-1"
               >
                 <span>+</span> 조건 추가
               </button>
@@ -512,7 +512,7 @@ export default function SearchPage() {
 
       {/* Error */}
       {error && (
-        <div className="mb-6 px-4 py-3 bg-red-950 border border-red-800 rounded-lg text-red-300 text-sm">
+        <div className="mb-6 px-4 py-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm">
           {error}
         </div>
       )}
@@ -520,14 +520,14 @@ export default function SearchPage() {
       {/* Aggregations */}
       {hasAggregations && (
         <div className="mb-6">
-          <p className="text-xs text-zinc-400 uppercase tracking-widest mb-3">집계</p>
+          <p className="text-xs text-stone-500 dark:text-zinc-400 uppercase tracking-widest mb-3">집계</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
             {Object.entries(response!.aggregations).map(([field, agg]) => (
-              <div key={field} className="bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3">
-                <p className="text-xs text-zinc-400 mb-1.5">{AGG_LABELS[field] ?? field}</p>
-                <p className="text-sm font-medium text-zinc-100">합계 {formatAggValue(field, agg.sum)}</p>
-                <p className="text-xs text-zinc-400 mt-1">평균 {formatAggValue(field, agg.avg)} · {agg.count}건</p>
-                <p className="text-xs text-zinc-500 mt-0.5">최소 {formatAggValue(field, agg.min)} · 최대 {formatAggValue(field, agg.max)}</p>
+              <div key={field} className="bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-700 rounded-lg px-4 py-3 shadow-sm">
+                <p className="text-xs text-stone-500 dark:text-zinc-300 mb-1.5">{AGG_LABELS[field] ?? field}</p>
+                <p className="text-sm font-medium text-stone-800 dark:text-zinc-100">합계 {formatAggValue(field, agg.sum)}</p>
+                <p className="text-xs text-stone-500 dark:text-zinc-400 mt-1">평균 {formatAggValue(field, agg.avg)} · {agg.count}건</p>
+                <p className="text-xs text-stone-500 dark:text-zinc-300 mt-0.5">최소 {formatAggValue(field, agg.min)} · 최대 {formatAggValue(field, agg.max)}</p>
               </div>
             ))}
           </div>
@@ -537,25 +537,25 @@ export default function SearchPage() {
       {/* Results */}
       {response && (
         <>
-          <p className="text-xs text-zinc-400 uppercase tracking-widest mb-3">
+          <p className="text-xs text-stone-500 dark:text-zinc-400 uppercase tracking-widest mb-3">
             {response.total}건의 결과
             {response.searchMode === 'regex' && (
-              <span className="ml-2 normal-case text-zinc-500">· 포함 검색</span>
+              <span className="ml-2 normal-case text-stone-500 dark:text-zinc-300">· 포함 검색</span>
             )}
           </p>
           {response.total === 0 ? (
-            <p className="text-zinc-500 text-sm">검색 결과가 없습니다.</p>
+            <p className="text-stone-500 dark:text-zinc-300 text-sm">검색 결과가 없습니다.</p>
           ) : (
-            <div className="border border-zinc-800 rounded-lg overflow-x-auto">
+            <div className="border border-stone-200 dark:border-zinc-700 rounded-lg overflow-x-auto shadow-sm">
               <table className="w-full text-sm min-w-[640px]">
                 <thead>
-                  <tr className="border-b border-zinc-800 bg-zinc-900">
-                    <th className="text-right px-3 py-2 text-xs text-zinc-400 font-medium w-24">날짜 / 시간</th>
-                    <th className="text-left px-3 py-2 text-xs text-zinc-400 font-medium">활동 / 내용</th>
-                    <th className="text-left px-3 py-2 text-xs text-zinc-400 font-medium w-24">장소</th>
-                    <th className="text-left px-3 py-2 text-xs text-zinc-400 font-medium w-24">구매</th>
-                    <th className="text-right px-3 py-2 text-xs text-zinc-400 font-medium w-24">비용</th>
-                    <th className="text-right px-3 py-2 text-xs text-zinc-400 font-medium w-20">소요</th>
+                  <tr className="border-b border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800">
+                    <th className="text-right px-3 py-2 text-xs text-stone-500 dark:text-zinc-400 font-medium w-24">날짜 / 시간</th>
+                    <th className="text-left px-3 py-2 text-xs text-stone-500 dark:text-zinc-400 font-medium">활동 / 내용</th>
+                    <th className="text-left px-3 py-2 text-xs text-stone-500 dark:text-zinc-400 font-medium w-24">장소</th>
+                    <th className="text-left px-3 py-2 text-xs text-stone-500 dark:text-zinc-400 font-medium w-24">구매</th>
+                    <th className="text-right px-3 py-2 text-xs text-stone-500 dark:text-zinc-400 font-medium w-24">비용</th>
+                    <th className="text-right px-3 py-2 text-xs text-stone-500 dark:text-zinc-400 font-medium w-20">소요</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -563,41 +563,41 @@ export default function SearchPage() {
                     <tr
                       key={entry._id}
                       onClick={() => setSelectedEntry(entry)}
-                      className={`border-b border-zinc-800/50 hover:bg-zinc-900/70 cursor-pointer transition-colors ${
+                      className={`border-b border-stone-100 dark:border-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-800 dark:bg-zinc-800 cursor-pointer transition-colors ${
                         i === response.results.length - 1 ? 'border-b-0' : ''
                       }`}
                     >
                       <td className="px-3 py-2 font-mono text-xs whitespace-nowrap text-right">
-                        <p className="text-zinc-300">{formatDate(entry)}</p>
+                        <p className="text-stone-600 dark:text-zinc-300">{formatDate(entry)}</p>
                         {!entry.allDay && entry.start?.hour && (
-                          <p className="text-zinc-500 mt-0.5">{entry.start.hour}</p>
+                          <p className="text-stone-500 dark:text-zinc-300 mt-0.5">{entry.start.hour}</p>
                         )}
-                        {entry.allDay && <p className="text-zinc-500 mt-0.5">하루종일</p>}
+                        {entry.allDay && <p className="text-stone-500 dark:text-zinc-300 mt-0.5">하루종일</p>}
                       </td>
                       <td className="px-3 py-2">
-                        <p className="text-zinc-500 dark:text-zinc-400 text-xs">{entry.activity?.category ?? ''} · {entry.activity?.name ?? '—'}</p>
-                        {entry.activity?.title && <p className="text-zinc-800 dark:text-zinc-100 text-xs font-medium mt-0.5">{entry.activity.title}</p>}
-                        {!entry.activity?.title && <p className="text-zinc-800 dark:text-zinc-100 text-xs font-medium">{entry.activity?.name ?? '—'}</p>}
+                        <p className="text-stone-500 dark:text-zinc-300 text-xs">{entry.activity?.category ?? ''} · {entry.activity?.name ?? '—'}</p>
+                        {entry.activity?.title && <p className="text-stone-800 dark:text-zinc-100 text-xs font-medium mt-0.5">{entry.activity.title}</p>}
+                        {!entry.activity?.title && <p className="text-stone-800 dark:text-zinc-100 text-xs font-medium">{entry.activity?.name ?? '—'}</p>}
                         {entry.activity?.additionalInfo && (
-                          <p className="text-zinc-500 dark:text-zinc-400 text-xs mt-0.5">{entry.activity.additionalInfo}</p>
+                          <p className="text-stone-500 dark:text-zinc-300 text-xs mt-0.5">{entry.activity.additionalInfo}</p>
                         )}
                       </td>
-                      <td className="px-3 py-2 text-zinc-500 text-xs">{entry.location?.activity ?? '—'}</td>
-                      <td className="px-3 py-2 text-zinc-500 dark:text-zinc-400 text-xs">
+                      <td className="px-3 py-2 text-stone-500 dark:text-zinc-300 text-xs">{entry.location?.activity ?? '—'}</td>
+                      <td className="px-3 py-2 text-stone-500 dark:text-zinc-300 text-xs">
                         {(entry.purchase ?? []).length > 0
                           ? entry.purchase!.map(p => p.item).filter(Boolean).join(', ')
                           : '—'}
                       </td>
                       <td className="px-3 py-2 text-right text-xs">
                         {entry.cost?.amountKRW ? (
-                          <span className="text-zinc-300">{formatKRW(entry.cost.amountKRW)}</span>
+                          <span className="text-stone-600 dark:text-zinc-300">{formatKRW(entry.cost.amountKRW)}</span>
                         ) : entry.cost?.amountForeign ? (
-                          <span className="text-zinc-400">{entry.cost.amountForeign.toLocaleString()} {entry.cost.currency}</span>
+                          <span className="text-stone-500 dark:text-zinc-400">{entry.cost.amountForeign.toLocaleString()} {entry.cost.currency}</span>
                         ) : (
-                          <span className="text-zinc-700">—</span>
+                          <span className="text-stone-300 dark:text-zinc-600">—</span>
                         )}
                       </td>
-                      <td className="px-3 py-2 text-right text-xs text-zinc-500">
+                      <td className="px-3 py-2 text-right text-xs text-stone-500 dark:text-zinc-300">
                         {formatDuration(entry.duration?.totalSeconds)}
                       </td>
                     </tr>
