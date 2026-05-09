@@ -589,8 +589,7 @@ export default function CostPage() {
   useSensor(PointerSensor),
   useSensor(TouchSensor, {
     activationConstraint: {
-      delay: 500,
-      tolerance: 0,
+      distance: 8,
     },
   }),
   useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
