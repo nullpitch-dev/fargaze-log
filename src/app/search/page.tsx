@@ -142,10 +142,9 @@ function DetailRow({ label, value }: { label: string; value?: string | number | 
 }
 
 function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
-  // Only render if at least one child is non-null
   return (
     <div className="mb-5">
-      <p className="text-xs text-stone-500 dark:text-zinc-300 uppercase tracking-widest mb-2">{title}</p>
+      <p className="text-xs text-stone-500 dark:text-zinc-300 uppercase tracking-widest mb-2 bg-stone-100 dark:bg-zinc-800 px-2 py-1 rounded -mx-2">{title}</p>
       {children}
     </div>
   );
@@ -164,12 +163,6 @@ function DetailPanel({ entry, onClose }: { entry: LogEntry; onClose: () => void 
         {/* Header */}
         <div className="sticky top-0 bg-white dark:bg-zinc-900 border-b border-stone-200 dark:border-zinc-700 px-5 py-4 flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs text-stone-500 dark:text-zinc-300 mb-1">
-              {s?.year && `${s.year}.${String(s.month).padStart(2,'0')}.${String(s.day).padStart(2,'0')}`}
-              {s?.weekday && ` (${s.weekday})`}
-              {!entry.allDay && s?.hour && ` · ${s.hour}${e?.hour ? ` → ${e.hour}` : ''}`}
-              {entry.allDay && ' · 하루 종일'}
-            </p>
             <p className="text-sm font-medium text-stone-800 dark:text-zinc-100">
               {entry.activity?.name ?? '—'}
             </p>

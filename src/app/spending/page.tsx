@@ -510,8 +510,10 @@ function SortableDetailRow({
 export default function CostPage() {
   // Filters
   const today = new Date();
-  const defaultFrom = new Date(today.getFullYear(), today.getMonth() - 11, 1).toISOString().slice(0, 10);
-  const defaultTo = today.toISOString().slice(0, 10);
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const defaultFrom = new Date(today.getFullYear(), today.getMonth() - 6, 1).toISOString().slice(0, 10);
+  const defaultTo = yesterday.toISOString().slice(0, 10);
   const [dateFrom, setDateFrom] = useState(defaultFrom);
   const [dateTo, setDateTo] = useState(defaultTo);
   const [excludeCategories, setExcludeCategories] = useState<string[]>([]);
