@@ -782,7 +782,6 @@ export default function CostPage() {
                         <CostCategoryRow
                           category={cat}
                           months={catMonths}
-                          total={catTotal}
                           collapsed={isCollapsed}
                           onToggle={() => toggleCollapsed(cat)}
                           onCellClick={mk => setDrill({ category: cat, categoryDetail: null, monthKey: mk, monthLabel: formatMonthLabel(mk) })}
