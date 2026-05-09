@@ -567,7 +567,8 @@ export default function SearchPage() {
                       }`}
                     >
                       <td className="px-3 py-2 font-mono text-xs whitespace-nowrap text-right">
-                        <p className="text-stone-600 dark:text-zinc-300">{formatDate(entry)}</p>
+                        <p className="text-stone-600
+                        dark:text-zinc-300">{formatDate(entry.start)}</p>
                         {!entry.allDay && entry.start?.hour && (
                           <p className="text-stone-500 dark:text-zinc-300 mt-0.5">{entry.start.hour}</p>
                         )}
