@@ -805,7 +805,6 @@ export default function CostPage() {
                               months={detRow.months}
                               fullMonthKeys={fullMonthKeys}
                               fullMonthCount={fullMonthCount}
-                              total={detRow.total}
                               onCellClick={mk => setDrill({ category: cat, categoryDetail: det, monthKey: mk, monthLabel: formatMonthLabel(mk) })}
                               monthKeys={monthKeys}
                               onMoveUp={() => moveDetailUp(cat, det)}
