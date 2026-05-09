@@ -10,7 +10,7 @@ interface LogEntry {
   allDay?: boolean;
   activity?: { category?: string; name?: string; title?: string; additionalInfo?: string; crossActivity?: string; relationship?: string };
   start?: { year?: number; month?: number; day?: number; weekday?: string; hour?: string; timezone?: string; timezoneOffset?: number };
-  end?: { year?: number; month?: number; day?: number; hour?: string; timezone?: string };
+  end?: { year?: number; month?: number; day?: number; weekday?: string; hour?: string; timezone?: string };
   duration?: { totalSeconds?: number };
   location?: { activity?: string; online?: string; other?: string };
   cost?: { amountKRW?: number; amountForeign?: number; currency?: string; categoryDetail?: string; category?: string };
@@ -81,17 +81,16 @@ const AGG_LABELS: Record<string, string> = {
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 
-function formatDate(entry: LogEntry): string {
-  const s = entry.start;
-  if (!s?.year) return '—';
-  const yy = String(s.year).slice(2);
-  const mm = String(s.month ?? 1).padStart(2, '0');
-  const dd = String(s.day ?? 1).padStart(2, '0');
+function formatDate(d?: { year?: number; month?: number; day?: number }): string {
+  if (!d?.year) return '—';
+  const yy = String(d.year).slice(2);
+  const mm = String(d.month ?? 1).padStart(2, '0');
+  const dd = String(d.day ?? 1).padStart(2, '0');
   return "'" + yy + '.' + mm + '.' + dd;
 }
 
 function formatDatetime(entry: LogEntry): string {
-  const date = formatDate(entry);
+  const date = formatDate(entry.start);
   if (entry.allDay) return date + ' 하루종일';
   const hour = entry.start?.hour;
   if (!hour) return date;
@@ -199,8 +198,8 @@ function DetailPanel({ entry, onClose }: { entry: LogEntry; onClose: () => void 
           </DetailSection>
 
           <DetailSection title="시간">
-            <DetailRow label="시작" value={s?.hour ? `${formatDate(entry)} ${s.hour} (${s.timezone})` : formatDate(entry)} />
-            <DetailRow label="종료" value={e?.hour ? `${e.year}.${String(e.month).padStart(2,'0')}.${String(e.day).padStart(2,'0')} ${e.hour} (${e.timezone})` : undefined} />
+            <DetailRow label="시작" value={s?.hour ? `${formatDate(s)}(${s.weekday ?? ''}) ${s.hour} (${s.timezone})` : formatDate(s)} />
+            <DetailRow label="종료" value={e?.hour ? `${formatDate(e)}(${e.weekday ?? ''}) ${e.hour} (${e.timezone})` : undefined} />
             <DetailRow label="소요" value={formatDuration(entry.duration?.totalSeconds)} />
           </DetailSection>
 

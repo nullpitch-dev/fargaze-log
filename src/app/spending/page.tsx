@@ -38,8 +38,8 @@ interface SummaryResponse {
 interface Transaction {
   _id: string;
   activity?: { category?: string; name?: string; title?: string; additionalInfo?: string };
-  start?: { year?: number; month?: number; day?: number; hour?: string; timezone?: string; datetime?: string };
-  end?: { hour?: string };
+  start?: { year?: number; month?: number; day?: number; weekday?: string; hour?: string; timezone?: string; datetime?: string };
+  end?: { year?: number; month?: number; day?: number; weekday?: string; hour?: string; timezone?: string };
   duration?: { totalSeconds?: number };
   location?: { activity?: string };
   cost?: { amountKRW?: number; amountForeign?: number; currency?: string; categoryDetail?: string; category?: string };
@@ -78,9 +78,7 @@ const LAYOUT_KEY = 'fargaze-cost-layout';
 // ── Formatters ────────────────────────────────────────────────────────────────
 
 function formatKRW(amount: number): string {
-  if (amount >= 1_000_000) return (amount / 1_000_000).toFixed(1) + 'M';
-  if (amount >= 1_000) return (amount / 1_000).toFixed(0) + 'K';
-  return amount.toLocaleString('ko-KR');
+  return Math.round(amount / 1_000).toLocaleString('ko-KR');
 }
 
 function formatKRWFull(amount: number): string {
@@ -97,12 +95,20 @@ function formatMonthLabel(monthKey: string, prevMonthKey?: string): string {
   return showYear ? `'${yy} ${monthName}` : monthName;
 }
 
-function formatDate(tx: Transaction): string {
-  const s = tx.start;
-  if (!s?.year) return '—';
-  const yy = String(s.year).slice(2);
-  const mm = String(s.month ?? 1).padStart(2, '0');
-  const dd = String(s.day ?? 1).padStart(2, '0');
+function getFullMonthKeys(monthKeys: string[], dateFrom: string, dateTo: string): string[] {
+  return monthKeys.filter(mk => {
+    const [year, month] = mk.split('-').map(Number);
+    const firstDay = `${mk}-01`;
+    const lastDay = `${mk}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`;
+    return dateFrom <= firstDay && dateTo >= lastDay;
+  });
+}
+
+function formatDate(d?: { year?: number; month?: number; day?: number }): string {
+  if (!d?.year) return '—';
+  const yy = String(d.year).slice(2);
+  const mm = String(d.month ?? 1).padStart(2, '0');
+  const dd = String(d.day ?? 1).padStart(2, '0');
   return `'${yy}.${mm}.${dd}`;
 }
 
@@ -170,8 +176,8 @@ function RecordModal({ entry, onClose }: { entry: Transaction; onClose: () => vo
             <DetailRow label="추가정보" value={entry.activity?.additionalInfo} />
           </DetailSection>
           <DetailSection title="시간">
-            <DetailRow label="시작" value={s?.hour ? `${formatDate(entry)} ${s.hour} (${s.timezone})` : formatDate(entry)} />
-            <DetailRow label="종료" value={e?.hour ? `${e.hour}` : undefined} />
+            <DetailRow label="시작" value={s?.hour ? `${formatDate(s)}(${s.weekday ?? ''}) ${s.hour} (${s.timezone})` : formatDate(s)} />
+            <DetailRow label="종료" value={e?.hour ? `${formatDate(e)}(${e.weekday ?? ''}) ${e.hour} (${e.timezone})` : undefined} />
             <DetailRow label="소요" value={formatDuration(entry.duration?.totalSeconds)} />
           </DetailSection>
           {entry.cost && (entry.cost.amountKRW || entry.cost.amountForeign) && (
@@ -266,7 +272,7 @@ function DrillDownSidebar({
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs text-stone-500 dark:text-zinc-400 font-mono">{formatDate(tx)}</p>
+                      <p className="text-xs text-stone-500 dark:text-zinc-400 font-mono">{formatDate(tx.start)}</p>
                       <p className="text-xs text-stone-800 dark:text-zinc-200 font-medium mt-0.5 truncate">
                         {tx.activity?.name ?? '—'}
                       </p>
@@ -313,6 +319,8 @@ function SortableCategoryRow({
   onToggle,
   onCellClick,
   monthKeys,
+  fullMonthKeys,
+  fullMonthCount,
   allDetails,
   hiddenDetails,
   onToggleDetail,
@@ -324,6 +332,8 @@ function SortableCategoryRow({
   onToggle: () => void;
   onCellClick: (monthKey: string) => void;
   monthKeys: string[];
+  fullMonthKeys: string[];
+  fullMonthCount: number;
   allDetails: string[];
   hiddenDetails: string[];
   onToggleDetail: (detail: string) => void;
@@ -344,6 +354,7 @@ function SortableCategoryRow({
   }, [filterOpen]);
 
   const hiddenCount = hiddenDetails.length;
+  const fullMonthTotal = fullMonthKeys.reduce((s, mk) => s + (months[mk] ?? 0), 0);
 
   return (
     <tr ref={setNodeRef} style={style} className="border-b border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800/50 hover:bg-stone-100 dark:hover:bg-zinc-700 transition-colors">
@@ -420,8 +431,15 @@ function SortableCategoryRow({
         </td>
       ))}
       <td className="px-3 py-2 text-right border-l border-stone-200 dark:border-zinc-700">
-        <span className="text-xs font-mono text-stone-600 dark:text-zinc-300">{formatKRW(total)}</span>
+        <span className="text-xs font-mono text-stone-600 dark:text-zinc-300">
+          {formatKRW(Math.round(fullMonthTotal / fullMonthCount))}
+        </span>
       </td>
+      
+
+
+
+
     </tr>
   );
 }
@@ -440,6 +458,8 @@ function SortableDetailRow({
   total,
   onCellClick,
   monthKeys,
+  fullMonthKeys,
+  fullMonthCount
 }: {
   category: string;
   detail: string;
@@ -447,9 +467,12 @@ function SortableDetailRow({
   total: number;
   onCellClick: (monthKey: string) => void;
   monthKeys: string[];
+  fullMonthKeys: string[];
+  fullMonthCount: number;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: `det:${category}:${detail}` });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  const fullMonthTotal = fullMonthKeys.reduce((s, mk) => s + (months[mk] ?? 0), 0);
 
   return (
     <tr ref={setNodeRef} style={style} className="border-b border-stone-100 dark:border-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-800 dark:bg-zinc-800/80 transition-colors">
@@ -474,7 +497,9 @@ function SortableDetailRow({
         </td>
       ))}
       <td className="px-3 py-1.5 text-right border-l border-zinc-800">
-        <span className="text-xs font-mono text-stone-500 dark:text-zinc-300">{formatKRW(total)}</span>
+        <span className="text-xs font-mono text-stone-500 dark:text-zinc-300">
+          {formatKRW(Math.round(fullMonthTotal / fullMonthCount))}
+        </span>
       </td>
     </tr>
   );
@@ -555,7 +580,8 @@ export default function CostPage() {
     });
   }, [dateFrom, dateTo, excludePurchaseInput]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchData(); }, []);
 
   // DnD sensors
   const sensors = useSensors(
@@ -616,8 +642,11 @@ export default function CostPage() {
 
   const catItems = sortedCategories.map(cat => `cat:${cat}`);
 
+  const fullMonthKeys = getFullMonthKeys(monthKeys, dateFrom, dateTo);
+  const fullMonthCount = fullMonthKeys.length || 1;
+
   return (
-    <div className="flex flex-col flex-1 px-4 py-6 max-w-full">
+    <div className="flex flex-col flex-1 px-4 py-6">
 
       {/* Filters */}
       <div className="mb-6 flex flex-wrap gap-4 items-end">
@@ -677,23 +706,30 @@ export default function CostPage() {
         </div>
       )}
 
+
       {/* Table */}
       {data && !loading && (
+        <>
+        <div className="w-fit">
+        <div className="text-xs text-stone-500 dark:text-zinc-400 text-right mb-1">단위: 천원</div>
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <div className="overflow-x-auto rounded-lg border border-stone-200 dark:border-zinc-700 shadow-sm">
+        <div className="overflow-x-auto rounded-lg border border-stone-200 dark:border-zinc-700 shadow-sm inline-block">
           <table className="text-sm border-collapse" style={{ minWidth: `${200 + monthKeys.length * 100 + 80}px` }}>
             <thead>
               <tr className="border-b border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800">
                 <th className="text-left px-3 py-2 text-xs text-stone-500 dark:text-zinc-400 font-medium sticky left-0 bg-stone-50 dark:bg-zinc-800 z-10 border-r border-stone-200 dark:border-zinc-700 w-48">
                   카테고리 / 세부항목
                 </th>
-                {monthKeys.map((mk, i) => (
-                  <th key={mk} className="text-right px-3 py-2 text-xs text-stone-500 dark:text-zinc-400 font-medium whitespace-nowrap w-24">
-                    {formatMonthLabel(mk, monthKeys[i - 1])}
-                  </th>
-                ))}
+                {monthKeys.map((mk, i) => {
+                  const isPartial = !fullMonthKeys.includes(mk);
+                  return (
+                    <th key={mk} className="text-right px-3 py-2 text-xs text-stone-500 dark:text-zinc-400 font-medium whitespace-nowrap w-24">
+                      {formatMonthLabel(mk, monthKeys[i - 1])}{isPartial ? '*' : ''}
+                    </th>
+                  );
+                })}
                 <th className="text-right px-3 py-2 text-xs text-stone-500 dark:text-zinc-400 font-medium border-l border-stone-200 dark:border-zinc-700 w-20">
-                  합계
+                  월평균 
                 </th>
               </tr>
             </thead>
@@ -731,6 +767,8 @@ export default function CostPage() {
                           onToggle={() => toggleCollapsed(cat)}
                           onCellClick={mk => setDrill({ category: cat, categoryDetail: null, monthKey: mk, monthLabel: formatMonthLabel(mk) })}
                           monthKeys={monthKeys}
+                          fullMonthKeys={fullMonthKeys}
+                          fullMonthCount={fullMonthCount}
                           allDetails={layout.detailOrder[cat] ?? allDetails(cat)}
                           hiddenDetails={layout.hiddenDetails[cat] ?? []}
                           onToggleDetail={det => toggleHiddenDetail(cat, det)}
@@ -744,6 +782,8 @@ export default function CostPage() {
                               category={cat}
                               detail={det}
                               months={detRow.months}
+                              fullMonthKeys={fullMonthKeys}
+                              fullMonthCount={fullMonthCount}
                               total={detRow.total}
                               onCellClick={mk => setDrill({ category: cat, categoryDetail: det, monthKey: mk, monthLabel: formatMonthLabel(mk) })}
                               monthKeys={monthKeys}
@@ -782,11 +822,14 @@ export default function CostPage() {
                   <td className="px-3 py-2 text-right border-l border-stone-200 dark:border-zinc-700">
                     <span className="text-xs font-mono text-stone-900 dark:text-zinc-50">
                       {formatKRW(
-                        sortedCategories.reduce((s, cat) => {
+                        Math.round(sortedCategories.reduce((s, cat) => {
                           const visibleDetails = (layout.detailOrder[cat] ?? allDetails(cat))
                             .filter(d => !(layout.hiddenDetails[cat] ?? []).includes(d));
-                          return s + visibleDetails.reduce((ds, det) => ds + (getRowData(cat, det)?.total ?? 0), 0);
-                        }, 0)
+                          return s + visibleDetails.reduce((ds, det) => {
+                            const detRow = getRowData(cat, det);
+                            return ds + fullMonthKeys.reduce((ms, mk) => ms + (detRow?.months[mk] ?? 0), 0);
+                          }, 0);
+                        }, 0) / fullMonthCount)
                       )}
                     </span>
                   </td>
@@ -795,6 +838,11 @@ export default function CostPage() {
           </table>
         </div>
         </DndContext>
+        {fullMonthKeys.length < monthKeys.length && (
+          <p className="text-xs text-stone-400 dark:text-zinc-500 mt-1">* 부분 월 (월평균 계산 제외)</p>
+        )}
+        </div>
+        </>
       )}
 
       {loading && (
