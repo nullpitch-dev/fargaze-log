@@ -7,6 +7,7 @@ import {
   closestCenter,
   KeyboardSensor,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   DragEndEvent,
@@ -74,6 +75,7 @@ interface Layout {
 }
 
 const LAYOUT_KEY = 'fargaze-cost-layout';
+const EXCLUDE_KEY = 'fargaze-exclude-categories';
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 
@@ -358,7 +360,7 @@ function SortableCategoryRow({
 
   return (
     <tr ref={setNodeRef} style={style} className="border-b border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800/50 hover:bg-stone-100 dark:hover:bg-zinc-700 transition-colors">
-      <td className="px-3 py-2 sticky left-0 bg-stone-50 dark:bg-zinc-800 z-10 border-r border-stone-200 dark:border-zinc-700">
+      <td className="px-2 py-1 sticky left-0 bg-stone-50 dark:bg-zinc-800 z-10 border-r border-stone-200 dark:border-zinc-700">
         <div className="flex items-center gap-2">
           <button {...attributes} {...listeners} className="text-stone-300 dark:text-zinc-600 hover:text-stone-500 dark:hover:text-zinc-400 cursor-grab active:cursor-grabbing text-xs leading-none px-0.5">⠿</button>
           <button onClick={onToggle} className="text-stone-500 dark:text-zinc-400 hover:text-stone-800 dark:hover:text-zinc-100 text-xs w-4">{collapsed ? '▸' : '▾'}</button>
@@ -416,8 +418,13 @@ function SortableCategoryRow({
           </div>
         </div>
       </td>
+      <td className="px-2 py-1 text-right border-r-2 border-stone-300 dark:border-zinc-600">
+        <span className="text-xs font-mono text-stone-600 dark:text-zinc-300">
+          {formatKRW(Math.round(fullMonthTotal / fullMonthCount))}
+        </span>
+      </td>
       {monthKeys.map(mk => (
-        <td key={mk} className="px-3 py-2 text-right">
+        <td key={mk} className="px-2 py-1 text-right">
           {months[mk] ? (
             <button
               onClick={() => onCellClick(mk)}
@@ -430,16 +437,6 @@ function SortableCategoryRow({
           )}
         </td>
       ))}
-      <td className="px-3 py-2 text-right border-l border-stone-200 dark:border-zinc-700">
-        <span className="text-xs font-mono text-stone-600 dark:text-zinc-300">
-          {formatKRW(Math.round(fullMonthTotal / fullMonthCount))}
-        </span>
-      </td>
-      
-
-
-
-
     </tr>
   );
 }
@@ -476,14 +473,19 @@ function SortableDetailRow({
 
   return (
     <tr ref={setNodeRef} style={style} className="border-b border-stone-100 dark:border-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-800 dark:bg-zinc-800/80 transition-colors">
-      <td className="px-3 py-1.5 sticky left-0 bg-white dark:bg-zinc-900 z-10 border-r border-stone-200 dark:border-zinc-700">
+      <td className="px-2 py-1 sticky left-0 bg-white dark:bg-zinc-900 z-10 border-r border-stone-200 dark:border-zinc-700">
         <div className="flex items-center gap-2 pl-6">
           <button {...attributes} {...listeners} className="text-zinc-800 hover:text-stone-500 dark:text-zinc-300 cursor-grab active:cursor-grabbing text-xs leading-none px-0.5">⠿</button>
           <span className="text-xs text-stone-500 dark:text-zinc-400">{detail}</span>
         </div>
       </td>
+      <td className="px-2 py-1 text-right border-r-2 border-stone-300 dark:border-zinc-600">
+        <span className="text-xs font-mono text-stone-500 dark:text-zinc-300">
+          {formatKRW(Math.round(fullMonthTotal / fullMonthCount))}
+        </span>
+      </td>
       {monthKeys.map(mk => (
-        <td key={mk} className="px-3 py-1.5 text-right">
+        <td key={mk} className="px-2 py-1 text-right">
           {months[mk] ? (
             <button
               onClick={() => onCellClick(mk)}
@@ -496,11 +498,6 @@ function SortableDetailRow({
           )}
         </td>
       ))}
-      <td className="px-3 py-1.5 text-right border-l border-zinc-800">
-        <span className="text-xs font-mono text-stone-500 dark:text-zinc-300">
-          {formatKRW(Math.round(fullMonthTotal / fullMonthCount))}
-        </span>
-      </td>
     </tr>
   );
 }
@@ -542,6 +539,8 @@ export default function CostPage() {
     try {
       const saved = localStorage.getItem(LAYOUT_KEY);
       if (saved) setLayout(JSON.parse(saved));
+      const savedExclude = localStorage.getItem('fargaze-exclude-categories');
+      if (savedExclude) setExcludeCategories(JSON.parse(savedExclude));
     } catch {}
     layoutLoaded.current = true;
   }, []);
@@ -587,9 +586,15 @@ export default function CostPage() {
 
   // DnD sensors
   const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  );
+  useSensor(PointerSensor),
+  useSensor(TouchSensor, {
+    activationConstraint: {
+      delay: 250,
+      tolerance: 5,
+    },
+  }),
+  useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+);
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -626,7 +631,11 @@ export default function CostPage() {
   }
 
   function toggleExcludeCategory(cat: string) {
-    setExcludeCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]);
+    setExcludeCategories(prev => {
+      const updated = prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat];
+      try { localStorage.setItem(EXCLUDE_KEY, JSON.stringify(updated)); } catch {}
+      return updated;
+    });
   }
 
 
@@ -716,26 +725,66 @@ export default function CostPage() {
         <div className="text-xs text-stone-500 dark:text-zinc-400 text-right mb-1">단위: 천원</div>
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <div className="overflow-x-auto rounded-lg border border-stone-200 dark:border-zinc-700 shadow-sm inline-block">
-          <table className="text-sm border-collapse" style={{ minWidth: `${200 + monthKeys.length * 100 + 80}px` }}>
+          <table className="text-sm border-collapse" style={{ minWidth: `${200 + monthKeys.length * 80 + 80}px` }}>
             <thead>
               <tr className="border-b border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800">
                 <th className="text-left px-3 py-2 text-xs text-stone-500 dark:text-zinc-400 font-medium sticky left-0 bg-stone-50 dark:bg-zinc-800 z-10 border-r border-stone-200 dark:border-zinc-700 w-48">
                   카테고리 / 세부항목
                 </th>
+                <th className="text-right px-2 py-1 text-xs text-stone-500 dark:text-zinc-400 font-medium border-r-2 border-stone-300 dark:border-zinc-600 w-20">
+                  월평균 
+                </th>
                 {monthKeys.map((mk, i) => {
                   const isPartial = !fullMonthKeys.includes(mk);
                   return (
-                    <th key={mk} className="text-right px-3 py-2 text-xs text-stone-500 dark:text-zinc-400 font-medium whitespace-nowrap w-24">
+                    <th key={mk} className="text-right px-2 py-1 text-xs text-stone-500
+                    dark:text-zinc-400 font-medium whitespace-nowrap w-20">
                       {formatMonthLabel(mk, monthKeys[i - 1])}{isPartial ? '*' : ''}
                     </th>
                   );
                 })}
-                <th className="text-right px-3 py-2 text-xs text-stone-500 dark:text-zinc-400 font-medium border-l border-stone-200 dark:border-zinc-700 w-20">
-                  월평균 
-                </th>
               </tr>
             </thead>
               <tbody>
+                {/* Column totals */}
+                <tr className="border-b-2 border-stone-300 dark:border-zinc-600 bg-stone-50 dark:bg-zinc-800">
+                  <td className="px-3 py-2 sticky left-0 bg-stone-50 dark:bg-zinc-800 z-10 border-r border-stone-200 dark:border-zinc-700">
+                    <span className="text-xs font-medium text-stone-500 dark:text-zinc-400">월 합계</span>
+                  </td>
+                  <td className="px-2 py-1 text-right border-r-2 border-stone-300 dark:border-zinc-600">
+                    <span className="text-xs font-mono text-stone-900 dark:text-zinc-50">
+                      {formatKRW(
+                        Math.round(sortedCategories.reduce((s, cat) => {
+                          const visibleDetails = (layout.detailOrder[cat] ?? allDetails(cat))
+                            .filter(d => !(layout.hiddenDetails[cat] ?? []).includes(d));
+                          return s + visibleDetails.reduce((ds, det) => {
+                            const detRow = getRowData(cat, det);
+                            return ds + fullMonthKeys.reduce((ms, mk) => ms + (detRow?.months[mk] ?? 0), 0);
+                          }, 0);
+                        }, 0) / fullMonthCount)
+                      )}
+                    </span>
+                  </td>
+                  {monthKeys.map(mk => {
+                    // Recalculate column total based on visible rows
+                    let colTotal = 0;
+                    for (const cat of sortedCategories) {
+                      const visibleDetails = (layout.detailOrder[cat] ?? allDetails(cat))
+                        .filter(d => !(layout.hiddenDetails[cat] ?? []).includes(d));
+                      for (const det of visibleDetails) {
+                        const detRow = getRowData(cat, det);
+                        colTotal += detRow?.months[mk] ?? 0;
+                      }
+                    }
+                    return (
+                      <td key={mk} className="px-2 py-1 text-right">
+                        <span className="text-xs font-mono text-stone-600 dark:text-zinc-300">
+                          {colTotal > 0 ? formatKRW(colTotal) : '—'}
+                        </span>
+                      </td>
+                    );
+                  })}
+                </tr>
                 <SortableContext items={catItems} strategy={verticalListSortingStrategy}>
                   {sortedCategories.map(cat => {
                     const catRow = getRowData(cat, null);
@@ -796,46 +845,6 @@ export default function CostPage() {
                     );
                   })}
                 </SortableContext>
-
-                {/* Column totals */}
-                <tr className="border-t-2 border-stone-300 dark:border-zinc-600 bg-stone-50 dark:bg-zinc-800">
-                  <td className="px-3 py-2 sticky left-0 bg-stone-50 dark:bg-zinc-800 z-10 border-r border-stone-200 dark:border-zinc-700">
-                    <span className="text-xs font-medium text-stone-500 dark:text-zinc-400">월 합계</span>
-                  </td>
-                  {monthKeys.map(mk => {
-                    // Recalculate column total based on visible rows
-                    let colTotal = 0;
-                    for (const cat of sortedCategories) {
-                      const visibleDetails = (layout.detailOrder[cat] ?? allDetails(cat))
-                        .filter(d => !(layout.hiddenDetails[cat] ?? []).includes(d));
-                      for (const det of visibleDetails) {
-                        const detRow = getRowData(cat, det);
-                        colTotal += detRow?.months[mk] ?? 0;
-                      }
-                    }
-                    return (
-                      <td key={mk} className="px-3 py-2 text-right">
-                        <span className="text-xs font-mono text-stone-600 dark:text-zinc-300">
-                          {colTotal > 0 ? formatKRW(colTotal) : '—'}
-                        </span>
-                      </td>
-                    );
-                  })}
-                  <td className="px-3 py-2 text-right border-l border-stone-200 dark:border-zinc-700">
-                    <span className="text-xs font-mono text-stone-900 dark:text-zinc-50">
-                      {formatKRW(
-                        Math.round(sortedCategories.reduce((s, cat) => {
-                          const visibleDetails = (layout.detailOrder[cat] ?? allDetails(cat))
-                            .filter(d => !(layout.hiddenDetails[cat] ?? []).includes(d));
-                          return s + visibleDetails.reduce((ds, det) => {
-                            const detRow = getRowData(cat, det);
-                            return ds + fullMonthKeys.reduce((ms, mk) => ms + (detRow?.months[mk] ?? 0), 0);
-                          }, 0);
-                        }, 0) / fullMonthCount)
-                      )}
-                    </span>
-                  </td>
-                </tr>
               </tbody>
           </table>
         </div>
