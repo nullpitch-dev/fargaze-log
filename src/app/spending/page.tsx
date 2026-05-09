@@ -1,25 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-} from '@dnd-kit/core';
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import { arrayMove } from '@dnd-kit/sortable';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -311,12 +294,11 @@ function DrillDownSidebar({
   );
 }
 
-// ── Sortable Category Row ──────────────────────────────────────────────────────
+// ── Category Row ──────────────────────────────────────────────────────
 
-function SortableCategoryRow({
+function CostCategoryRow({
   category,
   months,
-  total,
   collapsed,
   onToggle,
   onCellClick,
@@ -326,10 +308,11 @@ function SortableCategoryRow({
   allDetails,
   hiddenDetails,
   onToggleDetail,
+  onMoveUp,
+  onMoveDown,
 }: {
   category: string;
   months: Record<string, number>;
-  total: number;
   collapsed: boolean;
   onToggle: () => void;
   onCellClick: (monthKey: string) => void;
@@ -339,9 +322,9 @@ function SortableCategoryRow({
   allDetails: string[];
   hiddenDetails: string[];
   onToggleDetail: (detail: string) => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: `cat:${category}` });
-  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
   const [filterOpen, setFilterOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
 
@@ -359,10 +342,13 @@ function SortableCategoryRow({
   const fullMonthTotal = fullMonthKeys.reduce((s, mk) => s + (months[mk] ?? 0), 0);
 
   return (
-    <tr ref={setNodeRef} style={style} className="border-b border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800/50 hover:bg-stone-100 dark:hover:bg-zinc-700 transition-colors">
+    <tr className="border-b border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800/50 hover:bg-stone-100 dark:hover:bg-zinc-700 transition-colors">
       <td className="px-2 py-1 sticky left-0 bg-stone-50 dark:bg-zinc-800 z-10 border-r border-stone-200 dark:border-zinc-700">
         <div className="flex items-center gap-2">
-          <button {...attributes} {...listeners} className="text-stone-300 dark:text-zinc-600 hover:text-stone-500 dark:hover:text-zinc-400 cursor-grab active:cursor-grabbing text-xs leading-none px-0.5">⠿</button>
+          <div className="flex flex-col">
+            <button onClick={onMoveUp} className="text-stone-300 dark:text-zinc-600 hover:text-stone-500 dark:hover:text-zinc-400 text-xs leading-none px-0.5">▲</button>
+            <button onClick={onMoveDown} className="text-stone-300 dark:text-zinc-600 hover:text-stone-500 dark:hover:text-zinc-400 text-xs leading-none px-0.5">▼</button>
+          </div>
           <button onClick={onToggle} className="text-stone-500 dark:text-zinc-400 hover:text-stone-800 dark:hover:text-zinc-100 text-xs w-4">{collapsed ? '▸' : '▾'}</button>
           <span className="text-xs font-medium text-stone-900 dark:text-zinc-50 flex-1">{category}</span>
           <div className="relative" ref={filterRef}>
@@ -442,40 +428,39 @@ function SortableCategoryRow({
 }
 
 
+// ── Detail Row ────────────────────────────────────────────────────────
 
-
-
-
-// ── Sortable Detail Row ────────────────────────────────────────────────────────
-
-function SortableDetailRow({
+function CostDetailRow({
   category,
   detail,
   months,
-  total,
   onCellClick,
   monthKeys,
   fullMonthKeys,
-  fullMonthCount
+  fullMonthCount,
+  onMoveUp,
+  onMoveDown,
 }: {
   category: string;
   detail: string;
   months: Record<string, number>;
-  total: number;
   onCellClick: (monthKey: string) => void;
   monthKeys: string[];
   fullMonthKeys: string[];
   fullMonthCount: number;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: `det:${category}:${detail}` });
-  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
   const fullMonthTotal = fullMonthKeys.reduce((s, mk) => s + (months[mk] ?? 0), 0);
 
   return (
-    <tr ref={setNodeRef} style={style} className="border-b border-stone-100 dark:border-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-800 dark:bg-zinc-800/80 transition-colors">
+    <tr className="border-b border-stone-100 dark:border-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-800 dark:bg-zinc-800/80 transition-colors">
       <td className="px-2 py-1 sticky left-0 bg-white dark:bg-zinc-900 z-10 border-r border-stone-200 dark:border-zinc-700">
         <div className="flex items-center gap-2 pl-6">
-          <button {...attributes} {...listeners} className="text-zinc-800 hover:text-stone-500 dark:text-zinc-300 cursor-grab active:cursor-grabbing text-xs leading-none px-0.5">⠿</button>
+          <div className="flex flex-col">
+            <button onClick={onMoveUp} className="text-stone-300 dark:text-zinc-600 hover:text-stone-500 dark:hover:text-zinc-400 text-xs leading-none px-0.5">▲</button>
+            <button onClick={onMoveDown} className="text-stone-300 dark:text-zinc-600 hover:text-stone-500 dark:hover:text-zinc-400 text-xs leading-none px-0.5">▼</button>
+          </div>
           <span className="text-xs text-stone-500 dark:text-zinc-400">{detail}</span>
         </div>
       </td>
@@ -584,39 +569,6 @@ export default function CostPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, []);
 
-  // DnD sensors
-  const sensors = useSensors(
-  useSensor(PointerSensor),
-  useSensor(TouchSensor, {
-    activationConstraint: {
-      distance: 8,
-    },
-  }),
-  useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-);
-
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const activeId = String(active.id);
-    const overId = String(over.id);
-
-    if (activeId.startsWith('cat:') && overId.startsWith('cat:')) {
-      const from = activeId.slice(4);
-      const to = overId.slice(4);
-      const oldIndex = layout.categoryOrder.indexOf(from);
-      const newIndex = layout.categoryOrder.indexOf(to);
-      saveLayout({ ...layout, categoryOrder: arrayMove(layout.categoryOrder, oldIndex, newIndex) });
-    } else if (activeId.startsWith('det:') && overId.startsWith('det:')) {
-      const [, cat, fromDet] = activeId.split(':');
-      const [, , toDet] = overId.split(':');
-      const order = layout.detailOrder[cat] ?? [];
-      const oldIndex = order.indexOf(fromDet);
-      const newIndex = order.indexOf(toDet);
-      saveLayout({ ...layout, detailOrder: { ...layout.detailOrder, [cat]: arrayMove(order, oldIndex, newIndex) } });
-    }
-  }
-
   function toggleCollapsed(cat: string) {
     saveLayout({ ...layout, collapsed: { ...layout.collapsed, [cat]: !layout.collapsed[cat] } });
   }
@@ -637,6 +589,31 @@ export default function CostPage() {
     });
   }
 
+  function moveCategoryUp(cat: string) {
+    const idx = layout.categoryOrder.indexOf(cat);
+    if (idx <= 0) return;
+    saveLayout({ ...layout, categoryOrder: arrayMove(layout.categoryOrder, idx, idx - 1) });
+  }
+
+  function moveCategoryDown(cat: string) {
+    const idx = layout.categoryOrder.indexOf(cat);
+    if (idx >= layout.categoryOrder.length - 1) return;
+    saveLayout({ ...layout, categoryOrder: arrayMove(layout.categoryOrder, idx, idx + 1) });
+  }
+
+  function moveDetailUp(cat: string, det: string) {
+    const order = layout.detailOrder[cat] ?? [];
+    const idx = order.indexOf(det);
+    if (idx <= 0) return;
+    saveLayout({ ...layout, detailOrder: { ...layout.detailOrder, [cat]: arrayMove(order, idx, idx - 1) } });
+  }
+
+  function moveDetailDown(cat: string, det: string) {
+    const order = layout.detailOrder[cat] ?? [];
+    const idx = order.indexOf(det);
+    if (idx >= order.length - 1) return;
+    saveLayout({ ...layout, detailOrder: { ...layout.detailOrder, [cat]: arrayMove(order, idx, idx + 1) } });
+  }
 
 
   // Build visible rows
@@ -649,8 +626,6 @@ export default function CostPage() {
   const sortedCategories = layout.categoryOrder.filter(cat =>
     !excludeCategories.includes(cat) && allCategories.includes(cat)
   );
-
-  const catItems = sortedCategories.map(cat => `cat:${cat}`);
 
   const fullMonthKeys = getFullMonthKeys(monthKeys, dateFrom, dateTo);
   const fullMonthCount = fullMonthKeys.length || 1;
@@ -722,7 +697,6 @@ export default function CostPage() {
         <>
         <div className="w-fit">
         <div className="text-xs text-stone-500 dark:text-zinc-400 text-right mb-1">단위: 천원</div>
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <div className="overflow-x-auto rounded-lg border border-stone-200 dark:border-zinc-700 shadow-sm inline-block">
           <table className="text-sm border-collapse" style={{ minWidth: `${200 + monthKeys.length * 80 + 80}px` }}>
             <thead>
@@ -784,14 +758,10 @@ export default function CostPage() {
                     );
                   })}
                 </tr>
-                <SortableContext items={catItems} strategy={verticalListSortingStrategy}>
                   {sortedCategories.map(cat => {
                     const catRow = getRowData(cat, null);
                     if (!catRow) return null;
                     const isCollapsed = layout.collapsed[cat] ?? false;
-                    const detailIds = (layout.detailOrder[cat] ?? allDetails(cat))
-                      .filter(d => !(layout.hiddenDetails[cat] ?? []).includes(d))
-                      .map(d => `det:${cat}:${d}`);
 
                     // Recalculate category row excluding hidden details
                     const visibleDetails = (layout.detailOrder[cat] ?? allDetails(cat))
@@ -808,8 +778,8 @@ export default function CostPage() {
                     }
 
                     return (
-                      <SortableContext key={cat} items={detailIds} strategy={verticalListSortingStrategy}>
-                        <SortableCategoryRow
+                      <React.Fragment key={cat}>
+                        <CostCategoryRow
                           category={cat}
                           months={catMonths}
                           total={catTotal}
@@ -822,12 +792,14 @@ export default function CostPage() {
                           allDetails={layout.detailOrder[cat] ?? allDetails(cat)}
                           hiddenDetails={layout.hiddenDetails[cat] ?? []}
                           onToggleDetail={det => toggleHiddenDetail(cat, det)}
+                          onMoveUp={() => moveCategoryUp(cat)}
+                          onMoveDown={() => moveCategoryDown(cat)}
                         />
                         {!isCollapsed && visibleDetails.map(det => {
                           const detRow = getRowData(cat, det);
                           if (!detRow) return null;
                           return (
-                            <SortableDetailRow
+                            <CostDetailRow
                               key={`${cat}:${det}`}
                               category={cat}
                               detail={det}
@@ -837,17 +809,17 @@ export default function CostPage() {
                               total={detRow.total}
                               onCellClick={mk => setDrill({ category: cat, categoryDetail: det, monthKey: mk, monthLabel: formatMonthLabel(mk) })}
                               monthKeys={monthKeys}
+                              onMoveUp={() => moveDetailUp(cat, det)}
+                              onMoveDown={() => moveDetailDown(cat, det)}
                             />
                           );
                         })}
-                      </SortableContext>
+                      </React.Fragment>
                     );
                   })}
-                </SortableContext>
               </tbody>
           </table>
         </div>
-        </DndContext>
         {fullMonthKeys.length < monthKeys.length && (
           <p className="text-xs text-stone-400 dark:text-zinc-500 mt-1">* 부분 월 (월평균 계산 제외)</p>
         )}
