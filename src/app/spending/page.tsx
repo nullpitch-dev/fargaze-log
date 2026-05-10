@@ -57,8 +57,17 @@ interface Layout {
   hiddenDetails: Record<string, string[]>;
 }
 
+interface DrillDownState {
+  category: string;
+  categoryDetail: string | null;
+  monthKey: string;
+  monthLabel: string;
+  hiddenDetails: string[];
+}
+
 const LAYOUT_KEY = 'fargaze-cost-layout';
 const EXCLUDE_KEY = 'fargaze-exclude-categories';
+const CROSS_KEY = 'fargaze-cross-activities';
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 
@@ -225,7 +234,14 @@ function DrillDownSidebar({
     if (drill.categoryDetail) params.set('categoryDetail', drill.categoryDetail);
     fetch(`/api/cost-transactions?${params}`)
       .then(r => r.json())
-      .then(d => { setTransactions(d.results ?? []); setLoading(false); });
+      .then(d => {
+        const results = (d.results ?? []).filter((tx: Transaction) =>
+          drill.hiddenDetails.length === 0 ||
+          !drill.hiddenDetails.includes(tx.cost?.categoryDetail ?? '')
+        );
+        setTransactions(results);
+        setLoading(false);
+      });
   }, [drill]);
 
   return (
@@ -499,8 +515,9 @@ export default function CostPage() {
   const [dateFrom, setDateFrom] = useState(defaultFrom);
   const [dateTo, setDateTo] = useState(defaultTo);
   const [excludeCategories, setExcludeCategories] = useState<string[]>([]);
-
   const [excludePurchaseInput, setExcludePurchaseInput] = useState('');
+  const [crossActivityOptions, setCrossActivityOptions] = useState<string[]>([]);
+  const [selectedCrossActivities, setSelectedCrossActivities] = useState<string[]>([]);
 
   // Data
   const [data, setData] = useState<SummaryResponse | null>(null);
@@ -512,6 +529,10 @@ export default function CostPage() {
 
   // Drill-down
   const [drill, setDrill] = useState<DrillDownState | null>(null);
+
+  // Sorting by clicking headers
+  const [sortKey, setSortKey] = useState<string | null>(null); // null = user order, 'avg' or month key e.g. '2026-04'
+const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
 
   // All categories and details from data
   const allCategories = data ? [...new Set(data.rows.filter(r => r.categoryDetail === null).map(r => r.category))] : [];
@@ -526,8 +547,14 @@ export default function CostPage() {
       if (saved) setLayout(JSON.parse(saved));
       const savedExclude = localStorage.getItem('fargaze-exclude-categories');
       if (savedExclude) setExcludeCategories(JSON.parse(savedExclude));
+      const savedCross = localStorage.getItem(CROSS_KEY);
+      if (savedCross) setSelectedCrossActivities(JSON.parse(savedCross));
     } catch {}
     layoutLoaded.current = true;
+
+    fetch('/api/cross-activities')
+      .then(r => r.json())
+      .then(d => setCrossActivityOptions(d.values ?? []));
   }, []);
 
   // Save layout to localStorage
@@ -542,6 +569,8 @@ export default function CostPage() {
     const params = new URLSearchParams({ dateFrom, dateTo });
     const excludePurchaseItems = excludePurchaseInput.split(',').map(s => s.trim()).filter(Boolean);
     if (excludePurchaseItems.length > 0) params.set('excludePurchaseItems', excludePurchaseItems.join(','));
+    if (selectedCrossActivities.length > 0) params.set('crossActivities', selectedCrossActivities.join(','));
+    console.log('crossActivities param:', params.get('crossActivities'));
     const res = await fetch(`/api/cost-summary?${params}`);
     const json: SummaryResponse = await res.json();
     setData(json);
@@ -564,7 +593,7 @@ export default function CostPage() {
       try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(next)); } catch {}
       return next;
     });
-  }, [dateFrom, dateTo, excludePurchaseInput]);
+  }, [dateFrom, dateTo, excludePurchaseInput, selectedCrossActivities]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, []);
@@ -585,6 +614,26 @@ export default function CostPage() {
     setExcludeCategories(prev => {
       const updated = prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat];
       try { localStorage.setItem(EXCLUDE_KEY, JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+  }
+
+  function toggleCrossActivity(val: string) {
+    setSelectedCrossActivities(prev => {
+      const updated = prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val];
+      try { localStorage.setItem(CROSS_KEY, JSON.stringify(updated)); } catch {}
+      // Fetch with updated value directly
+      const params = new URLSearchParams({ dateFrom, dateTo });
+      const excludePurchaseItems = excludePurchaseInput.split(',').map(s => s.trim()).filter(Boolean);
+      if (excludePurchaseItems.length > 0) params.set('excludePurchaseItems', excludePurchaseItems.join(','));
+      if (updated.length > 0) params.set('crossActivities', updated.join(','));
+      setLoading(true);
+      fetch(`/api/cost-summary?${params}`)
+        .then(r => r.json())
+        .then(json => {
+          setData(json);
+          setLoading(false);
+        });
       return updated;
     });
   }
@@ -615,6 +664,20 @@ export default function CostPage() {
     saveLayout({ ...layout, detailOrder: { ...layout.detailOrder, [cat]: arrayMove(order, idx, idx + 1) } });
   }
 
+  function handleSortClick(key: string) {
+    if (sortKey === key) {
+      if (sortDir === 'desc') setSortDir('asc');
+      else { setSortKey(null); setSortDir('desc'); }
+    } else {
+      setSortKey(key);
+      setSortDir('desc');
+    }
+  }
+
+  function SortIndicator({ colKey, sortKey, sortDir }: { colKey: string; sortKey: string | null; sortDir: 'desc' | 'asc' }) {
+    if (sortKey !== colKey) return <span className="text-stone-300 dark:text-zinc-600 ml-1">⇅</span>;
+    return <span className="ml-1">{sortDir === 'desc' ? '↓' : '↑'}</span>;
+  }
 
   // Build visible rows
   const monthKeys = data?.months ?? [];
@@ -623,12 +686,36 @@ export default function CostPage() {
     return data?.rows.find(r => r.category === category && r.categoryDetail === detail);
   }
 
+  const fullMonthKeys = getFullMonthKeys(monthKeys, dateFrom, dateTo);
+  const fullMonthCount = fullMonthKeys.length || 1;
+
+  function getSortValue(category: string, detail: string | null, key: string): number {
+    if (key === 'avg') {
+      const visibleDetails = (layout.detailOrder[category] ?? allDetails(category))
+        .filter(d => !(layout.hiddenDetails[category] ?? []).includes(d));
+      const total = detail === null
+        ? visibleDetails.reduce((s, det) => s + fullMonthKeys.reduce((ms, mk) => ms + (getRowData(category, det)?.months[mk] ?? 0), 0), 0)
+        : fullMonthKeys.reduce((ms, mk) => ms + (getRowData(category, detail)?.months[mk] ?? 0), 0);
+      return total / fullMonthCount;
+    }
+    if (detail === null) {
+      const visibleDetails = (layout.detailOrder[category] ?? allDetails(category))
+        .filter(d => !(layout.hiddenDetails[category] ?? []).includes(d));
+      return visibleDetails.reduce((s, det) => s + (getRowData(category, det)?.months[key] ?? 0), 0);
+    }
+    return getRowData(category, detail)?.months[key] ?? 0;
+  }
+
   const sortedCategories = layout.categoryOrder.filter(cat =>
     !excludeCategories.includes(cat) && allCategories.includes(cat)
   );
 
-  const fullMonthKeys = getFullMonthKeys(monthKeys, dateFrom, dateTo);
-  const fullMonthCount = fullMonthKeys.length || 1;
+  const sortedCategoriesWithSort = sortKey === null
+    ? sortedCategories
+    : [...sortedCategories].sort((a, b) => {
+        const diff = getSortValue(a, null, sortKey) - getSortValue(b, null, sortKey);
+        return sortDir === 'desc' ? -diff : diff;
+      });
 
   return (
     <div className="flex flex-col flex-1 px-4 py-6">
@@ -691,6 +778,28 @@ export default function CostPage() {
         </div>
       )}
 
+      {/* Cross activity filter chips */}
+      {crossActivityOptions.length > 0 && (
+        <div className="mb-4">
+          <p className="text-xs text-stone-500 dark:text-zinc-300 mb-2">교차활동 필터 (선택 시 해당 항목만 표시)</p>
+          <div className="flex flex-wrap gap-2">
+            {crossActivityOptions.map(val => (
+              <button
+                key={val}
+                onClick={() => toggleCrossActivity(val)}
+                className={`px-2 py-1 rounded text-xs transition-colors border ${
+                  selectedCrossActivities.includes(val)
+                    ? 'bg-stone-800 dark:bg-zinc-200 border-stone-800 dark:border-zinc-200 text-white dark:text-zinc-900'
+                    : 'bg-white dark:bg-zinc-900 border-stone-300 dark:border-zinc-600 text-stone-600 dark:text-zinc-300 hover:border-stone-500'
+                }`}
+              >
+                {val}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
 
       {/* Table */}
       {data && !loading && (
@@ -704,15 +813,21 @@ export default function CostPage() {
                 <th className="text-left px-3 py-2 text-xs text-stone-500 dark:text-zinc-400 font-medium sticky left-0 bg-stone-50 dark:bg-zinc-800 z-10 border-r border-stone-200 dark:border-zinc-700 w-48">
                   카테고리 / 세부항목
                 </th>
-                <th className="text-right px-2 py-1 text-xs text-stone-500 dark:text-zinc-400 font-medium border-r-2 border-stone-300 dark:border-zinc-600 w-20">
-                  월평균 
+                <th
+                  className="text-right px-2 py-1 text-xs text-stone-500 dark:text-zinc-400 font-medium border-r-2 border-stone-300 dark:border-zinc-600 w-20 cursor-pointer hover:text-stone-800 dark:hover:text-zinc-100 select-none"
+                  onClick={() => handleSortClick('avg')}
+                >
+                  월평균<SortIndicator colKey="avg" sortKey={sortKey} sortDir={sortDir} />
                 </th>
                 {monthKeys.map((mk, i) => {
                   const isPartial = !fullMonthKeys.includes(mk);
                   return (
-                    <th key={mk} className="text-right px-2 py-1 text-xs text-stone-500
-                    dark:text-zinc-400 font-medium whitespace-nowrap w-20">
-                      {formatMonthLabel(mk, monthKeys[i - 1])}{isPartial ? '*' : ''}
+                    <th
+                      key={mk}
+                      className="text-right px-2 py-1 text-xs text-stone-500 dark:text-zinc-400 font-medium whitespace-nowrap w-20 cursor-pointer hover:text-stone-800 dark:hover:text-zinc-100 select-none"
+                      onClick={() => handleSortClick(mk)}
+                    >
+                      {formatMonthLabel(mk, monthKeys[i - 1])}{isPartial ? '*' : ''}<SortIndicator colKey={mk} sortKey={sortKey} sortDir={sortDir} />
                     </th>
                   );
                 })}
@@ -758,7 +873,7 @@ export default function CostPage() {
                     );
                   })}
                 </tr>
-                  {sortedCategories.map(cat => {
+                  {sortedCategoriesWithSort.map(cat => {
                     const catRow = getRowData(cat, null);
                     if (!catRow) return null;
                     const isCollapsed = layout.collapsed[cat] ?? false;
@@ -766,6 +881,14 @@ export default function CostPage() {
                     // Recalculate category row excluding hidden details
                     const visibleDetails = (layout.detailOrder[cat] ?? allDetails(cat))
                       .filter(d => !(layout.hiddenDetails[cat] ?? []).includes(d));
+
+                    const sortedVisibleDetails = sortKey === null
+                      ? visibleDetails
+                      : [...visibleDetails].sort((a, b) => {
+                          const diff = getSortValue(cat, a, sortKey) - getSortValue(cat, b, sortKey);
+                          return sortDir === 'desc' ? -diff : diff;
+                        });
+
                     const catMonths: Record<string, number> = {};
                     let catTotal = 0;
                     for (const det of visibleDetails) {
@@ -784,7 +907,13 @@ export default function CostPage() {
                           months={catMonths}
                           collapsed={isCollapsed}
                           onToggle={() => toggleCollapsed(cat)}
-                          onCellClick={mk => setDrill({ category: cat, categoryDetail: null, monthKey: mk, monthLabel: formatMonthLabel(mk) })}
+                          onCellClick={mk => setDrill({
+                            category: cat,
+                            categoryDetail: null,
+                            monthKey: mk,
+                            monthLabel: formatMonthLabel(mk),
+                            hiddenDetails: layout.hiddenDetails[cat] ?? []
+                          })}
                           monthKeys={monthKeys}
                           fullMonthKeys={fullMonthKeys}
                           fullMonthCount={fullMonthCount}
@@ -794,7 +923,7 @@ export default function CostPage() {
                           onMoveUp={() => moveCategoryUp(cat)}
                           onMoveDown={() => moveCategoryDown(cat)}
                         />
-                        {!isCollapsed && visibleDetails.map(det => {
+                        {!isCollapsed && sortedVisibleDetails.map(det => {
                           const detRow = getRowData(cat, det);
                           if (!detRow) return null;
                           return (
@@ -805,7 +934,13 @@ export default function CostPage() {
                               months={detRow.months}
                               fullMonthKeys={fullMonthKeys}
                               fullMonthCount={fullMonthCount}
-                              onCellClick={mk => setDrill({ category: cat, categoryDetail: det, monthKey: mk, monthLabel: formatMonthLabel(mk) })}
+                              onCellClick={mk => setDrill({
+                                category: cat,
+                                categoryDetail: det,
+                                monthKey: mk,
+                                monthLabel: formatMonthLabel(mk),
+                                hiddenDetails: []
+                              })}
                               monthKeys={monthKeys}
                               onMoveUp={() => moveDetailUp(cat, det)}
                               onMoveDown={() => moveDetailDown(cat, det)}
