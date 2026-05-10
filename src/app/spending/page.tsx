@@ -546,10 +546,6 @@ const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
       if (savedExclude) setExcludeCategories(JSON.parse(savedExclude));
     } catch {}
     layoutLoaded.current = true;
-
-    fetch('/api/cross-activities')
-      .then(r => r.json())
-      .then(d => setCrossActivityOptions(d.values ?? []));
   }, []);
 
   // Save layout to localStorage
