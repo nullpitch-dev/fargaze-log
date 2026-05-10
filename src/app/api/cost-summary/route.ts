@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
   const dateTo = searchParams.get('dateTo') ?? defaults.to;
   const categoriesParam = searchParams.get('categories');
   const detailsParam = searchParams.get('categoryDetails');
+  const crossActivitiesParam = searchParams.get('crossActivities');
   const excludePurchaseItemsParam = searchParams.get('excludePurchaseItems')?.trim();
   const excludePurchaseItems = excludePurchaseItemsParam
     ? excludePurchaseItemsParam.split(',').map(s => s.trim()).filter(Boolean)
@@ -65,6 +66,11 @@ export async function GET(request: NextRequest) {
   }
   if (detailsParam) {
     matchStage['cost.categoryDetail'] = { $in: detailsParam.split(',').map(s => s.trim()) };
+  }
+  if (crossActivitiesParam) {
+    matchStage['activity.crossActivity'] = {
+      $in: crossActivitiesParam.split(',').map(s => s.trim()),
+    };
   }
   if (excludePurchaseItems.length > 0) {
     matchStage['purchase'] = {

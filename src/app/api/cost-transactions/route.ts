@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
   const categoryDetail = searchParams.get('categoryDetail');
   const dateFrom = searchParams.get('dateFrom');
   const dateTo = searchParams.get('dateTo');
+  const crossActivitiesParam = searchParams.get('crossActivities');
 
   if (!category || !dateFrom || !dateTo) {
     return NextResponse.json({ error: 'category, dateFrom, dateTo are required' }, { status: 400 });
@@ -34,6 +35,11 @@ export async function GET(request: NextRequest) {
 
   if (categoryDetail) {
     match['cost.categoryDetail'] = categoryDetail;
+  }
+  if (crossActivitiesParam) {
+    match['activity.crossActivity'] = {
+      $in: crossActivitiesParam.split(',').map(s => s.trim()),
+    };
   }
 
   const results = await Log.find(match)
