@@ -12,7 +12,7 @@ export async function GET() {
 
   const values: string[] = await Log.distinct('activity.crossActivity', {
     userId,
-    'activity.crossActivity': { $exists: true, $ne: null, $ne: '' },
+    'activity.crossActivity': { $exists: true, $nin: [null, ''] },
   });
 
   const sorted = values.filter(Boolean).sort((a, b) => a.localeCompare(b, 'ko'));
