@@ -48,11 +48,6 @@ export async function GET(request: NextRequest) {
     ? excludePurchaseItemsParam.split(',').map(s => s.trim()).filter(Boolean)
     : [];
 
-  const crossActivitiesParam = searchParams.get('crossActivities')?.trim();
-  const crossActivities = crossActivitiesParam
-    ? crossActivitiesParam.split(',').map(s => s.trim()).filter(Boolean)
-    : [];
-
   await connectDB();
 
   const matchStage: any = {
@@ -83,10 +78,6 @@ export async function GET(request: NextRequest) {
         },
       },
     };
-  }
-
-  if (crossActivities.length > 0) {
-    matchStage['activity.crossActivity'] = { $in: crossActivities };
   }
 
   const pipeline: any[] = [

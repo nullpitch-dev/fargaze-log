@@ -67,7 +67,6 @@ interface DrillDownState {
 
 const LAYOUT_KEY = 'fargaze-cost-layout';
 const EXCLUDE_KEY = 'fargaze-exclude-categories';
-const CROSS_KEY = 'fargaze-cross-activities';
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 
@@ -516,8 +515,6 @@ export default function CostPage() {
   const [dateTo, setDateTo] = useState(defaultTo);
   const [excludeCategories, setExcludeCategories] = useState<string[]>([]);
   const [excludePurchaseInput, setExcludePurchaseInput] = useState('');
-  const [crossActivityOptions, setCrossActivityOptions] = useState<string[]>([]);
-  const [selectedCrossActivities, setSelectedCrossActivities] = useState<string[]>([]);
 
   // Data
   const [data, setData] = useState<SummaryResponse | null>(null);
@@ -547,8 +544,6 @@ const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
       if (saved) setLayout(JSON.parse(saved));
       const savedExclude = localStorage.getItem('fargaze-exclude-categories');
       if (savedExclude) setExcludeCategories(JSON.parse(savedExclude));
-      const savedCross = localStorage.getItem(CROSS_KEY);
-      if (savedCross) setSelectedCrossActivities(JSON.parse(savedCross));
     } catch {}
     layoutLoaded.current = true;
 
@@ -569,8 +564,6 @@ const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
     const params = new URLSearchParams({ dateFrom, dateTo });
     const excludePurchaseItems = excludePurchaseInput.split(',').map(s => s.trim()).filter(Boolean);
     if (excludePurchaseItems.length > 0) params.set('excludePurchaseItems', excludePurchaseItems.join(','));
-    if (selectedCrossActivities.length > 0) params.set('crossActivities', selectedCrossActivities.join(','));
-    console.log('crossActivities param:', params.get('crossActivities'));
     const res = await fetch(`/api/cost-summary?${params}`);
     const json: SummaryResponse = await res.json();
     setData(json);
@@ -593,7 +586,7 @@ const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
       try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(next)); } catch {}
       return next;
     });
-  }, [dateFrom, dateTo, excludePurchaseInput, selectedCrossActivities]);
+  }, [dateFrom, dateTo, excludePurchaseInput]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, []);
@@ -614,26 +607,6 @@ const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
     setExcludeCategories(prev => {
       const updated = prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat];
       try { localStorage.setItem(EXCLUDE_KEY, JSON.stringify(updated)); } catch {}
-      return updated;
-    });
-  }
-
-  function toggleCrossActivity(val: string) {
-    setSelectedCrossActivities(prev => {
-      const updated = prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val];
-      try { localStorage.setItem(CROSS_KEY, JSON.stringify(updated)); } catch {}
-      // Fetch with updated value directly
-      const params = new URLSearchParams({ dateFrom, dateTo });
-      const excludePurchaseItems = excludePurchaseInput.split(',').map(s => s.trim()).filter(Boolean);
-      if (excludePurchaseItems.length > 0) params.set('excludePurchaseItems', excludePurchaseItems.join(','));
-      if (updated.length > 0) params.set('crossActivities', updated.join(','));
-      setLoading(true);
-      fetch(`/api/cost-summary?${params}`)
-        .then(r => r.json())
-        .then(json => {
-          setData(json);
-          setLoading(false);
-        });
       return updated;
     });
   }
@@ -777,29 +750,6 @@ const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
           </div>
         </div>
       )}
-
-      {/* Cross activity filter chips */}
-      {crossActivityOptions.length > 0 && (
-        <div className="mb-4">
-          <p className="text-xs text-stone-500 dark:text-zinc-300 mb-2">교차활동 필터 (선택 시 해당 항목만 표시)</p>
-          <div className="flex flex-wrap gap-2">
-            {crossActivityOptions.map(val => (
-              <button
-                key={val}
-                onClick={() => toggleCrossActivity(val)}
-                className={`px-2 py-1 rounded text-xs transition-colors border ${
-                  selectedCrossActivities.includes(val)
-                    ? 'bg-stone-800 dark:bg-zinc-200 border-stone-800 dark:border-zinc-200 text-white dark:text-zinc-900'
-                    : 'bg-white dark:bg-zinc-900 border-stone-300 dark:border-zinc-600 text-stone-600 dark:text-zinc-300 hover:border-stone-500'
-                }`}
-              >
-                {val}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
 
       {/* Table */}
       {data && !loading && (
