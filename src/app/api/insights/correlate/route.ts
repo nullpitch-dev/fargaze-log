@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
       { $unwind: '$food.alcohols' },
       {
         $match: {
-          'food.alcohols.item': { $exists: true, $ne: null, $ne: '' },
+          'food.alcohols.item': { $exists: true, $nin: [null, ''] },
         },
       },
       {
