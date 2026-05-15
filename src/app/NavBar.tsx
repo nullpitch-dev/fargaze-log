@@ -1,5 +1,4 @@
 'use client';
-
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -21,6 +20,7 @@ export default function NavBar() {
         FarGaze
       </span>
       <Link href="/search" className={navClass('/search')}>Search</Link>
+      <Link href="/insights" className={navClass('/insights')}>Insights</Link>
       <Link href="/spending" className={navClass('/spending')}>Spending</Link>
     </nav>
   );
