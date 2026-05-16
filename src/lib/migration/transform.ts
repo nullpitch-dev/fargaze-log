@@ -120,9 +120,11 @@ export function parsePeople(
         result.push({ method, category, target: '' });
       }
     } else {
-      targetList.forEach(target => {
-        result.push({ method, category, target });
-      });
+      targetList
+        .filter(target => target !== '등')
+        .forEach(target => {
+          result.push({ method, category, target });
+        });
     }
   }
 

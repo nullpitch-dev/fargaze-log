@@ -220,9 +220,9 @@ async function main() {
   // ─────────────────────────────────────────────────────────────────────────
 
   // ── RARELY NEEDED — uncomment when ~2025 data needs correction ────────────
-  // await Log.deleteMany({ userId, 'start.year': { $lt: 2026 } });
-  // console.log('🗑️  Cleared ~2025 logs');
-  // results.push(await migrateSheet(process.env.SPREADSHEET_ID_ARCHIVE!, '~2025', userId, 4));
+  await Log.deleteMany({ userId, 'start.year': { $lt: 2026 } });
+  console.log('🗑️  Cleared ~2025 logs');
+  results.push(await migrateSheet(process.env.SPREADSHEET_ID_ARCHIVE!, '~2025', userId, 4));
   // ─────────────────────────────────────────────────────────────────────────
 
   // ── DAILY — current year archive ─────────────────────────────────────────
