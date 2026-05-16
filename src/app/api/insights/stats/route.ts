@@ -215,7 +215,7 @@ function computeInteractionsSummary(docs: InteractionDoc[]) {
   const personCategories: Record<string, string[]> = {};
   const personInteractionCount: Record<string, number> = {};
   // For table: per person, per method/category combo → count
-  const personRows: Record<string, { method: string; category: string; count: number }[]> = {};
+  const personRows: Record<string, { method: string; count: number }[]> = {};
 
   for (const doc of docs) {
     for (const group of (doc.people ?? [])) {
