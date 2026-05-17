@@ -279,7 +279,7 @@ function computeInteractionsSummary(docs: any[]) {
 }
 
 // Compute per-bucket data for trend mode
-function computeInteractionsTrendBucket(docs: any[], relTypeFilter: string[] = [], methodFilter: string[] = '') {
+function computeInteractionsTrendBucket(docs: any[], relTypeFilter: string[] = [], methodFilter: string[] = []) {
   const interactions = docs.filter(d => d.activity?.relationship === '함께');
   const byRelationType: Record<string, number> = {};
   const byMethod:       Record<string, number> = {};
