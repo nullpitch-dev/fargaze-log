@@ -1,11 +1,10 @@
 // src/app/insights/_components/GlobalFilterBar.tsx
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { GlobalFilter, TimeMode } from '../_lib/types';
-import {
-  todayStr, defaultPeriodFrom, defaultTimePeriod,
-} from '../_lib/date-helpers';
+import { todayStr, defaultPeriodFrom, defaultTimePeriod } from '../_lib/date-helpers';
+import { MultiSelectDropdown } from './MultiSelectDropdown';
 
 const TIME_MODE_LABELS: Record<TimeMode, string> = {
   month: 'Month', week: 'Week', day: 'Day', period: 'Period',
@@ -17,18 +16,8 @@ export function GlobalFilterBar({ filter, onApply, crossActivityOptions }: {
   crossActivityOptions: string[];
 }) {
   const [local, setLocal] = useState<GlobalFilter>(filter);
-  const [caOpen, setCaOpen] = useState(false);
-  const caRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setLocal(filter); }, [filter]);
-
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (caRef.current && !caRef.current.contains(e.target as Node)) setCaOpen(false);
-    }
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
 
   function setTimeMode(mode: TimeMode) {
     setLocal(prev => ({
@@ -37,18 +26,6 @@ export function GlobalFilterBar({ filter, onApply, crossActivityOptions }: {
       timePeriod: defaultTimePeriod(mode),
       dateFrom: prev.dateFrom || defaultPeriodFrom(),
       dateTo: prev.dateTo || todayStr(),
-    }));
-  }
-
-  const allSelected = local.crossActivities.length === crossActivityOptions.length;
-  const noneSelected = local.crossActivities.length === 0;
-
-  function toggleCA(v: string) {
-    setLocal(prev => ({
-      ...prev,
-      crossActivities: prev.crossActivities.includes(v)
-        ? prev.crossActivities.filter(x => x !== v)
-        : [...prev.crossActivities, v],
     }));
   }
 
@@ -102,44 +79,22 @@ export function GlobalFilterBar({ filter, onApply, crossActivityOptions }: {
           </div>
         )}
 
-        {/* Cross-activity */}
+        {/* Activity type — uses shared MultiSelectDropdown.
+            GlobalFilterBar commits on Apply, so onClose is omitted intentionally. */}
         {crossActivityOptions.length > 0 && (
-          <div className="flex flex-col gap-1 relative" ref={caRef}>
+          <div className="flex flex-col gap-1">
             <label className="text-[10px] text-stone-400 dark:text-zinc-500 uppercase tracking-wide">Activity type</label>
-            <button onClick={() => setCaOpen(v => !v)}
-              className={`flex items-center gap-2 bg-white dark:bg-zinc-900 border rounded px-3 py-1.5 text-xs shadow-sm focus:outline-none transition-colors ${
-                !allSelected
-                  ? 'border-blue-400 dark:border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'border-stone-300 dark:border-zinc-600 text-stone-900 dark:text-zinc-50'
-              }`}>
-              {allSelected ? 'All' : noneSelected ? 'None' : `${local.crossActivities.length} selected`}
-              <span className="text-stone-400 dark:text-zinc-500">▾</span>
-            </button>
-            {caOpen && (
-              <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-zinc-800 border border-stone-200 dark:border-zinc-600 rounded-lg shadow-xl min-w-[180px] py-1">
-                <label className="flex items-center gap-2 px-3 py-1.5 hover:bg-stone-50 dark:hover:bg-zinc-700 cursor-pointer border-b border-stone-100 dark:border-zinc-700">
-                  <input type="checkbox" checked={allSelected}
-                    ref={el => { if (el) el.indeterminate = !allSelected && !noneSelected; }}
-                    onChange={() => setLocal(prev => ({
-                      ...prev,
-                      crossActivities: allSelected ? [] : [...crossActivityOptions],
-                    }))}
-                    className="accent-blue-500" />
-                  <span className="text-xs font-medium text-stone-700 dark:text-zinc-200">
-                    {allSelected ? 'Deselect all' : 'Select all'}
-                  </span>
-                </label>
-                {crossActivityOptions.map(opt => (
-                  <label key={opt} className="flex items-center gap-2 px-3 py-1.5 hover:bg-stone-50 dark:hover:bg-zinc-700 cursor-pointer">
-                    <input type="checkbox" checked={local.crossActivities.includes(opt)}
-                      onChange={() => toggleCA(opt)} className="accent-blue-500" />
-                    <span className={`text-xs ${local.crossActivities.includes(opt) ? 'text-stone-700 dark:text-zinc-200' : 'text-stone-400 dark:text-zinc-500 line-through'}`}>
-                      {opt}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            )}
+            <MultiSelectDropdown
+              label={
+                local.crossActivities.length === crossActivityOptions.length ? 'All'
+                : local.crossActivities.length === 0 ? 'None'
+                : `${local.crossActivities.length} selected`
+              }
+              options={crossActivityOptions}
+              selected={local.crossActivities}
+              onChange={next => setLocal(prev => ({ ...prev, crossActivities: next }))}
+              // onClose intentionally omitted — GlobalFilterBar commits on Apply button
+            />
           </div>
         )}
 

@@ -1,4 +1,9 @@
 // src/app/api/insights/stats/route.ts
+// Replace the entire file with this version.
+// Changes vs previous: interactions.summary now supports mode=trend,
+// returning per-bucket totalCount, uniquePeopleCount, byRelationType,
+// byMethod, top7, and transitioning arrays.
+
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import connectDB from '@/lib/mongodb';
@@ -8,13 +13,13 @@ import Log from '@/models/Log';
 
 const SLEEP_THRESHOLD_HOUR = 6;
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 const QUALITY_SCORE: Record<string, number> = {
   '좋음': 1,
   '보통': 0,
   '나쁨': -1,
 };
+
+// ── Date helpers ──────────────────────────────────────────────────────────────
 
 function hourStringToMinutes(hourStr: string | null | undefined): number | null {
   if (!hourStr) return null;
@@ -25,440 +30,443 @@ function hourStringToMinutes(hourStr: string | null | undefined): number | null 
   return h * 60 + m;
 }
 
-function applyMidnightThreshold(minutes: number): number {
-  return minutes < SLEEP_THRESHOLD_HOUR * 60 ? minutes + 1440 : minutes;
-}
-
-function minutesToClock(minutes: number): string {
-  const wrapped = Math.round(minutes) % 1440;
-  const h = Math.floor(wrapped / 60);
-  const m = Math.round(wrapped % 60);
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}
-
-function assignedDate(
-  year: number,
-  month: number,
-  day: number,
-  hourStr: string | null | undefined,
-): { year: number; month: number; day: number } {
-  const mins = hourStringToMinutes(hourStr);
-  if (mins === null) return { year, month, day };
-  if (mins < SLEEP_THRESHOLD_HOUR * 60) {
-    const d = new Date(year, month - 1, day - 1);
-    return { year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate() };
+function assignSleepDate(startDatetime: Date, startHour: string | null | undefined): Date {
+  const mins = hourStringToMinutes(startHour);
+  if (mins !== null && mins < SLEEP_THRESHOLD_HOUR * 60) {
+    const d = new Date(startDatetime);
+    d.setDate(d.getDate() - 1);
+    return d;
   }
-  return { year, month, day };
+  return startDatetime;
 }
 
-function isoWeek(date: Date): { isoYear: number; isoWeek: number } {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
-  const week1 = new Date(d.getFullYear(), 0, 4);
-  const isoWeekNum =
-    1 + Math.round(((d.getTime() - week1.getTime()) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
-  return { isoYear: d.getFullYear(), isoWeek: isoWeekNum };
-}
-
-// ── Date range helpers ────────────────────────────────────────────────────────
-
-function summaryRange(timeMode: string, timePeriod: string): { dateFrom: Date; dateTo: Date } | null {
-  if (timeMode === 'month') {
+function buildDateRange(
+  timeMode: string,
+  timePeriod: string | null,
+  dateFrom: string | null,
+  dateTo: string | null,
+): { start: Date; end: Date } {
+  if (timeMode === 'period' && dateFrom && dateTo) {
+    return {
+      start: new Date(`${dateFrom}T00:00:00.000Z`),
+      end:   new Date(`${dateTo}T23:59:59.999Z`),
+    };
+  }
+  if (timeMode === 'month' && timePeriod) {
     const [y, m] = timePeriod.split('-').map(Number);
-    if (!y || !m) return null;
-    return { dateFrom: new Date(y, m - 1, 1), dateTo: new Date(y, m, 0, 23, 59, 59) };
+    const start = new Date(Date.UTC(y, m - 1, 1));
+    const end   = new Date(Date.UTC(y, m, 0, 23, 59, 59, 999));
+    return { start, end };
   }
-  if (timeMode === 'week') {
-    const match = timePeriod.match(/^(\d{4})-W(\d{1,2})$/);
-    if (!match) return null;
-    const y = parseInt(match[1]);
-    const w = parseInt(match[2]);
-    const jan4 = new Date(y, 0, 4);
-    const dayOfWeek = (jan4.getDay() + 6) % 7;
-    const monday = new Date(jan4.getTime() - dayOfWeek * 86400000 + (w - 1) * 7 * 86400000);
-    const sunday = new Date(monday.getTime() + 6 * 86400000 + 23 * 3600000 + 59 * 60000 + 59000);
-    return { dateFrom: monday, dateTo: sunday };
+  if (timeMode === 'week' && timePeriod) {
+    const [yearStr, weekStr] = timePeriod.split('-W');
+    const year = parseInt(yearStr);
+    const week = parseInt(weekStr);
+    const jan4 = new Date(Date.UTC(year, 0, 4));
+    const dayOfWeek = jan4.getUTCDay() || 7;
+    const monday = new Date(jan4);
+    monday.setUTCDate(jan4.getUTCDate() - (dayOfWeek - 1) + (week - 1) * 7);
+    const sunday = new Date(monday);
+    sunday.setUTCDate(monday.getUTCDate() + 6);
+    sunday.setUTCHours(23, 59, 59, 999);
+    return { start: monday, end: sunday };
   }
-  if (timeMode === 'day') {
-    const from = new Date(timePeriod);
-    const to = new Date(timePeriod);
-    to.setHours(23, 59, 59);
-    return { dateFrom: from, dateTo: to };
+  if (timeMode === 'day' && timePeriod) {
+    return {
+      start: new Date(`${timePeriod}T00:00:00.000Z`),
+      end:   new Date(`${timePeriod}T23:59:59.999Z`),
+    };
   }
-  return null;
+  const now = new Date();
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const end   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+  return { start, end };
 }
 
-function trendBuckets(
+function stepBack(
   timeMode: string,
   timePeriod: string,
-  bucketsBack: number,
-): { label: string; dateFrom: Date; dateTo: Date }[] {
-  const buckets: { label: string; dateFrom: Date; dateTo: Date }[] = [];
+  steps: number,
+): string {
   if (timeMode === 'month') {
     const [y, m] = timePeriod.split('-').map(Number);
-    for (let i = bucketsBack - 1; i >= 0; i--) {
-      const d = new Date(y, m - 1 - i, 1);
-      const label = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      buckets.push({ label, dateFrom: new Date(d.getFullYear(), d.getMonth(), 1), dateTo: new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59) });
-    }
-  } else if (timeMode === 'week') {
-    const anchorRange = summaryRange('week', timePeriod);
-    if (!anchorRange) return [];
-    for (let i = bucketsBack - 1; i >= 0; i--) {
-      const monday = new Date(anchorRange.dateFrom.getTime() - i * 7 * 86400000);
-      const sunday = new Date(monday.getTime() + 6 * 86400000 + 23 * 3600000 + 59 * 60000 + 59000);
-      const { isoYear, isoWeek: wNum } = isoWeek(monday);
-      buckets.push({ label: `${isoYear}-W${String(wNum).padStart(2, '0')}`, dateFrom: monday, dateTo: sunday });
-    }
-  } else if (timeMode === 'day') {
-    const anchor = new Date(timePeriod);
-    for (let i = bucketsBack - 1; i >= 0; i--) {
-      const d = new Date(anchor.getTime() - i * 86400000);
-      const label = d.toISOString().slice(0, 10);
-      const from = new Date(d); from.setHours(0, 0, 0, 0);
-      const to = new Date(d); to.setHours(23, 59, 59, 999);
-      buckets.push({ label, dateFrom: from, dateTo: to });
-    }
+    const d = new Date(Date.UTC(y, m - 1 - steps, 1));
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
   }
-  return buckets;
+  if (timeMode === 'week') {
+    const [yearStr, weekStr] = timePeriod.split('-W');
+    const year = parseInt(yearStr);
+    const week = parseInt(weekStr);
+    const jan4 = new Date(Date.UTC(year, 0, 4));
+    const dayOfWeek = jan4.getUTCDay() || 7;
+    const monday = new Date(jan4);
+    monday.setUTCDate(jan4.getUTCDate() - (dayOfWeek - 1) + (week - 1) * 7);
+    monday.setUTCDate(monday.getUTCDate() - steps * 7);
+    const weekNum = Math.ceil(
+      ((monday.getTime() - new Date(Date.UTC(monday.getUTCFullYear(), 0, 1)).getTime()) / 86400000 + 1) / 7,
+    );
+    return `${monday.getUTCFullYear()}-W${String(weekNum).padStart(2, '0')}`;
+  }
+  if (timeMode === 'day') {
+    const d = new Date(`${timePeriod}T00:00:00.000Z`);
+    d.setUTCDate(d.getUTCDate() - steps);
+    return d.toISOString().slice(0, 10);
+  }
+  return timePeriod;
+}
+
+function labelForPeriod(timeMode: string, period: string): string {
+  if (timeMode === 'month') {
+    const [y, m] = period.split('-');
+    return `${y.slice(2)}/${m}`;
+  }
+  if (timeMode === 'week') return period.replace('-W', 'W');
+  if (timeMode === 'day') return period.slice(5);
+  return period;
 }
 
 // ── Sleep helpers ─────────────────────────────────────────────────────────────
 
-interface SleepDoc {
-  start: { year: number; month: number; day: number; hour: string };
-  end: { hour: string };
-  duration: { totalSeconds: number };
-  sleep: { quality: string };
-}
+function computeSleepSummary(docs: any[]) {
+  const valid = docs.filter(
+    d =>
+      d.activity?.category === '생리' &&
+      d.activity?.name === '수면' &&
+      d.duration?.totalSeconds != null &&
+      d.duration.totalSeconds >= 3600,
+  );
+  if (!valid.length) return null;
 
-async function fetchSleepDocs(userId: string, dateFrom: Date, dateTo: Date, crossActivities?: string[]): Promise<SleepDoc[]> {
-  const match: any = {
-    userId,
-    'activity.category': '생리',
-    'activity.name': '수면',
-    'start.datetime': { $gte: dateFrom, $lte: dateTo },
-  };
-  if (crossActivities?.length) match['activity.crossActivity'] = { $in: crossActivities };
-  return Log.find(match)
-    .select('start.year start.month start.day start.hour end.hour duration.totalSeconds sleep.quality')
-    .lean() as Promise<SleepDoc[]>;
-}
+  const totalSec  = valid.reduce((s, d) => s + d.duration.totalSeconds, 0);
+  const avgSec    = totalSec / valid.length;
+  const bedtimes  = valid.map(d => hourStringToMinutes(d.start?.hour)).filter((v): v is number => v !== null);
+  const waketimes = valid.map(d => hourStringToMinutes(d.end?.hour)).filter((v): v is number => v !== null);
 
-function computeSleepSummary(docs: SleepDoc[]) {
-  if (docs.length === 0) return null;
-  const durations = docs.map(d => d.duration?.totalSeconds).filter((s): s is number => !!s && s >= 3600);
-  const bedtimeMins = docs.map(d => { const m = hourStringToMinutes(d.start?.hour); return m !== null ? applyMidnightThreshold(m) : null; }).filter((m): m is number => m !== null);
-  const waketimeMins = docs.map(d => { const m = hourStringToMinutes(d.end?.hour); return m !== null ? m : null; }).filter((m): m is number => m !== null);
-  const qualityScores = docs.map(d => QUALITY_SCORE[d.sleep?.quality]).filter((s): s is number => s !== undefined);
-  const qualityCounts = { '좋음': 0, '보통': 0, '나쁨': 0 };
-  docs.forEach(d => { const q = d.sleep?.quality; if (q in qualityCounts) qualityCounts[q as keyof typeof qualityCounts]++; });
+  const adjustedBedtimes = bedtimes.map(m => (m < SLEEP_THRESHOLD_HOUR * 60 ? m + 1440 : m));
+  const avgBedtimeMins   = adjustedBedtimes.length ? adjustedBedtimes.reduce((s, v) => s + v, 0) / adjustedBedtimes.length : null;
+  const avgWaketimeMins  = waketimes.length ? waketimes.reduce((s, v) => s + v, 0) / waketimes.length : null;
+
+  function minsToClockStr(m: number | null): string | null {
+    if (m === null) return null;
+    const wrapped = Math.round(m) % 1440;
+    return `${String(Math.floor(wrapped / 60)).padStart(2, '0')}:${String(Math.round(wrapped % 60)).padStart(2, '0')}`;
+  }
+
+  const qualityCounts: Record<string, number> = {};
+  let qualitySum = 0, qualityN = 0;
+  for (const d of valid) {
+    const q = d.sleep?.quality;
+    if (q) {
+      qualityCounts[q] = (qualityCounts[q] ?? 0) + 1;
+      const score = QUALITY_SCORE[q];
+      if (score !== undefined) { qualitySum += score; qualityN++; }
+    }
+  }
+
   return {
-    count: docs.length,
-    duration: { avgSeconds: durations.length > 0 ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length) : null },
-    bedtime: { avgClock: bedtimeMins.length > 0 ? minutesToClock(bedtimeMins.reduce((a, b) => a + b, 0) / bedtimeMins.length) : null },
-    waketime: { avgClock: waketimeMins.length > 0 ? minutesToClock(waketimeMins.reduce((a, b) => a + b, 0) / waketimeMins.length) : null },
-    quality: { avgScore: qualityScores.length > 0 ? Math.round((qualityScores.reduce((a, b) => a + b, 0) / qualityScores.length) * 100) / 100 : null, counts: qualityCounts },
+    count:    valid.length,
+    duration: { avgSeconds: Math.round(avgSec) },
+    bedtime:  { avgClock: minsToClockStr(avgBedtimeMins) },
+    waketime: { avgClock: minsToClockStr(avgWaketimeMins) },
+    quality:  {
+      counts:   qualityCounts,
+      avgScore: qualityN ? Math.round((qualitySum / qualityN) * 100) / 100 : null,
+    },
   };
 }
 
 // ── Interactions helpers ──────────────────────────────────────────────────────
 
-// Dominant value = the value that appears most often in an array of strings
-function dominant(values: string[]): string {
-  if (values.length === 0) return '';
-  const freq: Record<string, number> = {};
-  for (const v of values) freq[v] = (freq[v] ?? 0) + 1;
-  return Object.entries(freq).sort((a, b) => b[1] - a[1])[0][0];
-}
+function computeInteractionsSummary(docs: any[]) {
+  const interactions = docs.filter(d => d.activity?.relationship === '함께');
 
-interface InteractionDoc {
-  people: { method: string; category: string; target: string }[];
-}
-
-async function fetchInteractionDocs(
-  userId: string,
-  dateFrom: Date,
-  dateTo: Date,
-  crossActivities?: string[],
-): Promise<InteractionDoc[]> {
-  const match: any = {
-    userId,
-    'activity.relationship': '함께',
-    'start.datetime': { $gte: dateFrom, $lte: dateTo },
-  };
-  if (crossActivities?.length) match['activity.crossActivity'] = { $in: crossActivities };
-  return Log.find(match)
-    .select('people')
-    .lean() as Promise<InteractionDoc[]>;
-}
-
-function computeInteractionsSummary(docs: InteractionDoc[]) {
-  const totalInteractions = docs.length;
-
-  // ── Interactions section ──────────────────────────────────────────────────
-  // Each record contributes once per people[] entry to method/category counts
-  const intByMethod: Record<string, number> = {};
+  const intByMethod:   Record<string, number> = {};
   const intByCategory: Record<string, number> = {};
 
-  for (const doc of docs) {
+  // Per-person tracking: name → { methods: {m: count}, categories: {c: count} }
+  const personMap: Record<string, { methods: Record<string, number>; categories: Record<string, number>; total: number }> = {};
+
+  for (const doc of interactions) {
     for (const group of (doc.people ?? [])) {
-      if (group.method) intByMethod[group.method] = (intByMethod[group.method] ?? 0) + 1;
-      if (group.category) intByCategory[group.category] = (intByCategory[group.category] ?? 0) + 1;
-    }
-  }
+      const method   = group.method ?? '기타';
+      const category = group.category ?? '기타';
+      intByMethod[method]     = (intByMethod[method] ?? 0) + 1;
+      intByCategory[category] = (intByCategory[category] ?? 0) + 1;
 
-  // ── People section ────────────────────────────────────────────────────────
-  // Collect per-person: all methods and categories across all their interactions
-  const personMethods: Record<string, string[]> = {};
-  const personCategories: Record<string, string[]> = {};
-  const personInteractionCount: Record<string, number> = {};
-  // For table: per person, per method/category combo → count
-  const personRows: Record<string, { method: string; count: number }[]> = {};
+      const targets: string[] = Array.isArray(group.targets)
+        ? group.targets
+        : typeof group.target === 'string'
+          ? [group.target]
+          : [];
 
-  for (const doc of docs) {
-    for (const group of (doc.people ?? [])) {
-      const name = group.target;
-      if (!name) continue;
-      // Accumulate for dominant calculation
-      if (!personMethods[name]) personMethods[name] = [];
-      if (!personCategories[name]) personCategories[name] = [];
-      if (group.method) personMethods[name].push(group.method);
-      if (group.category) personCategories[name].push(group.category);
-
-      // Accumulate for table rows: count per (method, category) combo
-      if (!personRows[name]) personRows[name] = [];
-      const key = group.method;
-      const existing = personRows[name].find(r => r.method === key);
-      if (existing) existing.count++;
-      else personRows[name].push({ method: group.method ?? '', count: 1 });
-
-      // Total interactions per person
-      personInteractionCount[name] = (personInteractionCount[name] ?? 0) + 1;
-    }
-  }
-
-  const uniquePeople = Object.keys(personInteractionCount);
-  const totalPeople = uniquePeople.length;
-
-  // People pies — dominant method/category per person, counted once each
-  const peopleByMethod: Record<string, number> = {};
-  const peopleByCategory: Record<string, number> = {};
-  for (const name of uniquePeople) {
-    const dom = dominant(personMethods[name] ?? []);
-    const domCat = dominant(personCategories[name] ?? []);
-    if (dom) peopleByMethod[dom] = (peopleByMethod[dom] ?? 0) + 1;
-    if (domCat) peopleByCategory[domCat] = (peopleByCategory[domCat] ?? 0) + 1;
-  }
-
-  // ── Top 5 people table ────────────────────────────────────────────────────
-  const sortedPeople = uniquePeople
-    .map(name => ({ name, total: personInteractionCount[name] }))
-    .sort((a, b) => b.total - a.total);
-
-  const top10 = sortedPeople.slice(0, 10);
-  const top10Names = new Set(top10.map(p => p.name));
-  const top10Sum = top10.reduce((sum, p) => sum + p.total, 0);
-  const othersTotal = totalInteractions - top10Sum;
-
-  // Others dominant method/category — from all non-top-10 interaction docs' people entries
-  const othersMethods: string[] = [];
-  const othersCategories: string[] = [];
-  for (const doc of docs) {
-    for (const group of (doc.people ?? [])) {
-      const name = group.target;
-      if (!top10Names.has(name)) {
-        if (group.method) othersMethods.push(group.method);
-        if (group.category) othersCategories.push(group.category);
+      for (const name of targets) {
+        if (!name || name === '등') continue;
+        if (!personMap[name]) personMap[name] = { methods: {}, categories: {}, total: 0 };
+        personMap[name].methods[method]     = (personMap[name].methods[method] ?? 0) + 1;
+        personMap[name].categories[category] = (personMap[name].categories[category] ?? 0) + 1;
+        personMap[name].total++;
       }
     }
   }
 
-  const topPeople = top10.map(({ name, total }) => ({
+  const dominantKey = (counts: Record<string, number>): string =>
+    Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '기타';
+
+  const peopleByMethod:   Record<string, number> = {};
+  const peopleByCategory: Record<string, number> = {};
+  for (const p of Object.values(personMap)) {
+    const dm = dominantKey(p.methods);
+    const dc = dominantKey(p.categories);
+    peopleByMethod[dm]   = (peopleByMethod[dm] ?? 0) + 1;
+    peopleByCategory[dc] = (peopleByCategory[dc] ?? 0) + 1;
+  }
+
+  // Top 10 ranked by total interactions
+  const sorted = Object.entries(personMap)
+    .sort((a, b) => b[1].total - a[1].total)
+    .slice(0, 10);
+
+  const top10 = sorted.map(([name, data]) => ({
     name,
-    dominantCategory: dominant(personCategories[name] ?? []),
-    total,
-    rows: (personRows[name] ?? [])
-      .sort((a, b) => b.count - a.count)
-      .map(r => ({ method: r.method, count: r.count })),
+    dominantCategory: dominantKey(data.categories),
+    total: data.total,
+    rows: Object.entries(data.methods)
+      .sort((a, b) => b[1] - a[1])
+      .map(([method, count]) => ({ method, count })),
   }));
+
+  const top10Total = top10.reduce((s, p) => s + p.total, 0);
+  const othersTotal = interactions.length - top10Total;
+
+  const othersMethodCounts:   Record<string, number> = {};
+  const othersCategoryCounts: Record<string, number> = {};
+  const top10Names = new Set(top10.map(p => p.name));
+  for (const doc of interactions) {
+    for (const group of (doc.people ?? [])) {
+      const targets: string[] = Array.isArray(group.targets)
+        ? group.targets
+        : typeof group.target === 'string'
+          ? [group.target]
+          : [];
+      for (const name of targets) {
+        if (!name || name === '등' || top10Names.has(name)) continue;
+        const m = group.method ?? '기타';
+        const c = group.category ?? '기타';
+        othersMethodCounts[m]   = (othersMethodCounts[m] ?? 0) + 1;
+        othersCategoryCounts[c] = (othersCategoryCounts[c] ?? 0) + 1;
+      }
+    }
+  }
 
   return {
     interactions: {
-      total: totalInteractions,
-      byMethod: intByMethod,
+      total:      interactions.length,
+      byMethod:   intByMethod,
       byCategory: intByCategory,
     },
     people: {
-      total: totalPeople,
-      byMethod: peopleByMethod,
+      total:      Object.keys(personMap).length,
+      byMethod:   peopleByMethod,
       byCategory: peopleByCategory,
     },
-    topPeople,
+    topPeople: top10,
     others: {
-      total: othersTotal,
-      dominantMethod: dominant(othersMethods),
-      dominantCategory: dominant(othersCategories),
+      total:           othersTotal,
+      dominantMethod:  dominantKey(othersMethodCounts),
+      dominantCategory: dominantKey(othersCategoryCounts),
     },
   };
 }
 
-// ── Route handler ─────────────────────────────────────────────────────────────
+// Compute per-bucket data for trend mode
+function computeInteractionsTrendBucket(docs: any[], relTypeFilter: string[] = [], methodFilter: string[] = '') {
+  const interactions = docs.filter(d => d.activity?.relationship === '함께');
+  const byRelationType: Record<string, number> = {};
+  const byMethod:       Record<string, number> = {};
+  const personCounts:   Record<string, number> = {};
 
-export async function GET(request: NextRequest) {
+  for (const doc of interactions) {
+    for (const group of (doc.people ?? [])) {
+      const method   = group.method ?? '기타';
+      const category = group.category ?? '기타';
+      byMethod[method]       = (byMethod[method] ?? 0) + 1;
+      byRelationType[category] = (byRelationType[category] ?? 0) + 1;
+
+      const targets: string[] = Array.isArray(group.targets)
+        ? group.targets
+        : typeof group.target === 'string'
+          ? [group.target]
+          : [];
+
+      // Apply top7 filters (AND logic) — only affects person ranking
+      if (relTypeFilter.length && !relTypeFilter.includes(category)) continue;
+      if (methodFilter.length  && !methodFilter.includes(method))    continue;
+
+      for (const name of targets) {
+        if (!name || name === '등') continue;
+        personCounts[name] = (personCounts[name] ?? 0) + 1;
+      }
+    }
+  }
+
+  const sorted = Object.entries(personCounts)
+    .sort((a, b) => b[1] - a[1]);
+
+  const top7 = sorted.slice(0, 7).map(([name, count]) => ({ name, count }));
+  const uniquePeopleCount = Object.keys(personCounts).length;
+
+  return {
+    totalCount:        interactions.length,
+    uniquePeopleCount,
+    byRelationType,
+    byMethod,
+    top7,
+  };
+}
+
+// Build transitioning arrays from ordered bucket data
+function addTransitioning(
+  buckets: { label: string; top7: { name: string; count: number }[] }[],
+): { label: string; top7: { name: string; count: number }[]; transitioning: string[] }[] {
+  return buckets.map((bucket, i) => {
+    const prev = i > 0 ? buckets[i - 1] : null;
+    const next = i < buckets.length - 1 ? buckets[i + 1] : null;
+
+    const currentNames = new Set(bucket.top7.map(p => p.name));
+    const prevNames    = new Set(prev?.top7.map(p => p.name) ?? []);
+    const nextNames    = new Set(next?.top7.map(p => p.name) ?? []);
+
+    const transitioning: string[] = [];
+    // Dropped from previous top5 but not in current
+    for (const name of prevNames) {
+      if (!currentNames.has(name)) transitioning.push(name);
+    }
+    // Will appear in next top5 but not in current
+    for (const name of nextNames) {
+      if (!currentNames.has(name) && !transitioning.includes(name)) {
+        transitioning.push(name);
+      }
+    }
+
+    return { ...bucket, transitioning };
+  });
+}
+
+// ── Main route ────────────────────────────────────────────────────────────────
+
+export async function GET(req: NextRequest) {
   const session = await auth();
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const userId = (session.user as any)?.userId;
-  if (!userId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-
-  const { searchParams } = new URL(request.url);
-  const metric = searchParams.get('metric');
-  const mode = searchParams.get('mode') ?? 'summary';
-  const timeMode = searchParams.get('timeMode') ?? 'month';
-  const timePeriod = searchParams.get('timePeriod') ?? '';
-  const dateFrom = searchParams.get('dateFrom');
-  const dateTo = searchParams.get('dateTo');
-  const bucketsBack = parseInt(searchParams.get('bucketsBack') ?? '6');
-  const crossActivities = searchParams.get('crossActivities');
-  const limit = parseInt(searchParams.get('limit') ?? '10');
-
-  const crossList = crossActivities
-    ? crossActivities.split(',').map(s => s.trim()).filter(Boolean)
-    : undefined;
-
-  if (!metric) return NextResponse.json({ error: 'metric is required' }, { status: 400 });
+  const userId = (session as any)?.user?.userId;
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
 
   await connectDB();
 
-  // ── Helper: resolve date range ──────────────────────────────────────────────
-  function resolveDateRange(): { from: Date; to: Date } | null {
-    if (timeMode === 'period') {
-      if (!dateFrom || !dateTo) return null;
-      const to = new Date(dateTo);
-      to.setHours(23, 59, 59, 999);
-      return { from: new Date(dateFrom), to };
-    }
-    const range = summaryRange(timeMode, timePeriod);
-    if (!range) return null;
-    return { from: range.dateFrom, to: range.dateTo };
-  }
+  const sp          = req.nextUrl.searchParams;
+  const metric      = sp.get('metric') ?? '';
+  const mode        = sp.get('mode') ?? 'summary';
+  const timeMode    = sp.get('timeMode') ?? 'month';
+  const timePeriod  = sp.get('timePeriod') ?? '';
+  const dateFrom    = sp.get('dateFrom');
+  const dateTo      = sp.get('dateTo');
+  const bucketsBack     = parseInt(sp.get('bucketsBack') ?? '6');
+  const crossActivities = sp.get('crossActivities')?.split(',').filter(Boolean) ?? [];
+  const top7RelType     = sp.get('top7RelType')?.split(',').filter(Boolean) ?? [];
+  const top7Method      = sp.get('top7Method')?.split(',').filter(Boolean)  ?? [];
 
-  // ── sleep.* ─────────────────────────────────────────────────────────────────
-  if (metric.startsWith('sleep.')) {
-    if (mode === 'summary') {
-      const range = resolveDateRange();
-      if (!range) return NextResponse.json({ error: 'Invalid date range' }, { status: 400 });
-      const docs = await fetchSleepDocs(userId, range.from, range.to, crossList);
-      return NextResponse.json({ metric, mode, timeMode, summary: computeSleepSummary(docs) });
-    }
-    if (mode === 'trend') {
-      if (timeMode === 'period') return NextResponse.json({ error: 'Trend not available for period mode' }, { status: 400 });
-      const buckets = trendBuckets(timeMode, timePeriod, bucketsBack);
-      if (!buckets.length) return NextResponse.json({ error: 'Could not compute trend buckets' }, { status: 400 });
-      const allDocs = await fetchSleepDocs(userId, buckets[0].dateFrom, buckets[buckets.length - 1].dateTo, crossList);
-      const data = buckets.map(bucket => {
-        const bucketDocs = allDocs.filter(doc => {
-          const s = doc.start;
-          if (!s?.year || !s?.month || !s?.day) return false;
-          const ad = assignedDate(s.year, s.month, s.day, s.hour);
-          const adDate = new Date(ad.year, ad.month - 1, ad.day);
-          return adDate >= bucket.dateFrom && adDate <= bucket.dateTo;
-        });
-        return { label: bucket.label, summary: computeSleepSummary(bucketDocs) };
-      });
-      return NextResponse.json({ metric, mode, timeMode, bucketsBack, data });
-    }
-    return NextResponse.json({ error: 'Invalid mode' }, { status: 400 });
-  }
-
-  // ── interactions.summary ────────────────────────────────────────────────────
+  // ── interactions.summary ──────────────────────────────────────────────────
   if (metric === 'interactions.summary') {
-    const range = resolveDateRange();
-    if (!range) return NextResponse.json({ error: 'Invalid date range' }, { status: 400 });
-    const docs = await fetchInteractionDocs(userId, range.from, range.to, crossList);
-    const summary = computeInteractionsSummary(docs);
-    return NextResponse.json({ metric, mode, timeMode, summary });
-  }
-
-  // ── people.frequency ────────────────────────────────────────────────────────
-  if (metric === 'people.frequency') {
-    const range = resolveDateRange();
-    if (!range) return NextResponse.json({ error: 'Invalid date range' }, { status: 400 });
-
-    const baseMatch: any = {
-      userId,
-      'people.0': { $exists: true },
-      'start.datetime': { $gte: range.from, $lte: range.to },
-    };
-    if (crossList?.length) baseMatch['activity.crossActivity'] = { $in: crossList };
-
-    if (mode === 'summary') {
-      const pipeline: any[] = [
-        { $match: baseMatch },
-        { $unwind: '$people' },
-        { $match: { 'people.target': { $exists: true, $nin: [null, ''] } } },
-        { $group: { _id: '$people.target', count: { $sum: 1 }, category: { $first: '$people.category' } } },
-        { $sort: { count: -1 } },
-        { $limit: limit },
-      ];
-      const raw = await Log.aggregate(pipeline);
-      return NextResponse.json({ metric, mode, timeMode, data: raw.map(r => ({ key: r._id, value: r.count, meta: { category: r.category } })) });
-    }
-
     if (mode === 'trend') {
-      if (timeMode === 'period') return NextResponse.json({ error: 'Trend not available for period mode' }, { status: 400 });
-      const buckets = trendBuckets(timeMode, timePeriod, bucketsBack);
-      if (!buckets.length) return NextResponse.json({ error: 'Could not compute trend buckets' }, { status: 400 });
+      // Build ordered list of periods (oldest → newest)
+      const periods: string[] = [];
+      for (let i = bucketsBack - 1; i >= 0; i--) {
+        periods.push(stepBack(timeMode, timePeriod || currentPeriod(timeMode), i));
+      }
 
-      // Top people from full range
-      const topPipeline: any[] = [
-        { $match: { ...baseMatch, 'start.datetime': { $gte: buckets[0].dateFrom, $lte: buckets[buckets.length - 1].dateTo } } },
-        { $unwind: '$people' },
-        { $match: { 'people.target': { $exists: true, $nin: [null, ''] } } },
-        { $group: { _id: '$people.target', count: { $sum: 1 } } },
-        { $sort: { count: -1 } },
-        { $limit: limit },
-      ];
-      const topPeople = (await Log.aggregate(topPipeline)).map(r => r._id as string);
+      const bucketResults = await Promise.all(
+        periods.map(async period => {
+          const { start, end } = buildDateRange(timeMode, period, null, null);
+          const filter: Record<string, any> = {
+            userId,
+            'start.datetime': { $gte: start, $lte: end },
+          };
+          if (crossActivities.length) {
+            filter['activity.crossActivity'] = { $in: crossActivities };
+          }
+          const docs = await Log.find(filter).lean();
+          const bucket = computeInteractionsTrendBucket(docs, top7RelType, top7Method);
+          return { label: labelForPeriod(timeMode, period), ...bucket };
+        }),
+      );
 
-      const data = await Promise.all(buckets.map(async bucket => {
-        const bMatch = { ...baseMatch, 'start.datetime': { $gte: bucket.dateFrom, $lte: bucket.dateTo } };
-        const pipeline: any[] = [
-          { $match: bMatch },
-          { $unwind: '$people' },
-          { $match: { 'people.target': { $in: topPeople } } },
-          { $group: { _id: '$people.target', count: { $sum: 1 } } },
-        ];
-        const raw = await Log.aggregate(pipeline);
-        return { label: bucket.label, data: raw.map(r => ({ key: r._id, value: r.count })) };
-      }));
+      const withTransitioning = addTransitioning(bucketResults);
 
-      return NextResponse.json({ metric, mode, timeMode, bucketsBack, data });
+      return NextResponse.json({ data: withTransitioning });
     }
 
-    return NextResponse.json({ error: 'Invalid mode' }, { status: 400 });
-  }
-
-  // ── cost.total ──────────────────────────────────────────────────────────────
-  if (metric === 'cost.total') {
-    const range = resolveDateRange();
-    if (!range) return NextResponse.json({ error: 'Invalid date range' }, { status: 400 });
-
-    const baseMatch: any = {
+    // Summary mode
+    const { start, end } = buildDateRange(timeMode, timePeriod, dateFrom, dateTo);
+    const filter: Record<string, any> = {
       userId,
-      'cost.amountKRW': { $gt: 0 },
-      'start.datetime': { $gte: range.from, $lte: range.to },
+      'start.datetime': { $gte: start, $lte: end },
     };
-    if (crossList?.length) baseMatch['activity.crossActivity'] = { $in: crossList };
-
-    const raw = await Log.aggregate([
-      { $match: baseMatch },
-      { $group: { _id: { year: '$start.year', month: '$start.month' }, total: { $sum: '$cost.amountKRW' }, count: { $sum: 1 } } },
-      { $sort: { '_id.year': 1, '_id.month': 1 } },
-    ]);
-    return NextResponse.json({ metric, mode, timeMode, data: raw.map(r => ({ key: `${r._id.year}-${String(r._id.month).padStart(2, '0')}`, value: r.total, count: r.count })) });
+    if (crossActivities.length) {
+      filter['activity.crossActivity'] = { $in: crossActivities };
+    }
+    const docs = await Log.find(filter).lean();
+    const summary = computeInteractionsSummary(docs);
+    return NextResponse.json({ summary });
   }
 
-  return NextResponse.json({ error: `Unknown metric: ${metric}` }, { status: 400 });
+  // ── sleep.all ─────────────────────────────────────────────────────────────
+  if (metric === 'sleep.all') {
+    if (mode === 'trend') {
+      const periods: string[] = [];
+      for (let i = bucketsBack - 1; i >= 0; i--) {
+        periods.push(stepBack(timeMode, timePeriod || currentPeriod(timeMode), i));
+      }
+
+      const results = await Promise.all(
+        periods.map(async period => {
+          const { start, end } = buildDateRange(timeMode, period, null, null);
+          const filter: Record<string, any> = {
+            userId,
+            'start.datetime': { $gte: start, $lte: end },
+            'activity.category': '생리',
+            'activity.name': '수면',
+          };
+          if (crossActivities.length) filter['activity.crossActivity'] = { $in: crossActivities };
+          const docs = await Log.find(filter).lean();
+          return { label: labelForPeriod(timeMode, period), summary: computeSleepSummary(docs) };
+        }),
+      );
+      return NextResponse.json({ data: results });
+    }
+
+    const { start, end } = buildDateRange(timeMode, timePeriod, dateFrom, dateTo);
+    const filter: Record<string, any> = {
+      userId,
+      'start.datetime': { $gte: start, $lte: end },
+      'activity.category': '생리',
+      'activity.name': '수면',
+    };
+    if (crossActivities.length) filter['activity.crossActivity'] = { $in: crossActivities };
+    const docs = await Log.find(filter).lean();
+    return NextResponse.json({ summary: computeSleepSummary(docs) });
+  }
+
+  return NextResponse.json({ error: 'Unknown metric' }, { status: 400 });
+}
+
+function currentPeriod(timeMode: string): string {
+  const now = new Date();
+  if (timeMode === 'month') {
+    return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+  }
+  if (timeMode === 'week') {
+    const jan1    = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
+    const dayOfYr = Math.floor((now.getTime() - jan1.getTime()) / 86400000) + 1;
+    const week    = Math.ceil(dayOfYr / 7);
+    return `${now.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+  }
+  return now.toISOString().slice(0, 10);
 }
