@@ -140,6 +140,7 @@ async function migrateReferenceLists(spreadsheetId: string, userId: string) {
     { name: 'transport.returnType', col: 10 },
     { name: 'people.method', col: 12 },
     { name: 'people.category', col: 13 },
+    { name: 'food.alcohols.item', col: 14 },
   ];
 
   await ReferenceList.deleteMany({ userId });
@@ -220,9 +221,9 @@ async function main() {
   // ─────────────────────────────────────────────────────────────────────────
 
   // ── RARELY NEEDED — uncomment when ~2025 data needs correction ────────────
-  await Log.deleteMany({ userId, 'start.year': { $lt: 2026 } });
-  console.log('🗑️  Cleared ~2025 logs');
-  results.push(await migrateSheet(process.env.SPREADSHEET_ID_ARCHIVE!, '~2025', userId, 4));
+  // await Log.deleteMany({ userId, 'start.year': { $lt: 2026 } });
+  // console.log('🗑️  Cleared ~2025 logs');
+  // results.push(await migrateSheet(process.env.SPREADSHEET_ID_ARCHIVE!, '~2025', userId, 4));
   // ─────────────────────────────────────────────────────────────────────────
 
   // ── DAILY — current year archive ─────────────────────────────────────────

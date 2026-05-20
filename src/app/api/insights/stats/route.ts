@@ -352,6 +352,262 @@ function addTransitioning(
   });
 }
 
+// ── Drinking helpers ──────────────────────────────────────────────────────────
+
+function hourStrToDecimal(hourStr: string | null | undefined): number | null {
+  if (!hourStr) return null;
+  const [hPart, mPart] = hourStr.split(':');
+  const h = parseInt(hPart);
+  const m = parseInt(mPart ?? '0');
+  if (isNaN(h) || isNaN(m)) return null;
+  return h + m / 60;
+}
+
+function classifyOccasion(
+  foodType: string | null | undefined,
+  startHour: string | null | undefined,
+): string {
+  const type = foodType ?? '';
+  if (type === '아침') return '아침술';
+  if (type === '점심') return '점심술';
+  if (type === '저녁') return '저녁술';
+  const h = hourStrToDecimal(startHour);
+  if (h !== null && h < 18) return '낮술';
+  return 'After/No dinner';
+}
+
+// Returns yesterday as YYYY-MM-DD (UTC)
+function yesterdayStr(): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+// Difference in calendar days between two YYYY-MM-DD strings (a - b)
+function diffDays(a: string, b: string): number {
+  return Math.round(
+    (new Date(`${a}T00:00:00.000Z`).getTime() -
+      new Date(`${b}T00:00:00.000Z`).getTime()) /
+      86400000,
+  );
+}
+
+// Score(D) = diffDays(D, lastDrinkBeforeD) - 1 + (D is rest ? 1 : 0)
+// If no prior drinking day exists, anchor to datasetFirstDate.
+function computeDailyScores(
+  allDrinkingDates: Set<string>,
+  periodDates: string[],
+  datasetFirstDate: string,
+): { dateStr: string; score: number; isDrinking: boolean }[] {
+  const sortedDrinkDates = [...allDrinkingDates].sort();
+
+  return periodDates.map(dateStr => {
+    const isDrinking = allDrinkingDates.has(dateStr);
+
+    let lastDrink: string | null = null;
+    for (let i = sortedDrinkDates.length - 1; i >= 0; i--) {
+      if (sortedDrinkDates[i] < dateStr) {
+        lastDrink = sortedDrinkDates[i];
+        break;
+      }
+    }
+
+    const anchor = lastDrink ?? datasetFirstDate;
+    const score  = diffDays(dateStr, anchor) - 1 + (isDrinking ? 0 : 1);
+    return { dateStr, score: Math.max(0, score), isDrinking };
+  });
+}
+
+// Bucket a rest score into a histogram label
+function bucketScore(score: number): string {
+  if (score === 0)  return '0d';
+  if (score <= 2)   return '1–2d';
+  if (score <= 6)   return '3–6d';
+  if (score <= 13)  return '1–2w';
+  if (score <= 29)  return '2–4w';
+  return '1m+';
+}
+
+const SCORE_BUCKET_ORDER = ['0d', '1–2d', '3–6d', '1–2w', '2–4w', '1m+'];
+ 
+async function computeDrinkingSummary(
+  userId: string,
+  periodStart: Date,
+  periodEnd: Date,
+  crossActivities: string[],
+): Promise<any> {
+
+  // ── Step 1: all distinct drinking days (full dataset, unbounded) ─────────────
+  const allDrinkingRaw = await Log.aggregate([
+    { $match: { userId, 'food.alcohols': { $exists: true, $not: { $size: 0 } } } },
+    { $project: { _id: 0, date: { $dateToString: { format: '%Y-%m-%d', date: '$start.datetime' } } } },
+    { $group: { _id: '$date' } },
+    { $sort: { _id: 1 } },
+  ]);
+  const allDrinkingDates = new Set<string>(
+    allDrinkingRaw.map((r: any) => r._id).filter(Boolean),
+  );
+  const sortedAll = [...allDrinkingDates].sort();
+  const datasetFirstDate = sortedAll[0] ?? periodStart.toISOString().slice(0, 10);
+
+  // ── Step 2: cap effective period end at yesterday ────────────────────────────
+  const yesterday = yesterdayStr();
+  const rawEnd     = periodEnd.toISOString().slice(0, 10);
+  const rawStart   = periodStart.toISOString().slice(0, 10);
+  const effectiveEnd   = rawEnd < yesterday ? rawEnd : yesterday;
+  const effectiveStart = rawStart;
+
+  // Build array of every date in the effective period
+  const periodDates: string[] = [];
+  const cursor  = new Date(`${effectiveStart}T00:00:00.000Z`);
+  const endDate = new Date(`${effectiveEnd}T00:00:00.000Z`);
+  while (cursor <= endDate) {
+    periodDates.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  const daysInPeriod = periodDates.length;
+
+  // ── Step 3: fetch alcohol entries in the effective period ────────────────────
+  const filter: Record<string, any> = {
+    userId,
+    'start.datetime': {
+      $gte: new Date(`${effectiveStart}T00:00:00.000Z`),
+      $lte: new Date(`${effectiveEnd}T23:59:59.999Z`),
+    },
+    'food.alcohols': { $exists: true, $not: { $size: 0 } },
+  };
+  if (crossActivities.length) {
+    filter['activity.crossActivity'] = { $in: crossActivities };
+  }
+  const docs = await Log.find(filter).lean();
+
+  // ── Step 4: daily scores and histogram ──────────────────────────────────────
+  const dailyScores = computeDailyScores(allDrinkingDates, periodDates, datasetFirstDate);
+
+  const drinkingDaySet = new Set(
+    docs
+      .map((d: any) =>
+        d.start?.datetime
+          ? new Date(d.start.datetime).toISOString().slice(0, 10)
+          : null,
+      )
+      .filter(Boolean),
+  );
+
+  const scoreSum    = dailyScores.reduce((s, d) => s + d.score, 0);
+  const avgRestDays = daysInPeriod > 0
+    ? Math.round((scoreSum / daysInPeriod) * 10) / 10
+    : 0;
+
+  const histogram: Record<string, number> = Object.fromEntries(
+    SCORE_BUCKET_ORDER.map(k => [k, 0]),
+  );
+  for (const { score } of dailyScores) {
+    histogram[bucketScore(score)]++;
+  }
+
+  // ── Step 5: remaining metrics ────────────────────────────────────────────────
+
+  // Occasions
+  const occasions: Record<string, number> = {
+    '아침술': 0, '점심술': 0, '저녁술': 0, '낮술': 0, 'After/No dinner': 0,
+  };
+  for (const doc of docs) {
+    const label = classifyOccasion((doc as any).food?.type, (doc as any).start?.hour);
+    occasions[label] = (occasions[label] ?? 0) + 1;
+  }
+
+  // Avg start & end times — circular, pre-6am treated as 24+
+  const THRESHOLD = 6;
+  function toCircular(vals: (number | null)[]): number | null {
+    const v = vals.filter((x): x is number => x !== null).map(h => h < THRESHOLD ? h + 24 : h);
+    return v.length ? v.reduce((s, x) => s + x, 0) / v.length : null;
+  }
+  function decimalToClock(dec: number | null): string | null {
+    if (dec === null) return null;
+    const wrapped = Math.round(dec * 60) % 1440;
+    return `${String(Math.floor(wrapped / 60)).padStart(2, '0')}:${String(wrapped % 60).padStart(2, '0')}`;
+  }
+
+  const avgStartClock = decimalToClock(toCircular(docs.map((d: any) => hourStrToDecimal(d.start?.hour))));
+  const avgEndClock   = decimalToClock(toCircular(docs.map((d: any) => hourStrToDecimal(d.end?.hour))));
+
+  // Avg duration
+  const durations = docs
+    .map((d: any) => d.duration?.totalSeconds)
+    .filter((v): v is number => v != null && v > 0);
+  const avgDurationSeconds = durations.length
+    ? Math.round(durations.reduce((s, v) => s + v, 0) / durations.length)
+    : null;
+
+  // Companions — one count per event, dominant relation type represents the event
+  const aloneCount = docs.filter((d: any) => !d.people || d.people.length === 0).length;
+  const byRelationType: Record<string, number> = {};
+  const personMap: Record<string, { categories: Record<string, number>; total: number }> = {};
+
+  for (const doc of docs) {
+    if (!(doc as any).people?.length) continue;
+
+    // Count groups per category in this event to find dominant
+    const eventCategoryCounts: Record<string, number> = {};
+    for (const group of (doc as any).people) {
+      const category = group.category ?? '기타';
+      eventCategoryCounts[category] = (eventCategoryCounts[category] ?? 0) + 1;
+    }
+    const dominantCategory = Object.entries(eventCategoryCounts)
+      .sort((a, b) => b[1] - a[1])[0]?.[0] ?? '기타';
+
+    // byRelationType: one count per event using dominant category
+    byRelationType[dominantCategory] = (byRelationType[dominantCategory] ?? 0) + 1;
+
+    // Top people: one count per person per event
+    const eventPeople = new Set<string>();
+    for (const group of (doc as any).people) {
+      const category = group.category ?? '기타';
+      const targets: string[] = Array.isArray(group.targets)
+        ? group.targets
+        : typeof group.target === 'string' ? [group.target] : [];
+      for (const name of targets) {
+        if (!name || name === '등' || eventPeople.has(name)) continue;
+        eventPeople.add(name);
+        if (!personMap[name]) personMap[name] = { categories: {}, total: 0 };
+        personMap[name].categories[category] = (personMap[name].categories[category] ?? 0) + 1;
+        personMap[name].total++;
+      }
+    }
+  }
+
+  const dominantKey = (counts: Record<string, number>): string =>
+    Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '기타';
+
+  const topPeople = Object.entries(personMap)
+    .sort((a, b) => b[1].total - a[1].total)
+    .slice(0, 10)
+    .map(([name, data]) => ({
+      name,
+      dominantCategory: dominantKey(data.categories),
+      total: data.total,
+    }));
+
+  return {
+    daysInPeriod,
+    drinkingDays:      drinkingDaySet.size,
+    restDays:          daysInPeriod - drinkingDaySet.size,
+    avgRestDays,
+    histogram,
+    avgStartClock,
+    avgEndClock,
+    avgDurationSeconds,
+    occasions,
+    companions: {
+      alone:          aloneCount,
+      total:          docs.length,  // matches Occasion total exactly
+      byRelationType,
+      topPeople,
+    },
+  };
+}
+
 // ── Main route ────────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
@@ -454,6 +710,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ summary: computeSleepSummary(docs) });
   }
 
+  // ── drinking.summary ────────────────────────────────────────────────────────
+  if (metric === 'drinking.summary') {
+    const { start, end } = buildDateRange(timeMode, timePeriod, dateFrom, dateTo);
+    const summary = await computeDrinkingSummary(userId, start, end, crossActivities);
+    return NextResponse.json({ summary });
+  }
+  
   return NextResponse.json({ error: 'Unknown metric' }, { status: 400 });
 }
 

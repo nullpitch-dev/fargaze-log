@@ -326,14 +326,14 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
           ) : summaryTab === 'stats' ? (
             <div className="grid grid-cols-2 gap-x-4 divide-x divide-stone-100 dark:divide-zinc-800">
               <div className="flex flex-col gap-3">
-                <BigStat value={summaryData.interactions.total} label="interactions" />
-                <MiniSection title="Method"   data={summaryData.interactions.byMethod}   colorMap={METHOD_COLORS} />
-                <MiniSection title="Category" data={summaryData.interactions.byCategory} colorMap={CATEGORY_COLORS} />
+               <BigStat value={summaryData.interactions.total} label="interactions" />
+                <MiniSection title="Relation Type" data={summaryData.interactions.byCategory} colorMap={CATEGORY_COLORS} />
+                <MiniSection title="Method"        data={summaryData.interactions.byMethod}   colorMap={METHOD_COLORS} /> 
               </div>
               <div className="flex flex-col gap-3 pl-4">
                 <BigStat value={summaryData.people.total} label="unique people" />
-                <MiniSection title="Method"   data={summaryData.people.byMethod}   colorMap={METHOD_COLORS} />
-                <MiniSection title="Category" data={summaryData.people.byCategory} colorMap={CATEGORY_COLORS} />
+                <MiniSection title="Relation Type" data={summaryData.people.byCategory} colorMap={CATEGORY_COLORS} />
+                <MiniSection title="Method"        data={summaryData.people.byMethod}   colorMap={METHOD_COLORS} />
               </div>
             </div>
           ) : (

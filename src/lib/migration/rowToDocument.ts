@@ -4,6 +4,7 @@ import {
   parseString,
   parseDateTime,
   zipMultiValue,
+  zipMultiValueWithPlusSplit,
   zipFoodValue,
   parsePeople,
   computeTotalSeconds,
@@ -155,7 +156,7 @@ export function rowToDocument(row: any[], userId: string): any {
     get(row, C.ALCOHOL_NOTE)
   );
 
-  const exercise = zipMultiValue(
+  const exercise = zipMultiValueWithPlusSplit(
     get(row, C.EXERCISE_ITEM),
     get(row, C.EXERCISE_AMOUNT),
     get(row, C.EXERCISE_UNIT)

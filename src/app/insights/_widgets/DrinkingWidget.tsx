@@ -1,0 +1,345 @@
+'use client';
+// src/app/insights/_widgets/DrinkingWidget.tsx
+
+import { useEffect, useState } from 'react';
+import { WidgetCard } from '../_components/WidgetCard';
+import { useIsDark } from '../_lib/hooks';
+import { buildParams } from '../_lib/date-helpers';
+import { formatDuration } from '../_lib/format';
+import type { WidgetProps } from '../_lib/types';
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+type SummaryTab = 'stats' | 'top10';
+
+interface DrinkingSummary {
+  daysInPeriod:       number;
+  drinkingDays:       number;
+  restDays:           number;
+  avgRestDays:        number;
+  histogram:          Record<string, number>;
+  avgStartClock:      string | null;
+  avgEndClock:        string | null;
+  avgDurationSeconds: number | null;
+  occasions:          Record<string, number>;
+  companions: {
+    alone:          number;
+    total:          number;
+    byRelationType: Record<string, number>;
+    topPeople:      { name: string; dominantCategory: string; total: number }[];
+  };
+}
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const BUCKET_ORDER = ['0d', '1–2d', '3–6d', '1–2w', '2–4w', '1m+'];
+
+const OCCASION_COLORS: Record<string, string> = {
+  '아침술':          '#f59e0b',
+  '점심술':          '#10b981',
+  '저녁술':          '#3b82f6',
+  '낮술':            '#8b5cf6',
+  'After/No dinner': '#ef4444',
+};
+
+const RELATION_COLORS: Record<string, string> = {
+  '가족': '#1d4ed8', '업무': '#7c3aed', '친목': '#0891b2',
+  '연애': '#ec4899', '종교': '#d97706', '기타': '#6b7280',
+};
+
+// ── Rest Histogram ────────────────────────────────────────────────────────────
+
+function RestHistogram({
+  histogram,
+  avgRestDays,
+  isDark,
+}: {
+  histogram: Record<string, number>;
+  avgRestDays: number;
+  isDark: boolean;
+}) {
+  const barColor   = isDark ? '#2dd4bf' : '#1d4ed8';  // teal-400 / blue-700
+  const gridColor  = isDark ? '#3f3f46' : '#e7e5e4';  // zinc-700 / stone-200
+  const labelColor = isDark ? '#a1a1aa' : '#a8a29e';  // zinc-400 / stone-400
+  const valueColor = isDark ? '#f4f4f5' : '#292524';  // zinc-100 / stone-800
+  const avgColor   = isDark ? '#f4f4f5' : '#292524';  // same as value labels
+
+  const counts   = BUCKET_ORDER.map(k => histogram[k] ?? 0);
+  const maxCount = Math.max(...counts, 1);
+
+  const W = 300, H = 110;
+  const padT = 18, padB = 22;
+  const chartH = H - padT - padB;
+  const barCount = BUCKET_ORDER.length;
+  const barGap   = 6;
+  const barW     = (W - barGap * (barCount - 1)) / barCount;
+
+  return (
+    <div className="flex items-center gap-3">
+      {/* Chart + title stacked */}
+      <div className="flex-1 min-w-0 flex flex-col gap-1">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ overflow: 'visible' }}>
+          {/* Grid line at top */}
+          <line x1={0} y1={padT} x2={W} y2={padT} stroke={gridColor} strokeWidth={1} />
+
+          {/* Bars + labels */}
+          {counts.map((count, i) => {
+            const barH  = maxCount > 0 ? (count / maxCount) * chartH : 0;
+            const x     = i * (barW + barGap);
+            const y     = padT + chartH - barH;
+            const label = BUCKET_ORDER[i];
+            return (
+              <g key={label}>
+                <rect
+                  x={x} y={y}
+                  width={barW} height={Math.max(barH, 0)}
+                  fill={barColor} rx={3}
+                  opacity={count === 0 ? 0.15 : 0.85}
+                />
+                {count > 0 && (
+                  <text
+                    x={x + barW / 2} y={y - 4}
+                    textAnchor="middle" fontSize={11}
+                    fill={valueColor} fontWeight="500"
+                  >
+                    {count}
+                  </text>
+                )}
+                <text
+                  x={x + barW / 2} y={H - 4}
+                  textAnchor="middle" fontSize={11}
+                  fill={labelColor}
+                >
+                  {label}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+        {/* Chart title */}
+        <span className="text-[10px] text-stone-400 dark:text-zinc-500 text-center tracking-wide">
+          Consecutive Rest Days
+        </span>
+      </div>
+
+      {/* Avg stat — vertically centred alongside chart+title block */}
+      <div className="flex flex-col items-center shrink-0">
+        <span className="text-2xl font-medium text-stone-800 dark:text-zinc-100 leading-none tabular-nums">
+          {avgRestDays}
+        </span>
+        <span className="text-[10px] text-stone-400 dark:text-zinc-500 mt-0.5">Avg.</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Compact horizontal bar ────────────────────────────────────────────────────
+
+function HorizBar({ label, count, total, color }: {
+  label: string; count: number; total: number; color: string;
+}) {
+  const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+  return (
+    <div className="flex items-center gap-1.5 text-[11px]">
+      <span className="w-16 shrink-0 text-stone-500 dark:text-zinc-400 truncate">{label}</span>
+      <div className="flex-1 h-1 rounded-full bg-stone-100 dark:bg-zinc-800 overflow-hidden min-w-0">
+        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
+      </div>
+      <span className="w-5 text-right text-stone-500 dark:text-zinc-400 shrink-0">{count}</span>
+    </div>
+  );
+}
+
+function CompactSection({ title, data, colorMap }: {
+  title: string; data: Record<string, number>; colorMap: Record<string, string>;
+}) {
+  const total  = Object.values(data).reduce((s, v) => s + v, 0);
+  const sorted = Object.entries(data).sort((a, b) => b[1] - a[1]);
+  if (!sorted.length) return null;
+  return (
+    <div className="flex flex-col gap-1 min-w-0">
+      <span className="text-[10px] font-medium text-stone-400 dark:text-zinc-500 uppercase tracking-wide">
+        {title}
+      </span>
+      {sorted.map(([k, v]) => (
+        <HorizBar key={k} label={k} count={v} total={total} color={colorMap[k] ?? '#a8a29e'} />
+      ))}
+    </div>
+  );
+}
+
+// ── Stat card ─────────────────────────────────────────────────────────────────
+
+function StatCard({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-xl font-medium text-stone-800 dark:text-zinc-100 leading-none tabular-nums">
+        {value}
+      </span>
+      <span className="text-[10px] text-stone-400 dark:text-zinc-500">{label}</span>
+    </div>
+  );
+}
+
+// ── Stats tab ─────────────────────────────────────────────────────────────────
+
+function StatsTab({ data, isDark }: { data: DrinkingSummary; isDark: boolean }) {
+  const drinkingPct = data.daysInPeriod > 0
+    ? Math.round((data.drinkingDays / data.daysInPeriod) * 100)
+    : 0;
+
+  const companionData: Record<string, number> = { '혼자': data.companions.alone };
+  for (const [k, v] of Object.entries(data.companions.byRelationType)) {
+    companionData[k] = (companionData[k] ?? 0) + v;
+  }
+  const companionColors: Record<string, string> = { '혼자': '#a8a29e', ...RELATION_COLORS };
+
+  return (
+    <div className="flex flex-col gap-3">
+
+      {/* Row 1: Drinking Days (fixed) + Rest Histogram with Avg. Rest Days (fills rest) */}
+      <div className="flex items-center gap-5">
+        <div className="flex flex-col gap-0.5 shrink-0">
+          <span className="text-2xl font-medium text-stone-800 dark:text-zinc-100 leading-none tabular-nums">
+            {data.drinkingDays}
+          </span>
+          <span className="text-sm text-stone-400 dark:text-zinc-500 tabular-nums">
+            / {data.daysInPeriod}d ({drinkingPct}%)
+          </span>
+          <span className="text-[10px] text-stone-400 dark:text-zinc-500 mt-0.5">Drinking Days</span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <RestHistogram
+            histogram={data.histogram}
+            avgRestDays={data.avgRestDays}
+            isDark={isDark}
+          />
+        </div>
+      </div>
+
+      <div className="border-t border-stone-100 dark:border-zinc-800" />
+
+      {/* Row 2: Start / End / Duration */}
+      <div className="grid grid-cols-3 gap-2">
+        <StatCard value={data.avgStartClock ?? '—'} label="Avg. Start" />
+        <StatCard value={data.avgEndClock   ?? '—'} label="Avg. End" />
+        <StatCard
+          value={data.avgDurationSeconds ? formatDuration(data.avgDurationSeconds) : '—'}
+          label="Avg. Duration"
+        />
+      </div>
+
+      <div className="border-t border-stone-100 dark:border-zinc-800" />
+
+      {/* Row 3: Occasion + With Whom side by side */}
+      <div className="grid grid-cols-2 gap-3">
+        <CompactSection
+          title="Occasion"
+          data={data.occasions}
+          colorMap={OCCASION_COLORS}
+        />
+        <CompactSection
+          title="With Whom"
+          data={companionData}
+          colorMap={companionColors}
+        />
+      </div>
+
+    </div>
+  );
+}
+
+// ── Top 10 tab ────────────────────────────────────────────────────────────────
+
+function Top10Tab({ data }: { data: DrinkingSummary }) {
+  const people = data.companions.topPeople;
+  if (!people.length) {
+    return <p className="text-xs text-stone-400 dark:text-zinc-500">No companion data</p>;
+  }
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="border-b border-stone-100 dark:border-zinc-800 text-stone-400 dark:text-zinc-500">
+            <th className="text-left py-1 pr-2 font-medium">Name</th>
+            <th className="text-left py-1 pr-2 font-medium">Type</th>
+            <th className="text-right py-1 font-medium">#</th>
+          </tr>
+        </thead>
+        <tbody>
+          {people.map((p, i) => (
+            <tr key={i} className="border-b border-stone-50 dark:border-zinc-800/50">
+              <td className="py-1 pr-2 font-medium text-stone-800 dark:text-zinc-100 truncate max-w-0">
+                {p.name}
+              </td>
+              <td className="py-1 pr-2 text-stone-500 dark:text-zinc-400">
+                <span className="flex items-center gap-1">
+                  <span
+                    className="w-1.5 h-1.5 rounded-full shrink-0"
+                    style={{ background: RELATION_COLORS[p.dominantCategory] ?? '#6b7280' }}
+                  />
+                  {p.dominantCategory}
+                </span>
+              </td>
+              <td className="py-1 text-right font-mono text-stone-700 dark:text-zinc-200">
+                {p.total}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── Main widget ───────────────────────────────────────────────────────────────
+
+export function DrinkingWidget({ globalFilter }: WidgetProps) {
+  const isDark = useIsDark();
+  const [summaryTab, setSummaryTab]   = useState<SummaryTab>('stats');
+  const [summaryData, setSummaryData] = useState<DrinkingSummary | null>(null);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState<string | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+    const url = `/api/insights/stats?${buildParams(
+      { metric: 'drinking.summary', mode: 'summary' },
+      globalFilter,
+    )}`;
+    fetch(url)
+      .then(r => r.json())
+      .then(d => { setSummaryData(d.summary ?? null); setLoading(false); })
+      .catch(() => { setError('Failed to load data.'); setLoading(false); });
+  }, [globalFilter]);
+
+  return (
+    <WidgetCard title="Drinking" floor={1} loading={loading} error={error}>
+      {/* Tab bar */}
+      <div className="flex rounded overflow-hidden border border-stone-200 dark:border-zinc-700 text-[11px] mb-3 self-start">
+        {(['stats', 'top10'] as SummaryTab[]).map(t => (
+          <button
+            key={t}
+            onClick={() => setSummaryTab(t)}
+            className={`px-2.5 py-1 transition-colors ${
+              summaryTab === t
+                ? 'bg-stone-800 dark:bg-zinc-200 text-white dark:text-zinc-900 font-medium'
+                : 'bg-white dark:bg-zinc-900 text-stone-500 dark:text-zinc-400 hover:bg-stone-50 dark:hover:bg-zinc-800'
+            }`}
+          >
+            {t === 'stats' ? 'Stats' : 'Top 10'}
+          </button>
+        ))}
+      </div>
+
+      {!summaryData ? (
+        <p className="text-xs text-stone-400 dark:text-zinc-500">No data</p>
+      ) : summaryTab === 'stats' ? (
+        <StatsTab data={summaryData} isDark={isDark} />
+      ) : (
+        <Top10Tab data={summaryData} />
+      )}
+    </WidgetCard>
+  );
+}

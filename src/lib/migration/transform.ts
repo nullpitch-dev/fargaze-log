@@ -74,7 +74,33 @@ export function zipMultiValue(
   }));
 }
 
+// Like zipMultiValue but splits plus-concatenated item names and divides amount evenly
+export function zipMultiValueWithPlusSplit(
+  items: string,
+  amounts: string,
+  units: string
+): Array<{ item: string; amount: string; unit: string }> {
+  const itemArr = splitComma(items);
+  const amountArr = splitComma(amounts);
+  const unitArr = splitComma(units);
+  if (itemArr.length === 0) return [];
+  return itemArr.flatMap((item, i) => {
+    const subItems = item.split('+').map(s => s.trim()).filter(s => s !== '');
+    if (subItems.length <= 1) {
+      return [{ item, amount: amountArr[i] ?? '', unit: unitArr[i] ?? '' }];
+    }
+    const rawAmount = parseFloat((amountArr[i] ?? '').replace(/,/g, ''));
+    const dividedAmount = !isNaN(rawAmount) ? String(rawAmount / subItems.length) : '';
+    return subItems.map(subItem => ({
+      item: subItem,
+      amount: dividedAmount,
+      unit: unitArr[i] ?? '',
+    }));
+  });
+}
+
 // Zip item/amount/unit/note arrays into array of objects
+// Plus-concatenated item names are split and amount is divided evenly
 export function zipFoodValue(
   items: string,
   amounts: string,
@@ -86,12 +112,27 @@ export function zipFoodValue(
   const unitArr = splitComma(units);
   const noteArr = splitComma(notes);
   if (itemArr.length === 0) return [];
-  return itemArr.map((item, i) => ({
-    item,
-    amount: amountArr[i] ?? '',
-    unit: unitArr[i] ?? '',
-    note: noteArr[i] ?? '',
-  }));
+  return itemArr.flatMap((item, i) => {
+    const subItems = item.split('+').map(s => s.trim()).filter(s => s !== '');
+    if (subItems.length <= 1) {
+      return [{
+        item,
+        amount: amountArr[i] ?? '',
+        unit: unitArr[i] ?? '',
+        note: noteArr[i] ?? '',
+      }];
+    }
+    const rawAmount = parseFloat((amountArr[i] ?? '').replace(/,/g, ''));
+    const dividedAmount = !isNaN(rawAmount)
+      ? String(rawAmount / subItems.length)
+      : '';
+    return subItems.map(subItem => ({
+      item: subItem,
+      amount: dividedAmount,
+      unit: unitArr[i] ?? '',
+      note: noteArr[i] ?? '',
+    }));
+  });
 }
 
 // Parse people field (pipe = group separator, comma = within group)
