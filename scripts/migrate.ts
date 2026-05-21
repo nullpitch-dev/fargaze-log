@@ -14,6 +14,7 @@ import ActivityMaster from '../src/models/ActivityMaster';
 import ReferenceList from '../src/models/ReferenceList';
 import TimezoneMaster from '../src/models/TimezoneMaster';
 import ExchangeRate from '../src/models/ExchangeRate';
+import AlcoholConversion from '../src/models/AlcoholConversion';
 
 // ── GOOGLE SHEETS ─────────────────────────────────────────────────────────────
 
@@ -207,6 +208,7 @@ async function main() {
   await ReferenceList.syncIndexes();
   await TimezoneMaster.syncIndexes();
   await ExchangeRate.syncIndexes();
+  await AlcoholConversion.syncIndexes();
   console.log('✅ Indexes synced');
 
   const userId = 'hyoje';
@@ -218,6 +220,7 @@ async function main() {
   // await migrateReferenceLists(process.env.SPREADSHEET_ID_ACTIVE!, userId);
   // await migrateTimezoneMaster(process.env.SPREADSHEET_ID_ACTIVE!, userId);
   // await migrateExchangeRate(process.env.SPREADSHEET_ID_ACTIVE!, userId);
+  // await migrateAlcoholConversion(process.env.SPREADSHEET_ID_ACTIVE!, userId);
   // ─────────────────────────────────────────────────────────────────────────
 
   // ── RARELY NEEDED — uncomment when ~2025 data needs correction ────────────

@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import connectDB from '@/lib/mongodb';
 import Log from '@/models/Log';
+import AlcoholConversion from '@/models/AlcoholConversion';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -421,14 +422,44 @@ function computeDailyScores(
 // Bucket a rest score into a histogram label
 function bucketScore(score: number): string {
   if (score === 0)  return '0d';
-  if (score <= 2)   return '1–2d';
-  if (score <= 6)   return '3–6d';
+  if (score === 1)  return '1d';
+  if (score <= 3)   return '2–3d';
+  if (score <= 6)   return '4–6d';
   if (score <= 13)  return '1–2w';
   if (score <= 29)  return '2–4w';
   return '1m+';
 }
 
-const SCORE_BUCKET_ORDER = ['0d', '1–2d', '3–6d', '1–2w', '2–4w', '1m+'];
+const SCORE_BUCKET_ORDER = ['0d', '1d', '2–3d', '4–6d', '1–2w', '2–4w', '1m+'];
+
+// ── Drinking date assignment (6am threshold) ──────────────────────────────────
+ 
+/**
+ * Given a log document's start.datetime and start.hour,
+ * returns the YYYY-MM-DD string this record belongs to.
+ * Records between 00:00–05:59 are attributed to the previous calendar day.
+ */
+function assignDrinkingDate(datetime: Date, hourStr: string | null | undefined): string {
+  const mins = hourStringToMinutes(hourStr);
+  const d = new Date(datetime);
+  if (mins !== null && mins < SLEEP_THRESHOLD_HOUR * 60) {
+    d.setUTCDate(d.getUTCDate() - 1);
+  }
+  return d.toISOString().slice(0, 10);
+}
+ 
+// ── Percentile helper ─────────────────────────────────────────────────────────
+ 
+function percentile(sorted: number[], p: number): number {
+  if (!sorted.length) return 0;
+  const idx = (p / 100) * (sorted.length - 1);
+  const lo  = Math.floor(idx);
+  const hi  = Math.ceil(idx);
+  if (lo === hi) return sorted[lo];
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+}
+ 
+// ── computeDrinkingSummary ────────────────────────────────────────────────────
  
 async function computeDrinkingSummary(
   userId: string,
@@ -436,27 +467,41 @@ async function computeDrinkingSummary(
   periodEnd: Date,
   crossActivities: string[],
 ): Promise<any> {
-
-  // ── Step 1: all distinct drinking days (full dataset, unbounded) ─────────────
-  const allDrinkingRaw = await Log.aggregate([
-    { $match: { userId, 'food.alcohols': { $exists: true, $not: { $size: 0 } } } },
-    { $project: { _id: 0, date: { $dateToString: { format: '%Y-%m-%d', date: '$start.datetime' } } } },
-    { $group: { _id: '$date' } },
-    { $sort: { _id: 1 } },
-  ]);
+ 
+  // ── Step 1: load conversion table ───────────────────────────────────────────
+  const conversionDocs = await AlcoholConversion.find({ userId }).lean();
+  // Build a lookup: `${item}||${unit}` → drinks
+  const convMap = new Map<string, number>();
+  for (const c of conversionDocs) {
+    convMap.set(`${(c as any).item}||${(c as any).unit}`, (c as any).drinks);
+  }
+ 
+  // ── Step 2: all distinct drinking days (full dataset, unbounded) ─────────────
+  // Fetch raw to apply 6am date assignment in JS (can't do it in aggregation easily)
+  const allDrinkingRaw = await Log.find(
+    { userId, 'food.alcohols': { $exists: true, $not: { $size: 0 } } },
+    { 'start.datetime': 1, 'start.hour': 1 },
+  ).lean();
+ 
   const allDrinkingDates = new Set<string>(
-    allDrinkingRaw.map((r: any) => r._id).filter(Boolean),
+    allDrinkingRaw
+      .map((d: any) =>
+        d.start?.datetime
+          ? assignDrinkingDate(new Date(d.start.datetime), d.start?.hour)
+          : null,
+      )
+      .filter(Boolean) as string[],
   );
   const sortedAll = [...allDrinkingDates].sort();
   const datasetFirstDate = sortedAll[0] ?? periodStart.toISOString().slice(0, 10);
-
-  // ── Step 2: cap effective period end at yesterday ────────────────────────────
-  const yesterday = yesterdayStr();
-  const rawEnd     = periodEnd.toISOString().slice(0, 10);
-  const rawStart   = periodStart.toISOString().slice(0, 10);
-  const effectiveEnd   = rawEnd < yesterday ? rawEnd : yesterday;
+ 
+  // ── Step 3: cap effective period end at yesterday ────────────────────────────
+  const yesterday     = yesterdayStr();
+  const rawEnd        = periodEnd.toISOString().slice(0, 10);
+  const rawStart      = periodStart.toISOString().slice(0, 10);
+  const effectiveEnd  = rawEnd < yesterday ? rawEnd : yesterday;
   const effectiveStart = rawStart;
-
+ 
   // Build array of every date in the effective period
   const periodDates: string[] = [];
   const cursor  = new Date(`${effectiveStart}T00:00:00.000Z`);
@@ -466,12 +511,17 @@ async function computeDrinkingSummary(
     cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
   const daysInPeriod = periodDates.length;
-
-  // ── Step 3: fetch alcohol entries in the effective period ────────────────────
+ 
+  // ── Step 4: fetch alcohol entries in the effective period ────────────────────
+  // Expand window by 6h on the early side to capture pre-6am records
+  // that belong to the first day of the period
+  const fetchStart = new Date(`${effectiveStart}T00:00:00.000Z`);
+  fetchStart.setUTCHours(fetchStart.getUTCHours() - SLEEP_THRESHOLD_HOUR);
+ 
   const filter: Record<string, any> = {
     userId,
     'start.datetime': {
-      $gte: new Date(`${effectiveStart}T00:00:00.000Z`),
+      $gte: fetchStart,
       $lte: new Date(`${effectiveEnd}T23:59:59.999Z`),
     },
     'food.alcohols': { $exists: true, $not: { $size: 0 } },
@@ -480,34 +530,128 @@ async function computeDrinkingSummary(
     filter['activity.crossActivity'] = { $in: crossActivities };
   }
   const docs = await Log.find(filter).lean();
-
-  // ── Step 4: daily scores and histogram ──────────────────────────────────────
+ 
+  // ── Step 5: daily scores and histogram ──────────────────────────────────────
   const dailyScores = computeDailyScores(allDrinkingDates, periodDates, datasetFirstDate);
-
-  const drinkingDaySet = new Set(
+ 
+  // Build drinkingDaySet using assignDrinkingDate
+  const drinkingDaySet = new Set<string>(
     docs
       .map((d: any) =>
         d.start?.datetime
-          ? new Date(d.start.datetime).toISOString().slice(0, 10)
+          ? assignDrinkingDate(new Date(d.start.datetime), d.start?.hour)
           : null,
       )
-      .filter(Boolean),
+      .filter((s): s is string => s !== null && periodDates.includes(s)),
   );
-
+ 
   const scoreSum    = dailyScores.reduce((s, d) => s + d.score, 0);
   const avgRestDays = daysInPeriod > 0
     ? Math.round((scoreSum / daysInPeriod) * 10) / 10
     : 0;
-
+ 
   const histogram: Record<string, number> = Object.fromEntries(
     SCORE_BUCKET_ORDER.map(k => [k, 0]),
   );
   for (const { score } of dailyScores) {
     histogram[bucketScore(score)]++;
   }
+ 
+  // ── Step 6: drinks quantity ──────────────────────────────────────────────────
+ 
+  // Accumulate drinks per assigned date
+  const drinksByDate = new Map<string, number>();
+ 
+  for (const doc of docs) {
+    if (!(doc as any).start?.datetime) continue;
+    const dateStr = assignDrinkingDate(
+      new Date((doc as any).start.datetime),
+      (doc as any).start?.hour,
+    );
+    // Only count dates within the effective period
+    if (!periodDates.includes(dateStr)) continue;
+ 
+    const alcohols: any[] = (doc as any).food?.alcohols ?? [];
+    let sessionDrinks = 0;
+    for (const a of alcohols) {
+      const key = `${a.item}||${a.unit}`;
+      const drinksPerUnit = convMap.get(key) ?? null;
+      if (drinksPerUnit === null) continue;         // unknown item×unit — skip
+      const amount = parseFloat(a.amount);
+      if (isNaN(amount)) continue;
+      sessionDrinks += amount * drinksPerUnit;
+    }
+ 
+    drinksByDate.set(dateStr, (drinksByDate.get(dateStr) ?? 0) + sessionDrinks);
+  }
+ 
+  // Total drinks for the period
+  const totalDrinks = Math.round(
+    [...drinksByDate.values()].reduce((s, v) => s + v, 0) * 100,
+  ) / 100;
+ 
+  // Per-day stats — drinking days only
+  const perDayValues = [...drinksByDate.entries()]
+    .filter(([dateStr]) => drinkingDaySet.has(dateStr))
+    .map(([, v]) => Math.round(v * 100) / 100)
+    .sort((a, b) => a - b);
+ 
+  const drinkingDaysCount = perDayValues.length;
+ 
+  const drinksStats = drinkingDaysCount > 0
+    ? {
+        total:  totalDrinks,
+        min:    perDayValues[0],
+        max:    perDayValues[perDayValues.length - 1],
+        avg:    Math.round((perDayValues.reduce((s, v) => s + v, 0) / drinkingDaysCount) * 100) / 100,
+        p25:    Math.round(percentile(perDayValues, 25) * 100) / 100,
+        p75:    Math.round(percentile(perDayValues, 75) * 100) / 100,
+        n:      drinkingDaysCount,
+      }
+    : null;
+ 
+  // Drink Type — split each record proportionally by drinks value
+  // Total across all types = total number of records (docs.length)
+  const drinkTypeAccum: Record<string, number> = {};
 
-  // ── Step 5: remaining metrics ────────────────────────────────────────────────
+  for (const doc of docs) {
+    const dateStr = (doc as any).start?.datetime
+      ? assignDrinkingDate(new Date((doc as any).start.datetime), (doc as any).start?.hour)
+      : null;
+    if (!dateStr || !periodDates.includes(dateStr)) continue;
 
+    const alcohols: any[] = (doc as any).food?.alcohols ?? [];
+
+    // Compute drinks value per item in this record
+    const itemDrinks: { item: string; drinks: number }[] = [];
+    for (const a of alcohols) {
+      const key = `${a.item}||${a.unit}`;
+      const drinksPerUnit = convMap.get(key) ?? null;
+      if (drinksPerUnit === null) continue;
+      const amount = parseFloat(a.amount);
+      if (isNaN(amount)) continue;
+      itemDrinks.push({ item: a.item, drinks: amount * drinksPerUnit });
+    }
+
+    const recordTotal = itemDrinks.reduce((s, x) => s + x.drinks, 0);
+    if (recordTotal === 0) continue;
+
+    // Split this record (= 1.0) proportionally across items
+    for (const { item, drinks } of itemDrinks) {
+      const share = drinks / recordTotal;
+      drinkTypeAccum[item] = (drinkTypeAccum[item] ?? 0) + share;
+    }
+  }
+
+  // Round to integers for display
+  const drinkType: Record<string, number> = {};
+  for (const [item, val] of Object.entries(drinkTypeAccum)) {
+    const rounded = Math.round(val);
+    if (rounded > 0) drinkType[item] = rounded;
+  }
+
+  // ── Step 7: remaining metrics ────────────────────────────────────────────────
+ 
   // Occasions
   const occasions: Record<string, number> = {
     '아침술': 0, '점심술': 0, '저녁술': 0, '낮술': 0, 'After/No dinner': 0,
@@ -516,7 +660,7 @@ async function computeDrinkingSummary(
     const label = classifyOccasion((doc as any).food?.type, (doc as any).start?.hour);
     occasions[label] = (occasions[label] ?? 0) + 1;
   }
-
+ 
   // Avg start & end times — circular, pre-6am treated as 24+
   const THRESHOLD = 6;
   function toCircular(vals: (number | null)[]): number | null {
@@ -528,10 +672,10 @@ async function computeDrinkingSummary(
     const wrapped = Math.round(dec * 60) % 1440;
     return `${String(Math.floor(wrapped / 60)).padStart(2, '0')}:${String(wrapped % 60).padStart(2, '0')}`;
   }
-
+ 
   const avgStartClock = decimalToClock(toCircular(docs.map((d: any) => hourStrToDecimal(d.start?.hour))));
   const avgEndClock   = decimalToClock(toCircular(docs.map((d: any) => hourStrToDecimal(d.end?.hour))));
-
+ 
   // Avg duration
   const durations = docs
     .map((d: any) => d.duration?.totalSeconds)
@@ -539,16 +683,15 @@ async function computeDrinkingSummary(
   const avgDurationSeconds = durations.length
     ? Math.round(durations.reduce((s, v) => s + v, 0) / durations.length)
     : null;
-
-  // Companions — one count per event, dominant relation type represents the event
+ 
+  // Companions
   const aloneCount = docs.filter((d: any) => !d.people || d.people.length === 0).length;
   const byRelationType: Record<string, number> = {};
   const personMap: Record<string, { categories: Record<string, number>; total: number }> = {};
-
+ 
   for (const doc of docs) {
     if (!(doc as any).people?.length) continue;
-
-    // Count groups per category in this event to find dominant
+ 
     const eventCategoryCounts: Record<string, number> = {};
     for (const group of (doc as any).people) {
       const category = group.category ?? '기타';
@@ -556,11 +699,8 @@ async function computeDrinkingSummary(
     }
     const dominantCategory = Object.entries(eventCategoryCounts)
       .sort((a, b) => b[1] - a[1])[0]?.[0] ?? '기타';
-
-    // byRelationType: one count per event using dominant category
     byRelationType[dominantCategory] = (byRelationType[dominantCategory] ?? 0) + 1;
-
-    // Top people: one count per person per event
+ 
     const eventPeople = new Set<string>();
     for (const group of (doc as any).people) {
       const category = group.category ?? '기타';
@@ -576,10 +716,10 @@ async function computeDrinkingSummary(
       }
     }
   }
-
+ 
   const dominantKey = (counts: Record<string, number>): string =>
     Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '기타';
-
+ 
   const topPeople = Object.entries(personMap)
     .sort((a, b) => b[1].total - a[1].total)
     .slice(0, 10)
@@ -588,7 +728,7 @@ async function computeDrinkingSummary(
       dominantCategory: dominantKey(data.categories),
       total: data.total,
     }));
-
+ 
   return {
     daysInPeriod,
     drinkingDays:      drinkingDaySet.size,
@@ -599,9 +739,11 @@ async function computeDrinkingSummary(
     avgEndClock,
     avgDurationSeconds,
     occasions,
+    drinks:    drinksStats,
+    drinkType,
     companions: {
       alone:          aloneCount,
-      total:          docs.length,  // matches Occasion total exactly
+      total:          docs.length,
       byRelationType,
       topPeople,
     },
