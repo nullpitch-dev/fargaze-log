@@ -7,6 +7,8 @@ import { useIsDark } from '../_lib/hooks';
 import { buildParams } from '../_lib/date-helpers';
 import { formatDuration } from '../_lib/format';
 import type { WidgetProps } from '../_lib/types';
+import { BoxPlot } from '../_components/charts/BoxPlot';
+import { Histogram } from '../_components/charts/Histogram';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -79,7 +81,7 @@ function HorizBar({ label, count, total, color }: {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
   return (
     <div className="flex items-center gap-1.5 text-[11px]">
-      <span className="w-20 shrink-0 text-stone-500 dark:text-zinc-400 truncate">{label}</span>
+      <span className="w-8 shrink-0 text-stone-500 dark:text-zinc-400 truncate">{label}</span>
       <div className="flex-1 h-1 rounded-full bg-stone-100 dark:bg-zinc-800 overflow-hidden min-w-0">
         <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
       </div>
@@ -119,140 +121,36 @@ function StatCard({ value, label }: { value: string; label: string }) {
   );
 }
 
-// ── Drinks Box Plot ───────────────────────────────────────────────────────────
 
-function DrinksBoxPlot({ drinks, isDark }: { drinks: DrinksStats; isDark: boolean }) {
-  const barColor   = isDark ? '#2dd4bf' : '#1d4ed8';
-  const gridColor  = isDark ? '#3f3f46' : '#e7e5e4';
-  const labelColor = isDark ? '#a1a1aa' : '#a8a29e';
-  const avgColor   = isDark ? '#f97316' : '#ea580c';
+// ── Total Drinks card with ⓘ tooltip ─────────────────────────────────────────
 
-  const W = 260, H = 72;
-  const padL = 32, padR = 32;
-  const chartW = W - padL - padR;
-  const midY   = H / 2;
-  const boxH   = 18;
-
-  const { min, max, avg, p25, p75 } = drinks;
-  const range = max - min || 1;
-  const toX = (v: number) => padL + ((v - min) / range) * chartW;
-
-  const xMin = toX(min);
-  const xMax = toX(max);
-  const x25  = toX(p25);
-  const x75  = toX(p75);
-  const xAvg = toX(avg);
-
-  // All labels above the box; stagger avg up slightly to avoid overlap with min/max
-  const labelY = midY - boxH / 2 - 5;
-
+function TotalDrinksCard({ total, isDark }: { total: number; isDark: boolean }) {
+  const [tipOpen, setTipOpen] = useState(false);
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ overflow: 'visible' }}>
-      {/* Baseline */}
-      <line x1={padL} y1={midY} x2={padL + chartW} y2={midY}
-        stroke={gridColor} strokeWidth={1} />
-
-      {/* Whiskers */}
-      <line x1={xMin} y1={midY - boxH / 2} x2={xMin} y2={midY + boxH / 2}
-        stroke={barColor} strokeWidth={1.5} />
-      <line x1={xMin} y1={midY} x2={x25} y2={midY}
-        stroke={barColor} strokeWidth={1.5} />
-      <line x1={x75} y1={midY} x2={xMax} y2={midY}
-        stroke={barColor} strokeWidth={1.5} />
-      <line x1={xMax} y1={midY - boxH / 2} x2={xMax} y2={midY + boxH / 2}
-        stroke={barColor} strokeWidth={1.5} />
-
-      {/* IQR box */}
-      <rect x={x25} y={midY - boxH / 2} width={Math.max(x75 - x25, 1)} height={boxH}
-        fill={barColor} opacity={0.2} rx={2} />
-      <rect x={x25} y={midY - boxH / 2} width={Math.max(x75 - x25, 1)} height={boxH}
-        fill="none" stroke={barColor} strokeWidth={1.5} rx={2} />
-
-      {/* Avg diamond */}
-      <polygon
-        points={`${xAvg},${midY - 7} ${xAvg + 6},${midY} ${xAvg},${midY + 7} ${xAvg - 6},${midY}`}
-        fill={avgColor}
-      />
-
-      {/* Min label — always bottom-left of whisker */}
-      <text x={xMin} y={midY + boxH / 2 + 13} textAnchor="middle"
-        fontSize={11} fill={labelColor}>{min}</text>
-
-      {/* Max label — always bottom-right of whisker */}
-      <text x={xMax} y={midY + boxH / 2 + 13} textAnchor="middle"
-        fontSize={11} fill={labelColor}>{max}</text>
-
-      {/* Avg label — above the diamond */}
-      <text x={xAvg} y={labelY} textAnchor="middle"
-        fontSize={11} fill={avgColor} fontWeight="600">{avg}</text>
-
-      {/* P25 / P75 — above box, suppressed if too close to whiskers */}
-      {x25 - xMin > 26 && (
-        <text x={x25} y={labelY} textAnchor="middle"
-          fontSize={11} fill={labelColor}>P25 {p25}</text>
+    <div className="flex flex-col gap-0.5">
+      <div className="flex items-center gap-1">
+        <span className="text-[10px] font-medium text-stone-400 dark:text-zinc-500 uppercase tracking-wide">
+          Total Drinks
+        </span>
+        {/* ⓘ icon — click/tap toggles tooltip */}
+        <button
+          onClick={() => setTipOpen(v => !v)}
+          className="text-stone-300 dark:text-zinc-600 hover:text-stone-400 dark:hover:text-zinc-400 leading-none"
+          style={{ fontSize: '11px', lineHeight: 1 }}
+          aria-label="What is a drink?"
+        >
+          ⓘ
+        </button>
+      </div>
+      <span className="text-2xl font-medium text-stone-800 dark:text-zinc-100 leading-none tabular-nums">
+        {Math.round(total)}
+      </span>
+      {tipOpen && (
+        <span className="text-[10px] text-stone-400 dark:text-zinc-500 leading-snug mt-0.5">
+          1 drink = 50 ml soju equivalent
+        </span>
       )}
-      {xMax - x75 > 26 && (
-        <text x={x75} y={labelY} textAnchor="middle"
-          fontSize={11} fill={labelColor}>P75 {p75}</text>
-      )}
-    </svg>
-  );
-}
-
-// ── Rest Histogram ────────────────────────────────────────────────────────────
-
-function RestHistogram({
-  histogram,
-  avgRestDays,
-  isDark,
-}: {
-  histogram: Record<string, number>;
-  avgRestDays: number;
-  isDark: boolean;
-}) {
-  const barColor   = isDark ? '#2dd4bf' : '#1d4ed8';
-  const gridColor  = isDark ? '#3f3f46' : '#e7e5e4';
-  const labelColor = isDark ? '#a1a1aa' : '#a8a29e';
-  const valueColor = isDark ? '#f4f4f5' : '#292524';
-
-  const counts   = BUCKET_ORDER.map(k => histogram[k] ?? 0);
-  const maxCount = Math.max(...counts, 1);
-
-  const W = 300, H = 100;
-  const padT = 20, padB = 20;
-  const chartH   = H - padT - padB;
-  const barCount = BUCKET_ORDER.length;
-  const barGap   = 4;
-  const barW     = (W - barGap * (barCount - 1)) / barCount;
-
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ overflow: 'visible' }}>
-      <line x1={0} y1={padT} x2={W} y2={padT} stroke={gridColor} strokeWidth={1} />
-      {counts.map((count, i) => {
-        const barH  = maxCount > 0 ? (count / maxCount) * chartH : 0;
-        const x     = i * (barW + barGap);
-        const y     = padT + chartH - barH;
-        const label = BUCKET_ORDER[i];
-        return (
-          <g key={label}>
-            <rect
-              x={x} y={y} width={barW} height={Math.max(barH, 0)}
-              fill={barColor} rx={3} opacity={count === 0 ? 0.15 : 0.85}
-            />
-            {count > 0 && (
-              <text x={x + barW / 2} y={y - 4} textAnchor="middle"
-                fontSize={11} fill={valueColor} fontWeight="500">
-                {count}
-              </text>
-            )}
-            <text x={x + barW / 2} y={H - 2} textAnchor="middle"
-              fontSize={11} fill={labelColor}>
-              {label}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
+    </div>
   );
 }
 
@@ -272,40 +170,44 @@ function StatsTab({ data, isDark }: { data: DrinkingSummary; isDark: boolean }) 
   return (
     <div className="flex flex-col gap-3">
 
-      {/* ── Row 1: Drinking Days | Total Drinks | Drinks Per Day ── */}
-      <div className="flex items-end gap-5">
-        <div className="flex flex-col gap-0.5 shrink-0">
-          <div className="flex items-baseline gap-1">
-            <span className="text-2xl font-medium text-stone-800 dark:text-zinc-100 leading-none tabular-nums">
-              {data.drinkingDays}
+      {/* ── Row 1: [Drinking Days / Total Drinks] 35 | [Drinks Per Day box plot] 65 ── */}
+      <div className="flex gap-4">
+
+        {/* Left 35%: stacked Drinking Days + Total Drinks */}
+        <div className="flex flex-col gap-2" style={{ flex: '35' }}>
+          {/* Drinking Days */}
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[10px] font-medium text-stone-400 dark:text-zinc-500 uppercase tracking-wide">
+              Drinking Days
             </span>
-            <span className="text-sm text-stone-400 dark:text-zinc-500 tabular-nums">
-              / {data.daysInPeriod}d ({drinkingPct}%)
-            </span>
+            <div className="flex items-baseline gap-1">
+              <span className="text-2xl font-medium text-stone-800 dark:text-zinc-100 leading-none tabular-nums">
+                {data.drinkingDays}
+              </span>
+              <span className="text-sm text-stone-400 dark:text-zinc-500 tabular-nums">
+                / {data.daysInPeriod}d ({drinkingPct}%)
+              </span>
+            </div>
           </div>
-          <span className="text-[10px] text-stone-400 dark:text-zinc-500">Drinking Days</span>
+
+          {/* Total Drinks */}
+          {data.drinks && (
+            <TotalDrinksCard total={data.drinks.total} isDark={isDark} />
+          )}
         </div>
 
+        {/* Right 65%: Drinks Per Day box plot */}
         {data.drinks && (
-          <>
-            <div className="flex flex-col gap-0.5 shrink-0">
-              <span className="text-2xl font-medium text-stone-800 dark:text-zinc-100 leading-none tabular-nums">
-                {data.drinks.total}
-              </span>
-              <div className="flex items-center gap-1">
-                <span className="text-[10px] text-stone-400 dark:text-zinc-500">Total Drinks</span>
-                <span className="text-[9px] text-stone-300 dark:text-zinc-600">(50 ml soju eq.)</span>
-              </div>
+          <div className="flex flex-col" style={{ flex: '65', gap: '6px' }}>
+            <span className="text-[10px] font-medium text-stone-400 dark:text-zinc-500 uppercase tracking-wide">
+              Drinks Per Day
+            </span>
+            <div className="flex flex-col w-full" style={{ gap: '1px' }}>
+              <BoxPlot {...data.drinks} isDark={isDark} />
             </div>
-
-            <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-              <DrinksBoxPlot drinks={data.drinks} isDark={isDark} />
-              <span className="text-[10px] text-stone-400 dark:text-zinc-500">
-                Drinks Per Day ({data.drinks.n} drinking days)
-              </span>
-            </div>
-          </>
+          </div>
         )}
+
       </div>
 
       <div className="border-t border-stone-100 dark:border-zinc-800" />
@@ -319,11 +221,11 @@ function StatsTab({ data, isDark }: { data: DrinkingSummary; isDark: boolean }) 
 
       <div className="border-t border-stone-100 dark:border-zinc-800" />
 
-      {/* ── Row 3: Consecutive Rest Days (70%) | Session Time (30%) ── */}
+      {/* ── Row 3: Consecutive Rest Days (65%) | Session Time (35%) ── */}
       <div className="flex gap-4">
 
-        {/* Left 70%: histogram */}
-        <div className="flex flex-col gap-1" style={{ flex: '6.5' }}>
+        {/* Left 65%: histogram */}
+        <div className="flex flex-col gap-1" style={{ flex: '65' }}>
           <div className="flex items-baseline gap-1.5">
             <span className="text-[10px] font-medium text-stone-400 dark:text-zinc-500 uppercase tracking-wide">
               Consecutive Rest Days
@@ -332,11 +234,14 @@ function StatsTab({ data, isDark }: { data: DrinkingSummary; isDark: boolean }) 
               (Avg: {data.avgRestDays}d)
             </span>
           </div>
-          <RestHistogram histogram={data.histogram} avgRestDays={data.avgRestDays} isDark={isDark} />
+          <Histogram
+            buckets={BUCKET_ORDER.map(label => ({ label, count: data.histogram[label] ?? 0 }))}
+            isDark={isDark}
+          />
         </div>
 
-        {/* Right 30%: Session Time */}
-        <div className="flex flex-col gap-2" style={{ flex: '3.5' }}>
+        {/* Right 35%: Session Time */}
+        <div className="flex flex-col gap-2" style={{ flex: '35' }}>
           <span className="text-[10px] font-medium text-stone-400 dark:text-zinc-500 uppercase tracking-wide">
             Session Time
           </span>
