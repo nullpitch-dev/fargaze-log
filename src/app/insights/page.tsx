@@ -68,7 +68,7 @@ export default function InsightsPage() {
         crossActivityOptions={crossActivityOptions}
       />
 
-      <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, 420px)' }}>
+      <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, 440px)' }}>
         {WIDGETS.map(({ id, size, component: Widget }) => (
           <div key={id} className={SIZE_COLS[size]}>
             <Widget globalFilter={appliedFilter} />
