@@ -103,10 +103,15 @@ function stepBack(
     const monday = new Date(jan4);
     monday.setUTCDate(jan4.getUTCDate() - (dayOfWeek - 1) + (week - 1) * 7);
     monday.setUTCDate(monday.getUTCDate() - steps * 7);
-    const weekNum = Math.ceil(
-      ((monday.getTime() - new Date(Date.UTC(monday.getUTCFullYear(), 0, 1)).getTime()) / 86400000 + 1) / 7,
-    );
-    return `${monday.getUTCFullYear()}-W${String(weekNum).padStart(2, '0')}`;
+    // Recalculate ISO week number using jan4 of the result year
+    const resultYear = monday.getUTCFullYear();
+    const jan4Result = new Date(Date.UTC(resultYear, 0, 4));
+    const dow4Result = jan4Result.getUTCDay() || 7;
+    const week1Monday = new Date(jan4Result);
+    week1Monday.setUTCDate(jan4Result.getUTCDate() - (dow4Result - 1));
+    const diffDaysVal = Math.round((monday.getTime() - week1Monday.getTime()) / 86400000);
+    const resultWeek = Math.floor(diffDaysVal / 7) + 1;
+    return `${resultYear}-W${String(resultWeek).padStart(2, '0')}`;
   }
   if (timeMode === 'day') {
     const d = new Date(`${timePeriod}T00:00:00.000Z`);
@@ -854,6 +859,21 @@ export async function GET(req: NextRequest) {
 
   // ── drinking.summary ────────────────────────────────────────────────────────
   if (metric === 'drinking.summary') {
+    if (mode === 'trend') {
+      const periods: string[] = [];
+      for (let i = bucketsBack - 1; i >= 0; i--) {
+        periods.push(stepBack(timeMode, timePeriod || currentPeriod(timeMode), i));
+      }
+      const bucketResults = await Promise.all(
+        periods.map(async period => {
+          const { start, end } = buildDateRange(timeMode, period, null, null);
+          const bucket = await computeDrinkingTrendBucket(userId, start, end, crossActivities);
+          return { label: labelForPeriod(timeMode, period), ...bucket };
+        }),
+      );
+      return NextResponse.json({ data: bucketResults });
+    }
+
     const { start, end } = buildDateRange(timeMode, timePeriod, dateFrom, dateTo);
     const summary = await computeDrinkingSummary(userId, start, end, crossActivities);
     return NextResponse.json({ summary });
@@ -862,16 +882,272 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ error: 'Unknown metric' }, { status: 400 });
 }
 
+// ── computeDrinkingTrendBucket ────────────────────────────────────────────────
+
+async function computeDrinkingTrendBucket(
+  userId: string,
+  periodStart: Date,
+  periodEnd: Date,
+  crossActivities: string[],
+): Promise<{
+  drinkingDays: number;
+  daysInPeriod: number;
+  totalDrinks: number;
+  avgDrinksPerDay: number | null;
+  drinksBox: { min: number; max: number; avg: number; p25: number; p75: number } | null;
+  avgRestDays: number;
+  histogram: Record<string, number>;
+  drinkType: Record<string, number>;
+  occasions: Record<string, number>;
+  companions: Record<string, number>;
+  avgStartMins: number | null;
+  avgEndMins: number | null;
+  avgDurationSeconds: number | null;
+}> {
+  // Load conversion table
+  const conversionDocs = await AlcoholConversion.find({ userId }).lean();
+  const convMap = new Map<string, number>();
+  for (const c of conversionDocs) {
+    convMap.set(`${(c as any).item}||${(c as any).unit}`, (c as any).drinks);
+  }
+
+  // Period dates
+  const yesterday      = yesterdayStr();
+  const rawEnd         = periodEnd.toISOString().slice(0, 10);
+  const rawStart       = periodStart.toISOString().slice(0, 10);
+  const effectiveEnd   = rawEnd < yesterday ? rawEnd : yesterday;
+  const effectiveStart = rawStart;
+
+  const periodDates: string[] = [];
+  const cursor  = new Date(`${effectiveStart}T00:00:00.000Z`);
+  const endDate = new Date(`${effectiveEnd}T00:00:00.000Z`);
+  while (cursor <= endDate) {
+    periodDates.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  const daysInPeriod = periodDates.length;
+  if (daysInPeriod === 0) {
+    return {
+      drinkingDays: 0, daysInPeriod: 0, totalDrinks: 0,
+      avgDrinksPerDay: null, drinksBox: null, avgRestDays: 0,
+      histogram: {}, drinkType: {}, occasions: {}, companions: {},
+      avgStartMins: null, avgEndMins: null, avgDurationSeconds: null,
+    };
+  }
+
+  // Fetch docs in the period (with 6h lookback)
+  const fetchStart = new Date(`${effectiveStart}T00:00:00.000Z`);
+  fetchStart.setUTCHours(fetchStart.getUTCHours() - SLEEP_THRESHOLD_HOUR);
+  const filter: Record<string, any> = {
+    userId,
+    'start.datetime': {
+      $gte: fetchStart,
+      $lte: new Date(`${effectiveEnd}T23:59:59.999Z`),
+    },
+    'food.alcohols': { $exists: true, $not: { $size: 0 } },
+  };
+  if (crossActivities.length) filter['activity.crossActivity'] = { $in: crossActivities };
+  const docs = await Log.find(filter).lean();
+
+  // Drinking days
+  const drinkingDaySet = new Set<string>(
+    docs
+      .map((d: any) =>
+        d.start?.datetime
+          ? assignDrinkingDate(new Date(d.start.datetime), d.start?.hour)
+          : null,
+      )
+      .filter((s): s is string => s !== null && periodDates.includes(s)),
+  );
+
+  // Drinks per date
+  const drinksByDate = new Map<string, number>();
+  const drinkTypeAccum: Record<string, number> = {};
+  const occasions: Record<string, number> = {
+    '아침술': 0, '점심술': 0, '저녁술': 0, '낮술': 0, 'After/No dinner': 0,
+  };
+  const companions: Record<string, number> = {};
+
+  for (const doc of docs) {
+    if (!(doc as any).start?.datetime) continue;
+    const dateStr = assignDrinkingDate(
+      new Date((doc as any).start.datetime),
+      (doc as any).start?.hour,
+    );
+    if (!periodDates.includes(dateStr)) continue;
+
+    // Drinks quantity
+    const alcohols: any[] = (doc as any).food?.alcohols ?? [];
+    let sessionDrinks = 0;
+    const itemDrinks: { item: string; drinks: number }[] = [];
+    for (const a of alcohols) {
+      const key = `${a.item}||${a.unit}`;
+      const dpu = convMap.get(key) ?? null;
+      if (dpu === null) continue;
+      const amt = parseFloat(a.amount);
+      if (isNaN(amt)) continue;
+      const d = amt * dpu;
+      sessionDrinks += d;
+      itemDrinks.push({ item: a.item, drinks: d });
+    }
+    drinksByDate.set(dateStr, (drinksByDate.get(dateStr) ?? 0) + sessionDrinks);
+
+    // Drink type (proportional)
+    const recTotal = itemDrinks.reduce((s, x) => s + x.drinks, 0);
+    if (recTotal > 0) {
+      for (const { item, drinks } of itemDrinks) {
+        drinkTypeAccum[item] = (drinkTypeAccum[item] ?? 0) + drinks / recTotal;
+      }
+    }
+
+    // Occasions
+    const occ = classifyOccasion((doc as any).food?.type, (doc as any).start?.hour);
+    occasions[occ] = (occasions[occ] ?? 0) + 1;
+
+    // Companions (by relation type)
+    for (const group of ((doc as any).people ?? [])) {
+      const cat = group.category ?? '기타';
+      companions[cat] = (companions[cat] ?? 0) + 1;
+    }
+    if (!((doc as any).people?.length)) {
+      companions['혼자'] = (companions['혼자'] ?? 0) + 1;
+    }
+  }
+
+  const totalDrinks = Math.round(
+    [...drinksByDate.values()].reduce((s, v) => s + v, 0) * 100,
+  ) / 100;
+
+  const perDayValues = [...drinksByDate.entries()]
+    .filter(([d]) => drinkingDaySet.has(d))
+    .map(([, v]) => Math.round(v * 100) / 100)
+    .sort((a, b) => a - b);
+
+  const n = perDayValues.length;
+  const drinksBox = n > 0 ? {
+    min: perDayValues[0],
+    max: perDayValues[n - 1],
+    avg: Math.round((perDayValues.reduce((s, v) => s + v, 0) / n) * 100) / 100,
+    p25: Math.round(percentile(perDayValues, 25) * 100) / 100,
+    p75: Math.round(percentile(perDayValues, 75) * 100) / 100,
+  } : null;
+
+  const avgDrinksPerDay = n > 0
+    ? Math.round((perDayValues.reduce((s, v) => s + v, 0) / n) * 100) / 100
+    : null;
+
+  // Drink type rounded
+  const drinkType: Record<string, number> = {};
+  for (const [item, val] of Object.entries(drinkTypeAccum)) {
+    const r = Math.round(val);
+    if (r > 0) drinkType[item] = r;
+  }
+
+  // Histogram — reuse same daily score logic as summary
+  // We need allDrinkingDates for this; fetch lazily for the full dataset
+  const allDrinkingRaw = await Log.find(
+    { userId, 'food.alcohols': { $exists: true, $not: { $size: 0 } } },
+    { 'start.datetime': 1, 'start.hour': 1 },
+  ).lean();
+  const allDrinkingDates = new Set<string>(
+    allDrinkingRaw
+      .map((d: any) => d.start?.datetime
+        ? assignDrinkingDate(new Date(d.start.datetime), d.start?.hour)
+        : null)
+      .filter(Boolean) as string[],
+  );
+  const sortedAll = [...allDrinkingDates].sort();
+  const datasetFirstDate = sortedAll[0] ?? effectiveStart;
+  const dailyScores = computeDailyScores(allDrinkingDates, periodDates, datasetFirstDate);
+  const histogram: Record<string, number> = Object.fromEntries(
+    SCORE_BUCKET_ORDER.map(k => [k, 0]),
+  );
+  for (const { score } of dailyScores) {
+    histogram[bucketScore(score)]++;
+  }
+
+  // avgRestDays — use same dailyScores logic as computeDrinkingSummary
+  const scoreSum = dailyScores.reduce((s, d) => s + d.score, 0);
+  const avgRestDays = daysInPeriod > 0
+    ? Math.round((scoreSum / daysInPeriod) * 10) / 10
+    : 0;
+
+  // Session time — avg start/end as minutes-since-midnight (with midnight overflow for end)
+  // Use circular mean with 6am threshold for start; allow end > 1440
+  const THRESHOLD = 6;
+  function toCircularMins(vals: (number | null)[]): number | null {
+    const v = vals.filter((x): x is number => x !== null)
+      .map(m => m < THRESHOLD * 60 ? m + 1440 : m);
+    if (!v.length) return null;
+    const avg = v.reduce((s, x) => s + x, 0) / v.length;
+    return Math.round(avg % 1440);
+  }
+
+  const startMinsArr = docs.map((d: any) => hourStringToMinutes(d.start?.hour));
+  const endMinsArr   = docs.map((d: any) => {
+    const m = hourStringToMinutes((d as any).end?.hour);
+    if (m === null) return null;
+    // If end < start (overnight), add 1440
+    const sm = hourStringToMinutes((d as any).start?.hour);
+    return (sm !== null && m < sm) ? m + 1440 : m;
+  });
+
+  const avgStartMins = toCircularMins(startMinsArr);
+  // For end: use raw average allowing >1440
+  const validEndMins = endMinsArr.filter((x): x is number => x !== null);
+  const avgEndMinsRaw = validEndMins.length
+    ? Math.round(validEndMins.reduce((s, v) => s + v, 0) / validEndMins.length)
+    : null;
+
+  const durations = docs
+    .map((d: any) => d.duration?.totalSeconds)
+    .filter((v): v is number => v != null && v > 0);
+  const avgDurationSeconds = durations.length
+    ? Math.round(durations.reduce((s, v) => s + v, 0) / durations.length)
+    : null;
+
+  return {
+    drinkingDays: drinkingDaySet.size,
+    daysInPeriod,
+    totalDrinks,
+    avgDrinksPerDay,
+    drinksBox,
+    avgRestDays,
+    histogram,
+    drinkType,
+    occasions,
+    companions,
+    avgStartMins,
+    avgEndMins: avgEndMinsRaw,
+    avgDurationSeconds,
+  };
+}
+
 function currentPeriod(timeMode: string): string {
   const now = new Date();
   if (timeMode === 'month') {
     return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
   }
   if (timeMode === 'week') {
-    const jan1    = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
-    const dayOfYr = Math.floor((now.getTime() - jan1.getTime()) / 86400000) + 1;
-    const week    = Math.ceil(dayOfYr / 7);
-    return `${now.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+    // ISO week: find Monday of W01 (Monday on or before Jan 4)
+    const year    = now.getUTCFullYear();
+    const jan4    = new Date(Date.UTC(year, 0, 4));
+    const dow4    = jan4.getUTCDay() || 7;
+    const week1Mon = new Date(jan4);
+    week1Mon.setUTCDate(jan4.getUTCDate() - (dow4 - 1));
+    // Find this week's Monday
+    const dow     = now.getUTCDay() || 7;
+    const thisMon = new Date(now);
+    thisMon.setUTCDate(now.getUTCDate() - (dow - 1));
+    thisMon.setUTCHours(0, 0, 0, 0);
+    const diff    = Math.round((thisMon.getTime() - week1Mon.getTime()) / 86400000);
+    const week    = Math.floor(diff / 7) + 1;
+    const resultYear = thisMon.getUTCFullYear();
+    // Handle year boundary — if week < 1, it belongs to previous year's last week
+    if (week < 1) {
+      return stepBack('week', `${resultYear + 1}-W01`, 1);
+    }
+    return `${resultYear}-W${String(week).padStart(2, '0')}`;
   }
   return now.toISOString().slice(0, 10);
 }

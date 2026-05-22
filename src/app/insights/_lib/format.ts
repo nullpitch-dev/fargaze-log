@@ -17,7 +17,12 @@ export function formatBucketLabel(label: string): string {
     const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     return names[parseInt(label.split('-')[1]) - 1];
   }
-  if (/W\d+/.test(label)) return `W${label.split('-W')[1]}`;
+  // Week label — handles both "2026-W21" (raw) and "2026W21" / "W21" (compressed)
+  if (/W\d+/.test(label)) {
+    if (label.includes('-W')) return `W${label.split('-W')[1]}`;
+    const m = label.match(/^(\d{2,4})?(W\d{2})$/);
+    return m ? m[2] : label;
+  }
   if (/^\d{4}-\d{2}-\d{2}$/.test(label)) return label.split('-')[2];
   return label;
 }

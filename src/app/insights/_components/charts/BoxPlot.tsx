@@ -22,7 +22,7 @@ export function BoxPlot({ min, max, avg, p25, p75, isDark }: BoxPlotProps) {
   const avgLeft  = ((avg - min) / range) * 100;
 
   return (
-    <div className="flex flex-col w-full" style={{ gap: '1px' }}>
+    <div className="flex flex-col w-full pr-5" style={{ gap: '1px' }}>
 
       {/* Upper label row: min, avg, max */}
       <div className="relative w-full" style={{ height: '14px' }}>

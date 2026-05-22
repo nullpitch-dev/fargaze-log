@@ -27,10 +27,10 @@ const WIDGETS: WidgetConfig[] = [
   { id: 'drinking',     size: 'md', component: DrinkingWidget },
 ];
 
-const SIZE_COLS: Record<WidgetSize, string> = {
-  sm: 'col-span-1',
-  md: 'col-span-1',
-  lg: 'col-span-1 md:col-span-2 lg:col-span-3',
+const SIZE_BREAK: Record<WidgetSize, string> = {
+  sm: 'break-inside-avoid',
+  md: 'break-inside-avoid',
+  lg: 'break-inside-avoid',
 };
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -68,9 +68,9 @@ export default function InsightsPage() {
         crossActivityOptions={crossActivityOptions}
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="columns-1 md:columns-2 lg:columns-3 gap-4">
         {WIDGETS.map(({ id, size, component: Widget }) => (
-          <div key={id} className={SIZE_COLS[size]}>
+          <div key={id} className={`${SIZE_BREAK[size]} mb-4`}>
             <Widget globalFilter={appliedFilter} />
           </div>
         ))}

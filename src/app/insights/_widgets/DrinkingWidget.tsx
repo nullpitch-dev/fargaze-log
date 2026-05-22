@@ -2,17 +2,25 @@
 // src/app/insights/_widgets/DrinkingWidget.tsx
 
 import { useEffect, useState } from 'react';
-import { WidgetCard } from '../_components/WidgetCard';
+import { WidgetCard, ViewToggle, BucketSelector } from '../_components/WidgetCard';
 import { useIsDark } from '../_lib/hooks';
 import { buildParams } from '../_lib/date-helpers';
 import { formatDuration } from '../_lib/format';
-import type { WidgetProps } from '../_lib/types';
+import type { WidgetProps, WidgetViewMode } from '../_lib/types';
 import { BoxPlot } from '../_components/charts/BoxPlot';
 import { Histogram } from '../_components/charts/Histogram';
+import {
+  CssTrendChart,
+  CssStackedBarChart,
+  CssVerticalBoxPlotChart,
+  CssDualLineChart,
+  CssRestChart,
+} from '../_components/charts/css-chart-components';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type SummaryTab = 'stats' | 'top10';
+type SummaryTab  = 'stats' | 'top10';
+type TrendMetric = 'days' | 'totalDrinks' | 'drinksPerDay' | 'drinkType' | 'occasion' | 'withWhom' | 'restDays' | 'sessionTime';
 
 interface DrinksStats {
   total: number;
@@ -43,6 +51,40 @@ interface DrinkingSummary {
     topPeople:      { name: string; dominantCategory: string; total: number }[];
   };
 }
+
+interface DrinkingTrendBucket {
+  label:              string;
+  drinkingDays:       number;
+  daysInPeriod:       number;
+  totalDrinks:        number;
+  avgDrinksPerDay:    number | null;
+  drinksBox:          { min: number; max: number; avg: number; p25: number; p75: number } | null;
+  avgRestDays:        number;
+  histogram:          Record<string, number>;
+  drinkType:          Record<string, number>;
+  occasions:          Record<string, number>;
+  companions:         Record<string, number>;
+  avgStartMins:       number | null;
+  avgEndMins:         number | null;
+  avgDurationSeconds: number | null;
+}
+
+// ── Metric definitions ────────────────────────────────────────────────────────
+
+const TREND_METRICS: { key: TrendMetric; label: string; desc: string; tip?: string }[] = [
+  { key: 'days',        label: 'Freq',      desc: 'Number of drinking days over time'                },
+  { key: 'totalDrinks', label: 'Amt(all)',  desc: 'Total drinks consumed over time',
+    tip: '1 drink = 50 ml soju equivalent' },
+  { key: 'drinksPerDay',label: 'Amt(day)',  desc: 'Drinks per drinking day — distribution over time',
+    tip: '1 drink = 50 ml soju equivalent' },
+  { key: 'drinkType',   label: 'Type',      desc: 'Mix of drink types over time (100%)'              },
+  { key: 'occasion',    label: 'Occasion',  desc: 'Mix of drinking occasions over time (100%)'       },
+  { key: 'withWhom',    label: 'People',    desc: 'Who you drink with over time (100%)'              },
+  { key: 'restDays',    label: 'Rest',      desc: 'Rest days distribution and average over time',
+    tip: 'Consecutive days without drinking before each day' },
+  { key: 'sessionTime', label: 'Session',   desc: 'Average session start and end time over time',
+    tip: '1 drink = 50 ml soju equivalent' },
+];
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -308,52 +350,261 @@ function Top10Tab({ data }: { data: DrinkingSummary }) {
   );
 }
 
+// ── Trend ⓘ tooltip ───────────────────────────────────────────────────────────
+
+function TrendTip({ tip }: { tip: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="relative inline-flex items-center">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="text-stone-300 dark:text-zinc-600 hover:text-stone-400 dark:hover:text-zinc-400 leading-none ml-0.5"
+        style={{ fontSize: '11px', lineHeight: 1 }}
+        aria-label="Info">ⓘ</button>
+      {open && (
+        <span className="absolute left-full top-1/2 -translate-y-1/2 ml-1 z-10 rounded px-2 py-1 text-[10px] leading-snug whitespace-nowrap"
+          style={{ background: 'var(--color-stone-800, #292524)', color: '#e7e5e4',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.18)' }}>
+          {tip}
+        </span>
+      )}
+    </span>
+  );
+}
+
+// ── Trend chart dispatcher ────────────────────────────────────────────────────
+
+function DrinkingTrendChart({
+  metric, buckets, isDark, bucketsBack,
+}: {
+  metric: TrendMetric;
+  buckets: DrinkingTrendBucket[];
+  isDark: boolean;
+  bucketsBack: number;
+}) {
+  const labels = buckets.map(b => b.label);
+  const alwaysShow = bucketsBack <= 6;
+
+  if (metric === 'days') {
+    return (
+      <CssTrendChart
+        series={[{
+          values: buckets.map(b => b.drinkingDays),
+          color: isDark ? '#2dd4bf' : '#1d4ed8',
+        }]}
+        labels={labels}
+        formatY={v => String(Math.round(v))}
+        isDark={isDark}
+        alwaysShowLabels={alwaysShow}
+      />
+    );
+  }
+
+  if (metric === 'totalDrinks') {
+    return (
+      <CssTrendChart
+        series={[{
+          values: buckets.map(b => b.totalDrinks),
+          color: isDark ? '#2dd4bf' : '#1d4ed8',
+        }]}
+        labels={labels}
+        formatY={v => String(Math.round(v))}
+        isDark={isDark}
+        alwaysShowLabels={alwaysShow}
+      />
+    );
+  }
+
+  if (metric === 'drinksPerDay') {
+    const boxBuckets = buckets
+      .filter(b => b.drinksBox !== null)
+      .map(b => ({ label: b.label, ...b.drinksBox! }));
+    if (!boxBuckets.length) return <p className="text-xs text-stone-400 dark:text-zinc-500">No data</p>;
+    return <CssVerticalBoxPlotChart buckets={boxBuckets} isDark={isDark} />;
+  }
+
+  if (metric === 'drinkType') {
+    return (
+      <CssStackedBarChart
+        buckets={buckets.map(b => ({ label: b.label, data: b.drinkType }))}
+        colorMap={DRINK_TYPE_COLORS}
+        isDark={isDark}
+      />
+    );
+  }
+
+  if (metric === 'occasion') {
+    return (
+      <CssStackedBarChart
+        buckets={buckets.map(b => ({ label: b.label, data: b.occasions }))}
+        colorMap={OCCASION_COLORS}
+        isDark={isDark}
+      />
+    );
+  }
+
+  if (metric === 'withWhom') {
+    const companionColors: Record<string, string> = { '혼자': '#a8a29e', ...RELATION_COLORS };
+    return (
+      <CssStackedBarChart
+        buckets={buckets.map(b => ({ label: b.label, data: b.companions }))}
+        colorMap={companionColors}
+        isDark={isDark}
+      />
+    );
+  }
+
+  if (metric === 'restDays') {
+    return (
+      <CssRestChart
+        buckets={buckets.map(b => ({
+          label:       b.label,
+          histogram:   b.histogram,
+          avgRestDays: b.avgRestDays,
+        }))}
+        isDark={isDark}
+      />
+    );
+  }
+
+  if (metric === 'sessionTime') {
+    return (
+      <CssDualLineChart
+        buckets={buckets.map(b => ({
+          label:              b.label,
+          avgStartMins:       b.avgStartMins,
+          avgEndMins:         b.avgEndMins,
+          avgDurationSeconds: b.avgDurationSeconds,
+        }))}
+        isDark={isDark}
+      />
+    );
+  }
+
+  return null;
+}
+
 // ── Main widget ───────────────────────────────────────────────────────────────
 
 export function DrinkingWidget({ globalFilter }: WidgetProps) {
   const isDark = useIsDark();
-  const [summaryTab, setSummaryTab]   = useState<SummaryTab>('stats');
+  const [viewMode,    setViewMode]    = useState<WidgetViewMode>('summary');
+  const [summaryTab,  setSummaryTab]  = useState<SummaryTab>('stats');
+  const [trendMetric, setTrendMetric] = useState<TrendMetric>('days');
+  const [bucketsBack, setBucketsBack] = useState(6);
   const [summaryData, setSummaryData] = useState<DrinkingSummary | null>(null);
-  const [loading, setLoading]         = useState(true);
-  const [error, setError]             = useState<string | null>(null);
+  const [trendData,   setTrendData]   = useState<DrinkingTrendBucket[]>([]);
+  const [loading,     setLoading]     = useState(true);
+  const [error,       setError]       = useState<string | null>(null);
+
+  const isPeriodMode = globalFilter.timeMode === 'period';
 
   useEffect(() => {
     setLoading(true);
     setError(null);
-    const url = `/api/insights/stats?${buildParams(
-      { metric: 'drinking.summary', mode: 'summary' },
-      globalFilter,
-    )}`;
-    fetch(url)
-      .then(r => r.json())
-      .then(d => { setSummaryData(d.summary ?? null); setLoading(false); })
-      .catch(() => { setError('Failed to load data.'); setLoading(false); });
-  }, [globalFilter]);
+
+    if (viewMode === 'summary') {
+      const url = `/api/insights/stats?${buildParams(
+        { metric: 'drinking.summary', mode: 'summary' },
+        globalFilter,
+      )}`;
+      fetch(url)
+        .then(r => r.json())
+        .then(d => { setSummaryData(d.summary ?? null); setLoading(false); })
+        .catch(() => { setError('Failed to load data.'); setLoading(false); });
+    } else {
+      const url = `/api/insights/stats?${buildParams(
+        { metric: 'drinking.summary', mode: 'trend', bucketsBack: String(bucketsBack) },
+        globalFilter,
+      )}`;
+      fetch(url)
+        .then(r => r.json())
+        .then(d => { setTrendData(d.data ?? []); setLoading(false); })
+        .catch(() => { setError('Failed to load data.'); setLoading(false); });
+    }
+  }, [globalFilter, viewMode, bucketsBack]);
 
   return (
-    <WidgetCard title="Drinking" floor={1} loading={loading} error={error}>
-      <div className="flex rounded overflow-hidden border border-stone-200 dark:border-zinc-700 text-[11px] mb-3 self-start">
-        {(['stats', 'top10'] as SummaryTab[]).map(t => (
-          <button
-            key={t}
-            onClick={() => setSummaryTab(t)}
-            className={`px-2.5 py-1 transition-colors ${
-              summaryTab === t
-                ? 'bg-stone-800 dark:bg-zinc-200 text-white dark:text-zinc-900 font-medium'
-                : 'bg-white dark:bg-zinc-900 text-stone-500 dark:text-zinc-400 hover:bg-stone-50 dark:hover:bg-zinc-800'
-            }`}
-          >
-            {t === 'stats' ? 'Stats' : 'Top 10'}
-          </button>
-        ))}
-      </div>
+    <WidgetCard
+      title="Drinking"
+      floor={1}
+      loading={loading}
+      error={error}
+      action={<ViewToggle value={viewMode} onChange={setViewMode} disabled={isPeriodMode} />}
+    >
+      {viewMode === 'summary' ? (
+        <>
+          {/* Summary tab bar */}
+          <div className="flex rounded overflow-hidden border border-stone-200 dark:border-zinc-700 text-[11px] mb-3 self-start">
+            {(['stats', 'top10'] as SummaryTab[]).map(t => (
+              <button
+                key={t}
+                onClick={() => setSummaryTab(t)}
+                className={`px-2.5 py-1 transition-colors ${
+                  summaryTab === t
+                    ? 'bg-stone-800 dark:bg-zinc-200 text-white dark:text-zinc-900 font-medium'
+                    : 'bg-white dark:bg-zinc-900 text-stone-500 dark:text-zinc-400 hover:bg-stone-50 dark:hover:bg-zinc-800'
+                }`}
+              >
+                {t === 'stats' ? 'Stats' : 'Top 10'}
+              </button>
+            ))}
+          </div>
 
-      {!summaryData ? (
-        <p className="text-xs text-stone-400 dark:text-zinc-500">No data</p>
-      ) : summaryTab === 'stats' ? (
-        <StatsTab data={summaryData} isDark={isDark} />
+          {!summaryData ? (
+            <p className="text-xs text-stone-400 dark:text-zinc-500">No data</p>
+          ) : summaryTab === 'stats' ? (
+            <StatsTab data={summaryData} isDark={isDark} />
+          ) : (
+            <Top10Tab data={summaryData} />
+          )}
+        </>
       ) : (
-        <Top10Tab data={summaryData} />
+        // ── Trend view ──────────────────────────────────────────────────────────
+        <div className="flex flex-col gap-3">
+
+          {/* Row 1: metric pills + BucketSelector */}
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex flex-wrap gap-1">
+              {TREND_METRICS.map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setTrendMetric(key)}
+                  className={`px-2.5 py-1 rounded text-[11px] transition-colors ${
+                    trendMetric === key
+                      ? 'bg-stone-800 dark:bg-zinc-200 text-white dark:text-zinc-900 font-medium'
+                      : 'bg-stone-100 dark:bg-zinc-800 text-stone-500 dark:text-zinc-400 hover:bg-stone-200 dark:hover:bg-zinc-700'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <BucketSelector value={bucketsBack} onChange={setBucketsBack} />
+          </div>
+
+          {/* Row 2: description + optional ⓘ */}
+          {TREND_METRICS.find(m => m.key === trendMetric)?.desc && (
+            <p className="text-[11px] text-stone-400 dark:text-zinc-500 -mt-1 flex items-center gap-1">
+              {TREND_METRICS.find(m => m.key === trendMetric)!.desc}
+              {TREND_METRICS.find(m => m.key === trendMetric)?.tip && (
+                <TrendTip tip={TREND_METRICS.find(m => m.key === trendMetric)!.tip!} />
+              )}
+            </p>
+          )}
+
+          {/* Row 3: chart */}
+          {trendData.length === 0 ? (
+            <p className="text-xs text-stone-400 dark:text-zinc-500">No data</p>
+          ) : (
+            <DrinkingTrendChart
+              metric={trendMetric}
+              buckets={trendData}
+              isDark={isDark}
+              bucketsBack={bucketsBack}
+            />
+          )}
+        </div>
       )}
     </WidgetCard>
   );
