@@ -23,13 +23,31 @@ export async function GET(request: NextRequest) {
 
   await connectDB();
 
+  // Filter by start.year/month/day (local date fields) to match the same records
+  // that cost-summary groups and counts. Using start.datetime (UTC) would shift
+  // records across day boundaries for non-UTC timezones.
+  const [fromYear, fromMonth, fromDay] = dateFrom.split('-').map(Number);
+  const [toYear, toMonth, toDay] = dateTo.split('-').map(Number);
+
   const match: any = {
     userId,
     'cost.category': category,
     'cost.amountKRW': { $gt: 0 },
-    'start.datetime': {
-      $gte: new Date(dateFrom),
-      $lte: new Date(dateTo),
+    $expr: {
+      $and: [
+        {
+          $gte: [
+            { $dateFromParts: { year: '$start.year', month: '$start.month', day: '$start.day' } },
+            { $dateFromParts: { year: fromYear, month: fromMonth, day: fromDay } },
+          ],
+        },
+        {
+          $lte: [
+            { $dateFromParts: { year: '$start.year', month: '$start.month', day: '$start.day' } },
+            { $dateFromParts: { year: toYear, month: toMonth, day: toDay } },
+          ],
+        },
+      ],
     },
   };
 

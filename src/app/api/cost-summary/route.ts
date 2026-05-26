@@ -51,18 +51,38 @@ export async function GET(request: NextRequest) {
 
   await connectDB();
 
+  // Filter by start.year/month/day (local date fields) rather than start.datetime (UTC)
+  // so results match the Google Sheet local dates exactly, regardless of timezone.
+  const [fromYear, fromMonth, fromDay] = dateFrom.split('-').map(Number);
+  const [toYear, toMonth, toDay] = dateTo.split('-').map(Number);
+
   const matchStage: any = {
     userId,
     'cost.amountKRW': { $gt: 0 },
-    'cost.category': { $ne: null },
-    'start.datetime': {
-      $gte: new Date(dateFrom),
-      $lte: new Date(dateTo),
+    $expr: {
+      $and: [
+        {
+          $gte: [
+            { $dateFromParts: { year: '$start.year', month: '$start.month', day: '$start.day' } },
+            { $dateFromParts: { year: fromYear, month: fromMonth, day: fromDay } },
+          ],
+        },
+        {
+          $lte: [
+            { $dateFromParts: { year: '$start.year', month: '$start.month', day: '$start.day' } },
+            { $dateFromParts: { year: toYear, month: toMonth, day: toDay } },
+          ],
+        },
+      ],
     },
   };
 
+  // Bug fix: use $nin as default guard so null-category records are always excluded,
+  // even when no category filter is active.
   if (categoriesParam) {
     matchStage['cost.category'] = { $in: categoriesParam.split(',').map(s => s.trim()) };
+  } else {
+    matchStage['cost.category'] = { $nin: [null, ''] };
   }
   if (detailsParam) {
     matchStage['cost.categoryDetail'] = { $in: detailsParam.split(',').map(s => s.trim()) };

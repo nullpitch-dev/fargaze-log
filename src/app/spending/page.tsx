@@ -50,6 +50,8 @@ interface DrillDownState {
   monthLabel: string;
   hiddenDetails: string[];
   crossActivities: string[];
+  dateFrom: string;
+  dateTo: string;
 }
 
 interface Layout {
@@ -400,11 +402,14 @@ function DrillDownSidebar({ drill, onClose }: { drill: DrillDownState; onClose: 
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
 
   useEffect(() => {
+    // Fetch only the clicked month, clamped to the overall filter period at the boundaries.
     const [year, month] = drill.monthKey.split('-');
-    const dateFrom = `${year}-${month}-01`;
-    const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
-    const dateTo = `${year}-${month}-${String(lastDay).padStart(2, '0')}`;
-    const params = new URLSearchParams({ category: drill.category, dateFrom, dateTo });
+    const monthFirst = `${year}-${month}-01`;
+    const monthLastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
+    const monthLast = `${year}-${month}-${String(monthLastDay).padStart(2, '0')}`;
+    const txDateFrom = drill.dateFrom > monthFirst ? drill.dateFrom : monthFirst;
+    const txDateTo   = drill.dateTo   < monthLast  ? drill.dateTo   : monthLast;
+    const params = new URLSearchParams({ category: drill.category, dateFrom: txDateFrom, dateTo: txDateTo });
     if (drill.categoryDetail) params.set('categoryDetail', drill.categoryDetail);
     if (drill.crossActivities.length > 0) params.set('crossActivities', drill.crossActivities.join(','));
     fetch(`/api/cost-transactions?${params}`)
@@ -783,7 +788,10 @@ export default function CostPage() {
 
   const monthKeys = data?.months ?? [];
   const fullMonthKeys = getFullMonthKeys(monthKeys, dateFrom, dateTo);
-  const fullMonthCount = fullMonthKeys.length || 1;
+  // If no full months exist (e.g. range is entirely within one partial month),
+  // fall back to all monthKeys so totals and averages are never zeroed out.
+  const totalMonthKeys = fullMonthKeys.length > 0 ? fullMonthKeys : monthKeys;
+  const fullMonthCount = totalMonthKeys.length || 1;
 
   function toggleCollapsed(cat: string) {
     saveLayout({ ...layout, collapsed: { ...layout.collapsed, [cat]: !layout.collapsed[cat] } });
@@ -851,8 +859,8 @@ export default function CostPage() {
       const visibleDetails = (layout.detailOrder[category] ?? allDetails(category))
         .filter(d => !(layout.hiddenDetails[category] ?? []).includes(d));
       const total = detail === null
-        ? visibleDetails.reduce((s, det) => s + fullMonthKeys.reduce((ms, mk) => ms + (getRowData(category, det)?.months[mk] ?? 0), 0), 0)
-        : fullMonthKeys.reduce((ms, mk) => ms + (getRowData(category, detail)?.months[mk] ?? 0), 0);
+        ? visibleDetails.reduce((s, det) => s + totalMonthKeys.reduce((ms, mk) => ms + (getRowData(category, det)?.months[mk] ?? 0), 0), 0)
+        : totalMonthKeys.reduce((ms, mk) => ms + (getRowData(category, detail)?.months[mk] ?? 0), 0);
       return total / fullMonthCount;
     }
     if (detail === null) {
@@ -987,7 +995,7 @@ export default function CostPage() {
                             .filter(d => !(layout.hiddenDetails[cat] ?? []).includes(d));
                           return s + visibleDetails.reduce((ds, det) => {
                             const detRow = getRowData(cat, det);
-                            return ds + fullMonthKeys.reduce((ms, mk) => ms + (detRow?.months[mk] ?? 0), 0);
+                            return ds + totalMonthKeys.reduce((ms, mk) => ms + (detRow?.months[mk] ?? 0), 0);
                           }, 0);
                         }, 0) / fullMonthCount)
                       )}
@@ -1054,9 +1062,11 @@ export default function CostPage() {
                           monthLabel: formatMonthLabel(mk),
                           hiddenDetails: layout.hiddenDetails[cat] ?? [],
                           crossActivities: selectedCrossActivities,
+                          dateFrom,
+                          dateTo,
                         })}
                         monthKeys={monthKeys}
-                        fullMonthKeys={fullMonthKeys}
+                        fullMonthKeys={totalMonthKeys}
                         fullMonthCount={fullMonthCount}
                         allDetails={layout.detailOrder[cat] ?? allDetails(cat)}
                         hiddenDetails={layout.hiddenDetails[cat] ?? []}
@@ -1073,7 +1083,7 @@ export default function CostPage() {
                             category={cat}
                             detail={det}
                             months={detRow.months}
-                            fullMonthKeys={fullMonthKeys}
+                            fullMonthKeys={totalMonthKeys}
                             fullMonthCount={fullMonthCount}
                             onCellClick={mk => setDrill({
                               category: cat,
@@ -1082,6 +1092,8 @@ export default function CostPage() {
                               monthLabel: formatMonthLabel(mk),
                               hiddenDetails: [],
                               crossActivities: selectedCrossActivities,
+                              dateFrom,
+                              dateTo,
                             })}
                             monthKeys={monthKeys}
                             onMoveUp={() => moveDetailUp(cat, det)}
