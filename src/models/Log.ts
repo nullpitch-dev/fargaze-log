@@ -60,6 +60,7 @@ export interface ILog extends Document {
     type?: string;
     carbs?: string;
     fat?: string;
+    spiciness?: string;
     drinks?: Array<{ item?: string; amount?: string; unit?: string; note?: string }>;
     foods?: Array<{ item?: string; amount?: string; unit?: string; note?: string }>;
     alcohols?: Array<{ item?: string; amount?: string; unit?: string; note?: string }>;
@@ -188,6 +189,7 @@ const LogSchema = new Schema<ILog>({
     },
     carbs: String,
     fat: String,
+    spiciness: String,
     drinks: [foodItemSchema],
     foods: [foodItemSchema],
     alcohols: [foodItemSchema],
