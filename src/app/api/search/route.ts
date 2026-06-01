@@ -86,6 +86,20 @@ function computeAggregations(results: any[]) {
   return aggregations;
 }
 
+// ── Query parser ────────────────────────────────────────────────────────────
+// Splits a raw query string into quoted phrases and remaining free text.
+// e.g. 'Brita "작은 정수기" "필터 교체"'
+//   → phrases: ['작은 정수기', '필터 교체']
+//   → freeText: 'Brita'
+function parseQuery(raw: string): { phrases: string[]; freeText: string } {
+  const phrases: string[] = [];
+  const freeText = raw
+    .replace(/"([^"]+)"/g, (_, p) => { phrases.push(p.trim()); return ''; })
+    .replace(/\s+/g, ' ')
+    .trim();
+  return { phrases, freeText };
+}
+
 export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session) {
@@ -130,13 +144,19 @@ export async function GET(request: NextRequest) {
   ];
 
   if (query) {
-    mustClauses.push({
-      text: {
-        query,
-        path: ALL_TEXT_PATHS,
-        fuzzy: { maxEdits: 1 },
-      },
-    });
+    const { phrases, freeText } = parseQuery(query);
+    // Each quoted phrase → exact phrase clause (must appear consecutively)
+    for (const phrase of phrases) {
+      mustClauses.push({
+        phrase: { query: phrase, path: ALL_TEXT_PATHS },
+      });
+    }
+    // Remaining free text → fuzzy bag-of-words (existing behaviour)
+    if (freeText) {
+      mustClauses.push({
+        text: { query: freeText, path: ALL_TEXT_PATHS, fuzzy: { maxEdits: 1 } },
+      });
+    }
   }
 
   for (const cond of conditions) {

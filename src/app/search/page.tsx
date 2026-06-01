@@ -401,7 +401,7 @@ export default function SearchPage() {
             type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="검색어 입력…"
+            placeholder='검색어 입력… (예: Brita "정수기 필터")'
             className="flex-1 bg-white dark:bg-zinc-900 border border-stone-300 dark:border-zinc-600 rounded-lg px-4 py-3 text-stone-900 dark:text-zinc-50 placeholder-stone-400 focus:outline-none focus:border-stone-400 text-sm shadow-sm"
           />
           <button
