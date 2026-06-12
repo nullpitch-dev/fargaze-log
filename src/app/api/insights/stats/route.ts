@@ -8,8 +8,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import connectDB from '@/lib/mongodb';
 import Log from '@/models/Log';
-import AlcoholConversion from '@/models/AlcoholConversion';
-
+import AlcoholConversion from '@/models/AlcoholConversion'; 
+import IngredientMaster from '@/models/IngredientMaster';  
+ 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const SLEEP_THRESHOLD_HOUR = 6;
@@ -755,6 +756,226 @@ async function computeDrinkingSummary(
   };
 }
 
+
+// ── computeDietSummary ────────────────────────────────────────────────────
+
+async function computeDietSummary(
+  userId: string,
+  periodStart: Date,
+  periodEnd: Date,
+  crossActivities: string[],
+): Promise<any> {
+  // ── level2 → level1 lookup (single source of truth: ingredient_master) ───────
+  const ingredientDocs = await IngredientMaster.find({ userId }).lean();
+  const level1Map = new Map<string, string>();
+  for (const ing of ingredientDocs) {
+    level1Map.set((ing as any).level2, (ing as any).level1);
+  }
+
+  // ── period dates (cap effective end at yesterday, like drinking) ─────────────
+  const yesterday      = yesterdayStr();
+  const rawEnd         = periodEnd.toISOString().slice(0, 10);
+  const rawStart       = periodStart.toISOString().slice(0, 10);
+  const effectiveEnd   = rawEnd < yesterday ? rawEnd : yesterday;
+  const effectiveStart = rawStart;
+
+  const periodDates = new Set<string>();
+  {
+    const cursor  = new Date(`${effectiveStart}T00:00:00.000Z`);
+    const endDate = new Date(`${effectiveEnd}T00:00:00.000Z`);
+    while (cursor <= endDate) {
+      periodDates.add(cursor.toISOString().slice(0, 10));
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+  }
+  const daysInPeriod = periodDates.size;
+
+  // ── fetch food/drink-bearing records (6h early lookback for pre-6am rows) ─────
+  const fetchStart = new Date(`${effectiveStart}T00:00:00.000Z`);
+  fetchStart.setUTCHours(fetchStart.getUTCHours() - SLEEP_THRESHOLD_HOUR);
+
+  const filter: Record<string, any> = {
+    userId,
+    'start.datetime': {
+      $gte: fetchStart,
+      $lte: new Date(`${effectiveEnd}T23:59:59.999Z`),
+    },
+    $or: [
+      { 'food.foods.0':  { $exists: true } },   // has ≥1 food item
+      { 'food.drinks.0': { $exists: true } },   // has ≥1 drink item
+    ],
+  };
+  if (crossActivities.length) {
+    filter['activity.crossActivity'] = { $in: crossActivities };
+  }
+  const docs = await Log.find(filter).lean();
+
+  // ── per-day accumulators ──────────────────────────────────────────────────────
+  const finishByDate    = new Map<string, number>();          // max end-mins per day
+  const servingsByDate  = new Map<string, number>();          // Σ 인분 per day
+  const carbsByDate      = new Map<string, number>();         // Σ (score × 인분) per day
+  const spicinessByDate  = new Map<string, 'H' | 'M' | 'L'>(); // max level per eating day
+
+  const ateIngCount    = new Map<string, number>();
+  const ateItemCount   = new Map<string, number>();
+  const drinkIngCount  = new Map<string, number>();
+  const drinkItemCount = new Map<string, number>();
+
+  // companions — scoped to food-bearing records ("with whom I eat")
+  let aloneCount = 0;
+  let companionTotal = 0;
+  const byRelationType: Record<string, number> = {};
+  const personMap: Record<string, { categories: Record<string, number>; total: number }> = {};
+
+  const CARB_SCORE: Record<string, number> = { H: 2, M: 1, L: 0 };
+  const spRank = (x: string | undefined) => (x === 'H' ? 3 : x === 'M' ? 2 : 1); // L / none = 1
+
+  for (const doc of docs) {
+    const d: any = doc;
+    if (!d.start?.datetime) continue;
+
+    // Shared 6am-boundary helper (00:00–05:59 → previous day)
+    const dateStr = assignDrinkingDate(new Date(d.start.datetime), d.start?.hour);
+    if (!periodDates.has(dateStr)) continue;
+
+    const foods:  any[] = d.food?.foods  ?? [];
+    const drinks: any[] = d.food?.drinks ?? [];
+    const hasFood = foods.some(f => f?.item);
+
+    // ── Drinks treemaps — every non-alcoholic drink, regardless of food ────────
+    for (const dr of drinks) {
+      if (dr?.item) drinkItemCount.set(dr.item, (drinkItemCount.get(dr.item) ?? 0) + 1);
+      for (const ing of (dr?.ingredients ?? [])) {
+        if (ing) drinkIngCount.set(ing, (drinkIngCount.get(ing) ?? 0) + 1);
+      }
+    }
+
+    // Everything below is food-bearing only — i.e. an actual "eating" record
+    if (!hasFood) continue;
+
+    // ── Finish-eating time: max end among food-bearing records ─────────────────
+    let endMins = hourStringToMinutes(d.end?.hour) ?? hourStringToMinutes(d.start?.hour);
+    if (endMins !== null) {
+      if (endMins < SLEEP_THRESHOLD_HOUR * 60) endMins += 1440; // post-midnight → +24h
+      finishByDate.set(dateStr, Math.max(finishByDate.get(dateStr) ?? 0, endMins));
+    }
+
+    // ── Servings (Σ 인분) + carbs weighting ────────────────────────────────────
+    let mealServings = 0;
+    for (const f of foods) {
+      const amt = parseFloat(String(f?.amount ?? '')); // works on String or Number
+      if (!isNaN(amt)) mealServings += amt;
+    }
+    servingsByDate.set(dateStr, (servingsByDate.get(dateStr) ?? 0) + mealServings);
+
+    const carbScore = d.food?.carbs ? (CARB_SCORE[d.food.carbs] ?? 0) : 0;
+    carbsByDate.set(dateStr, (carbsByDate.get(dateStr) ?? 0) + carbScore * mealServings);
+
+    // ── Spiciness: max level per eating day (L when eaten but not spicy) ───────
+    const sp: string | undefined = d.food?.spiciness;
+    const cur: 'H' | 'M' | 'L' = sp === 'H' ? 'H' : sp === 'M' ? 'M' : 'L';
+    const prev = spicinessByDate.get(dateStr);
+    if (!prev || spRank(cur) > spRank(prev)) spicinessByDate.set(dateStr, cur);
+
+    // ── Food treemaps ──────────────────────────────────────────────────────────
+    for (const f of foods) {
+      if (f?.item) ateItemCount.set(f.item, (ateItemCount.get(f.item) ?? 0) + 1);
+      for (const ing of (f?.ingredients ?? [])) {
+        if (ing) ateIngCount.set(ing, (ateIngCount.get(ing) ?? 0) + 1);
+      }
+    }
+
+    // ── Companions ("with whom I eat") — mirrors drinking treatment ────────────
+    if (!d.people?.length) {
+      aloneCount++;
+    } else {
+      const eventCategoryCounts: Record<string, number> = {};
+      for (const g of d.people) {
+        const c = g.category ?? '기타';
+        eventCategoryCounts[c] = (eventCategoryCounts[c] ?? 0) + 1;
+      }
+      const dom = Object.entries(eventCategoryCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '기타';
+      byRelationType[dom] = (byRelationType[dom] ?? 0) + 1;
+
+      const seen = new Set<string>();
+      for (const g of d.people) {
+        const c = g.category ?? '기타';
+        const targets: string[] = Array.isArray(g.targets)
+          ? g.targets
+          : typeof g.target === 'string' ? [g.target] : [];
+        for (const name of targets) {
+          if (!name || name === '등' || seen.has(name)) continue;
+          seen.add(name);
+          if (!personMap[name]) personMap[name] = { categories: {}, total: 0 };
+          personMap[name].categories[c] = (personMap[name].categories[c] ?? 0) + 1;
+          personMap[name].total++;
+        }
+      }
+    }
+    companionTotal++;
+  }
+
+  // ── shape per-day arrays (sorted ascending by date) ───────────────────────────
+  const sortByDate = <T extends [string, any]>(entries: T[]) =>
+    entries.sort((a, b) => (a[0] < b[0] ? -1 : 1));
+
+  const finishEating = sortByDate([...finishByDate.entries()])
+    .map(([date, endMins]) => ({ date, endMins: Math.round(endMins) }));
+  const servings = sortByDate([...servingsByDate.entries()])
+    .map(([date, total]) => ({ date, total: Math.round(total * 100) / 100 }));
+  const carbsIndex = sortByDate([...carbsByDate.entries()])
+    .map(([date, value]) => ({ date, value: Math.round(value * 100) / 100 }));
+  const spiciness = sortByDate([...spicinessByDate.entries()])
+    .map(([date, level]) => ({ date, level }));
+
+  // ── treemaps (frequency, sorted desc; level1 from ingredient_master) ──────────
+  const toIngArr = (m: Map<string, number>) =>
+    [...m.entries()].sort((a, b) => b[1] - a[1])
+      .map(([level2, count]) => ({ level2, level1: level1Map.get(level2) ?? '기타', count }));
+  const toItemArr = (m: Map<string, number>) =>
+    [...m.entries()].sort((a, b) => b[1] - a[1]).map(([item, count]) => ({ item, count }));
+
+  // ── averages (over days present in each series → the average line) ────────────
+  const mean = (arr: number[]) =>
+    arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : null;
+  const fAvg = mean(finishEating.map(x => x.endMins));
+  const sAvg = mean(servings.map(x => x.total));
+  const cAvg = mean(carbsIndex.map(x => x.value));
+  const averages = {
+    finishEatingMins: fAvg === null ? null : Math.round(fAvg),
+    servings:         sAvg === null ? null : Math.round(sAvg * 100) / 100,
+    carbsIndex:       cAvg === null ? null : Math.round(cAvg * 100) / 100,
+  };
+
+  // ── companions: topPeople ─────────────────────────────────────────────────────
+  const dominantKey = (counts: Record<string, number>): string =>
+    Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '기타';
+  const topPeople = Object.entries(personMap)
+    .sort((a, b) => b[1].total - a[1].total)
+    .slice(0, 10)
+    .map(([name, data]) => ({
+      name,
+      dominantCategory: dominantKey(data.categories),
+      total: data.total,
+    }));
+
+  return {
+    daysInPeriod,
+		rangeStart: rawStart,
+    rangeEnd:   rawEnd,
+    finishEating,      // [{ date, endMins }]  endMins may exceed 1440 (post-midnight)
+    servings,          // [{ date, total }]    Σ 인분
+    carbsIndex,        // [{ date, value }]    Σ (H2/M1/L0 × 인분), drinks excluded
+    spiciness,         // [{ date, level }]    'H' | 'M' | 'L'  (eating days only)
+    ateIngredients:   toIngArr(ateIngCount),    // [{ level2, level1, count }]
+    ateItems:         toItemArr(ateItemCount),  // [{ item, count }]
+    drankIngredients: toIngArr(drinkIngCount),
+    drankItems:       toItemArr(drinkItemCount),
+    companions: { alone: aloneCount, total: companionTotal, byRelationType, topPeople },
+    averages,          // { finishEatingMins, servings, carbsIndex }
+  };
+}
+
 // ── Main route ────────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
@@ -879,6 +1100,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ summary });
   }
   
+	// ── diet.summary ────────────────────────────────────────────────────────
+	if (metric === 'diet.summary') {
+		// Trend mode deferred — summary first, per build order.
+		const { start, end } = buildDateRange(timeMode, timePeriod, dateFrom, dateTo);
+		const summary = await computeDietSummary(userId, start, end, crossActivities);
+		return NextResponse.json({ summary });
+	}
+
   return NextResponse.json({ error: 'Unknown metric' }, { status: 400 });
 }
 

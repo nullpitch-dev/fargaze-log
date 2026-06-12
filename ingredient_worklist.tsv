@@ -1,0 +1,1629 @@
+item	frequency	suggested_level2	match_type	final_level2
+샐러드	507	Not Defined	not_defined	
+돈까스	249	Not Defined	not_defined	
+치킨	207	Not Defined	not_defined	
+과자	191	Not Defined	not_defined	
+탕수육	190	돼지고기	guessed	
+미역국	187	해조류	guessed	
+샌드위치	163	Not Defined	not_defined	
+회	159	Not Defined	not_defined	
+김치찌개	142	잎 채소|고추|마늘|소금|기타 소스	guessed	
+닭가슴살	139	Not Defined	not_defined	
+볶음밥	133	Not Defined	not_defined	
+물냉면	104	Not Defined	not_defined	
+전	99	Not Defined	not_defined	
+라면사리	89	밀	guessed	
+김밥	84	Not Defined	not_defined	
+피자	82	Not Defined	not_defined	
+냉면	81	Not Defined	not_defined	
+삶은 계란	79	계란	guessed	
+순대국	72	가공육|전분	guessed	
+컵라면	69	밀	guessed	
+짜장면	68	Not Defined	not_defined	
+등	68	Not Defined	not_defined	
+짬뽕국물	64	Not Defined	not_defined	
+씨리얼	63	Not Defined	not_defined	
+돼지수육	59	돼지고기	guessed	
+죽	59	Not Defined	not_defined	
+튀김	58	Not Defined	not_defined	
+제육볶음	57	Not Defined	not_defined	
+보쌈	57	Not Defined	not_defined	
+우동	53	Not Defined	not_defined	
+갈비탕	52	소고기	guessed	
+막국수	50	Not Defined	not_defined	
+유린기	50	Not Defined	not_defined	
+매운탕	49	Not Defined	not_defined	
+비빔밥	47	Not Defined	not_defined	
+부대찌개	47	Not Defined	not_defined	
+햄버거	46	Not Defined	not_defined	
+토스트	46	Not Defined	not_defined	
+계란말이	45	계란	guessed	
+스시	43	Not Defined	not_defined	
+소세지	43	Not Defined	not_defined	
+스테이크	42	Not Defined	not_defined	
+닭갈비	41	소고기	guessed	
+된장찌개	40	된장	guessed	
+쌀국수	39	Not Defined	not_defined	
+떡볶이	39	Not Defined	not_defined	
+짜파게티	38	Not Defined	not_defined	
+북어국	37	생선	guessed	
+불고기	37	기타 육류	guessed	
+추어탕	37	Not Defined	not_defined	
+군만두	36	밀|돼지고기|잎 채소	guessed	
+양장피	36	Not Defined	not_defined	
+오뎅	33	Not Defined	not_defined	
+팔보채	33	Not Defined	not_defined	
+비빔냉면	33	Not Defined	not_defined	
+계란찜	32	계란	guessed	
+육개장	31	Not Defined	not_defined	
+오믈렛	30	Not Defined	not_defined	
+초밥	30	Not Defined	not_defined	
+된장국	28	된장	guessed	
+국수	28	Not Defined	not_defined	
+메추리알	28	Not Defined	not_defined	
+감자탕	27	뿌리 채소	guessed	
+육회	26	Not Defined	not_defined	
+생선구이	26	생선	guessed	
+오뎅탕	25	Not Defined	not_defined	
+냉모밀	24	Not Defined	not_defined	
+감자칩	24	뿌리 채소	guessed	
+국	24	Not Defined	not_defined	
+함박스테이크	24	Not Defined	not_defined	
+두부김치	24	잎 채소|고추|마늘|소금|기타 소스	guessed	
+잡채	23	Not Defined	not_defined	
+설렁탕	23	Not Defined	not_defined	
+된장밥	23	된장	guessed	
+김치전	23	잎 채소|고추|마늘|소금|기타 소스	guessed	
+갈비찜	23	소고기	guessed	
+리조또	22	Not Defined	not_defined	
+깐풍기	22	Not Defined	not_defined	
+내장탕	22	내장류	guessed	
+돼지국밥	21	Not Defined	not_defined	
+짬뽕	20	Not Defined	not_defined	
+유산슬	20	Not Defined	not_defined	
+오리탕	20	Not Defined	not_defined	
+감자튀김	19	뿌리 채소	guessed	
+젓갈	19	Not Defined	not_defined	
+육전	19	Not Defined	not_defined	
+물회	19	Not Defined	not_defined	
+마른과일	19	단 과일	guessed	
+해장국	18	Not Defined	not_defined	
+소고기 스테이크	17	소고기	guessed	
+야채볶음	17	Not Defined	not_defined	
+칼국수	17	Not Defined	not_defined	
+곶감	17	Not Defined	not_defined	
+회덮밥	17	Not Defined	not_defined	
+딤섬	17	Not Defined	not_defined	
+닭강정	17	Not Defined	not_defined	
+돼지찌개	17	Not Defined	not_defined	
+백반	17	Not Defined	not_defined	
+주먹밥	16	Not Defined	not_defined	
+소고기 무국	16	소고기	guessed	
+떡국	16	Not Defined	not_defined	
+비빔면	16	Not Defined	not_defined	
+현미밥	16	쌀	guessed	
+순두부찌개	16	콩류	guessed	
+탕국	16	Not Defined	not_defined	
+감자전	16	뿌리 채소	guessed	
+누룽지탕	16	쌀	guessed	
+삼계탕	16	Not Defined	not_defined	
+반미	16	Not Defined	not_defined	
+비빔막국수	15	Not Defined	not_defined	
+떡갈비	15	소고기	guessed	
+오무라이스	15	Not Defined	not_defined	
+두루치기	15	Not Defined	not_defined	
+소고기 샤브샤브	15	소고기	guessed	
+돼지 두루치기	15	Not Defined	not_defined	
+핫도그	14	Not Defined	not_defined	
+팬케익	14	밀|설탕|기름	guessed	
+콩죽	14	Not Defined	not_defined	
+편육	14	Not Defined	not_defined	
+기억 안남	14	Not Defined	not_defined	
+동그랑땡	14	Not Defined	not_defined	
+난자완스	14	Not Defined	not_defined	
+솥밥	14	Not Defined	not_defined	
+생선전	14	생선	guessed	
+떡사리	14	Not Defined	not_defined	
+너겟	14	Not Defined	not_defined	
+비빔 막국수	14	Not Defined	not_defined	
+쵸콜렛	14	Not Defined	not_defined	
+돼지두루치기	14	Not Defined	not_defined	
+청포묵	14	Not Defined	not_defined	
+볶음면	13	Not Defined	not_defined	
+물만두	13	밀|돼지고기|잎 채소	guessed	
+짜장밥	13	Not Defined	not_defined	
+먹태	13	Not Defined	not_defined	
+나초	13	Not Defined	not_defined	
+구운채소	13	기타 채소	guessed	
+오랜지	13	Not Defined	not_defined	
+쿠키	12	Not Defined	not_defined	
+푸딩	12	Not Defined	not_defined	
+하몽	12	Not Defined	not_defined	
+국밥	12	Not Defined	not_defined	
+콩나물국	12	잎 채소	guessed	
+양꼬치	12	Not Defined	not_defined	
+비빔국수	12	Not Defined	not_defined	
+디저트	11	Not Defined	not_defined	
+야채	11	Not Defined	not_defined	
+파전	11	Not Defined	not_defined	
+오삼불고기	11	기타 육류	guessed	
+육회비빔밥	11	Not Defined	not_defined	
+닭백숙	11	Not Defined	not_defined	
+돼지불고기	10	기타 육류	guessed	
+채소찜	10	기타 채소	guessed	
+소고기 국밥	10	소고기	guessed	
+팝콘	10	Not Defined	not_defined	
+양갈비	10	소고기	guessed	
+전병	10	Not Defined	not_defined	
+쌈	10	Not Defined	not_defined	
+꼬치	10	Not Defined	not_defined	
+유산슬밥	10	Not Defined	not_defined	
+닭구이	9	Not Defined	not_defined	
+알밥	9	Not Defined	not_defined	
+김치국	9	잎 채소|고추|마늘|소금|기타 소스	guessed	
+닭곰탕	9	Not Defined	not_defined	
+도너스	9	Not Defined	not_defined	
+구근류	9	Not Defined	not_defined	
+콩나물국밥	9	잎 채소	guessed	
+마카롱	9	Not Defined	not_defined	
+제사음식	9	Not Defined	not_defined	
+통닭	8	Not Defined	not_defined	
+사시미	8	Not Defined	not_defined	
+김치찜	8	잎 채소|고추|마늘|소금|기타 소스	guessed	
+치킨까스	8	Not Defined	not_defined	
+모밀	8	Not Defined	not_defined	
+나베	8	Not Defined	not_defined	
+보리굴비	8	생선	guessed	
+샤브샤브	8	Not Defined	not_defined	
+들기름 막국수	8	기름	guessed	
+똥집	8	Not Defined	not_defined	
+짬뽕밥	8	Not Defined	not_defined	
+고등어구이	8	생선	guessed	
+연포탕	8	Not Defined	not_defined	
+알탕	8	Not Defined	not_defined	
+계란 스크램블	8	계란	guessed	
+황태해장국	8	생선	guessed	
+닭튀김	8	Not Defined	not_defined	
+우삼겹	8	Not Defined	not_defined	
+쑥떡	8	Not Defined	not_defined	
+소고기 장조림	7	소고기	guessed	
+미트볼	7	Not Defined	not_defined	
+생선까스	7	생선	guessed	
+대창	7	Not Defined	not_defined	
+고추잡채	7	열매 채소	guessed	
+햄 치즈 샌드위치	7	치즈	guessed	
+찜닭	7	Not Defined	not_defined	
+대게찜	7	갑각류	guessed	
+프렌치 토스트	7	Not Defined	not_defined	
+오겹살	7	Not Defined	not_defined	
+새우튀김	7	갑각류	guessed	
+고추장찌개	7	고추장	guessed	
+닭국물	7	Not Defined	not_defined	
+소머리국밥	7	Not Defined	not_defined	
+마른안주	7	Not Defined	not_defined	
+술국	7	Not Defined	not_defined	
+파니니	7	Not Defined	not_defined	
+짜글이	7	Not Defined	not_defined	
+크림스프	7	야채 육수	guessed	
+닭도리탕	7	Not Defined	not_defined	
+토마토스프	7	열매 채소	guessed	
+홍어무침	7	생선	guessed	
+유부초밥	7	콩류	guessed	
+오징어 튀김	6	연체류	guessed	
+장조림	6	Not Defined	not_defined	
+맛살	6	Not Defined	not_defined	
+돼지 스테이크	6	Not Defined	not_defined	
+타코	6	Not Defined	not_defined	
+복국	6	Not Defined	not_defined	
+티라미슈	6	Not Defined	not_defined	
+치킨 가라아게	6	Not Defined	not_defined	
+수제비	6	Not Defined	not_defined	
+치킨버거	6	Not Defined	not_defined	
+삼합	6	Not Defined	not_defined	
+지리	6	Not Defined	not_defined	
+뷔페 음식	6	Not Defined	not_defined	
+오리구이	6	Not Defined	not_defined	
+호두과자	6	견과류	guessed	
+조개찜	6	조개류	guessed	
+마들렌	6	Not Defined	not_defined	
+홍시	6	Not Defined	not_defined	
+LA갈비	6	소고기	guessed	
+어향동고	6	Not Defined	not_defined	
+낙지볶음	6	연체류	guessed	
+짜조	6	Not Defined	not_defined	
+육포	6	Not Defined	not_defined	
+간장게장	6	간장	guessed	
+토마토 스프	6	열매 채소	guessed	
+마카로니	6	Not Defined	not_defined	
+빙수	6	Not Defined	not_defined	
+돼지 수육	6	돼지고기	guessed	
+육사시미	6	Not Defined	not_defined	
+브리또	6	Not Defined	not_defined	
+곱창전골	6	내장류	guessed	
+대구탕	6	생선	guessed	
+붕어빵	6	Not Defined	not_defined	
+호떡	6	Not Defined	not_defined	
+부추전	6	잎 채소	guessed	
+말린과일	6	단 과일	guessed	
+참치캔	5	생선	guessed	
+계란탕	5	계란	guessed	
+난	5	Not Defined	not_defined	
+머핀	5	Not Defined	not_defined	
+마끼	5	Not Defined	not_defined	
+홍탕	5	Not Defined	not_defined	
+복튀김	5	Not Defined	not_defined	
+냉채	5	Not Defined	not_defined	
+뇨끼	5	Not Defined	not_defined	
+돼지볶음	5	Not Defined	not_defined	
+잔치국수	5	Not Defined	not_defined	
+굴전	5	Not Defined	not_defined	
+산낙지	5	연체류	guessed	
+밥 조금	5	Not Defined	not_defined	
+김말이	5	Not Defined	not_defined	
+감자볶음	5	뿌리 채소	guessed	
+밥 약간	5	Not Defined	not_defined	
+깐풍새우	5	갑각류	guessed	
+우거지 해장국	5	잎 채소	guessed	
+캐비어	5	Not Defined	not_defined	
+전복죽	5	조개류	guessed	
+어복쟁반	5	Not Defined	not_defined	
+와플	5	Not Defined	not_defined	
+죽순찌개	5	줄기 채소	guessed	
+나물비빔밥	5	잎 채소	guessed	
+콩국수	5	Not Defined	not_defined	
+녹두전	5	콩류	guessed	
+모밀국수	5	Not Defined	not_defined	
+아구찜	5	Not Defined	not_defined	
+두부전골	5	콩류	guessed	
+제육	5	Not Defined	not_defined	
+나주곰탕	5	Not Defined	not_defined	
+우거지해장국	5	잎 채소	guessed	
+삼각김밥	5	Not Defined	not_defined	
+과메기	5	Not Defined	not_defined	
+세꼬시	5	Not Defined	not_defined	
+만두국	5	밀|돼지고기|잎 채소	guessed	
+오징어볶음	5	연체류	guessed	
+롤케익	5	밀|설탕|기름	guessed	
+소고기 양지탕	5	소고기	guessed	
+등심	5	Not Defined	not_defined	
+명란젓	5	기타해산물	guessed	
+한정식	5	Not Defined	not_defined	
+치즈볼	5	치즈	guessed	
+꽈배기	5	Not Defined	not_defined	
+밀면	5	Not Defined	not_defined	
+참치회	5	생선	guessed	
+에너지바	5	Not Defined	not_defined	
+순대볶음	5	가공육|전분	guessed	
+사골국물	5	Not Defined	not_defined	
+곰국	5	Not Defined	not_defined	
+도너츠	5	Not Defined	not_defined	
+삽겹살	5	Not Defined	not_defined	
+구운야채	5	Not Defined	not_defined	
+연어 샐러드	4	생선	guessed	
+캔참치	4	생선	guessed	
+버거	4	Not Defined	not_defined	
+월남쌈	4	Not Defined	not_defined	
+케밥	4	Not Defined	not_defined	
+팟타이	4	Not Defined	not_defined	
+라면국물	4	밀	guessed	
+치킨윙	4	Not Defined	not_defined	
+쌀라미	4	Not Defined	not_defined	
+육회 비빔밥	4	Not Defined	not_defined	
+우동사리	4	Not Defined	not_defined	
+스프링롤	4	야채 육수	guessed	
+카스테라	4	Not Defined	not_defined	
+무국	4	Not Defined	not_defined	
+닭가슴살 샐러드	4	Not Defined	not_defined	
+쌀국수 국물	4	Not Defined	not_defined	
+찌개	4	Not Defined	not_defined	
+새우 샐러드	4	갑각류	guessed	
+버섯전골	4	버섯	guessed	
+소고기 전골	4	소고기	guessed	
+우동국물	4	Not Defined	not_defined	
+베이글	4	Not Defined	not_defined	
+마파두부	4	콩류	guessed	
+우유	4	Not Defined	not_defined	
+새우샐러드	4	갑각류	guessed	
+프렌치토스트	4	Not Defined	not_defined	
+전복구이	4	조개류	guessed	
+가지볶음	4	열매 채소	guessed	
+팥빙수	4	Not Defined	not_defined	
+호박전	4	열매 채소	guessed	
+돼지불백	4	Not Defined	not_defined	
+소고기국밥	4	소고기	guessed	
+수육국밥	4	돼지고기	guessed	
+어향가지	4	열매 채소	guessed	
+라조기	4	생선	guessed	
+조개탕	4	조개류	guessed	
+닭날개	4	Not Defined	not_defined	
+나물 비빔밥	4	잎 채소	guessed	
+숙주볶음	4	잎 채소	guessed	
+갈치구이	4	생선	guessed	
+오징어국	4	연체류	guessed	
+안동국시	4	Not Defined	not_defined	
+고추튀김	4	열매 채소	guessed	
+덮밥	4	Not Defined	not_defined	
+만두전골	4	밀|돼지고기|잎 채소	guessed	
+뻐해장국	4	Not Defined	not_defined	
+양파스프	4	야채 육수	guessed	
+대패 삼겹살	4	돼지고기	guessed	
+돼지찜	4	Not Defined	not_defined	
+핫바	4	Not Defined	not_defined	
+샤베트	4	Not Defined	not_defined	
+대구지리	4	생선	guessed	
+초콜렛	4	Not Defined	not_defined	
+소고기 미역국	4	소고기	guessed	
+오징어튀김	4	연체류	guessed	
+치즈스틱	4	치즈	guessed	
+라자냐	4	Not Defined	not_defined	
+황태국	4	생선	guessed	
+복무침	4	Not Defined	not_defined	
+두유	4	Not Defined	not_defined	
+대구뽈찜	4	생선	guessed	
+갈치조림	4	생선	guessed	
+오리불고기	4	기타 육류	guessed	
+완자전	4	Not Defined	not_defined	
+해물찜	4	Not Defined	not_defined	
+치즈불닭	4	치즈	guessed	
+꼬리곰탕	3	Not Defined	not_defined	
+돼지고기 스테이크	3	돼지고기	guessed	
+시저샐러드	3	Not Defined	not_defined	
+소고기 된장국	3	소고기	guessed	
+비빔 냉면	3	Not Defined	not_defined	
+수란	3	Not Defined	not_defined	
+야채튀김	3	Not Defined	not_defined	
+배추전	3	잎 채소	guessed	
+비스킷	3	Not Defined	not_defined	
+고등어 구이	3	생선	guessed	
+오징어 볶음	3	연체류	guessed	
+돼지고기 김치찜	3	돼지고기	guessed	
+라멘	3	Not Defined	not_defined	
+브로컬리	3	Not Defined	not_defined	
+쨈	3	Not Defined	not_defined	
+복지리	3	Not Defined	not_defined	
+오리백숙	3	Not Defined	not_defined	
+똠양꿍	3	Not Defined	not_defined	
+시리얼	3	Not Defined	not_defined	
+돼지김치찜	3	잎 채소|고추|마늘|소금|기타 소스	guessed	
+사리	3	Not Defined	not_defined	
+타코야끼	3	Not Defined	not_defined	
+교자	3	Not Defined	not_defined	
+호빵	3	Not Defined	not_defined	
+떡라면	3	밀	guessed	
+오리로스	3	Not Defined	not_defined	
+면사리	3	Not Defined	not_defined	
+파타야	3	Not Defined	not_defined	
+팬케이크	3	Not Defined	not_defined	
+메론	3	Not Defined	not_defined	
+찹쌀떡	3	쌀	guessed	
+차돌박이	3	Not Defined	not_defined	
+그라탕	3	Not Defined	not_defined	
+랍스터찜	3	갑각류	guessed	
+사골국	3	Not Defined	not_defined	
+닭다리	3	Not Defined	not_defined	
+고구마 튀김	3	뿌리 채소	guessed	
+딸기 빙수	3	베리류	guessed	
+퀘사디아	3	Not Defined	not_defined	
+마라탕	3	Not Defined	not_defined	
+닭볶음	3	Not Defined	not_defined	
+젤라또	3	Not Defined	not_defined	
+굴국밥	3	Not Defined	not_defined	
+오향장육	3	기타 소스	guessed	
+고기국수	3	기타 육류	guessed	
+고로케	3	Not Defined	not_defined	
+방울토마토	3	열매 채소	guessed	
+낙지전골	3	연체류	guessed	
+감자국	3	뿌리 채소	guessed	
+선지국	3	내장류	guessed	
+반반불고기	3	기타 육류	guessed	
+북어해장국	3	생선	guessed	
+메밀소바	3	메밀	guessed	
+장떡	3	Not Defined	not_defined	
+복육회	3	Not Defined	not_defined	
+챱스테이크	3	Not Defined	not_defined	
+황도	3	Not Defined	not_defined	
+생대구지리	3	생선	guessed	
+항정살	3	Not Defined	not_defined	
+순두부 찌개	3	콩류	guessed	
+립	3	Not Defined	not_defined	
+짬뽕탕	3	Not Defined	not_defined	
+젤리	3	Not Defined	not_defined	
+피칸파이	3	견과류	guessed	
+주물럭	3	Not Defined	not_defined	
+방어회	3	생선	guessed	
+오뎅국	3	Not Defined	not_defined	
+해물	3	Not Defined	not_defined	
+건빵	3	Not Defined	not_defined	
+돼지 김치찌개	3	잎 채소|고추|마늘|소금|기타 소스	guessed	
+호박잎쌈	3	잎 채소	guessed	
+선지해장국	3	내장류	guessed	
+마늘빵	3	마늘	guessed	
+코다리찜	3	생선	guessed	
+판모밀	3	Not Defined	not_defined	
+소갈비살	3	소고기	guessed	
+오리	3	Not Defined	not_defined	
+굴무침	3	Not Defined	not_defined	
+차돌짬뽕국물	3	Not Defined	not_defined	
+메밀전병	3	메밀	guessed	
+닭찜	3	Not Defined	not_defined	
+컵케익	3	밀|설탕|기름	guessed	
+닭똥집	3	Not Defined	not_defined	
+오징어무침	3	연체류	guessed	
+돼지김치찌개	3	잎 채소|고추|마늘|소금|기타 소스	guessed	
+구운 채소	3	기타 채소	guessed	
+돼지 불고기	3	기타 육류	guessed	
+소불고기	3	기타 육류	guessed	
+메밀국수	3	메밀	guessed	
+계란 토스트	3	계란	guessed	
+꽈베기	3	Not Defined	not_defined	
+양념통닭	3	기타 소스	guessed	
+삶은계란	3	계란	guessed	
+막국수 - 비빔	3	Not Defined	not_defined	
+크로아상	2	Not Defined	not_defined	
+돼지고기 카레	2	돼지고기	guessed	
+돼지고기 된장국	2	돼지고기	guessed	
+햄버거 패티	2	Not Defined	not_defined	
+짜파구리	2	Not Defined	not_defined	
+과일 샐러드	2	단 과일	guessed	
+스테이크 샌드위치	2	Not Defined	not_defined	
+연어 스테이크	2	생선	guessed	
+배추 된장국	2	된장	guessed	
+청경채 볶음	2	잎 채소	guessed	
+생선 구이	2	생선	guessed	
+고구마 맛탕	2	뿌리 채소	guessed	
+태국 음식	2	Not Defined	not_defined	
+야채스프	2	야채 육수	guessed	
+돼지 앞다리살 볶음밥	2	Not Defined	not_defined	
+문어 구이	2	연체류	guessed	
+오댕	2	Not Defined	not_defined	
+노루고기	2	기타 육류	guessed	
+타다끼	2	Not Defined	not_defined	
+홍어삼합	2	생선	guessed	
+노가리	2	Not Defined	not_defined	
+보리밥	2	보리쌀	guessed	
+북경오리	2	Not Defined	not_defined	
+매생이 해장국	2	해조류	guessed	
+햄 샌드위치	2	Not Defined	not_defined	
+스낵	2	Not Defined	not_defined	
+묵사발	2	Not Defined	not_defined	
+동태탕	2	생선	guessed	
+보쌈정식	2	Not Defined	not_defined	
+버섯 스프	2	버섯	guessed	
+퓨레	2	Not Defined	not_defined	
+방울 토마토	2	열매 채소	guessed	
+키토김밥	2	Not Defined	not_defined	
+소고기 볶음	2	소고기	guessed	
+꿔바로우	2	Not Defined	not_defined	
+새우전	2	갑각류	guessed	
+모닝글로리	2	Not Defined	not_defined	
+우육탕	2	Not Defined	not_defined	
+김치말이국수	2	잎 채소|고추|마늘|소금|기타 소스	guessed	
+울면	2	Not Defined	not_defined	
+치킨샐러드	2	Not Defined	not_defined	
+양다리	2	Not Defined	not_defined	
+김초밥	2	Not Defined	not_defined	
+새우꼬치	2	갑각류	guessed	
+꼬마김밥	2	Not Defined	not_defined	
+오징어회	2	연체류	guessed	
+브라우니	2	Not Defined	not_defined	
+물김치	2	잎 채소|고추|마늘|소금|기타 소스	guessed	
+돼지사태찜	2	Not Defined	not_defined	
+장어구이	2	생선	guessed	
+수육전골	2	돼지고기	guessed	
+비빔밥 나물	2	잎 채소	guessed	
+떡만두국	2	밀|돼지고기|잎 채소	guessed	
+칠리새우	2	갑각류	guessed	
+바싹불고기	2	기타 육류	guessed	
+온면	2	Not Defined	not_defined	
+소양념갈비	2	소고기	guessed	
+충무김밥	2	Not Defined	not_defined	
+차돌숙주볶음	2	잎 채소	guessed	
+문어 샐러드	2	연체류	guessed	
+당면사리	2	전분	guessed	
+동파육	2	Not Defined	not_defined	
+새우탕 칼국수	2	갑각류	guessed	
+초코파이	2	Not Defined	not_defined	
+조각케익	2	밀|설탕|기름	guessed	
+치킨 샐러드	2	Not Defined	not_defined	
+국물	2	Not Defined	not_defined	
+잡채밥	2	Not Defined	not_defined	
+연어 샌드위치	2	생선	guessed	
+약밥	2	Not Defined	not_defined	
+새우버거	2	갑각류	guessed	
+굴보쌈	2	Not Defined	not_defined	
+비빔밀면	2	Not Defined	not_defined	
+호박튀김	2	열매 채소	guessed	
+맑은 감자탕	2	뿌리 채소	guessed	
+스톨렌	2	Not Defined	not_defined	
+삶은 오징어	2	연체류	guessed	
+참치 샐러드	2	생선	guessed	
+소고기 타코	2	소고기	guessed	
+문어튀김	2	연체류	guessed	
+전골	2	Not Defined	not_defined	
+해신탕	2	Not Defined	not_defined	
+제육불고기	2	기타 육류	guessed	
+치킨가라아게	2	Not Defined	not_defined	
+전가복	2	Not Defined	not_defined	
+토마토계란볶음	2	열매 채소	guessed	
+라자니아	2	Not Defined	not_defined	
+막창	2	Not Defined	not_defined	
+파스타 샐러드	2	밀	guessed	
+순대곱창전골	2	내장류	guessed	
+믈냉면	2	Not Defined	not_defined	
+짜장범벅	2	Not Defined	not_defined	
+카레라이스	2	카레	guessed	
+닭전골	2	Not Defined	not_defined	
+양념갈비살	2	소고기	guessed	
+깻잎전	2	잎 채소	guessed	
+츄러스	2	Not Defined	not_defined	
+양념갈비	2	소고기	guessed	
+치즈버거	2	치즈	guessed	
+묵밥	2	Not Defined	not_defined	
+양파링	2	뿌리 채소	guessed	
+초계국수	2	Not Defined	not_defined	
+물밀면	2	Not Defined	not_defined	
+홍어전	2	생선	guessed	
+소고기 국밥(국만)	2	소고기	guessed	
+차돌	2	Not Defined	not_defined	
+홍어찜	2	생선	guessed	
+아우국	2	Not Defined	not_defined	
+화과자	2	Not Defined	not_defined	
+게살볶음	2	갑각류	guessed	
+돌솥비빔밥	2	Not Defined	not_defined	
+곱창순두부	2	콩류	guessed	
+쫄면사리	2	밀	guessed	
+한방 우보탕	2	Not Defined	not_defined	
+시금치 튀김	2	잎 채소	guessed	
+매운 라면	2	밀	guessed	
+사탕	2	Not Defined	not_defined	
+완탕스프	2	야채 육수	guessed	
+새우깡	2	갑각류	guessed	
+분짜	2	Not Defined	not_defined	
+소바	2	Not Defined	not_defined	
+고추장 삼겹살	2	고추장	guessed	
+소고기국	2	소고기	guessed	
+삼선우동 국물	2	Not Defined	not_defined	
+호박죽	2	열매 채소	guessed	
+옛날도시락	2	Not Defined	not_defined	
+회무침	2	Not Defined	not_defined	
+조기구이	2	생선	guessed	
+치즈튀김	2	치즈	guessed	
+둥지냉면	2	Not Defined	not_defined	
+제사 음식	2	Not Defined	not_defined	
+망고빙수	2	단 과일	guessed	
+오징어포 무침	2	연체류	guessed	
+소고기무국	2	소고기	guessed	
+곤드레밥	2	잎 채소	guessed	
+계란 샐러드	2	계란	guessed	
+도가니	2	Not Defined	not_defined	
+모닝빵	2	Not Defined	not_defined	
+참치김치찌개	2	잎 채소|고추|마늘|소금|기타 소스	guessed	
+쟁반짜장	2	Not Defined	not_defined	
+순대국밥	2	가공육|전분	guessed	
+토마토 파스타	2	열매 채소	guessed	
+소고기 죽순 찌개	2	소고기	guessed	
+홍어 무침	2	생선	guessed	
+연어회	2	생선	guessed	
+곰탕	2	Not Defined	not_defined	
+쑥국	2	Not Defined	not_defined	
+홍합탕	2	조개류	guessed	
+볶음우동	2	Not Defined	not_defined	
+양지곰탕	2	소고기	guessed	
+꽃게찜	2	갑각류	guessed	
+굴라시	2	Not Defined	not_defined	
+잡탕밥	2	Not Defined	not_defined	
+버섯 샐러드	2	버섯	guessed	
+케사디아	2	Not Defined	not_defined	
+카라멜	2	Not Defined	not_defined	
+대구찜	2	생선	guessed	
+조기조림	2	생선	guessed	
+감말랭이	2	Not Defined	not_defined	
+냉소바	2	Not Defined	not_defined	
+묵	2	Not Defined	not_defined	
+치킨너겟	2	Not Defined	not_defined	
+소고기샤브샤브	2	소고기	guessed	
+단호박 스프	2	열매 채소	guessed	
+쌀밥	2	Not Defined	not_defined	
+호박스프	2	야채 육수	guessed	
+쭈꾸미볶음	2	연체류	guessed	
+돼지 목살	2	Not Defined	not_defined	
+애프터눈 티	2	Not Defined	not_defined	
+오징어 무국	2	연체류	guessed	
+버섯찌개	2	버섯	guessed	
+말린 과일	2	단 과일	guessed	
+유과	2	Not Defined	not_defined	
+안동찜닭	2	Not Defined	not_defined	
+어묵탕	2	생선|밀	guessed	
+마른 과일	2	단 과일	guessed	
+도넛	2	Not Defined	not_defined	
+돈사태찜	2	Not Defined	not_defined	
+양념치킨	2	기타 소스	guessed	
+황태구이	2	생선	guessed	
+깁밥	2	Not Defined	not_defined	
+치즈돈까스	2	치즈	guessed	
+딸기 타르트	2	베리류	guessed	
+샌드위치 속	2	Not Defined	not_defined	
+뼈해장국	2	Not Defined	not_defined	
+죽순 소고기 된장찌개	2	소고기	guessed	
+반반 불고기	2	기타 육류	guessed	
+얼큰이양곰탕	2	Not Defined	not_defined	
+등갈비찜	2	소고기	guessed	
+마시멜로우	2	설탕	guessed	
+토마토소스 파스타	2	기타 소스	guessed	
+이탈리안 코스	2	Not Defined	not_defined	
+차돌짬뽕 국물	2	Not Defined	not_defined	
+양념돼지갈비	2	돼지고기	guessed	
+이탈리안	2	Not Defined	not_defined	
+장례식장 밥	2	Not Defined	not_defined	
+Pork Chop	2	Not Defined	not_defined	
+올리브오일 파스타	1	열매 채소	guessed	
+햄 치즈 야채 샌드위치	1	치즈	guessed	
+고추장 소스	1	고추장	guessed	
+생선 스테이크	1	생선	guessed	
+Galette	1	Not Defined	not_defined	
+Crepe	1	Not Defined	not_defined	
+씨저 샐러드	1	Not Defined	not_defined	
+양고기 스테이크	1	양고기	guessed	
+비트 리조또	1	뿌리 채소	guessed	
+홍합찜	1	조개류	guessed	
+대구 구이	1	생선	guessed	
+굴 겉저리 김치	1	잎 채소|고추|마늘|소금|기타 소스	guessed	
+대구 튀김	1	생선	guessed	
+캐밥	1	Not Defined	not_defined	
+계란 아보카도 스팸 볶음밥	1	열매 채소	guessed	
+옥수수 구이	1	옥수수	guessed	
+파김치	1	잎 채소|고추|마늘|소금|기타 소스	guessed	
+김치볶음밥	1	잎 채소|고추|마늘|소금|기타 소스	guessed	
+참치캔 계란국	1	계란	guessed	
+오리다리 구이	1	Not Defined	not_defined	
+참치 비빔밥	1	생선	guessed	
+김치 볶음밥	1	잎 채소|고추|마늘|소금|기타 소스	guessed	
+으깬 감자	1	뿌리 채소	guessed	
+해물 샤브샤브	1	Not Defined	not_defined	
+치킨 케밥	1	Not Defined	not_defined	
+샥슈카	1	Not Defined	not_defined	
+양고기 케밥	1	양고기	guessed	
+해산물 스튜	1	기타해산물	guessed	
+소고기 햄버거 패티	1	소고기	guessed	
+BBQ Lib	1	Not Defined	not_defined	
+소고기 볶음장	1	소고기	guessed	
+고등어 샐러드	1	생선	guessed	
+새우 리조또	1	갑각류	guessed	
+빵 스테이크	1	Not Defined	not_defined	
+양파 튀김	1	뿌리 채소	guessed	
+문어 무침	1	연체류	guessed	
+새우 고로케	1	갑각류	guessed	
+해바라기 씨	1	Not Defined	not_defined	
+그라놀라	1	Not Defined	not_defined	
+해물밥	1	Not Defined	not_defined	
+무화과 말림	1	단 과일	guessed	
+야채면	1	Not Defined	not_defined	
+벤또	1	Not Defined	not_defined	
+버섯 리조또	1	버섯	guessed	
+쵸코 딸기	1	베리류	guessed	
+메밀 곤약면	1	기타	guessed	
+팽이버섯 전	1	버섯	guessed	
+간장 새우	1	간장	guessed	
+간장 비빔밥	1	간장	guessed	
+달래장	1	마늘	guessed	
+콩 카레	1	카레	guessed	
+양 케밥	1	Not Defined	not_defined	
+아구 카레	1	카레	guessed	
+똠양 누들	1	Not Defined	not_defined	
+새우죽	1	갑각류	guessed	
+초고추장	1	고추장	guessed	
+크림소스 파스타	1	기타 소스|기타 유제품	guessed	
+훈제 연어 초밥	1	생선	guessed	
+계란국	1	계란	guessed	
+돼지 볶음	1	Not Defined	not_defined	
+돈부리	1	Not Defined	not_defined	
+롤	1	Not Defined	not_defined	
+소고기 파이	1	소고기	guessed	
+돼지 간장 볶음	1	간장	guessed	
+그릭 요거트	1	요거트	guessed	
+오이 냉국	1	열매 채소	guessed	
+야채 볶음	1	Not Defined	not_defined	
+카레 파스타	1	밀	guessed	
+삼겹살 김치볶음	1	돼지고기	guessed	
+돼지고기 김치볶음면	1	돼지고기	guessed	
+양고기 볶음	1	양고기	guessed	
+데친 야채	1	Not Defined	not_defined	
+계란 오믈렛	1	계란	guessed	
+닭날게 고추장 간장 조림	1	고추장	guessed	
+고추장 당면 볶음	1	고추장	guessed	
+팬케잌	1	Not Defined	not_defined	
+돌솥 비빔밥	1	Not Defined	not_defined	
+참치마요	1	생선	guessed	
+야채 스프	1	야채 육수	guessed	
+돼지볶음 간장 비빔면	1	간장	guessed	
+냉동 리조또	1	Not Defined	not_defined	
+닭죽	1	Not Defined	not_defined	
+문어 파스타	1	밀	guessed	
+카레 라이스	1	카레	guessed	
+돼지 앞다리살 볶음	1	Not Defined	not_defined	
+된장 라면	1	된장	guessed	
+냉동 밥	1	Not Defined	not_defined	
+흰자 볶음밥	1	Not Defined	not_defined	
+빠에야	1	Not Defined	not_defined	
+그릭 샐러드	1	Not Defined	not_defined	
+고등어 김치찜	1	생선	guessed	
+관자 샐러드	1	조개류	guessed	
+생선찜	1	생선	guessed	
+치즈라면	1	밀	guessed	
+자연산 회	1	Not Defined	not_defined	
+노루곰국	1	기타 육류	guessed	
+살라미 리예뜨	1	가공육	guessed	
+얼큰 소고기 양곰탕	1	소고기	guessed	
+새우 칼국수	1	갑각류	guessed	
+장어 덮밥	1	생선	guessed	
+전복무침	1	조개류	guessed	
+애플파이	1	Not Defined	not_defined	
+오징어 술국	1	연체류	guessed	
+꼬막찜	1	조개류	guessed	
+소고기 전	1	소고기	guessed	
+오리로스구이	1	Not Defined	not_defined	
+백숙	1	Not Defined	not_defined	
+복수육	1	돼지고기	guessed	
+복볶음	1	Not Defined	not_defined	
+양대창	1	Not Defined	not_defined	
+중식 코스	1	Not Defined	not_defined	
+돼지고기 덮밥	1	돼지고기	guessed	
+아포카토	1	Not Defined	not_defined	
+피쉬앤칩스	1	Not Defined	not_defined	
+치킨 꼬치	1	Not Defined	not_defined	
+돼지 샐러드	1	Not Defined	not_defined	
+이것저것	1	Not Defined	not_defined	
+쭈꾸미 구이	1	연체류	guessed	
+꽈리고추 구이	1	열매 채소	guessed	
+당근샐러드	1	뿌리 채소	guessed	
+과매기	1	Not Defined	not_defined	
+조기탕	1	생선	guessed	
+삼선우동	1	Not Defined	not_defined	
+매생이탕	1	해조류	guessed	
+간짜장	1	Not Defined	not_defined	
+돈까스 나베우동	1	Not Defined	not_defined	
+순살 감자탕	1	뿌리 채소	guessed	
+해물 닭 백숙	1	Not Defined	not_defined	
+광어 구이	1	생선	guessed	
+돈코츠 라멘	1	Not Defined	not_defined	
+치킨 또띠아	1	Not Defined	not_defined	
+잠봉 바게트	1	Not Defined	not_defined	
+통들깨 돼지고기 국밥	1	돼지고기	guessed	
+팔보체	1	Not Defined	not_defined	
+유산슬 덮밥	1	Not Defined	not_defined	
+양송이 스프	1	야채 육수	guessed	
+면 샤브샤브	1	Not Defined	not_defined	
+북어죽	1	생선	guessed	
+고구마전	1	뿌리 채소	guessed	
+나물밥	1	잎 채소	guessed	
+생면	1	Not Defined	not_defined	
+차돌삼합	1	Not Defined	not_defined	
+김치전골	1	잎 채소|고추|마늘|소금|기타 소스	guessed	
+감자 사라다	1	뿌리 채소	guessed	
+야채 샤브샤브	1	Not Defined	not_defined	
+새우 완자	1	갑각류	guessed	
+홍어 삼합	1	생선	guessed	
+돼지전골	1	Not Defined	not_defined	
+소고기 폭찹	1	소고기	guessed	
+잡채덮밥	1	Not Defined	not_defined	
+크림새우	1	갑각류	guessed	
+국수 국물	1	Not Defined	not_defined	
+대구 지리	1	생선	guessed	
+번데기탕	1	곤충	guessed	
+국수국물	1	Not Defined	not_defined	
+오리냉무침	1	Not Defined	not_defined	
+카레 비빔밥	1	카레	guessed	
+육회 마끼	1	Not Defined	not_defined	
+굴튀김	1	Not Defined	not_defined	
+들기름 스파케티	1	기름	guessed	
+닭다리 구이	1	Not Defined	not_defined	
+김치류	1	잎 채소|고추|마늘|소금|기타 소스	guessed	
+소고기 로스편채	1	소고기	guessed	
+황태 순두부	1	콩류	guessed	
+오삼 불고기	1	기타 육류	guessed	
+심계탕	1	Not Defined	not_defined	
+스파게티 컵라면	1	밀	guessed	
+보싸	1	Not Defined	not_defined	
+모짜랠라 튀김	1	Not Defined	not_defined	
+소고기 매운탕	1	소고기	guessed	
+들기름 파스타	1	기름	guessed	
+육회마끼	1	Not Defined	not_defined	
+버섯새우튀김	1	버섯	guessed	
+양념소갈비	1	소고기	guessed	
+오매기 떡	1	Not Defined	not_defined	
+소꼬리찜	1	소고기	guessed	
+고구마 스프	1	뿌리 채소	guessed	
+전복솥밥	1	조개류	guessed	
+아보카도 토마토 샌드위치	1	열매 채소	guessed	
+닭국	1	Not Defined	not_defined	
+물떡	1	Not Defined	not_defined	
+짜계치	1	Not Defined	not_defined	
+과일빙수	1	단 과일	guessed	
+삼겹살 튀김	1	돼지고기	guessed	
+렌칠콩	1	Not Defined	not_defined	
+사천짜장	1	Not Defined	not_defined	
+양갱	1	Not Defined	not_defined	
+돈사태떡찜	1	Not Defined	not_defined	
+생선조림	1	생선	guessed	
+매생이국	1	해조류	guessed	
+매생이 국	1	해조류	guessed	
+차돌 청국장	1	청국장	guessed	
+잠봉토스트	1	Not Defined	not_defined	
+탕탕이	1	Not Defined	not_defined	
+제주식 돼지고기 해장국	1	돼지고기	guessed	
+백깁치말이 국수	1	Not Defined	not_defined	
+오짬게티	1	Not Defined	not_defined	
+새우 야채 죽	1	갑각류	guessed	
+김치돈까스나베	1	잎 채소|고추|마늘|소금|기타 소스	guessed	
+삼선우동국물	1	Not Defined	not_defined	
+백짬뽕 국물만	1	Not Defined	not_defined	
+트위스터	1	Not Defined	not_defined	
+미니붕어빵	1	Not Defined	not_defined	
+새우칼국수	1	갑각류	guessed	
+미나리전	1	잎 채소	guessed	
+매운갈비찜	1	소고기	guessed	
+냉면육수	1	고기 육수	guessed	
+불낙비빔밥	1	Not Defined	not_defined	
+옥수수온면	1	옥수수	guessed	
+그릭요거트	1	요거트	guessed	
+김치말이 국수	1	잎 채소|고추|마늘|소금|기타 소스	guessed	
+가자미구이	1	생선	guessed	
+중식	1	Not Defined	not_defined	
+제육 쌈밥	1	Not Defined	not_defined	
+샤브우동	1	Not Defined	not_defined	
+참치 김치찌개	1	잎 채소|고추|마늘|소금|기타 소스	guessed	
+짜계치킨	1	Not Defined	not_defined	
+소고기 시래기 해장국	1	소고기	guessed	
+현미밥 조금	1	쌀	guessed	
+북엇국	1	Not Defined	not_defined	
+파스타샐러드	1	밀	guessed	
+소국밥	1	Not Defined	not_defined	
+백짬뽕(국물)	1	Not Defined	not_defined	
+문어국밥(국만)	1	연체류	guessed	
+새우가지	1	열매 채소	guessed	
+숙주 탕수육	1	돼지고기	guessed	
+차돌 야채찜	1	Not Defined	not_defined	
+전복갈낙탕	1	조개류	guessed	
+삼겹살 볶음	1	돼지고기	guessed	
+새우완자	1	갑각류	guessed	
+국수 전골	1	Not Defined	not_defined	
+가리국밥	1	Not Defined	not_defined	
+식혜	1	Not Defined	not_defined	
+닭고기 일본라면	1	닭고기	guessed	
+과일 사라다	1	단 과일	guessed	
+양곱탕	1	Not Defined	not_defined	
+소고기 매운 불고기	1	소고기	guessed	
+우육탕밥	1	Not Defined	not_defined	
+닭완자	1	Not Defined	not_defined	
+소떡	1	Not Defined	not_defined	
+회오리감자	1	뿌리 채소	guessed	
+초계면	1	Not Defined	not_defined	
+소갈비 자장면	1	소고기	guessed	
+간장갈비찜	1	간장	guessed	
+게찜	1	Not Defined	not_defined	
+굴떢국	1	Not Defined	not_defined	
+소세지빵	1	Not Defined	not_defined	
+소고기버섯들깨탕	1	소고기	guessed	
+국밥(국만)	1	Not Defined	not_defined	
+시래기 솥밥	1	잎 채소	guessed	
+미니 붕어빵	1	Not Defined	not_defined	
+어향가지새우	1	열매 채소	guessed	
+백짬뽕탕	1	Not Defined	not_defined	
+된장술밥	1	된장	guessed	
+고구마 전	1	뿌리 채소	guessed	
+소고기 우거지 해장국	1	소고기	guessed	
+크림빵	1	기타 유제품	guessed	
+쵸코파이	1	Not Defined	not_defined	
+허파	1	Not Defined	not_defined	
+타파스	1	Not Defined	not_defined	
+오징어 젓갈	1	연체류	guessed	
+요구르트	1	Not Defined	not_defined	
+에그 스크램블	1	Not Defined	not_defined	
+토마토 크림수프	1	열매 채소	guessed	
+소고기 스튜	1	소고기	guessed	
+치킨 등	1	Not Defined	not_defined	
+으깬감자	1	뿌리 채소	guessed	
+또띠아	1	Not Defined	not_defined	
+훈제 연어	1	생선	guessed	
+안심 스테이크	1	Not Defined	not_defined	
+짬뽕(국물만)	1	Not Defined	not_defined	
+슈톨렌	1	Not Defined	not_defined	
+컵밥	1	Not Defined	not_defined	
+스팸마요덮밥	1	가공육	guessed	
+백짬뽕	1	Not Defined	not_defined	
+소고기장터국밥	1	소고기	guessed	
+해물 된장찌개	1	된장	guessed	
+돼지 등뼈 김치찜	1	잎 채소|고추|마늘|소금|기타 소스	guessed	
+돈까스덮밥	1	Not Defined	not_defined	
+돼지 등뻐 김치찜	1	잎 채소|고추|마늘|소금|기타 소스	guessed	
+순대국(국만)	1	가공육|전분	guessed	
+새우 에비동	1	갑각류	guessed	
+온메밀소바	1	메밀	guessed	
+초계물냉면	1	Not Defined	not_defined	
+얼큰 우거지 양곰탕	1	잎 채소	guessed	
+우동 국물만	1	Not Defined	not_defined	
+계란구이	1	계란	guessed	
+삼겹살 구이	1	돼지고기	guessed	
+돼지국밥(국만)	1	Not Defined	not_defined	
+곤드래 솥밥	1	잎 채소	guessed	
+제주식 고사리 해장국	1	잎 채소	guessed	
+불고기 도시락	1	기타 육류	guessed	
+소고기 잡채밥	1	소고기	guessed	
+참치통조림	1	생선	guessed	
+굴국밥 국만	1	Not Defined	not_defined	
+연잎쌈	1	잎 채소	guessed	
+냉삼	1	Not Defined	not_defined	
+김치쫄면	1	잎 채소|고추|마늘|소금|기타 소스	guessed	
+돼지 목살구이	1	Not Defined	not_defined	
+고추장 김치찌개	1	고추장	guessed	
+새우구이	1	갑각류	guessed	
+전복탕	1	조개류	guessed	
+낙지 곱창 새우 전골	1	내장류	guessed	
+블고기 전골	1	기타 육류	guessed	
+해물누룽지탕	1	쌀	guessed	
+돼지편육	1	Not Defined	not_defined	
+묵무침	1	Not Defined	not_defined	
+망고케익	1	단 과일	guessed	
+단술	1	Not Defined	not_defined	
+우설	1	Not Defined	not_defined	
+은어 파스타	1	밀	guessed	
+찰광어	1	생선	guessed	
+물냉면 정식	1	Not Defined	not_defined	
+계란후라이	1	계란	guessed	
+게살스프	1	갑각류	guessed	
+백합탕	1	조개류	guessed	
+민어회	1	생선	guessed	
+성게알	1	기타해산물	guessed	
+닭간	1	Not Defined	not_defined	
+티저트	1	Not Defined	not_defined	
+캐사디아	1	Not Defined	not_defined	
+오믈렛 32번	1	Not Defined	not_defined	
+와인	1	Not Defined	not_defined	
+Crispy Artichokes	1	Not Defined	not_defined	
+아스퍼라거스	1	Not Defined	not_defined	
+생선스프	1	생선	guessed	
+에그스크렘블	1	Not Defined	not_defined	
+육쌈냉면	1	Not Defined	not_defined	
+소세지 산적	1	Not Defined	not_defined	
+냉칼국수	1	Not Defined	not_defined	
+토마토뻐파스타	1	열매 채소	guessed	
+소룡포	1	Not Defined	not_defined	
+완탕면	1	Not Defined	not_defined	
+양지탕	1	소고기	guessed	
+소고기 파전	1	소고기	guessed	
+김부각	1	Not Defined	not_defined	
+유산술	1	Not Defined	not_defined	
+복어국	1	생선	guessed	
+아귀수육	1	돼지고기	guessed	
+불낙전골	1	Not Defined	not_defined	
+오뎅떡볶이	1	Not Defined	not_defined	
+케이준 샐러드	1	Not Defined	not_defined	
+수육 전골	1	돼지고기	guessed	
+미나리 전	1	잎 채소	guessed	
+칡냉면	1	Not Defined	not_defined	
+묵은지 돼지찜	1	잎 채소|고추|마늘|소금|기타 소스	guessed	
+소고기 파스타	1	소고기	guessed	
+닭가슴살 스테이크	1	Not Defined	not_defined	
+양간	1	Not Defined	not_defined	
+생선국	1	생선	guessed	
+도사	1	Not Defined	not_defined	
+삶은 생선	1	생선	guessed	
+닭고기 꼬치	1	닭고기	guessed	
+훈제 오리	1	Not Defined	not_defined	
+다슬기 아욱국	1	기타해산물	guessed	
+바	1	Not Defined	not_defined	
+전복 미역국	1	해조류	guessed	
+돼지 사태찜	1	Not Defined	not_defined	
+사천 탕수육	1	돼지고기	guessed	
+해물 누룽지	1	쌀	guessed	
+골뱅이 쫄면	1	기타해산물	guessed	
+우동 전골	1	Not Defined	not_defined	
+만두 육개장	1	밀|돼지고기|잎 채소	guessed	
+감자 샐러드	1	뿌리 채소	guessed	
+오므라이스	1	Not Defined	not_defined	
+투움바 치킨 커틀렛	1	Not Defined	not_defined	
+국물 떡볶이	1	Not Defined	not_defined	
+방웅토마토	1	열매 채소	guessed	
+소면사리	1	밀	guessed	
+서대조림	1	생선	guessed	
+치즈 떡볶이	1	치즈	guessed	
+꼬막 비빔밥	1	조개류	guessed	
+치킨커틀렛	1	Not Defined	not_defined	
+소고기 미역국(밥만)	1	소고기	guessed	
+부대볶음	1	Not Defined	not_defined	
+가오리찜	1	생선	guessed	
+누룽지 삼계탕	1	쌀	guessed	
+감자샐러드	1	뿌리 채소	guessed	
+국수류	1	Not Defined	not_defined	
+치즈 샐러드	1	치즈	guessed	
+양고기 시금치 콩 카레	1	잎 채소	guessed	
+카레 전병	1	카레	guessed	
+탄두리치킨	1	Not Defined	not_defined	
+돼지	1	Not Defined	not_defined	
+인도음식	1	Not Defined	not_defined	
+떡 샐러드	1	Not Defined	not_defined	
+버섯 카레	1	버섯	guessed	
+코코넛 케익	1	단 과일	guessed	
+똠양국수	1	Not Defined	not_defined	
+토마토와 관자 샐러드	1	열매 채소	guessed	
+돼지고기 볶음과 계란면	1	돼지고기	guessed	
+닭꼬치	1	Not Defined	not_defined	
+냉삼겹	1	Not Defined	not_defined	
+쫀드기	1	Not Defined	not_defined	
+도가니탕	1	Not Defined	not_defined	
+중국식 냉면	1	Not Defined	not_defined	
+메로구이	1	생선	guessed	
+소고기볶음	1	소고기	guessed	
+골뱅이 소면	1	기타해산물	guessed	
+감자 된장국ㅂ계란찜	1	뿌리 채소	guessed	
+하몽 샐러드	1	Not Defined	not_defined	
+소고시	1	Not Defined	not_defined	
+티라미수	1	Not Defined	not_defined	
+김치스프	1	잎 채소|고추|마늘|소금|기타 소스	guessed	
+에그롤	1	Not Defined	not_defined	
+카나페	1	Not Defined	not_defined	
+오물렛	1	Not Defined	not_defined	
+우삼겹 김치만두전골	1	잎 채소|고추|마늘|소금|기타 소스	guessed	
+벼해장국	1	Not Defined	not_defined	
+아구지리	1	Not Defined	not_defined	
+껍데기	1	Not Defined	not_defined	
+생대구 지리	1	생선	guessed	
+아구튀김	1	Not Defined	not_defined	
+조리퐁	1	Not Defined	not_defined	
+칼국수 라면	1	밀	guessed	
+오이볶음	1	열매 채소	guessed	
+차돌짬뽕밥(국만)	1	Not Defined	not_defined	
+차돌박이 국밥(국만)	1	Not Defined	not_defined	
+가츠동	1	Not Defined	not_defined	
+알탕(국만)	1	Not Defined	not_defined	
+곳감	1	Not Defined	not_defined	
+굴국밥(국만)	1	Not Defined	not_defined	
+우육탕면	1	Not Defined	not_defined	
+솥밥 한정식	1	Not Defined	not_defined	
+소고기 해장국	1	소고기	guessed	
+김치국밥	1	잎 채소|고추|마늘|소금|기타 소스	guessed	
+차돌짬봉	1	Not Defined	not_defined	
+양무침	1	Not Defined	not_defined	
+생선찌개	1	생선	guessed	
+수제비 사리	1	Not Defined	not_defined	
+포도잎쌈밥	1	잎 채소	guessed	
+한우국밥	1	Not Defined	not_defined	
+채식 코스	1	Not Defined	not_defined	
+한정식 여러가지	1	열매 채소	guessed	
+소고기 만두전골	1	소고기	guessed	
+콩나물국밥(국만)	1	잎 채소	guessed	
+연어 아보카드 샐러드	1	생선	guessed	
+돼지갈비튀김	1	돼지고기	guessed	
+제주식 국밥	1	Not Defined	not_defined	
+뿌링치킨	1	Not Defined	not_defined	
+청국장가루	1	청국장	guessed	
+꽃빵	1	Not Defined	not_defined	
+똠양 쌀국수	1	Not Defined	not_defined	
+돈갈비 백탕	1	소고기	guessed	
+우거지갈비탕	1	잎 채소	guessed	
+삼선짬뽕국물	1	Not Defined	not_defined	
+토마토계란	1	열매 채소	guessed	
+잼	1	Not Defined	not_defined	
+감자면	1	뿌리 채소	guessed	
+물갈비	1	소고기	guessed	
+시래기 된장	1	잎 채소	guessed	
+덴뿌라	1	Not Defined	not_defined	
+미꾸라지 튀김	1	생선	guessed	
+버섯 팬케익	1	버섯	guessed	
+낙지순두부찌개	1	콩류	guessed	
+옥수수 온면	1	옥수수	guessed	
+가오리무침	1	생선	guessed	
+전어구이	1	생선	guessed	
+동태전	1	생선	guessed	
+생돼지갈비	1	돼지고기	guessed	
+갈매기살	1	Not Defined	not_defined	
+돼지수육귝밥	1	돼지고기	guessed	
+고로게	1	Not Defined	not_defined	
+토마토소스에 계란과 바게트	1	기타 소스	guessed	
+새우 빠에야	1	갑각류	guessed	
+모짜렐라 튀김	1	치즈	guessed	
+우렁쌈장	1	Not Defined	not_defined	
+순두부국	1	콩류	guessed	
+대방어 대가리 구이	1	생선	guessed	
+닭한마리	1	Not Defined	not_defined	
+전복삼계탕	1	조개류	guessed	
+망고샐러드	1	단 과일	guessed	
+소고기 수육	1	소고기	guessed	
+소고기 설렁탕	1	소고기	guessed	
+차돌배기	1	Not Defined	not_defined	
+수육국	1	돼지고기	guessed	
+국수 샐러드	1	Not Defined	not_defined	
+돼지고기 야채 볶음	1	돼지고기	guessed	
+돼지 생갈비	1	소고기	guessed	
+라볶이	1	Not Defined	not_defined	
+카레밥	1	카레	guessed	
+간장 갈비찜	1	간장	guessed	
+소고기 두부 전골	1	소고기	guessed	
+시저 셀러드	1	Not Defined	not_defined	
+깔라마리 크림	1	기타 유제품	guessed	
+플라이드 블랙 모짜	1	Not Defined	not_defined	
+디아볼라 피자	1	Not Defined	not_defined	
+루꼴라 피자	1	잎 채소	guessed	
+갑오징어 먹물 크림 파스타	1	연체류	guessed	
+빠쉐	1	Not Defined	not_defined	
+두부고추볶음	1	열매 채소	guessed	
+샐러리제육볶음	1	줄기 채소	guessed	
+옥수수 국수	1	옥수수	guessed	
+와라비 모찌	1	Not Defined	not_defined	
+파이	1	Not Defined	not_defined	
+천엽	1	Not Defined	not_defined	
+고추장 찌개	1	고추장	guessed	
+생삼겹 두루치기	1	Not Defined	not_defined	
+감자너겟	1	뿌리 채소	guessed	
+콜라겐 가루	1	기타	guessed	
+양지국	1	소고기	guessed	
+소고기 야채죽	1	소고기	guessed	
+너넷	1	Not Defined	not_defined	
+참치 샌드위치	1	생선	guessed	
+순두부 북어국	1	콩류	guessed	
+짜파게티 컵라면	1	밀	guessed	
+소고기 국수전골	1	소고기	guessed	
+중국냉면	1	Not Defined	not_defined	
+찐만두	1	밀|돼지고기|잎 채소	guessed	
+나가사끼 짬뽕	1	Not Defined	not_defined	
+우삽겹 샐러드	1	Not Defined	not_defined	
+순대전골	1	가공육|전분	guessed	
+닭계장	1	Not Defined	not_defined	
+깻닢전	1	Not Defined	not_defined	
+라먼사리	1	Not Defined	not_defined	
+깻입전	1	Not Defined	not_defined	
+사천탕면	1	Not Defined	not_defined	
+왕새우 오무라이스	1	갑각류	guessed	
+황태 김치국	1	잎 채소|고추|마늘|소금|기타 소스	guessed	
+기스면	1	Not Defined	not_defined	
+해파리냉채	1	기타해산물	guessed	
+팥빵	1	Not Defined	not_defined	
+홍어애	1	생선	guessed	
+홍어코	1	생선	guessed	
+홍어회	1	생선	guessed	
+홍어탕	1	생선	guessed	
+오리쌈밥	1	Not Defined	not_defined	
+짬뽕 수제비	1	Not Defined	not_defined	
+떡꼬치	1	Not Defined	not_defined	
+돼지갈비탕	1	돼지고기	guessed	
+소고기샐러드	1	소고기	guessed	
+해물라면	1	밀	guessed	
+문어샐러드	1	연체류	guessed	
+베이컨야채구이	1	가공육	guessed	
+지리탕	1	Not Defined	not_defined	
+불고기 샐러드	1	기타 육류	guessed	
+황태미역국	1	해조류	guessed	
+소고기 버섯 국수 전골	1	소고기	guessed	
+된장전골밥	1	된장	guessed	
+감자 수제비	1	뿌리 채소	guessed	
+팔진덮밥	1	Not Defined	not_defined	
+옛날스팸도시락	1	가공육	guessed	
+낙지 짜글이	1	연체류	guessed	
+소고기 샐러드	1	소고기	guessed	
+두부조림	1	콩류	guessed	
+치아바타	1	Not Defined	not_defined	
+콩고기 샐러드	1	콩류	guessed	
+닭껍질 튀김	1	닭고기	guessed	
+문어구이	1	연체류	guessed	
+닭발 튀김	1	닭고기	guessed	
+차돌 장국밥	1	Not Defined	not_defined	
+카레덮밥	1	카레	guessed	
+어묵 국수	1	생선|밀	guessed	
+깐쇼새우	1	갑각류	guessed	
+연어덮밥	1	생선	guessed	
+순두부 청국장	1	콩류	guessed	
+조랭이 미역국	1	해조류	guessed	
+막회	1	Not Defined	not_defined	
+곰치탕	1	생선	guessed	
+복껍질 무침	1	Not Defined	not_defined	
+복불고기	1	기타 육류	guessed	
+차돌 김치찌개	1	잎 채소|고추|마늘|소금|기타 소스	guessed	
+송어회	1	생선	guessed	
+곤드레 밥	1	잎 채소	guessed	
+굴탕면	1	Not Defined	not_defined	
+타르트	1	Not Defined	not_defined	
+매운 갈비찜	1	소고기	guessed	
+맑은 대파 육개장	1	줄기 채소	guessed	
+전복 스프	1	야채 육수	guessed	
+가지 소고기 볶음	1	소고기	guessed	
+돼지 간장 조림	1	간장	guessed	
+망고퓨레	1	단 과일	guessed	
+양곰탕	1	Not Defined	not_defined	
+회 비빔국수	1	Not Defined	not_defined	
+타코야키	1	Not Defined	not_defined	
+대구지리나베	1	생선	guessed	
+소고기쯔란볶음	1	소고기	guessed	
+도상면	1	Not Defined	not_defined	
+고기국	1	기타 육류	guessed	
+커피나	1	Not Defined	not_defined	
+쫄쫄이	1	Not Defined	not_defined	
+고기국물	1	기타 육류	guessed	
+은복국	1	Not Defined	not_defined	
+농어회	1	생선	guessed	
+농어지리	1	생선	guessed	
+크래커	1	Not Defined	not_defined	
+토마토 새우 샐러드	1	열매 채소	guessed	
+황태무침	1	생선	guessed	
+핫앤사우어스프	1	야채 육수	guessed	
+탄탄면	1	Not Defined	not_defined	
+찹쌀도너스	1	찹쌀	guessed	
+바지락술찜 등	1	조개류	guessed	
+낙지 비빔밥	1	연체류	guessed	
+크레페	1	Not Defined	not_defined	
+마른 새우	1	갑각류	guessed	
+도다리 세꼬시	1	생선	guessed	
+사과 견과류 샐러드	1	견과류	guessed	
+망고스무디	1	단 과일	guessed	
+새우까스	1	갑각류	guessed	
+꼬막무침	1	조개류	guessed	
+오돌뼈	1	Not Defined	not_defined	
+어죽	1	Not Defined	not_defined	
+라면 사리	1	밀	guessed	
+구운 아스파라거스	1	줄기 채소	guessed	
+쓰끼다시	1	Not Defined	not_defined	
+삶은 문어	1	연체류	guessed	
+닭너겟	1	Not Defined	not_defined	
+조기 조림	1	생선	guessed	
+치킨 너겟	1	Not Defined	not_defined	
+멘보샤	1	Not Defined	not_defined	
+우유 쉐이크	1	Not Defined	not_defined	
+리면	1	Not Defined	not_defined	
+삼치구이	1	생선	guessed	
+대패삼겹살 쌈밥	1	돼지고기	guessed	
+문어국밥	1	연체류	guessed	
+문어비빔밥	1	연체류	guessed	
+황태국밥	1	생선	guessed	
+양지해장국	1	소고기	guessed	
+냉라면	1	밀	guessed	
+목살	1	Not Defined	not_defined	
+짜조샐러드	1	Not Defined	not_defined	
+볶음쌀국수	1	Not Defined	not_defined	
+에그누들	1	Not Defined	not_defined	
+낙지 수제비	1	연체류	guessed	
+해물탕	1	Not Defined	not_defined	
+유린기냉모밀	1	Not Defined	not_defined	
+카츠돈	1	Not Defined	not_defined	
+등갈비	1	소고기	guessed	
+양지 해장국	1	소고기	guessed	
+우섬겹	1	Not Defined	not_defined	
+바게뜨 샌드위치	1	Not Defined	not_defined	
+치킨볼	1	Not Defined	not_defined	
+가지 그라탕	1	열매 채소	guessed	
+짬뽕 국물	1	Not Defined	not_defined	
+짜장	1	Not Defined	not_defined	
+타코와사비	1	기타 소스	guessed	
+청포묵 샐러드	1	Not Defined	not_defined	
+메운탕	1	Not Defined	not_defined	
+돼지목살구이	1	Not Defined	not_defined	
+메밀 냉소바	1	메밀	guessed	
+프렌치프라이	1	Not Defined	not_defined	
+나가사끼 짬뽕탕	1	Not Defined	not_defined	
+케이준	1	Not Defined	not_defined	
+산채비빔밥 정식	1	잎 채소	guessed	
+연어구이	1	생선	guessed	
+버섯무침	1	버섯	guessed	
+버섯전	1	버섯	guessed	
+버섯해장국	1	버섯	guessed	
+도가니수육	1	돼지고기	guessed	
+차돌 짬뽕국물	1	Not Defined	not_defined	
+햄 샐러드	1	Not Defined	not_defined	
+반찬에 밥	1	기타	guessed	
+콩나물 국	1	잎 채소	guessed	
+산채 정식	1	잎 채소	guessed	
+모밀소바	1	Not Defined	not_defined	
+소내장탕	1	내장류	guessed	
+식빵에 딸기쨈	1	베리류	guessed	
+가자미 미역국	1	생선	guessed	
+해물파전	1	Not Defined	not_defined	
+해물떡볶이	1	Not Defined	not_defined	
+돈사태 김치찜	1	잎 채소|고추|마늘|소금|기타 소스	guessed	
+소고기(뭉티기	1	소고기	guessed	
+구이	1	Not Defined	not_defined	
+육회)	1	Not Defined	not_defined	
+도가니 수육	1	돼지고기	guessed	
+미역 오뎅탕	1	해조류	guessed	
+버섯 매운탕	1	버섯	guessed	
+대방어	1	생선	guessed	
+쵸코바	1	Not Defined	not_defined	
+차돌된장	1	된장	guessed	
+간장치킨 하이라이스	1	간장	guessed	
+골뱅이 무침	1	기타해산물	guessed	
+복 칼국수	1	Not Defined	not_defined	
+복 튀김	1	Not Defined	not_defined	
+복 껍질	1	Not Defined	not_defined	
+함흥냉면	1	Not Defined	not_defined	
+황태전골	1	생선	guessed	
+새드위치	1	Not Defined	not_defined	
+케이크	1	Not Defined	not_defined	
+강정	1	Not Defined	not_defined	
+소고기 짜장면	1	소고기	guessed	
+회(심해 줄가자미와 감성돔)	1	생선	guessed	
+조개 미역국	1	해조류	guessed	
+간장비빔밥	1	간장	guessed	
+날개	1	Not Defined	not_defined	
+에그누들 해물볶음	1	Not Defined	not_defined	
+생선 대가리 구이	1	생선	guessed	
+우동 스끼야끼	1	Not Defined	not_defined	
+곱창순두부찌개	1	콩류	guessed	
+참치큐브	1	생선	guessed	
+꼬막밥	1	조개류	guessed	
+오리국	1	Not Defined	not_defined	
+메밀전	1	메밀	guessed	
+꼬막 무 밥	1	조개류	guessed	
+미역국 라면	1	밀	guessed	
+차돌 쌀국수	1	Not Defined	not_defined	
+해물 순두부 찌개	1	콩류	guessed	
+육개장칼국수	1	Not Defined	not_defined	
+전복물회	1	조개류	guessed	
+순대버섯전골	1	버섯	guessed	
+약과	1	Not Defined	not_defined	
+시저 샐러드	1	Not Defined	not_defined	
+물냉면 국물	1	Not Defined	not_defined	
+밤식빵	1	밀	guessed	
+설렁탕국물	1	Not Defined	not_defined	
+핫앤사우어수프	1	Not Defined	not_defined	
+햄 김치찌개	1	잎 채소|고추|마늘|소금|기타 소스	guessed	
+소곱창	1	내장류	guessed	
+문어탕	1	연체류	guessed	
+구운 아채	1	Not Defined	not_defined	
+차돌 된장	1	된장	guessed	
+명태포	1	생선	guessed	
+오징어 삼겹살 두루치기	1	돼지고기	guessed	
+물미역	1	해조류	guessed	
+갈치 구이	1	생선	guessed	
+회(도다리 세꼬시와 광어)	1	생선	guessed	
+돼지 갈비	1	소고기	guessed	
+숯불갈비	1	소고기	guessed	
+후라이드 치킨	1	Not Defined	not_defined	
+꿀떡	1	Not Defined	not_defined	
+해파리 무침	1	기타해산물	guessed	
+닭육계장	1	Not Defined	not_defined	
+군고구마	1	뿌리 채소	guessed	
+한우 양념갈비	1	소고기	guessed	
+하와이안 피자	1	Not Defined	not_defined	
+돼지고기 숙주 볶음	1	돼지고기	guessed	
+해물볶음	1	Not Defined	not_defined	
+채끝 스테이크	1	Not Defined	not_defined	
+광어 파스타	1	밀	guessed	
+열무김치	1	잎 채소|고추|마늘|소금|기타 소스	guessed	
+소시지 바게트	1	가공육	guessed	
+매운 돈 사태찜	1	Not Defined	not_defined	
+조개 등 해산물	1	기타해산물	guessed	
+민들레잎	1	잎 채소	guessed	
+해초류	1	해조류	guessed	
+챱스틱	1	Not Defined	not_defined	
+창란젓	1	Not Defined	not_defined	
+쥐치포	1	생선	guessed	
+소양지탕	1	소고기	guessed	
+치킨 커틀렛	1	Not Defined	not_defined	
+쭈꾸미 볶음	1	연체류	guessed	
+크림치즈	1	치즈	guessed	
+황태 곰탕	1	생선	guessed	
+말린 자두	1	단 과일	guessed	
+냉제육	1	Not Defined	not_defined	
+빈대떡	1	Not Defined	not_defined	
+함흥비빔냉면	1	Not Defined	not_defined	
+함흥물냉면	1	Not Defined	not_defined	
+보리굴비 정식	1	생선	guessed	
+땡초치킨	1	Not Defined	not_defined	
+사골우거지해장국	1	잎 채소	guessed	
+바른과일	1	단 과일	guessed	
+바게트	1	Not Defined	not_defined	
+냉수육	1	돼지고기	guessed	
+소시지 치아바타 샌드위치	1	가공육	guessed	
+훈둔탕	1	Not Defined	not_defined	
+가지세우볶음	1	열매 채소	guessed	
+아나고 회	1	Not Defined	not_defined	
+버서서두부	1	콩류	guessed	
+오리덮밥	1	Not Defined	not_defined	
+황태 해장국	1	생선	guessed	
+구운 야채	1	Not Defined	not_defined	
+구운아채	1	Not Defined	not_defined	
+버섯토마토	1	열매 채소	guessed	
+일본식 샤브샤브	1	Not Defined	not_defined	
+소고기 탕수육	1	소고기	guessed	
+복칼국수	1	Not Defined	not_defined	
+닭볶음탕	1	Not Defined	not_defined	
+전복치	1	조개류	guessed	
+고추장 돼지 두루치기	1	고추장	guessed	
+단팥빵	1	Not Defined	not_defined	
+돼지 짜글이	1	Not Defined	not_defined	
+소갈비찜	1	소고기	guessed	
+유자치즈	1	기타 과일	guessed	
+광어회덮밥	1	생선	guessed	
+스테이크 덮밥	1	Not Defined	not_defined	
+소고기 짬뽕탕	1	소고기	guessed	
+감자 튀김	1	뿌리 채소	guessed	
+과일샐러드	1	단 과일	guessed	
+베이커너견과류	1	견과류	guessed	
+불짜장	1	Not Defined	not_defined	
+공고기	1	기타 육류	guessed	
+훠궈	1	Not Defined	not_defined	
+버서서주부	1	Not Defined	not_defined	
+손두부	1	콩류	guessed	
+꼬막비빔밥	1	조개류	guessed	
+갈비살	1	소고기	guessed	
+치마살	1	Not Defined	not_defined	
+순두부 백반	1	콩류	guessed	
+빅파이	1	Not Defined	not_defined	
+사천탕수육	1	돼지고기	guessed	
+쵸코 아이스크림	1	기타 유제품|설탕	guessed	
+육회낙지	1	연체류	guessed	
+버섯두부소고기무국	1	소고기	guessed	
+두부보쌈	1	콩류	guessed	
+고등어조림	1	생선	guessed	
+업진살	1	Not Defined	not_defined	
+계란 소고기 전	1	소고기	guessed	
+김마끼	1	Not Defined	not_defined	
+귤 아이스크림	1	기타 유제품|설탕	guessed	
+짜장 떡볶이	1	Not Defined	not_defined	
+버섯두부샐러드	1	콩류	guessed	
+새알 미역국	1	해조류	guessed	
+광어회	1	생선	guessed	
+아이스크림(와일드바디)	1	기타 유제품|설탕	guessed	
+관자구이	1	조개류	guessed	
+토마토 스파게티	1	밀	guessed	
+봉골래 스파게티	1	밀	guessed	
+호박 샐러드	1	열매 채소	guessed	
+버섯 두부 샐러드	1	콩류	guessed	
+자장면	1	Not Defined	not_defined	
+게살 샐러드	1	갑각류	guessed	
+센드위치	1	Not Defined	not_defined	
+오뚜기 짜장라면	1	밀	guessed	
+팔보채만두	1	밀|돼지고기|잎 채소	guessed	
+버섯불고기전골	1	기타 육류	guessed	
+미나리찌개	1	잎 채소	guessed	
+소고기 안심	1	소고기	guessed	
+닭다리구이	1	Not Defined	not_defined	
+카스타드	1	Not Defined	not_defined	
+숯불닭구이	1	Not Defined	not_defined	
+갑자조림	1	Not Defined	not_defined	
+티라미슈 케익	1	밀|설탕|기름	guessed	
+머리고기	1	기타 육류	guessed	
+핫앤사워스프	1	야채 육수	guessed	
+추석 튀김	1	Not Defined	not_defined	
+몽셸통통	1	Not Defined	not_defined	
+치즈케익	1	치즈	guessed	
+해물전	1	Not Defined	not_defined	
+타워버거	1	Not Defined	not_defined	
+육칼국수	1	Not Defined	not_defined	
+깍두기	1	Not Defined	not_defined	
+쭈꾸미찜	1	연체류	guessed	
+케사이다	1	Not Defined	not_defined	
+소고기 스끼야끼	1	소고기	guessed	
+코다리찌개	1	생선	guessed	
+병아리콩셀러드	1	콩류	guessed	
+우렁된장	1	된장	guessed	
+소고기미역국	1	소고기	guessed	
+차례음식	1	Not Defined	not_defined	
+된장국에 밥	1	된장	guessed	
+프레즐	1	Not Defined	not_defined	
+맛살꼬치	1	Not Defined	not_defined	
+감자 죽순 된장국	1	뿌리 채소	guessed	
+대파해장국	1	줄기 채소	guessed	
+비빔밥야채	1	Not Defined	not_defined	
+성심당 튀긴소보루	1	Not Defined	not_defined	
+쵸코 크로아상	1	Not Defined	not_defined	
+돌솥비빔밥 고명만	1	기타	guessed	
+고등어김치조림	1	생선	guessed	
+참치샐러드	1	생선	guessed	
+보쌈.쭈꾸미	1	연체류	guessed	
+오돌뻐	1	Not Defined	not_defined	
+볶음 우동	1	Not Defined	not_defined	
+제사밥	1	Not Defined	not_defined	
+복숭아 빙수	1	단 과일	guessed	
+올갱이 해장국	1	기타해산물	guessed	
+돈까스 샐러드	1	Not Defined	not_defined	
+쥐포튀김	1	생선	guessed	
+상추절이	1	잎 채소	guessed	
+파인애플리조또	1	단 과일	guessed	
+올갱이해장국	1	기타해산물	guessed	
+김칫국	1	Not Defined	not_defined	
+돼지목살	1	Not Defined	not_defined	
+돼지갈비살	1	돼지고기	guessed	
+토마토소스 스파게티	1	기타 소스	guessed	
+등갈비김치찌개	1	소고기	guessed	
+칠리새우 샐러드	1	갑각류	guessed	
+우삼겹비지찌개	1	콩류	guessed	
+돈가스	1	Not Defined	not_defined	
+자몽빙수	1	기타 과일	guessed	
+파무침	1	Not Defined	not_defined	
+마늘김치찌개	1	잎 채소|고추|마늘|소금|기타 소스	guessed	
+오리고기 야채볶음	1	오리고기	guessed	
+돼지/소 수육	1	돼지고기	guessed	
+소고기 야채볶음	1	소고기	guessed	
+설럴탕	1	Not Defined	not_defined	
+어묵전골	1	생선|밀	guessed	
+파닭	1	Not Defined	not_defined	
+맛동산	1	Not Defined	not_defined	
+홈런볼	1	Not Defined	not_defined	
+오예스	1	Not Defined	not_defined	
+치즈샐러드	1	치즈	guessed	
+돼지갈비찜	1	돼지고기	guessed	
+걧잎	1	Not Defined	not_defined	
+구운 계란	1	계란	guessed	
+쭈꾸미 연포탕	1	연체류	guessed	
+차동짬뽕국물	1	Not Defined	not_defined	
+오징어까스	1	연체류	guessed	
+맛탕	1	Not Defined	not_defined	
+산적	1	Not Defined	not_defined	
+오리전골	1	Not Defined	not_defined	
+복까스	1	Not Defined	not_defined	
+복회무침	1	Not Defined	not_defined	
+우렁된장찌개	1	된장	guessed	
+프랜치프라이	1	Not Defined	not_defined	
+돈갈비백탕	1	소고기	guessed	
+찹쌀탕수육	1	돼지고기	guessed	
+마라우육	1	Not Defined	not_defined	
+버섯야채볶음	1	버섯	guessed	
+돼지목살스테이크	1	Not Defined	not_defined	
+버섯탕	1	버섯	guessed	
+생크림 케익	1	기타 유제품	guessed	
+토마토소스 미트볼	1	기타 소스	guessed	
+장터국밥	1	Not Defined	not_defined	
+보양꼬리곰탕	1	Not Defined	not_defined	
+포토	1	Not Defined	not_defined	
+딸기쨈	1	베리류	guessed	
+생선전골	1	생선	guessed	
+크림소스 스테이크	1	기타 소스|기타 유제품	guessed	
+소고기 들깨탕	1	소고기	guessed	
+설탕 토스트	1	설탕	guessed	
+순대국 특	1	가공육|전분	guessed	
+굴미역국	1	해조류	guessed	
+우거지탕	1	잎 채소	guessed	
+회 정식	1	Not Defined	not_defined	
+보리굴비정식	1	생선	guessed	
+일식 정식	1	Not Defined	not_defined	
+돼지고기 수육	1	돼지고기	guessed	
+전복회	1	조개류	guessed	
+오리샤브샤브	1	Not Defined	not_defined	
+갈비고기	1	소고기	guessed	
+미니우동	1	Not Defined	not_defined	
+들기름막국수	1	기름	guessed	
+인도카레	1	카레	guessed	
+팔진탕면 면빼고	1	Not Defined	not_defined	
+굴밥정식	1	Not Defined	not_defined	
+완탕과 수교면	1	Not Defined	not_defined	
+사천탕면 국물	1	Not Defined	not_defined	
+베트남 음식	1	Not Defined	not_defined	
+인도 음식	1	Not Defined	not_defined	
+우육탕면 국물	1	Not Defined	not_defined	
+돼지 앞다리살	1	Not Defined	not_defined	
+프렌치 코스	1	Not Defined	not_defined	
+마늘보쌈	1	마늘	guessed	
+꼬막정식	1	조개류	guessed	
+몽골리안비프	1	Not Defined	not_defined	
+새우볶음밥	1	갑각류	guessed	
+돈까스 정식	1	Not Defined	not_defined	
+제육복음	1	Not Defined	not_defined	
+상가집 음식	1	Not Defined	not_defined	
+불고기 황태 정식	1	기타 육류	guessed	
+중국식 우동(국물)	1	Not Defined	not_defined	
+팥죽	1	Not Defined	not_defined	
+야채 프랜치 토스트	1	Not Defined	not_defined	
+물 막국수	1	Not Defined	not_defined	
+마라우육탕	1	Not Defined	not_defined	
+참치 야채죽	1	생선	guessed	
+돼지보쌈	1	Not Defined	not_defined	
+치킨탕수	1	Not Defined	not_defined	
+부대찌게	1	Not Defined	not_defined	
+망고 빙수	1	단 과일	guessed	
+미역국 백반	1	해조류	guessed	
+인스턴트	1	Not Defined	not_defined	
+soup	1	Not Defined	not_defined	
+salad	1	Not Defined	not_defined	
+서브웨이 샌드위치 투고	1	Not Defined	not_defined	
+삼선짬뽕밥	1	Not Defined	not_defined	
+라뽂기	1	Not Defined	not_defined	
+wing	1	Not Defined	not_defined	
+케사디야	1	Not Defined	not_defined	
+파지타	1	Not Defined	not_defined	
+버섯탕수	1	버섯	guessed	
+스파이시튜나 비빔밥	1	Not Defined	not_defined	
+훈제연어	1	생선	guessed	
+훠거	1	Not Defined	not_defined	
+돈까스 - 옛날	1	Not Defined	not_defined	
+냉면 - 물	1	Not Defined	not_defined	
+탕수육 - 매운	1	돼지고기	guessed	
+막국수 - 들기름	1	기름	guessed	
+도다리세꼬시	1	생선	guessed	

@@ -61,8 +61,8 @@ export interface ILog extends Document {
     carbs?: string;
     fat?: string;
     spiciness?: string;
-    drinks?: Array<{ item?: string; amount?: string; unit?: string; note?: string }>;
-    foods?: Array<{ item?: string; amount?: string; unit?: string; note?: string }>;
+    drinks?: Array<{ item?: string; amount?: string; unit?: string; note?: string; ingredients?: string[] }>;
+    foods?: Array<{ item?: string; amount?: string; unit?: string; note?: string; ingredients?: string[] }>;
     alcohols?: Array<{ item?: string; amount?: string; unit?: string; note?: string }>;
   };
   people?: Array<{
@@ -131,6 +131,24 @@ const foodItemSchema = {
   note: String,
 };
 
+// food.foods has an extra ingredients[] field (level2 values)
+const foodsItemSchema = {
+  item: String,
+  amount: String,
+  unit: String,
+  note: String,
+  ingredients: { type: [String], default: undefined },
+};
+
+// food.drinks also carries ingredients[] (level2 values); note tag is preserved
+const drinksItemSchema = {
+  item: String,
+  amount: String,
+  unit: String,
+  note: String,
+  ingredients: { type: [String], default: undefined },
+};
+
 const LogSchema = new Schema<ILog>({
   userId: { type: String, required: true, index: true },
   allDay: Boolean,
@@ -190,8 +208,8 @@ const LogSchema = new Schema<ILog>({
     carbs: String,
     fat: String,
     spiciness: String,
-    drinks: [foodItemSchema],
-    foods: [foodItemSchema],
+    drinks: [drinksItemSchema],
+    foods: [foodsItemSchema],
     alcohols: [foodItemSchema],
   },
   people: [{

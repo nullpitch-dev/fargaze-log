@@ -340,11 +340,13 @@ interface CssVerticalBoxPlotChartProps {
   buckets:  BoxPlotBucket[];
   isDark:   boolean;
   yPadPct?: number;
+	formatY?: (v: number) => string;
+	height?:	number;
 }
 
 const VBOX_H = 140;
 
-export function CssVerticalBoxPlotChart({ buckets, isDark, yPadPct = 10 }: CssVerticalBoxPlotChartProps) {
+export function CssVerticalBoxPlotChart({ buckets, isDark, yPadPct = 10, formatY = String, height = VBOX_H }: CssVerticalBoxPlotChartProps) {
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
 
   const allVals = buckets.flatMap(b => [b.min, b.max]);
@@ -380,21 +382,21 @@ export function CssVerticalBoxPlotChart({ buckets, isDark, yPadPct = 10 }: CssVe
     <div className="flex flex-col gap-1 w-full select-none">
       <div className="flex w-full">
         {/* Y-axis */}
-        <div className="relative shrink-0 overflow-hidden" style={{ width: Y_LABEL_W, height: VBOX_H }}>
+        <div className="relative shrink-0 overflow-hidden" style={{ width: Y_LABEL_W, height: height }}>
           {yTicks.map(tick => {
             const t = yPct(tick);
             if (t < 3 || t > 97) return null;
             return (
               <span key={tick} className="absolute text-[10px] leading-none"
                 style={{ right: 4, top: `${t}%`, transform: 'translateY(-50%)', color: lc }}>
-                {tick}
+								{formatY(tick)}
               </span>
             );
           })}
         </div>
 
         {/* Plot */}
-        <div className="relative flex-1" style={{ height: VBOX_H }}>
+        <div className="relative flex-1" style={{ height: height }}>
           {yTicks.map(tick => (
             <div key={tick} className="absolute inset-x-0 pointer-events-none"
               style={{ top: `${yPct(tick)}%`, height: 1, background: gc, opacity: 0.7 }} />
@@ -414,7 +416,7 @@ export function CssVerticalBoxPlotChart({ buckets, isDark, yPadPct = 10 }: CssVe
 
               return (
                 <div key={b.label} className="flex-1 relative flex justify-center"
-                  style={{ height: VBOX_H, cursor: 'pointer' }}
+                  style={{ height: height, cursor: 'pointer' }}
                   onMouseEnter={() => setActiveIdx(i)}
                   onMouseLeave={() => setActiveIdx(null)}
                   onClick={() => setActiveIdx(isActive ? null : i)}>
@@ -455,9 +457,9 @@ export function CssVerticalBoxPlotChart({ buckets, isDark, yPadPct = 10 }: CssVe
                         background: isDark ? '#27272a' : '#fff',
                         border: `1px solid ${isDark ? '#3f3f46' : '#e7e5e4'}`,
                         boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}>
-                      <span style={{ color: lc }}>Max <span style={{ color: valueColor(isDark), fontWeight: 600 }}>{b.max}</span></span>
-                      <span style={{ color: avgC }}>Avg <span style={{ fontWeight: 600 }}>{b.avg}</span></span>
-                      <span style={{ color: lc }}>Min <span style={{ color: valueColor(isDark), fontWeight: 600 }}>{b.min}</span></span>
+											<span style={{ color: lc }}>Max <span style={{ color: valueColor(isDark), fontWeight: 600 }}>{formatY(b.max)}</span></span>
+                      <span style={{ color: avgC }}>Avg <span style={{ fontWeight: 600 }}>{formatY(b.avg)}</span></span>
+                      <span style={{ color: lc }}>Min <span style={{ color: valueColor(isDark), fontWeight: 600 }}>{formatY(b.min)}</span></span>
                     </div>
                   )}
 
@@ -1005,3 +1007,179 @@ export function CssRestChart({ buckets, isDark }: CssRestChartProps) {
     </div>
   );
 }
+
+// ── CssDailyChart ──────────────────────────────────────────────────────────────
+// REPLACES the previously appended CssDailyChart block in css-chart-components.tsx.
+// Reuses smoothPath, buildYTicks, the colour helpers, CHART_H and Y_LABEL_W above.
+//
+// Summary "distribution" view: a single daily series with an optional dashed
+// average line and optional background zone bands. Tooltip sits ABOVE the marker
+// (so the pointer never covers it), shows value + date, and the plot does NOT clip
+// so a high point's tooltip stays visible.
+
+export interface CssDailyZone { from: number; to: number; color: string; }
+
+interface CssDailyChartProps {
+  values:        (number | null)[];
+  labels:        string[];                 // 'YYYY-MM-DD'
+  formatY:       (v: number) => string;
+  isDark:        boolean;
+  avg?:          number | null;            // dashed average line + label
+  zones?:        CssDailyZone[];           // background bands, in data units
+  baselineZero?: boolean;                  // pin y-min to 0 (for sums / 인분)
+  yPadPct?:      number;
+}
+
+export function CssDailyChart({
+  values, labels, formatY, isDark, avg = null, zones, baselineZero = false, yPadPct = 12,
+}: CssDailyChartProps) {
+  const [activeIdx, setActiveIdx] = useState<number | null>(null);
+
+  const nums = values.filter((v): v is number => v !== null);
+  if (!nums.length) return <p className="text-xs" style={{ color: labelColor(isDark) }}>No data</p>;
+
+  const avgN   = avg ?? null;
+  const rawMin = Math.min(...nums, avgN ?? Infinity);
+  const rawMax = Math.max(...nums, avgN ?? -Infinity);
+  const pad    = Math.max(1, (rawMax - rawMin) * (yPadPct / 100));
+  const yMin   = baselineZero ? 0 : rawMin - pad;
+  const yMax   = rawMax + pad;
+  const yRange = yMax - yMin || 1;
+  const yTicks = buildYTicks(yMin, rawMax);
+
+  const n = labels.length;
+  function xPct(i: number) { return n <= 1 ? 50 : (i / (n - 1)) * 100; }
+  function yPct(v: number) { return (1 - (v - yMin) / yRange) * 100; }
+
+  const gc = gridLineColor(isDark);
+  const lc = labelColor(isDark);
+  const vc = valueColor(isDark);
+  const dc = lineColor(isDark);
+  const avgC = isDark ? '#f97316' : '#ea580c';
+
+  // ~6 evenly spaced x-axis dates
+  const tickCount = Math.min(6, n);
+  const labelIdx = new Set<number>();
+  for (let k = 0; k < tickCount; k++) {
+    labelIdx.add(Math.round((k / Math.max(1, tickCount - 1)) * (n - 1)));
+  }
+  const fmtX = (d: string) => { const p = d.split('-'); return p.length === 3 ? `${+p[1]}/${+p[2]}` : d; };
+
+  const pts = values
+    .map((v, i) => v !== null ? { x: xPct(i), y: yPct(v) } : null)
+    .filter((p): p is { x: number; y: number } => p !== null);
+  const dPath = smoothPath(pts);
+
+  return (
+    <div className="flex flex-col gap-1 w-full select-none">
+      <div className="flex w-full">
+        {/* Y-axis */}
+        <div className="relative shrink-0 overflow-hidden" style={{ width: Y_LABEL_W, height: CHART_H }}>
+          {yTicks.map(tick => {
+            const t = yPct(tick);
+            if (t < 3 || t > 97) return null;
+            return (
+              <span key={tick} className="absolute text-[10px] leading-none"
+                style={{ right: 4, top: `${t}%`, transform: 'translateY(-50%)', color: lc }}>
+                {formatY(tick)}
+              </span>
+            );
+          })}
+        </div>
+
+        {/* Plot — no overflow clip, so the above-marker tooltip stays visible */}
+        <div className="relative flex-1" style={{ height: CHART_H }}>
+          {/* Zone bands */}
+          {zones?.map((z, zi) => {
+            const top    = yPct(Math.min(z.to, yMax));
+            const bottom = yPct(Math.max(z.from, yMin));
+            const h      = Math.max(0, bottom - top);
+            if (h <= 0) return null;
+            return (
+              <div key={zi} className="absolute inset-x-0 pointer-events-none"
+                style={{ top: `${top}%`, height: `${h}%`, background: z.color }} />
+            );
+          })}
+
+          {/* Grid */}
+          {yTicks.map(tick => (
+            <div key={tick} className="absolute inset-x-0 pointer-events-none"
+              style={{ top: `${yPct(tick)}%`, height: 1, background: gc, opacity: 0.6 }} />
+          ))}
+
+          {/* Average line — thicker + larger label */}
+          {avgN !== null && avgN >= yMin && avgN <= yMax && (
+            <>
+              <div className="absolute inset-x-0 pointer-events-none"
+                style={{ top: `${yPct(avgN)}%`, height: 0, borderTop: `2px dashed ${avgC}`, opacity: 0.95 }} />
+              <span className="absolute text-[11px] font-semibold leading-none px-1 rounded"
+                style={{ right: 2, top: `${yPct(avgN)}%`, transform: 'translateY(-50%)', color: avgC,
+                  background: isDark ? 'rgba(24,24,27,0.75)' : 'rgba(255,255,255,0.75)', zIndex: 4 }}>
+                {formatY(avgN)}
+              </span>
+            </>
+          )}
+
+          {/* Spline */}
+          <svg className="absolute inset-0 w-full h-full overflow-visible"
+            preserveAspectRatio="none" viewBox="0 0 100 100">
+            {dPath && (
+              <path d={dPath} fill="none" stroke={dc} strokeWidth="1.5"
+                strokeLinejoin="round" strokeLinecap="round"
+                vectorEffect="non-scaling-stroke" opacity={0.9} />
+            )}
+          </svg>
+
+          {/* Dots + hover tooltip (always above the marker) */}
+          {labels.map((lbl, i) => {
+            const v = values[i];
+            return (
+              <div key={lbl + i} className="absolute top-0 bottom-0"
+                style={{ left: `${xPct(i)}%`, width: `${100 / Math.max(1, n)}%`,
+                  transform: 'translateX(-50%)', cursor: 'pointer', zIndex: 2 }}
+                onMouseEnter={() => setActiveIdx(i)}
+                onMouseLeave={() => setActiveIdx(null)}>
+                {v !== null && (() => {
+                  const top = `${yPct(v)}%`;
+                  const isActive = activeIdx === i;
+                  return (
+                    <>
+                      <div className="absolute rounded-full"
+                        style={{ left: '50%', top, transform: 'translate(-50%,-50%)',
+                          width: isActive ? 9 : 5, height: isActive ? 9 : 5,
+                          background: dc, opacity: isActive ? 1 : 0.85, zIndex: 3 }} />
+                      {isActive && (
+                        <div className="absolute rounded px-1.5 py-1 leading-tight whitespace-nowrap text-center pointer-events-none"
+                          style={{ left: '50%', top,
+                            transform: 'translate(-50%, calc(-100% - 11px))',
+                            background: isDark ? '#27272a' : '#ffffff',
+                            border: `1px solid ${isDark ? '#3f3f46' : '#e7e5e4'}`,
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.12)', zIndex: 6 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: vc }}>{formatY(v)}</div>
+                          <div style={{ fontSize: 10, color: lc, marginTop: 1 }}>{fmtX(lbl)}</div>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* X labels */}
+      <div className="flex w-full" style={{ paddingLeft: Y_LABEL_W }}>
+        <div className="relative flex-1" style={{ height: 14 }}>
+          {labels.map((lbl, i) => labelIdx.has(i) ? (
+            <span key={i} className="absolute text-[10px] leading-none"
+              style={{ left: `${xPct(i)}%`, transform: 'translateX(-50%)', color: lc }}>
+              {fmtX(lbl)}
+            </span>
+          ) : null)}
+        </div>
+      </div>
+    </div>
+  );
+}
+

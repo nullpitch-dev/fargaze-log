@@ -26,3 +26,20 @@ export const PERSON_COLORS_DARK  = ['#60a5fa', '#a78bfa', '#fbbf24', '#34d399', 
 export function personColors(isDark: boolean): string[] {
   return isDark ? PERSON_COLORS_DARK : PERSON_COLORS_LIGHT;
 }
+
+// Categorical palette for grouped charts (treemaps, etc.). Assigned by INDEX,
+// never keyed on domain values — keeps charts taxonomy-agnostic.
+// Light mode = darker fills (white text); dark mode = lighter fills (dark text).
+export const CATEGORY_COLORS_LIGHT = [
+  '#1d4ed8', '#be123c', '#15803d', '#c2410c', '#7c3aed', '#0891b2',
+  '#b45309', '#db2777', '#4d7c0f', '#0f766e', '#a21caf', '#4338ca',
+  '#a16207', '#0369a1', '#6d28d9', '#57534e',
+];
+export const CATEGORY_COLORS_DARK = [
+  '#60a5fa', '#fb7185', '#4ade80', '#fb923c', '#a78bfa', '#22d3ee',
+  '#fcd34d', '#f472b6', '#a3e635', '#2dd4bf', '#e879f9', '#818cf8',
+  '#facc15', '#38bdf8', '#c4b5fd', '#a8a29e',
+];
+export function categoryColors(isDark: boolean): string[] {
+  return isDark ? CATEGORY_COLORS_DARK : CATEGORY_COLORS_LIGHT;
+}

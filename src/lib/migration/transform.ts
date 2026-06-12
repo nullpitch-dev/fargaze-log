@@ -1,3 +1,5 @@
+import IngredientMaster from '../../models/IngredientMaster';
+
 // ── HELPERS ──────────────────────────────────────────────────────────────────
 
 // Remove thousand-separator commas and parse as number
@@ -254,3 +256,117 @@ export function createRowFilter() {
     return false;
   };
 }
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// parseFoodIngredients.ts  —  add to src/lib/migration/transform.ts
+//
+// Part 4 of the ingredient plan. Runs AFTER comma-split and plus-split,
+// on each individual food item string. Extracts the parenthesised ingredient
+// list and returns { item, ingredients }.
+//
+// Rules:
+//   바나나(단 과일)                → { item: '바나나', ingredients: ['단 과일'] }
+//   샌드위치(가공육|치즈|잎 채소)  → { item: '샌드위치', ingredients: ['가공육','치즈','잎 채소'] }
+//   밥                              → { item: '밥', ingredients: ['Not Defined'] }   (no parens)
+//   밥()                            → { item: '밥', ingredients: ['Not Defined'] }   (empty parens)
+//
+// Validation: ingredients are checked against the level2 vocabulary, which is
+// loaded ONCE from the ingredient_master collection (single source of truth —
+// the Ingredient sheet). If any ingredient is not valid, throw — the migration
+// caller skips the entire row and logs the offending value (Part 4.6).
+// ─────────────────────────────────────────────────────────────────────────────
+
+
+// Module-level cache of valid level2 values. Populated by loadValidLevel2().
+let _validLevel2: Set<string> | null = null;
+
+/**
+ * Load the level2 vocabulary from ingredient_master. Call once at the start of
+ * migration (before parsing any rows). Idempotent — subsequent calls are no-ops
+ * unless `force` is true.
+ *
+ * The "Not Defined" sentinel is always accepted in addition to the DB values.
+ */
+export async function loadValidLevel2(userId: string, force = false): Promise<Set<string>> {
+  if (_validLevel2 && !force) return _validLevel2;
+
+  const docs = await IngredientMaster.find({ userId }).select('level2 -_id').lean();
+  const set = new Set<string>(docs.map((d: any) => d.level2));
+  set.add('Not Defined'); // sentinel for unfilled / unparseable
+
+  if (set.size <= 1) {
+    throw new Error(
+      'loadValidLevel2: ingredient_master is empty for userId "' +
+        userId +
+        '". Run `npm run migrate-ingredient` first.'
+    );
+  }
+
+  _validLevel2 = set;
+  return set;
+}
+
+/** For tests / re-seeding: clear the cached vocabulary. */
+export function resetValidLevel2(): void {
+  _validLevel2 = null;
+}
+
+export class IngredientValidationError extends Error {
+  constructor(public readonly badValue: string, public readonly rawItem: string) {
+    super(`Unknown level2 ingredient "${badValue}" in food item "${rawItem}"`);
+    this.name = 'IngredientValidationError';
+  }
+}
+
+/**
+ * Split one already-comma/plus-split food token into name + ingredients[].
+ * Throws IngredientValidationError if any ingredient is not a valid level2 value.
+ *
+ * `loadValidLevel2()` MUST have been awaited earlier in the migration run,
+ * otherwise this throws (fail-fast rather than silently accepting anything).
+ */
+export function parseFoodIngredients(raw: string): { item: string; ingredients: string[] } {
+  if (!_validLevel2) {
+    throw new Error(
+      'parseFoodIngredients called before loadValidLevel2(). ' +
+        'Await loadValidLevel2(userId) once at migration start.'
+    );
+  }
+
+  const trimmed = raw.trim();
+
+  // Match a trailing (...) group. Use the LAST '(' so item names containing
+  // parentheses earlier are tolerated, though that is not expected.
+  const open = trimmed.lastIndexOf('(');
+  const close = trimmed.lastIndexOf(')');
+
+  if (open === -1 || close === -1 || close < open) {
+    return { item: trimmed, ingredients: ['Not Defined'] };   // no parentheses
+  }
+
+  const item = trimmed.slice(0, open).trim();
+  const inside = trimmed.slice(open + 1, close).trim();
+
+  if (inside === '') {
+    return { item, ingredients: ['Not Defined'] };            // empty parentheses
+  }
+
+  const ingredients = inside
+    .split('|')
+    .map(s => s.trim())
+    .filter(s => s !== '');
+
+  if (ingredients.length === 0) {
+    return { item, ingredients: ['Not Defined'] };
+  }
+
+  for (const ing of ingredients) {
+    if (!_validLevel2.has(ing)) {
+      throw new IngredientValidationError(ing, trimmed);
+    }
+  }
+
+  return { item, ingredients };
+}
+

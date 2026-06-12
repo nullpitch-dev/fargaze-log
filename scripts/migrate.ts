@@ -6,7 +6,7 @@ dotenv.config({ path: path.join(process.cwd(), '.env.local') });
 
 import mongoose from 'mongoose';
 import { google } from 'googleapis';
-import { createRowFilter } from '../src/lib/migration/transform';
+import { createRowFilter, loadValidLevel2 } from '../src/lib/migration/transform';
 import { rowToDocument } from '../src/lib/migration/rowToDocument';
 import Log from '../src/models/Log';
 import CostMaster from '../src/models/CostMaster';
@@ -212,6 +212,11 @@ async function main() {
   console.log('✅ Indexes synced');
 
   const userId = 'hyoje';
+
+  // Load level2 ingredient vocabulary from ingredient_master (single source of truth).
+  // Run `npm run migrate-ingredient` first if this throws.
+  await loadValidLevel2(userId);
+  console.log('✅ Level2 vocabulary loaded from ingredient_master');
   const results = [];
 
   // ── RARELY NEEDED — uncomment when supporting collections change ──────────

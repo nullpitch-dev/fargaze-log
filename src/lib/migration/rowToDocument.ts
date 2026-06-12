@@ -6,6 +6,7 @@ import {
   zipMultiValue,
   zipMultiValueWithPlusSplit,
   zipFoodValue,
+  parseFoodIngredients,
   parsePeople,
   computeTotalSeconds,
 } from './transform';
@@ -141,14 +142,25 @@ export function rowToDocument(row: any[], userId: string): any {
     get(row, C.DRINK_AMOUNT),
     get(row, C.DRINK_UNIT),
     get(row, C.DRINK_NOTE)
-  );
+  ).map(d => {
+    // Extract parenthesised ingredients (level2) from the item name.
+    // Throws IngredientValidationError on an unknown level2 → row is skipped.
+    // The drink note tag (커피/차) is preserved separately.
+    const { item, ingredients } = parseFoodIngredients(d.item);
+    return { ...d, item, ingredients };
+  });
 
   const foods = zipFoodValue(
     get(row, C.FOOD_ITEM),
     get(row, C.FOOD_AMOUNT),
     get(row, C.FOOD_UNIT),
     get(row, C.FOOD_NOTE)
-  );
+  ).map(f => {
+    // Extract parenthesised ingredients (level2) from the item name.
+    // Throws IngredientValidationError on an unknown level2 → row is skipped.
+    const { item, ingredients } = parseFoodIngredients(f.item);
+    return { ...f, item, ingredients };
+  });
 
   const alcohols = zipFoodValue(
     get(row, C.ALCOHOL_ITEM),
