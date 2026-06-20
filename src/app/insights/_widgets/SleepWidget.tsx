@@ -151,7 +151,7 @@ export function SleepWidget({ globalFilter }: WidgetProps) {
   const isDark = useIsDark();
   const [viewMode, setViewMode] = useState<WidgetViewMode>('summary');
   const [metric, setMetric] = useState<SleepMetricKey>('duration');
-  const [bucketsBack, setBucketsBack] = useState(6);
+  const [bucketsBack, setBucketsBack] = useState(12);
   const [summaryData, setSummaryData] = useState<any>(null);
   const [trendData, setTrendData] = useState<{ label: string; summary: any }[]>([]);
   const [loading, setLoading] = useState(true);

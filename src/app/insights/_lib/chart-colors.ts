@@ -43,3 +43,25 @@ export const CATEGORY_COLORS_DARK = [
 export function categoryColors(isDark: boolean): string[] {
   return isDark ? CATEGORY_COLORS_DARK : CATEGORY_COLORS_LIGHT;
 }
+
+// A different lightness tier than the base 16, so a repeated hue still reads
+// distinct: pale fills in light mode, deep fills in dark mode. Tile text picks
+// black/white per fill, so both tiers stay legible.
+const RANKFLOW_EXTRA_LIGHT = [
+  '#f9a8d4', '#fdba74', '#86efac', '#93c5fd', '#fde047', '#d8b4fe',
+  '#5eead4', '#fca5a5', '#a3e635', '#67e8f9', '#c4b5fd', '#cbd5e1',
+];
+const RANKFLOW_EXTRA_DARK = [
+  '#9d174d', '#9a3412', '#166534', '#1e40af', '#854d0e', '#6b21a8',
+  '#115e59', '#991b1b', '#3f6212', '#155e75', '#5b21b6', '#334155',
+];
+// The base-16 has two near-identical violets (indices 4 & 14); recolour the
+// second one for the rank-flow so people landing on it don't read as the same
+// purple. categoryColors itself is untouched (treemaps keep their order).
+const _rfLight = [...CATEGORY_COLORS_LIGHT]; _rfLight[14] = '#92400e';  // 2nd violet → brown
+const _rfDark  = [...CATEGORY_COLORS_DARK];  _rfDark[14]  = '#d4a373';  // 2nd violet → tan
+export const RANKFLOW_COLORS_LIGHT = [..._rfLight, ...RANKFLOW_EXTRA_LIGHT];
+export const RANKFLOW_COLORS_DARK  = [..._rfDark,  ...RANKFLOW_EXTRA_DARK];
+export function rankFlowColors(isDark: boolean): string[] {
+  return isDark ? RANKFLOW_COLORS_DARK : RANKFLOW_COLORS_LIGHT;
+}

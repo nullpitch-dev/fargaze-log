@@ -135,7 +135,7 @@ export function Treemap({
         const c = cells[i];
         const showLabel = r.w > 34 && r.h > 22;
         const showVal   = r.w > 44 && r.h > 34;
-        const fs = Math.max(10, Math.min(13, Math.round(Math.min(r.w, r.h) / 4)));
+        const fs = Math.max(10, Math.min(11, Math.round(Math.min(r.w, r.h) / 4)));
         return (
           <div
             key={c.label + i}
@@ -154,7 +154,7 @@ export function Treemap({
               </span>
             )}
             {showVal && (
-              <span style={{ fontSize: Math.max(9, fs - 2), opacity: 0.75 }}>
+              <span style={{ fontSize: Math.max(10, fs - 2), opacity: 0.75 }}>
                 {Math.round(c.value)}
               </span>
             )}

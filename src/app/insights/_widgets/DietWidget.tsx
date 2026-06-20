@@ -1,7 +1,7 @@
 'use client';
 // src/app/insights/_widgets/DietWidget.tsx
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { WidgetCard, ViewToggle } from '../_components/WidgetCard';
 import { useIsDark } from '../_lib/hooks';
@@ -14,6 +14,7 @@ import {
   CssDailyChart, CssVerticalBoxPlotChart, minsToClockStr,
   type CssDailyZone, type BoxPlotBucket,
 } from '../_components/charts/css-chart-components';
+import { DietTrendView, type DietTrendBucket } from './DietTrendView';
 
 // ── Types (mirrors diet.summary API contract) ─────────────────────────────────
 
@@ -25,6 +26,7 @@ interface DietSummary {
   rangeStart:       string;
   rangeEnd:         string;
   finishEating:     { date: string; endMins: number }[];
+  finishCaffeine:   { date: string; endMins: number }[];
   servings:         { date: string; total: number }[];
   carbsIndex:       { date: string; value: number }[];
   spiciness:        { date: string; level: 'H' | 'M' | 'L' }[];
@@ -38,10 +40,10 @@ interface DietSummary {
     byRelationType: Record<string, number>;
     topPeople:      { name: string; dominantCategory: string; total: number }[];
   };
-  averages: { finishEatingMins: number | null; servings: number | null; carbsIndex: number | null };
+	averages: { finishEatingMins: number | null; finishCaffeineMins: number | null; servings: number | null; carbsIndex: number | null };
 }
 
-type DailyMetric = 'finish' | 'servings' | 'carbs';
+type DailyMetric = 'finish' | 'caffeine' | 'servings' | 'carbs';
 type ModalKind   = DailyMetric | 'spicy';
 type SideTab     = 'food' | 'drink';
 type ViewTab     = 'ingredients' | 'items';
@@ -76,7 +78,7 @@ const SERVING_ZONES: CssDailyZone[] = [
 
 function Title({ children }: { children: React.ReactNode }) {
   return (
-    <span className="text-[10px] font-medium text-stone-400 dark:text-zinc-500 uppercase tracking-wide truncate">
+		<span className="text-[10px] font-medium text-stone-400 dark:text-zinc-500 uppercase tracking-wide truncate">
       {children}
     </span>
   );
@@ -129,7 +131,7 @@ function Bar({ label, value, frac, color, dot }: {
 }) {
   return (
     <div className="flex items-center gap-2 text-[11px]">
-      <span className="w-20 shrink-0 truncate text-stone-600 dark:text-zinc-300 inline-flex items-center gap-1">
+      <span className="w-14 shrink-0 truncate text-stone-600 dark:text-zinc-300 inline-flex items-center gap-1">
         {dot && <i style={{ background: dot, width: 7, height: 7, borderRadius: '50%', display: 'inline-block', flexShrink: 0 }} />}
         {label}
       </span>
@@ -162,7 +164,6 @@ function ModalShell({ title, onClose, children }: { title: string; onClose: () =
 // ── Companions ("with whom I eat") — toggleable ───────────────────────────────
 
 function Companions({ data, isDark }: { data: DietSummary; isDark: boolean }) {
-  const [tab, setTab] = useState<'relation' | 'people'>('relation');
   const c = data.companions;
   const ALONE = '혼자';
 
@@ -184,23 +185,24 @@ function Companions({ data, isDark }: { data: DietSummary; isDark: boolean }) {
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <Segmented value={tab} onChange={setTab}
-        options={[['relation', 'By relation'], ['people', 'Top companions']]} />
-      {tab === 'relation' ? (
+    <div className="grid grid-cols-2 gap-4">
+      <div className="flex flex-col gap-1.5 min-w-0">
+        <Title>By relation</Title>
         <div className="flex flex-col gap-1">
           {rel.map(r => (
             <Bar key={r.key} label={r.key} value={r.count} frac={r.count / relMax} color={relColor[r.key]} />
           ))}
         </div>
-      ) : (
+      </div>
+      <div className="flex flex-col gap-1.5 min-w-0">
+        <Title>Top companions</Title>
         <div className="flex flex-col gap-1">
           {people.map(p => (
             <Bar key={p.name} label={p.name} value={p.total} frac={p.total / pplMax}
               color={relColor[p.dominantCategory] ?? palette[0]} dot={relColor[p.dominantCategory]} />
           ))}
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -242,9 +244,14 @@ function SummaryView({ data, isDark }: { data: DietSummary; isDark: boolean }) {
     zones?: CssDailyZone[]; baselineZero?: boolean;
   }> = {
     finish: {
-      short: 'Finish', title: 'When I finished eating',
+      short: 'Eating cutoff', title: 'When I finished eating',
       values: data.finishEating.map(d => d.endMins), labels: data.finishEating.map(d => d.date),
       formatY: v => minsToClockStr(v, true), avg: data.averages.finishEatingMins,
+    },
+		caffeine: {
+      short: 'Caffeine cutoff', title: 'When I last had caffeine',
+      values: data.finishCaffeine.map(d => d.endMins), labels: data.finishCaffeine.map(d => d.date),
+      formatY: v => minsToClockStr(v, true), avg: data.averages.finishCaffeineMins,
     },
     servings: {
       short: 'Servings', title: 'Daily servings (인분)',
@@ -294,16 +301,16 @@ function SummaryView({ data, isDark }: { data: DietSummary; isDark: boolean }) {
     <div className="flex flex-col gap-4">
       {/* ── Distribution boxplots (tap → modal) ── */}
       <div>
-        <div className="grid grid-cols-3 gap-2">
-          {(['finish', 'servings', 'carbs'] as DailyMetric[]).map(key => {
+        <div className="grid grid-cols-4 gap-1">
+          {(['finish', 'caffeine', 'servings', 'carbs'] as DailyMetric[]).map(key => {
             const m = metrics[key];
             const stats = boxStats(m.values);
             return (
               <div key={key} role="button" tabIndex={0} onClick={() => setModal(key)}
                 className="flex flex-col gap-1 rounded-lg p-1 cursor-pointer hover:bg-stone-50 dark:hover:bg-zinc-800 transition-colors">
-                <Title>{m.short}</Title>
+								<Title><span className="block w-full text-center">{m.short}</span></Title>
                 {stats ? (
-                  <CssVerticalBoxPlotChart buckets={[{ label: '', ...stats }]} isDark={isDark} formatY={m.formatY} height={100} />
+									<CssVerticalBoxPlotChart buckets={[{ label: '', ...stats }]} isDark={isDark} formatY={m.formatY} height={100} compact />
                 ) : (
                   <p className="text-xs text-stone-400 dark:text-zinc-500">No data</p>
                 )}
@@ -367,8 +374,11 @@ export function DietWidget({ globalFilter }: WidgetProps) {
   const isDark = useIsDark();
   const [viewMode,    setViewMode]    = useState<WidgetViewMode>('summary');
   const [summaryData, setSummaryData] = useState<DietSummary | null>(null);
+	const [trendData, setTrendData] = useState<DietTrendBucket[] | null>(null);
+	const [bucketsBack, setBucketsBack] = useState(12);
   const [loading,     setLoading]     = useState(true);
-  const [error,       setError]       = useState<string | null>(null);
+	const [error,       setError]       = useState<string | null>(null);
+  const trendLoadedRef = useRef(false);
 
   const isPeriodMode = globalFilter.timeMode === 'period';
 
@@ -386,11 +396,25 @@ export function DietWidget({ globalFilter }: WidgetProps) {
       .catch(() => { setError('Failed to load data.'); setLoading(false); });
   }, [globalFilter, viewMode]);
 
+	useEffect(() => {
+		if (viewMode !== 'trend') return;
+    if (!trendLoadedRef.current) setLoading(true);
+    setError(null);
+    const url = `/api/insights/stats?${buildParams(
+      { metric: 'diet.summary', mode: 'trend', bucketsBack: String(bucketsBack) },
+      globalFilter,
+    )}`;
+    fetch(url)
+      .then(r => r.json())
+			.then(d => { setTrendData(d.data ?? []); trendLoadedRef.current = true; setLoading(false); })
+      .catch(() => { setError('Failed to load data.'); setLoading(false); });
+  }, [globalFilter, viewMode, bucketsBack]);
+
   return (
     <WidgetCard
       title="Diet"
       floor={1}
-      loading={loading && viewMode === 'summary'}
+      loading={loading}
       error={error}
       action={<ViewToggle value={viewMode} onChange={setViewMode} disabled={isPeriodMode} />}
     >
@@ -399,9 +423,15 @@ export function DietWidget({ globalFilter }: WidgetProps) {
           <p className="text-xs text-stone-400 dark:text-zinc-500">No data</p>
         ) : (
           <SummaryView data={summaryData} isDark={isDark} />
+
         )
       ) : (
-        <p className="text-xs text-stone-400 dark:text-zinc-500">Trend view — coming next.</p>
+				<DietTrendView
+					data={trendData ?? []}
+					isDark={isDark}
+					bucketsBack={bucketsBack}
+					onBucketsBackChange={setBucketsBack}
+				/>
       )}
     </WidgetCard>
   );

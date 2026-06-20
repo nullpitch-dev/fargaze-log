@@ -1,7 +1,7 @@
 'use client';
 // src/app/insights/_widgets/DrinkingWidget.tsx
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { WidgetCard, ViewToggle, BucketSelector } from '../_components/WidgetCard';
 import { useIsDark } from '../_lib/hooks';
 import { buildParams } from '../_lib/date-helpers';
@@ -16,11 +16,13 @@ import {
   CssDualLineChart,
   CssRestChart,
 } from '../_components/charts/css-chart-components';
+import { CssRankFlowChart } from '../_components/charts/CssRankFlowChart';
+import { MultiSelectDropdown } from '../_components/MultiSelectDropdown';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type SummaryTab  = 'stats' | 'top10';
-type TrendMetric = 'days' | 'totalDrinks' | 'drinksPerDay' | 'drinkType' | 'occasion' | 'withWhom' | 'restDays' | 'sessionTime';
+type TrendMetric = 'days' | 'totalDrinks' | 'drinksPerDay' | 'drinkType' | 'occasion' | 'withWhom' | 'topPeople' | 'restDays' | 'sessionTime';
 
 interface DrinksStats {
   total: number;
@@ -63,7 +65,8 @@ interface DrinkingTrendBucket {
   histogram:          Record<string, number>;
   drinkType:          Record<string, number>;
   occasions:          Record<string, number>;
-  companions:         Record<string, number>;
+	companions:         Record<string, number>;
+  people:             Record<string, Record<string, number>>;
   avgStartMins:       number | null;
   avgEndMins:         number | null;
   avgDurationSeconds: number | null;
@@ -79,7 +82,8 @@ const TREND_METRICS: { key: TrendMetric; label: string; desc: string; tip?: stri
     tip: '1 drink = 50 ml soju equivalent' },
   { key: 'drinkType',   label: 'Type',      desc: 'Mix of drink types over time (100%)'              },
   { key: 'occasion',    label: 'Occasion',  desc: 'Mix of drinking occasions over time (100%)'       },
-  { key: 'withWhom',    label: 'People',    desc: 'Who you drink with over time (100%)'              },
+	{ key: 'withWhom',    label: 'Relation',  desc: 'Mix of relation types over time (100%)'           },
+  { key: 'topPeople',   label: 'People',    desc: 'How your top 7 drinking companions change over time' },
   { key: 'restDays',    label: 'Rest',      desc: 'Rest days distribution and average over time',
     tip: 'Consecutive days without drinking before each day' },
   { key: 'sessionTime', label: 'Session',   desc: 'Average session start and end time over time',
@@ -382,8 +386,19 @@ function DrinkingTrendChart({
   isDark: boolean;
   bucketsBack: number;
 }) {
-  const labels = buckets.map(b => b.label);
+	const labels = buckets.map(b => b.label);
   const alwaysShow = bucketsBack <= 6;
+
+  // Relation filter for the People (rank-flow) tab — client-side, re-ranks live.
+  const [relationFilter, setRelationFilter] = useState<string[]>([]);
+  const allRelations = useMemo(
+    () => [...new Set(buckets.flatMap(b => Object.values(b.people).flatMap(cats => Object.keys(cats))))].filter(t => t.trim()),
+    [buckets],
+  );
+  const relInit = useRef(false);
+  useEffect(() => {
+    if (!relInit.current && allRelations.length) { setRelationFilter(allRelations); relInit.current = true; }
+  }, [allRelations]);
 
   if (metric === 'days') {
     return (
@@ -443,7 +458,7 @@ function DrinkingTrendChart({
     );
   }
 
-  if (metric === 'withWhom') {
+	if (metric === 'withWhom') {
     const companionColors: Record<string, string> = { '혼자': '#a8a29e', ...RELATION_COLORS };
     return (
       <CssStackedBarChart
@@ -452,6 +467,34 @@ function DrinkingTrendChart({
         isDark={isDark}
       />
     );
+  }
+
+  if (metric === 'topPeople') {
+    const selSet = new Set(relationFilter);   // empty really means none
+    const rankBuckets = buckets.map(b => ({
+      label: b.label,
+      ranked: Object.entries(b.people)
+        .map(([name, cats]) => ({
+          name,
+          count: Object.entries(cats).reduce((s, [c, v]) => s + (selSet.has(c) ? v : 0), 0),
+        }))
+        .filter(p => p.count > 0)
+        .sort((x, y) => y.count - x.count)
+        .slice(0, 7),
+    }));
+    const hasAny = rankBuckets.some(b => b.ranked.length);
+    const relControl = (
+      <MultiSelectDropdown label="Relation" options={allRelations}
+        selected={relationFilter} onChange={setRelationFilter} onClose={() => {}} />
+    );
+    return hasAny
+      ? <CssRankFlowChart buckets={rankBuckets} topN={7} isDark={isDark} controls={relControl} />
+      : (
+        <div className="flex flex-col gap-2">
+          <div className="flex justify-end">{relControl}</div>
+          <p className="text-xs text-stone-400 dark:text-zinc-500">No data</p>
+        </div>
+      );
   }
 
   if (metric === 'restDays') {
@@ -491,7 +534,7 @@ export function DrinkingWidget({ globalFilter }: WidgetProps) {
   const [viewMode,    setViewMode]    = useState<WidgetViewMode>('summary');
   const [summaryTab,  setSummaryTab]  = useState<SummaryTab>('stats');
   const [trendMetric, setTrendMetric] = useState<TrendMetric>('days');
-  const [bucketsBack, setBucketsBack] = useState(6);
+  const [bucketsBack, setBucketsBack] = useState(12);
   const [summaryData, setSummaryData] = useState<DrinkingSummary | null>(null);
   const [trendData,   setTrendData]   = useState<DrinkingTrendBucket[]>([]);
   const [loading,     setLoading]     = useState(true);

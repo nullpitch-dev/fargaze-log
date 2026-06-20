@@ -11,7 +11,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Service Concept & Work Breakdown Structure", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 2.5  |  12 June 2026", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 2.6  |  20 June 2026", size: 24 })], spacing: { after: 240 } }),
 );
 
 // VERSION HISTORY
@@ -33,6 +33,7 @@ C(table(["Version","Date","Summary of Changes"],[
   ["2.3","4 Jun 2026","WBS #60 (Food ingredient taxonomy) complete: ingredient_master collection, food.foods[].ingredients field, parseFoodIngredients parser with level2 validation, historical fill of ~6,150 rows (REVIEWED_MAP 1,156 entries over 6 batches), reconciliation verified (0 gap, 0 Not Defined); alcohol_conversion 와인/ml row added; taxonomy renames; daily routine and master-table update procedures documented in Design Doc v3.1"],
   ["2.4","5 Jun 2026","WBS #62 (Drink ingredient taxonomy) complete: food.drinks[].ingredients field (drinksItemSchema), same parseFoodIngredients parser reused for drinks; new 음료 level1 group (9 values) + 당류 level1 group (설탕/꿀 moved from 양념, 쨈 moved here, 초콜릿 added); fill-historical-drinks.ts (278 reviewed entries) + inspect-drinks.ts; scan-bad-parens.ts extended to drink column; ~5,460 drink items filled, 0 Not Defined, reconciliation 0 gap; documented in Design Doc v3.2"],
   ["2.5","12 Jun 2026","WBS #61 (Diet widget) Summary view complete: diet.summary API (computeDietSummary) reusing the 6am day-boundary and an ingredient_master level2→level1 join; seven summary metrics — distribution box plots (finish time / 인분 with zone bands / carbs), spiciness HeatStrip + Mon–Sun CalendarHeatmap, food & drink ingredient/item treemaps, with-whom companions — with tap-to-open daily-line and calendar modals; new chart components Treemap, CalendarHeatmap/HeatStrip, CssDailyChart; CssVerticalBoxPlotChart gained formatY+height; taxonomy-agnostic categoryColors palette; registered in page.tsx; documented in Design Doc v3.3. Trend view pending."],
+  ["2.6","20 Jun 2026","WBS #61 (Diet widget) Trend view complete — eight tabs: four box-plot metrics (Eating/Caffeine/Servings/Carbs), three StackedBars composition tabs (Composition, Spicy, Relation), and People (top-7 companion rank-flow). New CssRankFlowChart (CSS-only ranked-flow: colour-tiles ranked top-to-bottom, dashed reference line, dropped-people block, hover-trace, blur-names, controls slot), reusable StackedBars (percent/absolute, legend hover-highlight), and a portal-based rebuild of MultiSelectDropdown (renders on document.body, escapes widget-card overflow, edge-aware). Per-person people:{name:{category:count}} field added to the diet and drinking trend buckets; diet companions now count drink-only meetups; 아침 (breakfast) records exempt from the 6am rollback. Backported: Interactions swapped to CssRankFlowChart with tabs renamed (Type→Relation, Top 7→People, the unique-count tab → Unique) and a Relation filter; Drinking gained a People rank-flow tab and renamed its companion stack People→Relation. Unified Relation/People naming across the three trend views; default bucket count 12. Documented in Design Doc v3.5."],
 ],[1100,1500,6760]));
 C(spacer());
 
@@ -136,9 +137,9 @@ C(
   bullet("\u2705 52. Cost analysis dashboard"),
   bullet("\u2705 53. Widget framework and Insights dashboard"),
   bullet("\u2705 56. Widget: Interactions — Summary view (Stats tab + Top 10 tab) + full Trend view"),
-  bullet("\u2705 57. Widget: Drinking — Summary view (Stats + Top 10) + full Trend view (8 metrics)"),
+  bullet("\u2705 57. Widget: Drinking — Summary view (Stats + Top 10) + full Trend view (9 metrics)"),
   bullet("\u2705 60. Food ingredient taxonomy (NEW) — see dedicated sub-items below"),
-  bullet("\u25D0 61. Widget: Diet — Summary view complete (Trend view pending) — see dedicated sub-items below"),
+  bullet("\u2705 61. Widget: Diet — Summary view + full Trend view (8 metric tabs) complete — see dedicated sub-items below"),
 );
 C(h3("Sub-items for WBS #53 (Widget Framework):"));
 C(
@@ -153,15 +154,15 @@ C(
   bullet("\u2705 GET /api/insights/stats — supports sleep.all, interactions.summary, drinking.summary"),
   bullet("\u2705 Widget: Sleep — Summary + Trend (4 metrics, dark mode)"),
   bullet("\u2705 Widget: Interactions — Stats tab + Top 10 tab + full Trend view (5 chart types)"),
-  bullet("\u2705 Shared chart library: TrendChart, StackedBarChart, RankedFlowChart"),
-  bullet("\u2705 Shared UI component: MultiSelectDropdown"),
+  bullet("\u2705 Shared chart library: TrendChart, StackedBarChart, RankedFlowChart (RankedFlowChart superseded v2.6 by CssRankFlowChart); CssRankFlowChart and reusable StackedBars added v2.6"),
+  bullet("\u2705 Shared UI component: MultiSelectDropdown — rebuilt v2.6 to render its panel through a React portal on document.body (escapes widget-card overflow:hidden; edge-/scroll-/resize-aware)"),
 );
 C(h3("Sub-items for WBS #56 (Interactions Widget):"));
 C(
   bullet("\u2705 API: interactions.summary — summary mode and trend mode"),
   bullet("\u2705 Summary view: Stats tab + Top 10 tab"),
-  bullet("\u2705 Trend view: 5 metric tabs (Interactions, People, Type, Method, Top 7)"),
-  bullet("\u2705 Top 7 widget-local filters: Relation Type + Method; AND logic; commit-on-close"),
+  bullet("\u2705 Trend view: 5 metric tabs (Interactions, Unique, Relation, Method, People) — People is the CssRankFlowChart rank-flow (swapped from the SVG RankedFlowChart v2.6); tabs renamed v2.6 (People→Unique, Type→Relation, Top 7→People)"),
+  bullet("\u2705 People widget-local filters: Relation + Method; AND logic; commit-on-close, server-side re-fetch"),
 );
 C(h3("Sub-items for WBS #57 (Drinking Widget):"));
 C(
@@ -170,7 +171,7 @@ C(
   bullet("\u2705 API: drinking.summary trend mode — 8 bucket fields including histogram for Rest chart"),
   bullet("\u2705 Summary view: Stats tab (4-row layout) — BoxPlot, Histogram, proportional bars"),
   bullet("\u2705 Summary view: Top 10 tab (companion table)"),
-  bullet("\u2705 Trend view: 8 metric tabs — Freq, Amt(all), Amt(day), Type, Occasion, People, Rest, Session"),
+  bullet("\u2705 Trend view: 9 metric tabs — Freq, Amt(all), Amt(day), Type, Occasion, Relation, People, Rest, Session (v2.6: added People rank-flow via CssRankFlowChart + per-person people field with client-side Relation filter; renamed the companion stack People→Relation)"),
   bullet("\u2705 CSS chart components: CssTrendChart, CssStackedBarChart, CssVerticalBoxPlotChart, CssDualLineChart, CssRestChart"),
   bullet("\u2705 Week label compression (compressWeekLabels) applied to all 5 CSS charts"),
   bullet("\u2705 ISO week fix in stepBack() and currentPeriod() — Jan-4-based calculation"),
@@ -212,7 +213,7 @@ C(
   bullet("\u2705 css-chart-components.tsx: CssDailyChart added (avg line + zone bands + above-marker tooltip); CssVerticalBoxPlotChart gained formatY + height props"),
   bullet("\u2705 DietWidget.tsx Summary view: distribution box plots (Finish/인분/Carbs) with daily-line modals; spiciness strip + calendar modal; Food/Drink × Ingredients/Items treemap toggles; with-whom toggle (relation / companions); uppercase titles"),
   bullet("\u2705 Registered in page.tsx WIDGETS array (floor 1)"),
-  bullet("\u2B1C Trend view — weekly/monthly rollups of the summary metrics (pending)"),
+  bullet("\u2705 Trend view (v2.6) — 8 tabs: four box-plot metrics (Eating/Caffeine/Servings/Carbs), three StackedBars tabs (Composition with Food/Drink × Ingredients/Items toggles, Spicy, Relation), and People (CssRankFlowChart of top-7 companions with a client-side Relation filter); per-person people:{name:{category:count}} trend field; drink-only companions counted; 아침 6am-rollback exception; trendLoadedRef keeps the active tab across bucket-size changes"),
   bullet("\u2B1C foodsItemSchema.amount String → Number (optional housekeeping; API uses parseFloat, so not blocking)"),
 );
 C(h3("Remaining Phase 4 Items:"));
@@ -322,6 +323,6 @@ const doc = new Document({
   sections: [{ properties: { page: PAGE }, children }],
 });
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-WBS-v2.5.docx", buffer);
-  console.log("Wrote FarGaze-WBS-v2.5.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-WBS-v2.6.docx", buffer);
+  console.log("Wrote FarGaze-WBS-v2.6.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });

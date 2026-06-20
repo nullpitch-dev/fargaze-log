@@ -340,13 +340,16 @@ interface CssVerticalBoxPlotChartProps {
   buckets:  BoxPlotBucket[];
   isDark:   boolean;
   yPadPct?: number;
-	formatY?: (v: number) => string;
-	height?:	number;
+  formatY?: (v: number) => string;
+  height?:  number;
+  compact?: boolean;
 }
 
 const VBOX_H = 140;
 
-export function CssVerticalBoxPlotChart({ buckets, isDark, yPadPct = 10, formatY = String, height = VBOX_H }: CssVerticalBoxPlotChartProps) {
+export function CssVerticalBoxPlotChart({
+  buckets, isDark, yPadPct = 10, formatY = String, height = VBOX_H, compact = false,
+}: CssVerticalBoxPlotChartProps) {
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
 
   const allVals = buckets.flatMap(b => [b.min, b.max]);
@@ -368,8 +371,8 @@ export function CssVerticalBoxPlotChart({ buckets, isDark, yPadPct = 10, formatY
   const lc   = labelColor(isDark);
   const n    = buckets.length;
   const compressedLabels = compressWeekLabels(buckets.map(b => b.label));
+  const hasXLabels = compressedLabels.some(l => l && l.length > 0);
 
-  // Legend labels for rightmost bucket (no numbers, just names)
   const LEGEND_LABELS: { key: keyof BoxPlotBucket; name: string; color: (b: BoxPlotBucket) => string }[] = [
     { key: 'max', name: 'Max', color: () => lc },
     { key: 'p75', name: 'P75', color: () => lc },
@@ -381,23 +384,25 @@ export function CssVerticalBoxPlotChart({ buckets, isDark, yPadPct = 10, formatY
   return (
     <div className="flex flex-col gap-1 w-full select-none">
       <div className="flex w-full">
-        {/* Y-axis */}
-        <div className="relative shrink-0 overflow-hidden" style={{ width: Y_LABEL_W, height: height }}>
-          {yTicks.map(tick => {
-            const t = yPct(tick);
-            if (t < 3 || t > 97) return null;
-            return (
-              <span key={tick} className="absolute text-[10px] leading-none"
-                style={{ right: 4, top: `${t}%`, transform: 'translateY(-50%)', color: lc }}>
-								{formatY(tick)}
-              </span>
-            );
-          })}
-        </div>
+        {/* Y-axis (hidden in compact) */}
+        {!compact && (
+          <div className="relative shrink-0 overflow-hidden" style={{ width: Y_LABEL_W, height }}>
+            {yTicks.map(tick => {
+              const t = yPct(tick);
+              if (t < 3 || t > 97) return null;
+              return (
+                <span key={tick} className="absolute text-[10px] leading-none"
+                  style={{ right: 4, top: `${t}%`, transform: 'translateY(-50%)', color: lc }}>
+                  {formatY(tick)}
+                </span>
+              );
+            })}
+          </div>
+        )}
 
         {/* Plot */}
-        <div className="relative flex-1" style={{ height: height }}>
-          {yTicks.map(tick => (
+        <div className="relative flex-1" style={{ height }}>
+          {!compact && yTicks.map(tick => (
             <div key={tick} className="absolute inset-x-0 pointer-events-none"
               style={{ top: `${yPct(tick)}%`, height: 1, background: gc, opacity: 0.7 }} />
           ))}
@@ -416,7 +421,7 @@ export function CssVerticalBoxPlotChart({ buckets, isDark, yPadPct = 10, formatY
 
               return (
                 <div key={b.label} className="flex-1 relative flex justify-center"
-                  style={{ height: height, cursor: 'pointer' }}
+                  style={{ height, cursor: 'pointer' }}
                   onMouseEnter={() => setActiveIdx(i)}
                   onMouseLeave={() => setActiveIdx(null)}
                   onClick={() => setActiveIdx(isActive ? null : i)}>
@@ -425,31 +430,45 @@ export function CssVerticalBoxPlotChart({ buckets, isDark, yPadPct = 10, formatY
                   <div className="absolute" style={{ left: '50%', top: `${topWhiskerPct}%`,
                     height: `${Math.max(whiskerH, 0)}%`, width: 1.5,
                     transform: 'translateX(-50%)', background: bc }} />
-
                   {/* Min cap */}
                   <div className="absolute" style={{ left: '50%', top: `${bottomWhiskerPct}%`,
                     width: 10, height: 2, transform: 'translate(-50%, -50%)', background: bc }} />
-
                   {/* Max cap */}
                   <div className="absolute" style={{ left: '50%', top: `${topWhiskerPct}%`,
                     width: 10, height: 2, transform: 'translate(-50%, -50%)', background: bc }} />
-
                   {/* IQR box fill */}
                   <div className="absolute rounded-sm" style={{ left: '20%', right: '20%',
                     top: `${boxTopPct}%`, height: `${Math.max(boxH, 2)}%`,
                     background: bc, opacity: 0.18 }} />
-
                   {/* IQR box border */}
                   <div className="absolute rounded-sm" style={{ left: '20%', right: '20%',
                     top: `${boxTopPct}%`, height: `${Math.max(boxH, 2)}%`,
                     border: `1.5px solid ${bc}` }} />
-
                   {/* Avg diamond */}
                   <div className="absolute" style={{ left: '50%', top: `${avgTopPct}%`,
                     width: 7, height: 7, transform: 'translate(-50%, -50%) rotate(45deg)',
                     background: avgC }} />
 
-                  {/* Hover tooltip: min / avg / max */}
+                  {/* Compact value labels: max (above) / avg (pill) / min (below) */}
+                  {compact && !isActive && (
+                    <>
+                      <span className="absolute text-[9px] leading-none whitespace-nowrap pointer-events-none"
+                        style={{ left: '50%', top: `${topWhiskerPct}%`, transform: 'translate(-50%, -135%)', color: lc }}>
+                        {formatY(b.max)}
+                      </span>
+                      <span className="absolute text-[10px] font-semibold leading-none whitespace-nowrap pointer-events-none rounded px-0.5"
+                        style={{ left: '50%', top: `${avgTopPct}%`, transform: 'translate(-50%, -50%)', color: avgC,
+                          background: isDark ? 'rgba(24,24,27,0.85)' : 'rgba(255,255,255,0.85)' }}>
+                        {formatY(b.avg)}
+                      </span>
+                      <span className="absolute text-[9px] leading-none whitespace-nowrap pointer-events-none"
+                        style={{ left: '50%', top: `${bottomWhiskerPct}%`, transform: 'translate(-50%, 55%)', color: lc }}>
+                        {formatY(b.min)}
+                      </span>
+                    </>
+                  )}
+
+                  {/* Hover tooltip: max / avg / min */}
                   {isActive && (
                     <div className="absolute z-10 rounded px-1.5 py-1 text-[10px] leading-snug whitespace-nowrap flex flex-col gap-0.5"
                       style={{ left: '50%', top: `${avgTopPct}%`,
@@ -457,28 +476,23 @@ export function CssVerticalBoxPlotChart({ buckets, isDark, yPadPct = 10, formatY
                         background: isDark ? '#27272a' : '#fff',
                         border: `1px solid ${isDark ? '#3f3f46' : '#e7e5e4'}`,
                         boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}>
-											<span style={{ color: lc }}>Max <span style={{ color: valueColor(isDark), fontWeight: 600 }}>{formatY(b.max)}</span></span>
+                      <span style={{ color: lc }}>Max <span style={{ color: valueColor(isDark), fontWeight: 600 }}>{formatY(b.max)}</span></span>
                       <span style={{ color: avgC }}>Avg <span style={{ fontWeight: 600 }}>{formatY(b.avg)}</span></span>
                       <span style={{ color: lc }}>Min <span style={{ color: valueColor(isDark), fontWeight: 600 }}>{formatY(b.min)}</span></span>
                     </div>
                   )}
 
-                  {/* Rightmost: legend labels only (no numbers) */}
-                  {isLast && !isActive && LEGEND_LABELS.map(({ key, name, color }) => {
+                  {/* Rightmost: legend names (hidden in compact) */}
+                  {!compact && isLast && !isActive && LEGEND_LABELS.map(({ key, name, color }) => {
                     const pct = yPct(b[key] as number);
                     const isAvg = key === 'avg';
-                    // Offset labels to avoid overlap
                     const offsetMap: Record<string, string> = {
-                      max: 'translateY(-13px)',
-                      p75: 'translateY(-11px)',
-                      avg: 'translateY(-11px)',
-                      p25: 'translateY(2px)',
-                      min: 'translateY(3px)',
+                      max: 'translateY(-13px)', p75: 'translateY(-11px)', avg: 'translateY(-11px)',
+                      p25: 'translateY(2px)', min: 'translateY(3px)',
                     };
                     return (
                       <div key={name} className="absolute text-[9px] leading-none whitespace-nowrap pointer-events-none"
-                        style={{ left: '62%', top: `${pct}%`,
-                          transform: offsetMap[key as string],
+                        style={{ left: '62%', top: `${pct}%`, transform: offsetMap[key as string],
                           color: color(b), fontWeight: isAvg ? 600 : 400 }}>
                         {name}
                       </div>
@@ -491,21 +505,24 @@ export function CssVerticalBoxPlotChart({ buckets, isDark, yPadPct = 10, formatY
         </div>
       </div>
 
-      {/* X labels */}
-      <div className="flex w-full" style={{ paddingLeft: Y_LABEL_W }}>
-        <div className="flex flex-1">
-          {compressedLabels.map((lbl, i) => (
-            <div key={i} className="flex-1 text-center text-[10px] leading-none"
-              style={{ color: i === n - 1 ? (isDark ? '#f4f4f5' : '#292524') : lc,
-                fontWeight: i === n - 1 ? 600 : 400 }}>
-              {lbl}
-            </div>
-          ))}
+      {/* X labels (skipped when every bucket label is empty, e.g. Diet's single box) */}
+      {hasXLabels && (
+        <div className="flex w-full" style={{ paddingLeft: compact ? 0 : Y_LABEL_W }}>
+          <div className="flex flex-1">
+            {compressedLabels.map((lbl, i) => (
+              <div key={i} className="flex-1 text-center text-[10px] leading-none"
+                style={{ color: i === n - 1 ? (isDark ? '#f4f4f5' : '#292524') : lc,
+                  fontWeight: i === n - 1 ? 600 : 400 }}>
+                {lbl}
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
+
 
 // ── CssDualLineChart (Session Time) ──────────────────────────────────────────
 // From / To lines sharing Y-axis in HH:MM, with filled area + arrows + duration labels.

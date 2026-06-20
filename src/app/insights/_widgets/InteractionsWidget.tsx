@@ -6,8 +6,9 @@ import { WidgetCard, ViewToggle, BucketSelector } from '../_components/WidgetCar
 import { MultiSelectDropdown } from '../_components/MultiSelectDropdown';
 import { useIsDark } from '../_lib/hooks';
 import { chartColors, PERSON_COLORS_LIGHT, PERSON_COLORS_DARK } from '../_lib/chart-colors';
-import { TrendChart, StackedBarChart, RankedFlowChart } from '../_lib/chart-components';
-import type { StackedBarBucket, RankedFlowBucket } from '../_lib/chart-components';
+import { TrendChart, StackedBarChart } from '../_lib/chart-components';
+import type { StackedBarBucket } from '../_lib/chart-components';
+import { CssRankFlowChart } from '../_components/charts/CssRankFlowChart';
 import { buildParams } from '../_lib/date-helpers';
 import type { WidgetProps, WidgetViewMode } from '../_lib/types';
 import type { YAxisConfig } from '../_lib/chart-components';
@@ -31,10 +32,10 @@ interface TrendBucket {
 
 const TREND_METRICS: { key: TrendMetric; label: string; desc: string }[] = [
   { key: 'interactions', label: 'Interactions', desc: 'Total number of interaction events over time'      },
-  { key: 'people',       label: 'People',       desc: 'Number of unique people interacted with over time' },
-  { key: 'relationType', label: 'Type',         desc: 'Mix of relation types over time (100%)'            },
+  { key: 'people',       label: 'Unique',       desc: 'Number of unique people interacted with over time' },
+  { key: 'relationType', label: 'Relation',         desc: 'Mix of relation types over time (100%)'            },
   { key: 'method',       label: 'Method',       desc: 'Mix of interaction methods over time (100%)'       },
-  { key: 'top7',         label: 'Top 7',        desc: 'How your top 7 people change over time'            },
+  { key: 'top7',         label: 'People',        desc: 'How your top 7 people change over time'            },
 ];
 
 // ── Colours ───────────────────────────────────────────────────────────────────
@@ -50,17 +51,6 @@ const CATEGORY_COLORS: Record<string, string> = {
   '가족': '#1d4ed8', '업무': '#7c3aed', '친목': '#0891b2',
   '연애': '#ec4899', '종교': '#d97706', '기타': '#6b7280',
 };
-
-function buildPersonColorMap(buckets: TrendBucket[], isDark: boolean): Record<string, string> {
-  const palette = isDark ? PERSON_COLORS_DARK : PERSON_COLORS_LIGHT;
-  const seen: string[] = [];
-  for (const b of buckets)
-    for (const { name } of b.top7)
-      if (!seen.includes(name)) seen.push(name);
-  const map: Record<string, string> = {};
-  seen.forEach((name, i) => { map[name] = palette[i % palette.length]; });
-  return map;
-}
 
 function buildCategoryColorMap(
   buckets: TrendBucket[],
@@ -104,14 +94,6 @@ function toStackedBuckets(
   key: 'byRelationType' | 'byMethod',
 ): StackedBarBucket[] {
   return buckets.map(b => ({ label: b.label, data: b[key] }));
-}
-
-function toRankedFlowBuckets(buckets: TrendBucket[]): RankedFlowBucket[] {
-  return buckets.map(b => ({
-    label:        b.label,
-    ranked:       b.top7,
-    transitioning: b.transitioning,
-  }));
 }
 
 // ── Summary sub-components ────────────────────────────────────────────────────
@@ -215,7 +197,7 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
   const [viewMode, setViewMode]       = useState<WidgetViewMode>('summary');
   const [summaryTab, setSummaryTab]   = useState<SummaryTab>('stats');
   const [trendMetric, setTrendMetric] = useState<TrendMetric>('interactions');
-  const [bucketsBack, setBucketsBack] = useState(6);
+  const [bucketsBack, setBucketsBack] = useState(12);
 
   // Draft filter state (updates on every checkbox click, no re-fetch)
   const [top7RelType, setTop7RelType]           = useState<string[]>([]);
@@ -282,7 +264,6 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
   }, [trendData]);
 
   // Derived values
-  const personColorMap  = buildPersonColorMap(trendData, isDark);
   const relTypeColorMap = buildCategoryColorMap(trendData, 'byRelationType', isDark);
   const methodColorMap  = buildCategoryColorMap(trendData, 'byMethod', isDark);
   const neutralGrey     = isDark ? NEUTRAL_GREY_DARK : NEUTRAL_GREY_LIGHT;
@@ -372,26 +353,6 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
             <p className="text-[11px] text-stone-400 dark:text-zinc-500 -mt-1">{activeDesc}</p>
           )}
 
-          {/* Row 3: Top 7 filters (only shown for top7 metric) */}
-          {trendMetric === 'top7' && trendData.length > 0 && (
-            <div className="flex items-center justify-end gap-2 -mt-3 -mb-3">
-              <MultiSelectDropdown
-                label="Type"
-                options={relTypeOptions}
-                selected={top7RelType}
-                onChange={setTop7RelType}
-                onClose={() => setCommittedRelType([...top7RelTypeRef.current])}
-              />
-              <MultiSelectDropdown
-                label="Method"
-                options={methodOptions}
-                selected={top7Method}
-                onChange={setTop7Method}
-                onClose={() => setCommittedMethod([...top7MethodRef.current])}
-              />
-            </div>
-          )}
-
           {/* Row 4: chart */}
           {trendData.length === 0 ? (
             <p className="text-xs text-stone-400 dark:text-zinc-500">No data</p>
@@ -422,13 +383,29 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
               isDark={isDark}
               neutralGrey={neutralGrey}
             />
-          ) : (
-            <RankedFlowChart
-              buckets={toRankedFlowBuckets(trendData)}
+					) : (
+            <CssRankFlowChart
+              buckets={trendData.map(b => ({ label: b.label, ranked: b.top7 }))}
               topN={7}
-              colorMap={personColorMap}
               isDark={isDark}
-              neutralGrey={neutralGrey}
+              controls={
+                <>
+                  <MultiSelectDropdown
+                    label="Relation"
+                    options={relTypeOptions}
+                    selected={top7RelType}
+                    onChange={setTop7RelType}
+                    onClose={() => setCommittedRelType([...top7RelTypeRef.current])}
+                  />
+                  <MultiSelectDropdown
+                    label="Method"
+                    options={methodOptions}
+                    selected={top7Method}
+                    onChange={setTop7Method}
+                    onClose={() => setCommittedMethod([...top7MethodRef.current])}
+                  />
+                </>
+              }
             />
           )}
         </div>

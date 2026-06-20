@@ -15,7 +15,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze Log", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Data Design & Requirements Document", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 3.3  |  12 June 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 3.5  |  20 June 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
 );
 
 // ===== VERSION HISTORY =====
@@ -40,6 +40,8 @@ C(table(
     ["3.1","4 Jun 2026","Hyoje / Claude","Food ingredient taxonomy added: two-level (level1/level2) ingredient_master collection; food.foods[].ingredients field; parenthesis ingredient notation in source data; parseFoodIngredients parser with level2 validation; historical fill of ~6,150 food rows via fill-historical-ingredients.ts; alcohol_conversion 와인/ml row added; taxonomy renames (해물 육수, 채소 육수, 기타 해산물); 콩류/청국장 moved under 곡류 level1; new Sections 6.6, 8.7, 15, 16; daily routine and master-table update procedures documented"],
     ["3.2","5 Jun 2026","Hyoje / Claude","Drink ingredient taxonomy added: food.drinks[].ingredients field (drinksItemSchema) populated from level2 values via the same parseFoodIngredients parser; new 음료 level1 group (커피, 디카페인 커피, 보이차, 홍차, 녹차, 허브차, 탄산, 카페인, 기타 음료); new 당류 level1 group with 초콜릿 (설탕/꿀 moved here from 양념; 쨈 moved here too); fill-historical-drinks.ts (278 reviewed drink entries) + inspect-drinks.ts; scan-bad-parens.ts extended to scan the drink column; ~5,460 drink items filled, 0 Not Defined; new Section 6.7; Sections 5.2, 8.7, 14, 15, 16 updated for drinks"],
     ["3.3","12 Jun 2026","Hyoje / Claude","Diet widget (WBS #61) Summary view complete: diet.summary API (computeDietSummary) reusing assignDrinkingDate 6am day-boundary and an ingredient_master level2→level1 join; seven summary metrics — distribution box plots (finish-eating time, daily 인분 with green/blue/red zone bands, carbs index), spiciness HeatStrip + Mon–Sun CalendarHeatmap, food & drink ingredient/item treemaps, with-whom companions — with tap-to-open daily-line and calendar modals; new chart components Treemap, CalendarHeatmap/HeatStrip, CssDailyChart; CssVerticalBoxPlotChart gained formatY + height props; taxonomy-agnostic CATEGORY_COLORS palette (categoryColors); new Section 13.8; Sections 13.2, 13.3, 13.4, 14.8, 14.9 updated. Trend view pending."],
+    ["3.4","14 Jun 2026","Hyoje / Claude","Insights API restructured: route.ts (~1,400 lines) split into a thin GET dispatcher (~150 lines) plus one compute module per widget under src/lib/insights/ (dates, util, sleep, interactions, drinking, diet) — a pure no-op move, verified by diffing each metric's response before/after. Diet widget refinements: 4th box plot 'Caffeine cutoff' (latest 커피/카페인 drink time per day → finishCaffeine, computed in the drinks pass so it counts coffee without food); compact box plots (no y-axis, no Max/P75/Avg/P25/Min legend — value labels at max/avg/min instead) so four boxes fit one row; box-plot headers renamed EATING CUTOFF / CAFFEINE CUTOFF and centred; treemap label font capped at 11px; CssVerticalBoxPlotChart gained a compact prop. Sections 13.3, 13.4, 13.8, 14.4, 14.7 updated."],
+    ["3.5","20 Jun 2026","Hyoje / Claude","Diet widget (WBS #61) Trend view complete — eight tabs: four box-plot metrics (Eating/Caffeine/Servings/Carbs), three 100% stacked-composition tabs (Composition with Food/Drink × Ingredients/Items toggles, Spicy, Relation), and People (rank-flow of top-7 companions). New shared chart CssRankFlowChart — CSS-only ranked-flow (colour-tiles ranked top→bottom, dashed reference line, grey block listing people who dropped from the previous bucket's top-N, hover-to-trace, blur-names privacy toggle, luminance-adaptive tile text, controls slot); rankFlowColors two-tier palette. New reusable StackedBars (percent/absolute modes, legend hover-highlight). MultiSelectDropdown rebuilt to render its panel through a React portal on document.body with fixed positioning, so it escapes widget-card overflow:hidden and stays edge-/scroll-/resize-aware. Per-person people:{name:{category:count}} field added to the diet AND drinking trend buckets for client-side companion filtering and re-ranking. Diet companion scope widened to count drink-only meetups; 아침 (breakfast) records exempted from the 6am day-rollback. Backward-applied to existing widgets: Interactions now uses CssRankFlowChart (replacing the SVG RankedFlowChart) with its trend tabs renamed Type→Relation and Top 7→People (the unique-people count tab renamed Unique to avoid the clash) and a Relation filter; Drinking gained a People rank-flow tab and renamed its companion stacked tab People→Relation. Unified trend naming across Diet/Drinking/Interactions: Relation = relation-type stack, People = top-7 individual rank-flow, Relation = the relation filter. Default bucket count set to 12. Sections 13.3, 13.4, 13.5, 13.8 updated."],
   ],
   [1200, 1500, 1700, 4960]
 ));
@@ -911,17 +913,20 @@ C(h2("13.3 Shared Chart Components"));
 C(table(["Component","File","Description"],[
   ["TrendChart","src/app/insights/_lib/chart-components.tsx","SVG spline line chart with hover/tap interaction"],
   ["StackedBarChart","src/app/insights/_lib/chart-components.tsx","100% stacked bar chart with legend"],
-  ["RankedFlowChart","src/app/insights/_lib/chart-components.tsx","Ranked flow with transitioning block and connecting lines"],
+  ["RankedFlowChart","src/app/insights/_lib/chart-components.tsx","SVG ranked flow with transitioning block and connecting lines — SUPERSEDED v3.5 by CssRankFlowChart; no longer used by any widget"],
   ["BoxPlot","src/app/insights/_components/charts/BoxPlot.tsx","CSS horizontal box plot; pr-5 right padding; label width w-10"],
   ["Histogram","src/app/insights/_components/charts/Histogram.tsx","CSS bar chart histogram; fixed font sizes"],
   ["CssTrendChart","src/app/insights/_components/charts/css-chart-components.tsx","CSS+SVG line chart with Catmull-Rom spline; multi-series; week label compression"],
   ["CssStackedBarChart","src/app/insights/_components/charts/css-chart-components.tsx","100% stacked bar chart; categories sorted by total descending; week compression"],
-  ["CssVerticalBoxPlotChart","src/app/insights/_components/charts/css-chart-components.tsx","Vertical box plots per bucket; rightmost shows Max/P75/Avg/P25/Min legends; hover tooltip; optional formatY + height props (v3.3, used by Diet's compact single-box plots)"],
+  ["CssVerticalBoxPlotChart","src/app/insights/_components/charts/css-chart-components.tsx","Vertical box plots per bucket; hover tooltip; props: formatY, height, and compact (v3.4). Default shows the y-axis and a Max/P75/Avg/P25/Min name legend on the rightmost bucket; compact hides both and prints value labels at max/avg/min so several boxes fit one row"],
   ["CssDualLineChart","src/app/insights/_components/charts/css-chart-components.tsx","Dual line chart (From/To); shared HH:MM Y-axis; filled area; dashed arrows with duration; +HH:MM for post-midnight"],
   ["CssRestChart","src/app/insights/_components/charts/css-chart-components.tsx","Stacked histogram bars + avg spline overlay; unified SVG coordinate space; PLOT_T/PLOT_B bounds"],
   ["CssDailyChart","src/app/insights/_components/charts/css-chart-components.tsx","(v3.3) Single daily-series line; optional dashed average line + zone bands; tooltip floats above the marker showing value + date; baselineZero option"],
   ["Treemap","src/app/insights/_components/charts/Treemap.tsx","(v3.3) Squarified treemap; CSS-positioned cells measured via ResizeObserver; top-N cap with a neutral 기타 (+N) rollup; per-mode cell text"],
   ["CalendarHeatmap / HeatStrip","src/app/insights/_components/charts/CalendarHeatmap.tsx","(v3.3) Mon–Sun calendar grid (modal) + single-row day strip (inline); range expanded to whole weeks; out-of-range days dimmed; colour via fillFor(date)"],
+  ["StackedBars","src/app/insights/_components/charts/StackedBars.tsx","(v3.5) Reusable stacked bars; percent or absolute mode; legend hover-highlight dims the other series; shared by the Diet Composition / Spicy / Relation tabs"],
+  ["CssRankFlowChart","src/app/insights/_components/charts/CssRankFlowChart.tsx","(v3.5) CSS-only ranked-flow ('top-N over time'): colour-tiles ranked top→bottom per bucket, a dashed reference line, and a grey block listing people who dropped out of the previous bucket's top-N. Per-person colour (rankFlowColors, first-seen order); hover-to-trace highlights one person across all buckets and shows per-bucket counts; blur-names privacy toggle; luminance-adaptive tile text; optional controls slot for a filter. No SVG. Used by Diet, Drinking, and Interactions"],
+  ["MultiSelectDropdown","src/app/insights/_components/MultiSelectDropdown.tsx","Generic multi-select with Select-all / Deselect-all; onChange(draft) / onClose(commit). Rebuilt v3.5 to render its panel through a React portal on document.body with fixed positioning, so it escapes widget-card overflow:hidden; edge-aware (flips up, clamps horizontally, caps height with scroll) and re-measures on selection change, scroll, and resize"],
 ],[2200,3400,3760]));
 C(spacer());
 C(note("Note: BoxPlot and Histogram use CSS/HTML exclusively (no SVG). CSS chart components use CSS for layout/dots/labels and thin SVG overlay only for curved line paths."));
@@ -934,8 +939,8 @@ C(
 C(bold("Interactions Widget (WBS #56)"));
 C(
   bullet("Summary view: Stats tab (horizontal bars for Relation Type + Method); Top 10 tab"),
-  bullet("Trend view: 5 metric tabs — Interactions, People, Type, Method (stacked bar), Top 7 (RankedFlow)"),
-  bullet("Widget-local filters: Relation Type + Method multi-select with AND logic; commit-on-close pattern"),
+  bullet("Trend view: 5 metric tabs — Interactions, Unique, Relation, Method (stacked bar), People (CssRankFlowChart, v3.5)"),
+  bullet("Widget-local filters: Relation + Method multi-select with AND logic; commit-on-close pattern with a server-side re-fetch (the People rank-flow is filtered on the server, unlike Diet/Drinking which filter client-side)"),
 );
 C(bold("Drinking Widget (WBS #57) — Complete"));
 C(
@@ -944,16 +949,26 @@ C(
   bullet("Row 2: [Drink Type | Occasion | With Whom] — proportional horizontal bar charts (3 columns)", 1),
   bullet("Row 3 (65%:35%): [Consecutive Rest Days histogram] | [Session Time — From / To / For]", 1),
   bullet("Summary view — Top 10 tab: companion table with dominant relation type"),
-  bullet("Trend view — 8 metric tabs: Freq, Amt(all), Amt(day), Type, Occasion, People, Rest, Session"),
+  bullet("Trend view — 9 metric tabs: Freq, Amt(all), Amt(day), Type, Occasion, Relation, People, Rest, Session — where Relation is the relation-type stack (formerly labelled People) and People (v3.5) is a CssRankFlowChart of the top-7 companions with a client-side Relation filter"),
 );
-C(bold("Diet Widget (WBS #61) — Summary complete; Trend pending"));
+C(bold("Diet Widget (WBS #61) — Complete"));
 C(
-  bullet("Summary view is distribution-oriented (not a trend): three vertical box plots — Finish time, Daily 인분, Carbs index — each tappable to open a modal with the full daily line (CssDailyChart); the 인분 line carries green/light-blue/red zone bands (<3 소식 / 3–6 적당 / >6 과식)"),
+  bullet("Summary view is distribution-oriented (not a trend): four compact vertical box plots in one row — EATING CUTOFF, CAFFEINE CUTOFF, SERVINGS (인분), CARBS — each tappable to open a modal with the full daily line (CssDailyChart); the 인분 line carries green/light-blue/red zone bands (<3 소식 / 3–6 적당 / >6 과식)"),
+  bullet("CAFFEINE CUTOFF = the latest time each day a caffeinated drink (ingredient 커피 or 카페인) was finished — computed in the same pass as the drink treemaps, so it counts coffee taken without any food", 1),
+  bullet("Compact box plots drop the y-axis and the Max/P75/Avg/P25/Min name legend, printing value labels at max / avg / min instead, so four boxes fit a single row", 1),
   bullet("Spicy days: an inline single-row HeatStrip (one cell per day) with a summary count (e.g. \"0 H and 4 M out of 31 days\"), tappable to open the Mon–Sun CalendarHeatmap modal", 1),
-  bullet("Treemaps shown one at a time via two toggles — Food/Drink × Ingredients/Items; ingredient cells coloured by level1 group (categoryColors), item cells by a single accent; top-N cap with a 기타 rollup", 1),
+  bullet("Treemaps shown one at a time via two toggles — Food/Drink × Ingredients/Items; ingredient cells coloured by level1 group (categoryColors), item cells by a single accent; top-N cap with a 기타 rollup; cell-label font capped at 11px", 1),
   bullet("With whom I eat: toggle between relationship bars (혼자 + categories) and a top-companions list", 1),
-  bullet("Uppercase section titles; compact layout (shortened box plots, single-treemap toggles) tuned to keep the widget near a single widget's height"),
+  bullet("Uppercase, centred section titles; compact layout (four-box row, single-treemap toggles) tuned to keep the widget near a single widget's height"),
 );
+C(bold("Diet — Trend view (8 tabs, complete v3.5)"));
+C(
+  bullet("Eating · Caffeine · Servings · Carbs — four box-plot-per-bucket tabs, each rendering CssVerticalBoxPlotChart (non-compact) across the weekly/monthly buckets"),
+  bullet("Composition · Spicy · Relation — three tabs built on the reusable StackedBars: Composition (Food/Drink × Ingredients/Items toggles; dynamic 30%-threshold 'others' rollup, capped at palette size), Spicy (absolute H/M/L day counts), Relation (relation-type mix, 100%; 혼자 neutral)"),
+  bullet("People — a CssRankFlowChart of the top-7 companions over time, with a Relation multi-select that re-ranks client-side (each person summed over the selected relation types, zeros dropped, top-7 re-taken)"),
+  bullet("Tab persistence: a trendLoadedRef in DietWidget keeps the view mounted across bucket-size changes so the active tab is not reset"),
+);
+C(note("Naming convention (unified v3.5) across the Diet, Drinking, and Interactions trend views: the relation-type 100% stacked tab is Relation; the top-7 individual rank-flow tab is People; the relation multi-select is the Relation filter. Diet and Drinking filter the rank-flow client-side from the per-bucket people map; Interactions filters server-side (committed on close, then re-fetch)."));
 C(h2("13.5 Drinking Widget — Data Model"));
 C(bold("6am Date Assignment Rule"));
 C(p("Alcohol records with start.datetime between 00:00–05:59 are attributed to the previous calendar day. Implemented via assignDrinkingDate() in the API route. The fetch window is expanded by 6 hours at the start of the period to capture midnight records."));
@@ -983,7 +998,7 @@ C(table(["Bucket","Range","Meaning"],[
 ],[2000,3400,3960]));
 C(spacer());
 C(bold("Trend Mode API — drinking.summary"));
-C(p("mode=trend returns per-bucket data: drinkingDays, daysInPeriod, totalDrinks, avgDrinksPerDay, drinksBox {min/max/avg/p25/p75}, avgRestDays (computed via dailyScores), histogram (Record<string,number> with all 7 buckets), drinkType, occasions, companions, avgStartMins, avgEndMins, avgDurationSeconds."));
+C(p("mode=trend returns per-bucket data: drinkingDays, daysInPeriod, totalDrinks, avgDrinksPerDay, drinksBox {min/max/avg/p25/p75}, avgRestDays (computed via dailyScores), histogram (Record<string,number> with all 7 buckets), drinkType, occasions, companions, people, avgStartMins, avgEndMins, avgDurationSeconds. companions is the relation-type stack (Record<string,number>) behind the Relation tab; people (added v3.5) is the per-person, per-relation-type breakdown Record<string, Record<string,number>> that drives the People rank-flow tab and its client-side Relation filter — built from the same per-event dedupe and category rules as the summary's topPeople."));
 C(h2("13.6 CSS Chart Architecture"));
 C(
   bullet("Bars, dots, labels, axes: CSS/HTML divs with pixel or percentage positioning"),
@@ -1002,18 +1017,19 @@ C(table(["Bug","Fix"],[
   ["avgRestDays in trend buckets incorrect","Now uses computeDailyScores() identical to computeDrinkingSummary()"],
 ],[3400,5960]));
 C(spacer());
-C(h2("13.8 Diet Widget — Data Model (NEW v3.3)"));
+C(h2("13.8 Diet Widget — Data Model (NEW v3.3; extended v3.4, v3.5)"));
 C(bold("API — diet.summary"));
 C(p("computeDietSummary(userId, periodStart, periodEnd, crossActivities) returns one summary object for the whole period. It reuses assignDrinkingDate() as the shared 6am day-boundary helper (00:00–05:59 → previous day) across every per-day metric, fetches food/drink-bearing records (food.foods[] or food.drinks[] non-empty) with a 6-hour early lookback, and joins level2 → level1 from ingredient_master in JS (same pattern as the alcohol convMap). Per-day arrays are capped at yesterday; rangeStart/rangeEnd carry the full (uncapped) filter range for the calendar grid."));
 C(table(["Field","Description"],[
   ["finishEating","[{date, endMins}] — latest end time among food-bearing records per day; endMins +1440 for post-midnight"],
+  ["finishCaffeine","[{date, endMins}] — latest end time among records with a caffeinated drink (ingredient 커피/카페인) per day; computed in the drinks pass, so coffee taken without food still counts (v3.4)"],
   ["servings","[{date, total}] — Σ food.foods[].amount (인분); parseFloat so it works on String or Number"],
   ["carbsIndex","[{date, value}] — Σ (carbs H=2/M=1/L=0 × that meal's 인분); drinks excluded"],
   ["spiciness","[{date, level}] — per eating day, max of H/M/L (L = ate but not spicy); a day absent from the array had no meal logged"],
   ["ateIngredients / drankIngredients","[{level2, level1, count}] — frequency; level1 joined from ingredient_master"],
   ["ateItems / drankItems","[{item, count}] — frequency by item name"],
-  ["companions","{alone, total, byRelationType, topPeople[]} — scoped to food-bearing records"],
-  ["averages","{finishEatingMins, servings, carbsIndex} — mean over days present (drives the average line/marker)"],
+  ["companions","{alone, total, byRelationType, topPeople[]} — scoped to food- OR drink-bearing records; drink-only meetups (e.g. coffee) now count (v3.5)"],
+  ["averages","{finishEatingMins, finishCaffeineMins, servings, carbsIndex} — mean over days present (drives the average line/marker)"],
   ["rangeStart / rangeEnd","full filter range (uncapped) — for the spiciness calendar grid"],
 ],[2700,6660]));
 C(spacer());
@@ -1022,10 +1038,12 @@ C(
   bullet("\"Eating\" = a record with at least one non-null food.foods[].item. A drink-only record (e.g. a midnight juice) is excluded from the eating metrics but still counts in the drink treemaps."),
   bullet("Alcohol (food.alcohols[]) is excluded entirely — it has no ingredients and is covered by the Drinking widget. Drink treemaps read food.drinks[] only."),
   bullet("Counting is frequency-based (each occurrence = 1)."),
-  bullet("The 6am day-boundary rule from the Drinking widget applies uniformly to every per-day Diet metric."),
+  bullet("The 6am day-boundary rule from the Drinking widget applies uniformly to every per-day Diet metric — with one exception (v3.5): records tagged food.type === '아침' (breakfast) are exempted from the previous-day rollback and the +1440 late-night shift, so an early-morning breakfast stays on its own calendar day."),
 );
 C(bold("Summary view = distribution, not trend"));
-C(p("The summary deliberately shows the distribution of daily values (box plots, with the full daily line one tap away in a modal) rather than a period trend — the average is the headline statistic. The Trend view (pending) will roll these same metrics into weekly/monthly buckets per the global filter."));
+C(p("The summary deliberately shows the distribution of daily values (box plots, with the full daily line one tap away in a modal) rather than a period trend — the average is the headline statistic. The Trend view (complete as of v3.5) rolls these same metrics into weekly/monthly buckets per the global filter; its eight tabs are described in Section 13.4."));
+C(bold("Trend Mode API — diet.summary (NEW v3.5)"));
+C(p("mode=trend returns one object per bucket: label, daysInPeriod, the four box-plot arrays (eatingCutoff, caffeineCutoff, servings, carbs), the composition maps (ateIng, ateItems, drankIng, drankItems), spicy {H,M,L}, relation (Record<string,number>, behind the Relation tab), and people (Record<string, Record<string,number>>). people is the per-person, per-relation-type companion breakdown that the People rank-flow tab filters and re-ranks client-side; it is built from the same personMap category counts the summary uses for topPeople, so the 아침 exception and the food-or-drink scope apply identically."));
 C(bold("Spiciness calendar — one rule for all filter modes"));
 C(p("Expand [rangeStart, rangeEnd] to whole Mon–Sun weeks and dim any day outside the range. Month → 1st to month-end with adjacent-month days dimmed; week → one row; day → that day's full week with only the one day solid; period → a continuous grid. Cell colours: red (any H), amber (M, no H), blue (ate, not spicy), empty (no meal logged). The inline HeatStrip uses the same fillFor() colouring in a single dateless/headerless row."));
 C(bold("Colour assignment"));
@@ -1035,8 +1053,10 @@ C(
   bullet("Treemap.tsx — squarified layout, CSS-positioned cells measured by ResizeObserver, top-N cap + neutral 기타 (+N) rollup"),
   bullet("CalendarHeatmap.tsx — CalendarHeatmap (full Mon–Sun grid, reusable for WBS #59) and HeatStrip (compact inline row)"),
   bullet("CssDailyChart (in css-chart-components.tsx) — daily line with average line, zone bands, above-marker value+date tooltip"),
-  bullet("CssVerticalBoxPlotChart gained formatY (e.g. HH:MM axis) and height props for the compact single-box use"),
+  bullet("CssVerticalBoxPlotChart gained formatY (e.g. HH:MM axis), height, and compact (v3.4 — drops the y-axis and the name legend, labelling max/avg/min directly) so four boxes fit one row"),
 );
+C(bold("Caffeine cutoff — placement (v3.4)"));
+C(p("finishCaffeine is built in the same loop pass that counts drink ingredients (before the food-only cut), not inside the finish-eating block. The finish-eating block runs only for food-bearing records, so computing caffeine there would silently drop coffees taken without food. The check is: any food.drinks[] entry whose ingredients include 커피 or 카페인 → take that record's end time as a candidate for the day's caffeine cutoff."));
 
 // ===== 14. HANDOVER =====
 C(h1("14. Project Handover & Developer Context"));
@@ -1070,9 +1090,12 @@ C(table(["Path","Purpose"],[
   ["src/app/insights/_widgets/SleepWidget.tsx","Sleep widget"],
   ["src/app/insights/_widgets/InteractionsWidget.tsx","Interactions widget"],
   ["src/app/insights/_widgets/DrinkingWidget.tsx","Drinking widget — Summary + Trend views, 8 metric tabs, TrendTip component"],
+  ["src/app/insights/_widgets/DietWidget.tsx","Diet widget (WBS #61) — Summary view: four compact box plots, spicy HeatStrip + calendar modal, treemap toggles, companions toggle (v3.3–v3.4)"],
   ["src/app/insights/_components/charts/BoxPlot.tsx","CSS horizontal box plot — props: min, max, avg, p25, p75, isDark"],
   ["src/app/insights/_components/charts/Histogram.tsx","CSS histogram — props: buckets[] ({label, count}), isDark"],
-  ["src/app/insights/_components/charts/css-chart-components.tsx","CSS+SVG chart components: CssTrendChart, CssStackedBarChart, CssVerticalBoxPlotChart, CssDualLineChart, CssRestChart, compressWeekLabels"],
+  ["src/app/insights/_components/charts/css-chart-components.tsx","CSS+SVG chart components: CssTrendChart, CssStackedBarChart, CssVerticalBoxPlotChart (compact prop v3.4), CssDualLineChart, CssRestChart, CssDailyChart (v3.3), compressWeekLabels"],
+  ["src/app/insights/_components/charts/Treemap.tsx","Squarified treemap (v3.3); ResizeObserver-measured cells; top-N + 기타 rollup; label font capped at 11px (v3.4)"],
+  ["src/app/insights/_components/charts/CalendarHeatmap.tsx","CalendarHeatmap (Mon–Sun grid, modal) + HeatStrip (single-row inline) (v3.3)"],
   ["src/app/insights/_lib/chart-components.tsx","SVG chart library: TrendChart, StackedBarChart, RankedFlowChart, smoothLinePath"],
   ["src/app/insights/_lib/chart-colors.ts","chartColors(isDark), PERSON_COLORS_LIGHT/DARK"],
   ["src/app/insights/_lib/format.ts","formatDuration, formatBucketLabel (handles month, week raw/compressed, day)"],
@@ -1081,7 +1104,13 @@ C(table(["Path","Purpose"],[
   ["src/app/insights/_components/WidgetCard.tsx","WidgetCard, ViewToggle, BucketSelector, FloorBadge"],
   ["src/app/insights/_components/GlobalFilterBar.tsx","Global filter bar — 4 time modes, cross-activity multi-select"],
   ["src/app/insights/_components/MultiSelectDropdown.tsx","Reusable multi-select dropdown"],
-  ["src/app/api/insights/stats/route.ts","GET /api/insights/stats — drinking.summary (summary + trend), sleep.all, interactions.summary"],
+  ["src/app/api/insights/stats/route.ts","GET /api/insights/stats — thin dispatcher (~150 lines, v3.4): auth + param parsing; routes metric/mode to the per-widget compute modules below"],
+  ["src/lib/insights/dates.ts","Shared date/period helpers (v3.4): buildDateRange, stepBack, labelForPeriod, currentPeriod, assignDrinkingDate, assignSleepDate, hourStringToMinutes, yesterdayStr, diffDays, SLEEP_THRESHOLD_HOUR"],
+  ["src/lib/insights/util.ts","Shared numeric helper (v3.4): percentile"],
+  ["src/lib/insights/sleep.ts","computeSleepSummary + QUALITY_SCORE (v3.4)"],
+  ["src/lib/insights/interactions.ts","computeInteractionsSummary, computeInteractionsTrendBucket, addTransitioning (v3.4) — no external deps"],
+  ["src/lib/insights/drinking.ts","computeDrinkingSummary, computeDrinkingTrendBucket + drinking helpers (computeDailyScores, bucketScore, classifyOccasion, hourStrToDecimal, SCORE_BUCKET_ORDER) (v3.4)"],
+  ["src/lib/insights/diet.ts","computeDietSummary (v3.4; computeDietTrend to follow with the Trend view)"],
   ["src/models/AlcoholConversion.ts","Mongoose model for alcohol_conversion collection"],
   ["src/models/IngredientMaster.ts","Mongoose model for ingredient_master collection (NEW v3.1); unique index { userId, level2 }"],
   ["src/models/Log.ts","Mongoose model for log collection; food.spiciness added v3.0; food.foods[].ingredients (foodsItemSchema) added v3.1; food.drinks[].ingredients (drinksItemSchema) added v3.2; alcohols unchanged"],
@@ -1139,6 +1168,7 @@ C(
   bullet("Dark mode: Tailwind v4 with prefers-color-scheme media query. Light = stone palette, dark = zinc palette."),
   bullet("DnD: @dnd-kit/core + @dnd-kit/sortable. Category drag moves details with it. Detail drag scoped within category."),
   bullet("Spending dropdown: uses React createPortal to render into document.body, escaping table stacking context."),
+  bullet("Insights API (v3.4): one compute module per widget under src/lib/insights/ (sleep, interactions, drinking, diet), each exporting its summary (and trend) function; route.ts is a thin GET dispatcher. Shared date/period helpers live in dates.ts, shared numerics in util.ts. Each widget keeps its own Log.find + aggregation (windows differ — drinking caps at yesterday, diet has a 6h lookback), so the fetch is deliberately not abstracted into one shared pass."),
 );
 C(h2("14.8 Current WBS Status"));
 C(table(["Phase","Status","Notes"],[
@@ -1248,7 +1278,7 @@ C(table(["Metric","Value"],[
 C(spacer());
 
 // ===== FOOTER =====
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v3.3 — 12 June 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v3.4 — 14 June 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 // ===== DOCUMENT ASSEMBLY =====
 const doc = new Document({
@@ -1284,6 +1314,6 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-Log-Data-Design-v3.3.docx", buffer);
-  console.log("Wrote FarGaze-Log-Data-Design-v3.3.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-Log-Data-Design-v3.5.docx", buffer);
+  console.log("Wrote FarGaze-Log-Data-Design-v3.5.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });
