@@ -11,17 +11,19 @@ import { BoxPlot } from '../_components/charts/BoxPlot';
 import { Histogram } from '../_components/charts/Histogram';
 import {
   CssTrendChart,
-  CssStackedBarChart,
   CssVerticalBoxPlotChart,
   CssDualLineChart,
   CssRestChart,
 } from '../_components/charts/css-chart-components';
+import { StackedBars } from '../_components/charts/StackedBars';
 import { CssRankFlowChart } from '../_components/charts/CssRankFlowChart';
 import { MultiSelectDropdown } from '../_components/MultiSelectDropdown';
+import { useLiveFilter } from '../_lib/useLiveFilter';
+import { BarSection } from '../_components/charts/bars';
+import { autoColorMap } from '../_lib/chart-colors';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type SummaryTab  = 'stats' | 'top10';
 type TrendMetric = 'days' | 'totalDrinks' | 'drinksPerDay' | 'drinkType' | 'occasion' | 'withWhom' | 'topPeople' | 'restDays' | 'sessionTime';
 
 interface DrinksStats {
@@ -119,41 +121,6 @@ const DRINK_TYPE_COLORS: Record<string, string> = {
   '과실주':   '#b45309', '막사':     '#78350f', '맥사':     '#164e63',
 };
 
-// ── Compact horizontal bar ────────────────────────────────────────────────────
-
-function HorizBar({ label, count, total, color }: {
-  label: string; count: number; total: number; color: string;
-}) {
-  const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-  return (
-    <div className="flex items-center gap-1.5 text-[11px]">
-      <span className="w-8 shrink-0 text-stone-500 dark:text-zinc-400 truncate">{label}</span>
-      <div className="flex-1 h-1 rounded-full bg-stone-100 dark:bg-zinc-800 overflow-hidden min-w-0">
-        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
-      </div>
-      <span className="w-5 text-right text-stone-500 dark:text-zinc-400 shrink-0">{count}</span>
-    </div>
-  );
-}
-
-function CompactSection({ title, data, colorMap }: {
-  title: string; data: Record<string, number>; colorMap: Record<string, string>;
-}) {
-  const total  = Object.values(data).reduce((s, v) => s + v, 0);
-  const sorted = Object.entries(data).sort((a, b) => b[1] - a[1]);
-  if (!sorted.length) return null;
-  return (
-    <div className="flex flex-col gap-1 min-w-0">
-      <span className="text-[10px] font-medium text-stone-400 dark:text-zinc-500 uppercase tracking-wide">
-        {title}
-      </span>
-      {sorted.map(([k, v]) => (
-        <HorizBar key={k} label={k} count={v} total={total} color={colorMap[k] ?? '#a8a29e'} />
-      ))}
-    </div>
-  );
-}
-
 // ── Stat card ─────────────────────────────────────────────────────────────────
 
 function StatCard({ value, label }: { value: string; label: string }) {
@@ -207,11 +174,23 @@ function StatsTab({ data, isDark }: { data: DrinkingSummary; isDark: boolean }) 
     ? Math.round((data.drinkingDays / data.daysInPeriod) * 100)
     : 0;
 
+	const grey = isDark ? '#52525b' : '#a8a29e';
   const companionData: Record<string, number> = { '혼자': data.companions.alone };
   for (const [k, v] of Object.entries(data.companions.byRelationType)) {
     companionData[k] = (companionData[k] ?? 0) + v;
   }
-  const companionColors: Record<string, string> = { '혼자': '#a8a29e', ...RELATION_COLORS };
+  // Relation palette (auto-assigned), shared with People so a person inherits
+  // their dominant relation's colour. 혼자 stays neutral grey.
+  const relKeys = Object.keys(companionData).filter(k => k !== '혼자')
+    .sort((a, b) => companionData[b] - companionData[a]);
+  const companionColors: Record<string, string> = { '혼자': grey, ...autoColorMap(relKeys, isDark) };
+
+  const peopleData:   Record<string, number> = {};
+  const peopleColors: Record<string, string> = {};
+  for (const p of data.companions.topPeople) {
+    peopleData[p.name]   = p.total;
+    peopleColors[p.name] = companionColors[p.dominantCategory] ?? grey;
+  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -258,11 +237,18 @@ function StatsTab({ data, isDark }: { data: DrinkingSummary; isDark: boolean }) 
 
       <div className="border-t border-stone-100 dark:border-zinc-800" />
 
-      {/* ── Row 2: Drink Type | Occasion | With Whom ── */}
-      <div className="grid grid-cols-3 gap-3">
-        <CompactSection title="Drink Type" data={data.drinkType ?? {}} colorMap={DRINK_TYPE_COLORS} />
-        <CompactSection title="Occasion"   data={data.occasions}       colorMap={OCCASION_COLORS} />
-        <CompactSection title="With Whom"  data={companionData}        colorMap={companionColors} />
+			{/* ── Row 2: two columns — left: Drink Type / Occasion · right: Relation / People ── */}
+      <div className="grid grid-cols-2 gap-4">
+        {/* Left */}
+        <div className="flex flex-col gap-3 min-w-0">
+					<BarSection title="Drink Type" data={data.drinkType ?? {}} isDark={isDark} />
+          <BarSection title="Occasion"   data={data.occasions}       isDark={isDark} />
+        </div>
+        {/* Right */}
+        <div className="flex flex-col gap-3 min-w-0">
+          <BarSection title="Relation" data={companionData} colorMap={companionColors} isDark={isDark} />
+          <BarSection title="People"   data={peopleData}    colorMap={peopleColors}    isDark={isDark} />
+        </div>
       </div>
 
       <div className="border-t border-stone-100 dark:border-zinc-800" />
@@ -313,47 +299,6 @@ function StatsTab({ data, isDark }: { data: DrinkingSummary; isDark: boolean }) 
   );
 }
 
-// ── Top 10 tab ────────────────────────────────────────────────────────────────
-
-function Top10Tab({ data }: { data: DrinkingSummary }) {
-  const people = data.companions.topPeople;
-  if (!people.length) {
-    return <p className="text-xs text-stone-400 dark:text-zinc-500">No companion data</p>;
-  }
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="border-b border-stone-100 dark:border-zinc-800 text-stone-400 dark:text-zinc-500">
-            <th className="text-left py-1 pr-2 font-medium">Name</th>
-            <th className="text-left py-1 pr-2 font-medium">Type</th>
-            <th className="text-right py-1 font-medium">#</th>
-          </tr>
-        </thead>
-        <tbody>
-          {people.map((p, i) => (
-            <tr key={i} className="border-b border-stone-50 dark:border-zinc-800/50">
-              <td className="py-1 pr-2 font-medium text-stone-800 dark:text-zinc-100 truncate max-w-0">
-                {p.name}
-              </td>
-              <td className="py-1 pr-2 text-stone-500 dark:text-zinc-400">
-                <span className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full shrink-0"
-                    style={{ background: RELATION_COLORS[p.dominantCategory] ?? '#6b7280' }} />
-                  {p.dominantCategory}
-                </span>
-              </td>
-              <td className="py-1 text-right font-mono text-stone-700 dark:text-zinc-200">
-                {p.total}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 // ── Trend ⓘ tooltip ───────────────────────────────────────────────────────────
 
 function TrendTip({ tip }: { tip: string }) {
@@ -378,6 +323,23 @@ function TrendTip({ tip }: { tip: string }) {
 
 // ── Trend chart dispatcher ────────────────────────────────────────────────────
 
+// Convert {label,data} buckets + a colour map into StackedBars props,
+// stacking the largest-total category at the bottom (as CssStackedBarChart did).
+function toStacked(
+  raw: { label: string; data: Record<string, number> }[],
+  colorMap: Record<string, string>,
+  isDark: boolean,
+) {
+  const ng = isDark ? '#71717a' : '#a8a29e';
+  const totals: Record<string, number> = {};
+  for (const b of raw) for (const [k, v] of Object.entries(b.data)) if (k.trim()) totals[k] = (totals[k] ?? 0) + v;
+  const cats = Object.keys(totals).filter(c => c.trim()).sort((a, b) => totals[b] - totals[a]);
+  return {
+    buckets: raw.map(b => ({ label: b.label, values: b.data })),
+    series:  cats.map(c => ({ key: c, label: c, color: colorMap[c] ?? ng })),
+  };
+}
+
 function DrinkingTrendChart({
   metric, buckets, isDark, bucketsBack,
 }: {
@@ -389,16 +351,13 @@ function DrinkingTrendChart({
 	const labels = buckets.map(b => b.label);
   const alwaysShow = bucketsBack <= 6;
 
-  // Relation filter for the People (rank-flow) tab — client-side, re-ranks live.
-  const [relationFilter, setRelationFilter] = useState<string[]>([]);
+	// Relation filter for the People (rank-flow) tab — live, but an empty selection
+  // ("Deselect all") is held until the dropdown closes rather than emptying the chart.
   const allRelations = useMemo(
     () => [...new Set(buckets.flatMap(b => Object.values(b.people).flatMap(cats => Object.keys(cats))))].filter(t => t.trim()),
     [buckets],
   );
-  const relInit = useRef(false);
-  useEffect(() => {
-    if (!relInit.current && allRelations.length) { setRelationFilter(allRelations); relInit.current = true; }
-  }, [allRelations]);
+  const relation = useLiveFilter(allRelations);
 
   if (metric === 'days') {
     return (
@@ -438,39 +397,27 @@ function DrinkingTrendChart({
     return <CssVerticalBoxPlotChart buckets={boxBuckets} isDark={isDark} />;
   }
 
-  if (metric === 'drinkType') {
-    return (
-      <CssStackedBarChart
-        buckets={buckets.map(b => ({ label: b.label, data: b.drinkType }))}
-        colorMap={DRINK_TYPE_COLORS}
-        isDark={isDark}
-      />
-    );
+	if (metric === 'drinkType') {
+    const { buckets: bk, series } = toStacked(
+      buckets.map(b => ({ label: b.label, data: b.drinkType })), DRINK_TYPE_COLORS, isDark);
+    return <StackedBars buckets={bk} series={series} isDark={isDark} mode="percent" />;
   }
 
   if (metric === 'occasion') {
-    return (
-      <CssStackedBarChart
-        buckets={buckets.map(b => ({ label: b.label, data: b.occasions }))}
-        colorMap={OCCASION_COLORS}
-        isDark={isDark}
-      />
-    );
+    const { buckets: bk, series } = toStacked(
+      buckets.map(b => ({ label: b.label, data: b.occasions })), OCCASION_COLORS, isDark);
+    return <StackedBars buckets={bk} series={series} isDark={isDark} mode="percent" />;
   }
 
-	if (metric === 'withWhom') {
+  if (metric === 'withWhom') {
     const companionColors: Record<string, string> = { '혼자': '#a8a29e', ...RELATION_COLORS };
-    return (
-      <CssStackedBarChart
-        buckets={buckets.map(b => ({ label: b.label, data: b.companions }))}
-        colorMap={companionColors}
-        isDark={isDark}
-      />
-    );
+    const { buckets: bk, series } = toStacked(
+      buckets.map(b => ({ label: b.label, data: b.companions })), companionColors, isDark);
+    return <StackedBars buckets={bk} series={series} isDark={isDark} mode="percent" />;
   }
 
   if (metric === 'topPeople') {
-    const selSet = new Set(relationFilter);   // empty really means none
+		const selSet = new Set(relation.applied);   // chart uses the applied set; empty = none
     const rankBuckets = buckets.map(b => ({
       label: b.label,
       ranked: Object.entries(b.people)
@@ -484,8 +431,8 @@ function DrinkingTrendChart({
     }));
     const hasAny = rankBuckets.some(b => b.ranked.length);
     const relControl = (
-      <MultiSelectDropdown label="Relation" options={allRelations}
-        selected={relationFilter} onChange={setRelationFilter} onClose={() => {}} />
+			<MultiSelectDropdown label="Relation" options={allRelations}
+        selected={relation.draft} onChange={relation.onChange} onClose={relation.onClose} />
     );
     return hasAny
       ? <CssRankFlowChart buckets={rankBuckets} topN={7} isDark={isDark} controls={relControl} />
@@ -532,7 +479,6 @@ function DrinkingTrendChart({
 export function DrinkingWidget({ globalFilter }: WidgetProps) {
   const isDark = useIsDark();
   const [viewMode,    setViewMode]    = useState<WidgetViewMode>('summary');
-  const [summaryTab,  setSummaryTab]  = useState<SummaryTab>('stats');
   const [trendMetric, setTrendMetric] = useState<TrendMetric>('days');
   const [bucketsBack, setBucketsBack] = useState(12);
   const [summaryData, setSummaryData] = useState<DrinkingSummary | null>(null);
@@ -575,33 +521,12 @@ export function DrinkingWidget({ globalFilter }: WidgetProps) {
       error={error}
       action={<ViewToggle value={viewMode} onChange={setViewMode} disabled={isPeriodMode} />}
     >
-      {viewMode === 'summary' ? (
-        <>
-          {/* Summary tab bar */}
-          <div className="flex rounded overflow-hidden border border-stone-200 dark:border-zinc-700 text-[11px] mb-3 self-start">
-            {(['stats', 'top10'] as SummaryTab[]).map(t => (
-              <button
-                key={t}
-                onClick={() => setSummaryTab(t)}
-                className={`px-2.5 py-1 transition-colors ${
-                  summaryTab === t
-                    ? 'bg-stone-800 dark:bg-zinc-200 text-white dark:text-zinc-900 font-medium'
-                    : 'bg-white dark:bg-zinc-900 text-stone-500 dark:text-zinc-400 hover:bg-stone-50 dark:hover:bg-zinc-800'
-                }`}
-              >
-                {t === 'stats' ? 'Stats' : 'Top 10'}
-              </button>
-            ))}
-          </div>
-
-          {!summaryData ? (
-            <p className="text-xs text-stone-400 dark:text-zinc-500">No data</p>
-          ) : summaryTab === 'stats' ? (
-            <StatsTab data={summaryData} isDark={isDark} />
-          ) : (
-            <Top10Tab data={summaryData} />
-          )}
-        </>
+			{viewMode === 'summary' ? (
+        !summaryData ? (
+          <p className="text-xs text-stone-400 dark:text-zinc-500">No data</p>
+        ) : (
+          <StatsTab data={summaryData} isDark={isDark} />
+        )
       ) : (
         // ── Trend view ──────────────────────────────────────────────────────────
         <div className="flex flex-col gap-3">

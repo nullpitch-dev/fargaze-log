@@ -4,7 +4,7 @@
 // stacked-bar tabs (composition / spicy / relation), and companions (rank-flow,
 // built next). Self-contained: only shared chart primitives are imported.
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   CssVerticalBoxPlotChart, minsToClockStr,
   type BoxPlotBucket,
@@ -12,6 +12,7 @@ import {
 import { StackedBars, type StackedSeries, type StackedBucket } from '../_components/charts/StackedBars';
 import { CssRankFlowChart, type RankFlowBucket } from '../_components/charts/CssRankFlowChart';
 import { MultiSelectDropdown } from '../_components/MultiSelectDropdown';
+import { useLiveFilter } from '../_lib/useLiveFilter';
 import { categoryColors } from '../_lib/chart-colors';
 import { BucketSelector } from '../_components/WidgetCard';
 
@@ -90,18 +91,13 @@ export function DietTrendView({ data, isDark, bucketsBack, onBucketsBackChange }
 	const [tab,  setTab]  = useState<TrendTab>('eating');
   const [side, setSide] = useState<SideTab>('food');
   const [view, setView] = useState<ViewTab>('ingredients');
-	const [typeFilter, setTypeFilter] = useState<string[]>([]);
-
-  // All relation types present, plus a one-time init so the filter starts with
-  // every type selected — but the user can then clear it down to none.
+	// Relation filter — live, but an empty selection ("Deselect all") is held
+  // until the dropdown closes rather than emptying the chart.
   const allTypes = useMemo(
     () => [...new Set(data.flatMap(b => Object.values(b.people).flatMap(cats => Object.keys(cats))))].filter(t => t.trim()),
     [data],
   );
-  const typeInit = useRef(false);
-  useEffect(() => {
-    if (!typeInit.current && allTypes.length) { setTypeFilter(allTypes); typeInit.current = true; }
-  }, [allTypes]);
+  const relation = useLiveFilter(allTypes);
   const palette = categoryColors(isDark);
   const neutral = isDark ? '#52525b' : '#a8a29e';
 
@@ -221,7 +217,7 @@ export function DietTrendView({ data, isDark, bucketsBack, onBucketsBackChange }
 
 	// ── companions (rank-flow of top-7 people, live Type filter) ───────────────
   function renderCompanions() {
-    const selSet = new Set(typeFilter);   // empty really means none
+		const selSet = new Set(relation.applied);   // chart uses the applied set; empty = none
     const buckets: RankFlowBucket[] = data.map(b => ({
       label: b.label,
       ranked: Object.entries(b.people)
@@ -236,8 +232,8 @@ export function DietTrendView({ data, isDark, bucketsBack, onBucketsBackChange }
 
     const hasAny = buckets.some(b => b.ranked.length);
     const typeControl = (
-      <MultiSelectDropdown label="Relation" options={allTypes}
-        selected={typeFilter} onChange={setTypeFilter} onClose={() => {}} />
+			<MultiSelectDropdown label="Relation" options={allTypes}
+        selected={relation.draft} onChange={relation.onChange} onClose={relation.onClose} />
     );
     return hasAny
       ? <CssRankFlowChart buckets={buckets} topN={7} isDark={isDark} controls={typeControl} />

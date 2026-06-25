@@ -65,3 +65,28 @@ export const RANKFLOW_COLORS_DARK  = [..._rfDark,  ...RANKFLOW_EXTRA_DARK];
 export function rankFlowColors(isDark: boolean): string[] {
   return isDark ? RANKFLOW_COLORS_DARK : RANKFLOW_COLORS_LIGHT;
 }
+
+// Dedicated palette for the standardised horizontal bar charts (Diet / Drinking /
+// Interactions summaries). Its own set — intentionally NOT categoryColors or
+// rankFlowColors — so the bars stay visually independent of the treemap/rank-flow.
+// Assigned by index (see autoColorMap), never keyed on domain values.
+export const BAR_COLORS_LIGHT = [
+  '#2563eb', '#dc2626', '#16a34a', '#d97706', '#9333ea', '#0d9488', '#e11d48',
+  '#65a30d', '#ea580c', '#c026d3', '#0284c7', '#ca8a04', '#4f46e5', '#475569',
+];
+export const BAR_COLORS_DARK = [
+  '#60a5fa', '#f87171', '#4ade80', '#fbbf24', '#c084fc', '#2dd4bf', '#fb7185',
+  '#a3e635', '#fb923c', '#e879f9', '#38bdf8', '#facc15', '#818cf8', '#94a3b8',
+];
+export function barColors(isDark: boolean): string[] {
+  return isDark ? BAR_COLORS_DARK : BAR_COLORS_LIGHT;
+}
+
+// Assign palette colours to keys by their given order (caller decides order,
+// e.g. descending count), wrapping if there are more keys than colours.
+export function autoColorMap(keys: string[], isDark: boolean): Record<string, string> {
+  const palette = barColors(isDark);
+  const map: Record<string, string> = {};
+  keys.forEach((k, i) => { map[k] = palette[i % palette.length]; });
+  return map;
+}

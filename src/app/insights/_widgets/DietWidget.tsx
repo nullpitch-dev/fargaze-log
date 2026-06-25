@@ -6,7 +6,7 @@ import { createPortal } from 'react-dom';
 import { WidgetCard, ViewToggle } from '../_components/WidgetCard';
 import { useIsDark } from '../_lib/hooks';
 import { buildParams } from '../_lib/date-helpers';
-import { categoryColors } from '../_lib/chart-colors';
+import { categoryColors, autoColorMap } from '../_lib/chart-colors';
 import type { WidgetProps, WidgetViewMode } from '../_lib/types';
 import { Treemap, type TreemapDatum } from '../_components/charts/Treemap';
 import { CalendarHeatmap, HeatStrip } from '../_components/charts/CalendarHeatmap';
@@ -15,6 +15,7 @@ import {
   type CssDailyZone, type BoxPlotBucket,
 } from '../_components/charts/css-chart-components';
 import { DietTrendView, type DietTrendBucket } from './DietTrendView';
+import { Title, BarSection } from '../_components/charts/bars';
 
 // ── Types (mirrors diet.summary API contract) ─────────────────────────────────
 
@@ -76,14 +77,6 @@ const SERVING_ZONES: CssDailyZone[] = [
 
 // ── Building blocks ───────────────────────────────────────────────────────────
 
-function Title({ children }: { children: React.ReactNode }) {
-  return (
-		<span className="text-[10px] font-medium text-stone-400 dark:text-zinc-500 uppercase tracking-wide truncate">
-      {children}
-    </span>
-  );
-}
-
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5 min-w-0">
@@ -126,23 +119,6 @@ function GroupLegend({ groups, colorMap }: { groups: string[]; colorMap: Record<
   );
 }
 
-function Bar({ label, value, frac, color, dot }: {
-  label: string; value: number | string; frac: number; color: string; dot?: string;
-}) {
-  return (
-    <div className="flex items-center gap-2 text-[11px]">
-      <span className="w-14 shrink-0 truncate text-stone-600 dark:text-zinc-300 inline-flex items-center gap-1">
-        {dot && <i style={{ background: dot, width: 7, height: 7, borderRadius: '50%', display: 'inline-block', flexShrink: 0 }} />}
-        {label}
-      </span>
-      <div className="flex-1 h-3 rounded bg-stone-100 dark:bg-zinc-800 overflow-hidden">
-        <div className="h-full rounded" style={{ width: `${Math.max(2, frac * 100)}%`, background: color }} />
-      </div>
-      <span className="w-7 text-right tabular-nums text-stone-500 dark:text-zinc-400">{value}</span>
-    </div>
-  );
-}
-
 function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   if (typeof document === 'undefined') return null;
   return createPortal(
@@ -166,19 +142,29 @@ function ModalShell({ title, onClose, children }: { title: string; onClose: () =
 function Companions({ data, isDark }: { data: DietSummary; isDark: boolean }) {
   const c = data.companions;
   const ALONE = '혼자';
+  const grey = isDark ? '#52525b' : '#a8a29e';
 
   const rel = [
     { key: ALONE, count: c.alone },
     ...Object.entries(c.byRelationType).map(([key, count]) => ({ key, count })),
   ].filter(r => r.count > 0).sort((a, b) => b.count - a.count);
-  const relMax = Math.max(...rel.map(r => r.count), 1);
 
-  const palette = categoryColors(isDark);
-  const relColor: Record<string, string> = { [ALONE]: isDark ? '#52525b' : '#a8a29e' };
-  rel.map(r => r.key).filter(k => k !== ALONE).forEach((k, i) => { relColor[k] = palette[i % palette.length]; });
+  // Relation palette (auto-assigned), shared with People so a person inherits
+  // their dominant relation's colour. ALONE stays neutral grey.
+  const relColor: Record<string, string> = {
+    [ALONE]: grey,
+    ...autoColorMap(rel.map(r => r.key).filter(k => k !== ALONE), isDark),
+  };
+  const relData: Record<string, number> = {};
+  rel.forEach(r => { relData[r.key] = r.count; });
 
   const people = c.topPeople.slice(0, 8);
-  const pplMax = Math.max(...people.map(p => p.total), 1);
+  const peopleData:   Record<string, number> = {};
+  const peopleColors: Record<string, string> = {};
+  people.forEach(p => {
+    peopleData[p.name]   = p.total;
+    peopleColors[p.name] = relColor[p.dominantCategory] ?? grey;
+  });
 
   if (!rel.length && !people.length) {
     return <p className="text-xs text-stone-400 dark:text-zinc-500">No data</p>;
@@ -186,23 +172,8 @@ function Companions({ data, isDark }: { data: DietSummary; isDark: boolean }) {
 
   return (
     <div className="grid grid-cols-2 gap-4">
-      <div className="flex flex-col gap-1.5 min-w-0">
-        <Title>By relation</Title>
-        <div className="flex flex-col gap-1">
-          {rel.map(r => (
-            <Bar key={r.key} label={r.key} value={r.count} frac={r.count / relMax} color={relColor[r.key]} />
-          ))}
-        </div>
-      </div>
-      <div className="flex flex-col gap-1.5 min-w-0">
-        <Title>Top companions</Title>
-        <div className="flex flex-col gap-1">
-          {people.map(p => (
-            <Bar key={p.name} label={p.name} value={p.total} frac={p.total / pplMax}
-              color={relColor[p.dominantCategory] ?? palette[0]} dot={relColor[p.dominantCategory]} />
-          ))}
-        </div>
-      </div>
+      <BarSection title="By relation"    data={relData}    colorMap={relColor}    isDark={isDark} />
+      <BarSection title="Top companions" data={peopleData} colorMap={peopleColors} isDark={isDark} />
     </div>
   );
 }

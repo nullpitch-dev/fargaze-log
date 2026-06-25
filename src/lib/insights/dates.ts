@@ -65,6 +65,23 @@ export function buildDateRange(
   return { start, end };
 }
 
+// ISO 8601 week numbering: a week belongs to the year containing its Thursday,
+// so the Monday's calendar year can differ (e.g. Mon 2025-12-29 is 2026-W01).
+function isoWeekParts(d: Date): { year: number; week: number } {
+  const date = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const dayNum = date.getUTCDay() || 7;             // Mon=1 … Sun=7
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum);  // shift to this week's Thursday
+  const isoYear   = date.getUTCFullYear();
+  const yearStart = new Date(Date.UTC(isoYear, 0, 1));
+  const week = Math.ceil(((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return { year: isoYear, week };
+}
+
+function isoWeekStr(d: Date): string {
+  const { year, week } = isoWeekParts(d);
+  return `${year}-W${String(week).padStart(2, '0')}`;
+}
+
 export function stepBack(
   timeMode: string,
   timePeriod: string,
@@ -82,17 +99,9 @@ export function stepBack(
     const jan4 = new Date(Date.UTC(year, 0, 4));
     const dayOfWeek = jan4.getUTCDay() || 7;
     const monday = new Date(jan4);
-    monday.setUTCDate(jan4.getUTCDate() - (dayOfWeek - 1) + (week - 1) * 7);
+	  monday.setUTCDate(jan4.getUTCDate() - (dayOfWeek - 1) + (week - 1) * 7);
     monday.setUTCDate(monday.getUTCDate() - steps * 7);
-    // Recalculate ISO week number using jan4 of the result year
-    const resultYear = monday.getUTCFullYear();
-    const jan4Result = new Date(Date.UTC(resultYear, 0, 4));
-    const dow4Result = jan4Result.getUTCDay() || 7;
-    const week1Monday = new Date(jan4Result);
-    week1Monday.setUTCDate(jan4Result.getUTCDate() - (dow4Result - 1));
-    const diffDaysVal = Math.round((monday.getTime() - week1Monday.getTime()) / 86400000);
-    const resultWeek = Math.floor(diffDaysVal / 7) + 1;
-    return `${resultYear}-W${String(resultWeek).padStart(2, '0')}`;
+    return isoWeekStr(monday);   // ISO year from the week's Thursday, not the Monday's calendar year
   }
   if (timeMode === 'day') {
     const d = new Date(`${timePeriod}T00:00:00.000Z`);
@@ -105,10 +114,13 @@ export function stepBack(
 export function labelForPeriod(timeMode: string, period: string): string {
   if (timeMode === 'month') {
     const [y, m] = period.split('-');
-    return `${y.slice(2)}/${m}`;
+    return `${y.slice(2)}.${m}`;                       // yy.mm  → "25.07"
   }
-  if (timeMode === 'week') return period.replace('-W', 'W');
-  if (timeMode === 'day') return period.slice(5);
+  if (timeMode === 'week') {
+    const [y, w] = period.split('-W');
+    return `${y.slice(2)}W${w}`;                       // yyWww  → "25W03"
+  }
+  if (timeMode === 'day') return period.slice(5).replace('-', '/');  // mm/dd → "07/15"
   return period;
 }
 
@@ -146,26 +158,8 @@ export function currentPeriod(timeMode: string): string {
   if (timeMode === 'month') {
     return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
   }
-  if (timeMode === 'week') {
-    // ISO week: find Monday of W01 (Monday on or before Jan 4)
-    const year    = now.getUTCFullYear();
-    const jan4    = new Date(Date.UTC(year, 0, 4));
-    const dow4    = jan4.getUTCDay() || 7;
-    const week1Mon = new Date(jan4);
-    week1Mon.setUTCDate(jan4.getUTCDate() - (dow4 - 1));
-    // Find this week's Monday
-    const dow     = now.getUTCDay() || 7;
-    const thisMon = new Date(now);
-    thisMon.setUTCDate(now.getUTCDate() - (dow - 1));
-    thisMon.setUTCHours(0, 0, 0, 0);
-    const diff    = Math.round((thisMon.getTime() - week1Mon.getTime()) / 86400000);
-    const week    = Math.floor(diff / 7) + 1;
-    const resultYear = thisMon.getUTCFullYear();
-    // Handle year boundary — if week < 1, it belongs to previous year's last week
-    if (week < 1) {
-      return stepBack('week', `${resultYear + 1}-W01`, 1);
-    }
-    return `${resultYear}-W${String(week).padStart(2, '0')}`;
+	if (timeMode === 'week') {
+    return isoWeekStr(now);   // ISO year from the week's Thursday handles the year boundary
   }
   return now.toISOString().slice(0, 10);
 }

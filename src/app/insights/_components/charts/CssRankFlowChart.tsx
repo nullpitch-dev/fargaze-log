@@ -11,6 +11,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { chartColors, rankFlowColors } from '../../_lib/chart-colors';
+import { formatBucketLabels } from './css-chart-components';
 
 export interface RankFlowBucket {
   label: string;
@@ -51,7 +52,8 @@ export function CssRankFlowChart({
 
   if (!buckets.length) return <p className="text-xs" style={{ color: ng }}>No data</p>;
 
-  const n = buckets.length;
+	const n = buckets.length;
+  const xLabels = formatBucketLabels(buckets.map(b => b.label));
 
   const palette = rankFlowColors(isDark);
   const order: string[] = [];
@@ -143,7 +145,7 @@ export function CssRankFlowChart({
           <div key={bi} className="flex-1 text-center"
             style={{ fontSize: 11, color: bi === n - 1 ? C.xLabelLast : C.xLabelDim,
               fontWeight: bi === n - 1 ? 600 : 400 }}>
-						{b.label}
+						{xLabels[bi]}
           </div>
         ))}
       </div>

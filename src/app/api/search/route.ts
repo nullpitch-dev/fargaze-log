@@ -159,15 +159,18 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  for (const cond of conditions) {
+	for (const cond of conditions) {
     const path = FIELD_PATH_MAP[cond.field];
-    if (path) {
+    if (!path) continue;
+    // Reuse the main-box parser: quoted parts → exact phrase on this field,
+    // unquoted remainder → fuzzy autocomplete (existing per-field behaviour).
+    const { phrases, freeText } = parseQuery(cond.value);
+    for (const phrase of phrases) {
+      mustClauses.push({ phrase: { query: phrase, path } });
+    }
+    if (freeText) {
       mustClauses.push({
-        autocomplete: {
-          query: cond.value,
-          path,
-          fuzzy: { maxEdits: 1 },
-        },
+        autocomplete: { query: freeText, path, fuzzy: { maxEdits: 1 } },
       });
     }
   }
@@ -245,13 +248,19 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Field conditions — each is a separate AND clause on its specific field
+		// Field conditions — each is a separate AND clause on its specific field.
+    // Quoted parts match as an exact (contiguous) phrase; mirrors the Atlas path.
     for (const cond of conditions) {
       const path = FIELD_PATH_MAP[cond.field];
-      if (path) {
-        const re = new RegExp(cond.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-        regexFilter.$and = regexFilter.$and ?? [];
-        regexFilter.$and.push({ [path]: re });
+      if (!path) continue;
+      const { phrases, freeText } = parseQuery(cond.value);
+      const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      regexFilter.$and = regexFilter.$and ?? [];
+      for (const phrase of phrases) {
+        regexFilter.$and.push({ [path]: new RegExp(esc(phrase), 'i') });
+      }
+      if (freeText) {
+        regexFilter.$and.push({ [path]: new RegExp(esc(freeText), 'i') });
       }
     }
 

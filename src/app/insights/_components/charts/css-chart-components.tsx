@@ -3,7 +3,6 @@
 // CSS-only chart components (no SVG except for line paths) for the Drinking Trend view.
 
 import React, { useState } from 'react';
-import { formatDuration } from '../../_lib/format';
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -74,28 +73,33 @@ interface CssTrendChartProps {
   labels:            string[];
   formatY:           (v: number) => string;
   isDark:            boolean;
-  alwaysShowLabels?: boolean;
+	alwaysShowLabels?: boolean;
   yPadPct?:          number;
+  yAxis?:            { min?: number; max?: number; baseline?: number | null; ticks?: { value: number; label: string }[] };
 }
 
 export function CssTrendChart({
-  series, labels, formatY, isDark, alwaysShowLabels = false, yPadPct = 10,
+	series, labels, formatY, isDark, yPadPct = 10, yAxis,
 }: CssTrendChartProps) {
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
 
   const allVals = series.flatMap(s => s.values).filter((v): v is number => v !== null);
   if (!allVals.length) return <p className="text-xs" style={{ color: labelColor(isDark) }}>No data</p>;
 
-  const rawMin = Math.min(...allVals);
-  const rawMax = Math.max(...allVals);
-  const pad    = Math.max(1, (rawMax - rawMin) * (yPadPct / 100));
-  const yMin   = rawMin - pad;
-  const yMax   = rawMax + pad;
+	const baseline = yAxis?.baseline ?? null;
+  // fold an optional reference line into the auto-range so it stays visible
+  const lo = baseline !== null ? Math.min(...allVals, baseline) : Math.min(...allVals);
+  const hi = baseline !== null ? Math.max(...allVals, baseline) : Math.max(...allVals);
+  const pad    = Math.max(1, (hi - lo) * (yPadPct / 100));
+  const yMin   = yAxis?.min ?? (lo - pad);
+  const yMax   = yAxis?.max ?? (hi + pad);
   const yRange = yMax - yMin || 1;
-  const yTicks = buildYTicks(yMin, rawMax);
+  const ticks  = yAxis?.ticks
+    ? yAxis.ticks
+    : buildYTicks(yMin, hi).map(v => ({ value: v, label: formatY(v) }));
 
   const n = labels.length;
-  const displayLabels = compressWeekLabels(labels);
+  const displayLabels = formatBucketLabels(labels);
   function xPct(i: number) { return n <= 1 ? 50 : (i / (n - 1)) * 100; }
   function yPct(v: number) { return (1 - (v - yMin) / yRange) * 100; }
 
@@ -108,13 +112,13 @@ export function CssTrendChart({
       <div className="flex w-full">
         {/* Y-axis labels */}
         <div className="relative shrink-0 overflow-hidden" style={{ width: Y_LABEL_W, height: CHART_H }}>
-          {yTicks.map(tick => {
-            const t = yPct(tick);
+					{ticks.map(tk => {
+            const t = yPct(tk.value);
             if (t < 3 || t > 97) return null;
             return (
-              <span key={tick} className="absolute text-[10px] leading-none"
+              <span key={tk.value} className="absolute text-[10px] leading-none"
                 style={{ right: 4, top: `${t}%`, transform: 'translateY(-50%)', color: lc }}>
-                {formatY(tick)}
+                {tk.label}
               </span>
             );
           })}
@@ -123,10 +127,16 @@ export function CssTrendChart({
         {/* Plot area */}
         <div className="relative flex-1" style={{ height: CHART_H }}>
           {/* Grid lines */}
-          {yTicks.map(tick => (
-            <div key={tick} className="absolute inset-x-0 pointer-events-none"
-              style={{ top: `${yPct(tick)}%`, height: 1, background: gc, opacity: 0.7 }} />
+					{ticks.map(tk => (
+            <div key={tk.value} className="absolute inset-x-0 pointer-events-none"
+              style={{ top: `${yPct(tk.value)}%`, height: 1, background: gc, opacity: 0.7 }} />
           ))}
+
+          {/* Baseline reference line (optional) */}
+          {baseline !== null && yPct(baseline) >= 0 && yPct(baseline) <= 100 && (
+            <div className="absolute inset-x-0 pointer-events-none"
+              style={{ top: `${yPct(baseline)}%`, height: 0, borderTop: `1px dashed ${lc}`, opacity: 0.8 }} />
+          )}
 
           {/* Spline lines */}
           <svg className="absolute inset-0 w-full h-full overflow-visible"
@@ -156,7 +166,7 @@ export function CssTrendChart({
                 if (v === null) return null;
                 const top        = `${yPct(v)}%`;
                 const isActive   = activeIdx === i;
-                const showLabel  = alwaysShowLabels || isActive;
+								const showLabel  = true;   // value labels always shown (all line charts)
                 const labelBelow = yPct(v) < 18;
                 return (
                   <React.Fragment key={si}>
@@ -209,122 +219,6 @@ export function CssTrendChart({
   );
 }
 
-// ── CssStackedBarChart ────────────────────────────────────────────────────────
-
-export interface CssStackedBucket {
-  label: string;
-  data:  Record<string, number>;
-}
-
-interface CssStackedBarChartProps {
-  buckets:  CssStackedBucket[];
-  colorMap: Record<string, string>;
-  isDark:   boolean;
-}
-
-const BAR_H = 120;
-
-export function CssStackedBarChart({ buckets, colorMap, isDark }: CssStackedBarChartProps) {
-  const [hoveredCat, setHoveredCat] = useState<string | null>(null);
-
-  // Sort categories by total across all buckets descending (largest at bottom)
-  const catTotals: Record<string, number> = {};
-  for (const b of buckets) {
-    for (const [k, v] of Object.entries(b.data)) {
-      if (k.trim()) catTotals[k] = (catTotals[k] ?? 0) + v;
-    }
-  }
-  const cats = Object.keys(catTotals)
-    .filter(c => c.trim())
-    .sort((a, b) => catTotals[b] - catTotals[a]); // descending → bottom-first in flex-col-reverse
-
-  const gc = gridLineColor(isDark);
-  const lc = labelColor(isDark);
-  const ng = isDark ? '#71717a' : '#a8a29e';
-  const n  = buckets.length;
-  const compressedLabels = compressWeekLabels(buckets.map(b => b.label));
-
-  return (
-    <div className="flex flex-col gap-1 w-full select-none">
-      <div className="flex w-full">
-        {/* Y-axis */}
-        <div className="relative shrink-0" style={{ width: Y_LABEL_W, height: BAR_H }}>
-          {[0, 25, 50, 75, 100].map(pct => (
-            <span key={pct} className="absolute text-[10px] leading-none"
-              style={{ right: 4, bottom: `${pct}%`, transform: 'translateY(50%)', color: lc }}>
-              {pct}%
-            </span>
-          ))}
-        </div>
-
-        {/* Bars */}
-        <div className="relative flex-1 flex items-end" style={{ height: BAR_H }}>
-          {[25, 50, 75, 100].map(pct => (
-            <div key={pct} className="absolute inset-x-0 pointer-events-none"
-              style={{ bottom: `${pct}%`, height: 1, background: gc, opacity: 0.7 }} />
-          ))}
-          <div className="absolute inset-0 flex">
-            {buckets.map((b, bi) => {
-              const total = Object.values(b.data).reduce((s, v) => s + v, 0) || 1;
-              return (
-                <div key={bi} className="flex-1 flex flex-col-reverse h-full px-0.5">
-                  {cats.map(cat => {
-                    const pct    = ((b.data[cat] ?? 0) / total) * 100;
-                    if (pct === 0) return null;
-                    const isHov  = hoveredCat === cat;
-                    return (
-                      <div key={cat}
-                        style={{ height: `${pct}%`, background: colorMap[cat] ?? ng,
-                          opacity: hoveredCat !== null && !isHov ? 0.35 : isHov ? 1 : 0.82,
-                          transition: 'opacity 0.15s' }}
-                        onMouseEnter={() => setHoveredCat(cat)}
-                        onMouseLeave={() => setHoveredCat(null)} />
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* X labels */}
-      <div className="flex w-full" style={{ paddingLeft: Y_LABEL_W }}>
-        <div className="flex flex-1">
-          {compressedLabels.map((lbl, i) => (
-            <div key={i} className="flex-1 text-center text-[10px] leading-none"
-              style={{ color: i === n - 1 ? (isDark ? '#f4f4f5' : '#292524') : lc,
-                fontWeight: i === n - 1 ? 600 : 400 }}>
-              {lbl}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Legend */}
-      <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 mt-1" style={{ paddingLeft: Y_LABEL_W }}>
-        {cats.map(cat => {
-          const isActive = hoveredCat === cat;
-          return (
-            <span key={cat}
-              className="flex items-center gap-1 text-[11px] transition-opacity cursor-default"
-              style={{ color: isActive ? (colorMap[cat] ?? ng) : (isDark ? '#a1a1aa' : '#78716c'),
-                fontWeight: isActive ? 600 : 400,
-                opacity: hoveredCat !== null && !isActive ? 0.4 : 1 }}
-              onMouseEnter={() => setHoveredCat(cat)}
-              onMouseLeave={() => setHoveredCat(null)}>
-              <span style={{ width: 10, height: 10, borderRadius: 2, flexShrink: 0, display: 'inline-block',
-                background: colorMap[cat] ?? ng,
-                outline: isActive ? `2px solid ${colorMap[cat] ?? ng}` : 'none', outlineOffset: 1 }} />
-              {cat}
-            </span>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 // ── CssVerticalBoxPlotChart ───────────────────────────────────────────────────
 
 export interface BoxPlotBucket {
@@ -370,7 +264,7 @@ export function CssVerticalBoxPlotChart({
   const gc   = gridLineColor(isDark);
   const lc   = labelColor(isDark);
   const n    = buckets.length;
-  const compressedLabels = compressWeekLabels(buckets.map(b => b.label));
+  const compressedLabels = formatBucketLabels(buckets.map(b => b.label));
   const hasXLabels = compressedLabels.some(l => l && l.length > 0);
 
   const LEGEND_LABELS: { key: keyof BoxPlotBucket; name: string; color: (b: BoxPlotBucket) => string }[] = [
@@ -555,7 +449,7 @@ export function CssDualLineChart({ buckets, isDark }: CssDualLineChartProps) {
     .filter((v): v is number => v !== null);
   if (!allMins.length) return <p className="text-xs" style={{ color: labelColor(isDark) }}>No data</p>;
 
-  const rawMin = Math.min(...allMins);
+	const rawMin = Math.min(...allMins);
   const rawMax = Math.max(...allMins);
   const pad    = Math.max(10, (rawMax - rawMin) * 0.10);
   const yMin   = rawMin - pad;
@@ -567,7 +461,7 @@ export function CssDualLineChart({ buckets, isDark }: CssDualLineChartProps) {
   function xPct(i: number) { return buckets.length <= 1 ? 50 : (i / (buckets.length - 1)) * 100; }
 
   const n  = buckets.length;
-  const compressedLabels = compressWeekLabels(buckets.map(b => b.label));
+  const compressedLabels = formatBucketLabels(buckets.map(b => b.label));
   const gc = gridLineColor(isDark);
   const lc = labelColor(isDark);
   const vc = valueColor(isDark);
@@ -639,29 +533,17 @@ export function CssDualLineChart({ buckets, isDark }: CssDualLineChartProps) {
                 vectorEffect="non-scaling-stroke" opacity={0.85} /> : null;
             })()}
 
-            {/* Vertical arrows + duration labels */}
+						{/* Vertical arrows (start → end) */}
             {buckets.map((b, i) => {
               if (b.avgStartMins === null || b.avgEndMins === null) return null;
-              const x   = xPct(i);
-              const y1  = yPct(b.avgStartMins);
-              const y2  = yPct(b.avgEndMins);
-              const mid = (y1 + y2) / 2;
-              const isActive  = activeIdx === i;
-              const showDur   = isActive || i === n - 1;
+              const x  = xPct(i);
+              const y1 = yPct(b.avgStartMins);
+              const y2 = yPct(b.avgEndMins);
               return (
-                <g key={i} style={{ pointerEvents: 'none' }}>
-                  <line x1={x} y1={y1 + 1.5} x2={x} y2={y2 - 2.5}
+								<g key={i} style={{ pointerEvents: 'none' }}>
+                  <line x1={x} y1={y1 + 1.5} x2={x} y2={y2}
                     stroke={arrowColor} strokeWidth="1" strokeDasharray="2 2"
                     vectorEffect="non-scaling-stroke" />
-                  <polygon points={`${x - 1.2},${y2 - 3} ${x + 1.2},${y2 - 3} ${x},${y2 - 0.8}`}
-                    fill={arrowColor} />
-                  {showDur && b.avgDurationSeconds !== null && (
-                    <text x={x + 2} y={mid} textAnchor="start" dominantBaseline="central"
-                      fontSize={9} fontWeight={500}
-                      fill={durColor} style={{ pointerEvents: 'none' }}>
-                      {formatDuration(b.avgDurationSeconds)}
-                    </text>
-                  )}
                 </g>
               );
             })}
@@ -680,21 +562,19 @@ export function CssDualLineChart({ buckets, isDark }: CssDualLineChartProps) {
               {b.avgStartMins !== null && (() => {
                 const top      = `${yPct(b.avgStartMins)}%`;
                 const isActive = activeIdx === i;
-                const below    = yPct(b.avgStartMins) < 18;
+								const below    = yPct(b.avgStartMins) < 86;   // start label sits below its dot
                 return (
                   <>
                     <div className="absolute rounded-full"
                       style={{ left: '50%', top, transform: 'translate(-50%, -50%)',
                         width: isActive ? 9 : 7, height: isActive ? 9 : 7,
                         background: fromColor, opacity: isActive ? 1 : 0.9, zIndex: 3 }} />
-                    {isActive && (
-                      <div className="absolute text-[10px] font-semibold leading-none whitespace-nowrap"
-                        style={{ left: '50%', top,
-                          transform: below ? 'translate(-50%, 8px)' : 'translate(-50%, -18px)',
-                          color: fromColor, zIndex: 4, pointerEvents: 'none' }}>
-                        {minsToClockStr(b.avgStartMins)}
-                      </div>
-                    )}
+										<div className="absolute text-[10px] font-semibold leading-none whitespace-nowrap"
+                      style={{ left: '50%', top,
+                        transform: below ? 'translate(-50%, 8px)' : 'translate(-50%, -18px)',
+                        color: fromColor, zIndex: 4, pointerEvents: 'none' }}>
+                      {minsToClockStr(b.avgStartMins)}
+                    </div>
                   </>
                 );
               })()}
@@ -710,15 +590,29 @@ export function CssDualLineChart({ buckets, isDark }: CssDualLineChartProps) {
                       style={{ left: '50%', top, transform: 'translate(-50%, -50%)',
                         width: isActive ? 9 : 7, height: isActive ? 9 : 7,
                         background: toColor, opacity: isActive ? 1 : 0.9, zIndex: 3 }} />
-                    {isActive && (
-                      <div className="absolute text-[10px] font-semibold leading-none whitespace-nowrap"
-                        style={{ left: '50%', top,
-                          transform: below ? 'translate(-50%, 8px)' : 'translate(-50%, -18px)',
-                          color: toColor, zIndex: 4, pointerEvents: 'none' }}>
-                        {minsToClockStr(b.avgEndMins, b.avgEndMins >= 1440)}
-                      </div>
-                    )}
+										<div className="absolute text-[10px] font-semibold leading-none whitespace-nowrap"
+                      style={{ left: '50%', top,
+                        transform: below ? 'translate(-50%, 8px)' : 'translate(-50%, -18px)',
+                        color: toColor, zIndex: 4, pointerEvents: 'none' }}>
+                      {minsToClockStr(b.avgEndMins, b.avgEndMins >= 1440)}
+                    </div>
                   </>
+                );
+              })()}
+							{/* Duration (always shown) — two lines (Xh / YYm); left of the line on the last bucket */}
+              {b.avgStartMins !== null && b.avgEndMins !== null && b.avgDurationSeconds !== null && (() => {
+                const totalMin = Math.round(b.avgDurationSeconds / 60);
+                const h = Math.floor(totalMin / 60);
+                const m = totalMin % 60;
+                const isLast = i === n - 1;
+                return (
+                  <div className="absolute text-[10px] font-semibold leading-tight whitespace-nowrap text-center"
+                    style={{ left: '50%', top: `${(yPct(b.avgStartMins) + yPct(b.avgEndMins)) / 2}%`,
+                      transform: isLast ? 'translate(calc(-100% - 4px), -50%)' : 'translate(4px, -50%)',
+                      color: durColor, zIndex: 4, pointerEvents: 'none' }}>
+                    <div>{h}h</div>
+                    <div>{String(m).padStart(2, '0')}m</div>
+                  </div>
                 );
               })()}
             </div>
@@ -753,26 +647,32 @@ export function CssDualLineChart({ buckets, isDark }: CssDualLineChartProps) {
   );
 }
 
-// ── Week label compression ────────────────────────────────────────────────────
-// Input labels are like "25/03" (month) or "25W03" (week) from labelForPeriod().
-// For week labels: show YYWww only for first bucket or year-change; rest show Www.
+// Formats trend bucket labels by granularity (detected via separator), omitting the
+// repeated leading part: week/month omit the repeated year, day omits the repeated
+// month. yyWww → "25W03"/"W03"; yy.mm → "25.07"/"07"; mm/dd → "07/15"/"16".
+export function formatBucketLabels(labels: string[]): string[] {
+  const omit = (
+    re: RegExp,
+    leadOf: (m: RegExpMatchArray) => string,
+    restOf: (m: RegExpMatchArray) => string,
+  ) => {
+    let last = '';
+    return labels.map((l, i) => {
+      const m = l.match(re)!;
+      const lead = leadOf(m);
+      const show = i === 0 || lead !== last;
+      last = lead;
+      return show ? l : restOf(m);
+    });
+  };
 
-export function compressWeekLabels(labels: string[]): string[] {
-  // Detect if these are week labels: match pattern YYWww or YYYYWww
-  const isWeek = labels.every(l => /^\d{2,4}W\d{2}$/.test(l));
-  if (!isWeek) return labels;
-
-  let lastYear = '';
-  return labels.map((lbl, i) => {
-    // Extract year and week parts — e.g. "25W03" → year="25", week="W03"
-    const match = lbl.match(/^(\d{2,4})(W\d{2})$/);
-    if (!match) return lbl;
-    const [, year, week] = match;
-    const isFirst      = i === 0;
-    const yearChanged  = year !== lastYear;
-    lastYear = year;
-    return (isFirst || yearChanged) ? lbl : week;
-  });
+  if (labels.every(l => /^\d{2}W\d{2}$/.test(l)))    // week: omit year
+    return omit(/^(\d{2})(W\d{2})$/, m => m[1], m => m[2]);
+  if (labels.every(l => /^\d{2}\.\d{2}$/.test(l)))   // month: omit year
+    return omit(/^(\d{2})\.(\d{2})$/, m => m[1], m => m[2]);
+  if (labels.every(l => /^\d{2}\/\d{2}$/.test(l)))   // day: omit month
+    return omit(/^(\d{2})\/(\d{2})$/, m => m[1], m => m[2]);
+  return labels;
 }
 
 // ── CssRestChart ──────────────────────────────────────────────────────────────
@@ -874,7 +774,7 @@ export function CssRestChart({ buckets, isDark }: CssRestChartProps) {
   }));
   const avgPath = smoothPath(avgPts);
 
-  const compressedLabels = compressWeekLabels(buckets.map(b => b.label));
+  const compressedLabels = formatBucketLabels(buckets.map(b => b.label));
 
   return (
     <div className="flex flex-col gap-1 w-full select-none">
@@ -953,13 +853,11 @@ export function CssRestChart({ buckets, isDark }: CssRestChartProps) {
                 vectorEffect="non-scaling-stroke" opacity={0.9} />
             )}
 
-            {/* Avg dots + labels */}
+						{/* Avg dots */}
             {buckets.map((b, i) => {
               const cx       = slotCenter(i);
               const cy       = avgPx(b.avgRestDays);
               const isActive = activeIdx === i;
-              const showLbl  = isActive || i === n - 1;
-              const below    = cy < 18;
               return (
                 <g key={i} style={{ cursor: 'pointer' }}
                   onMouseEnter={() => setActiveIdx(i)}
@@ -967,20 +865,29 @@ export function CssRestChart({ buckets, isDark }: CssRestChartProps) {
                   <circle cx={cx} cy={cy} r={isActive ? 4 : 2.5}
                     fill={avgColor} opacity={isActive ? 1 : 0.9}
                     vectorEffect="non-scaling-stroke" />
-                  {showLbl && (
-                    <text x={cx} y={cy + (below ? 10 : -6)}
-                      textAnchor="middle" fontSize={10} fontWeight={600}
-                      fill={avgColor} vectorEffect="non-scaling-stroke">
-                      {b.avgRestDays}d
-                    </text>
-                  )}
                 </g>
               );
             })}
           </svg>
+
+					{/* Avg value labels — HTML pills (readable over any bar, crisp + symmetric) */}
+          {buckets.map((b, i) => {
+            const cy    = avgPx(b.avgRestDays);
+            const below = cy < 18;
+            return (
+              <div key={i}
+                className="absolute text-[10px] font-semibold leading-none whitespace-nowrap pointer-events-none"
+                style={{ left: `${(slotCenter(i) / REST_W) * 100}%`,
+                  top: `${cy + (below ? 12 : -9)}px`,
+                  transform: 'translate(-50%, -50%)',
+                  color: avgColor,
+                  background: isDark ? 'rgba(24,24,27,0.72)' : 'rgba(255,255,255,0.80)',
+                  padding: '1px 3px', borderRadius: 3, zIndex: 2 }}>
+                {b.avgRestDays}d
+              </div>
+            );
+          })}
         </div>
-
-
       </div>
 
       {/* X labels */}

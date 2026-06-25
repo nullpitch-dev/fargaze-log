@@ -8,7 +8,7 @@ import { useIsDark } from '../_lib/hooks';
 import { chartColors } from '../_lib/chart-colors';
 import { formatDuration, formatQualityScore } from '../_lib/format';
 import { buildParams } from '../_lib/date-helpers';
-import { TrendChart, YAxisConfig, CHART } from '../_lib/chart-components';
+import { CssTrendChart } from '../_components/charts/css-chart-components';
 import { WidgetCard, ViewToggle, BucketSelector } from '../_components/WidgetCard';
 
 // ── Quality pie ───────────────────────────────────────────────────────────────
@@ -59,46 +59,15 @@ function QualityPie({ counts }: { counts: { '좋음': number; '보통': number; 
 // ── Y-axis config per sleep metric ────────────────────────────────────────────
 
 type SleepMetricKey = 'duration' | 'bedtime' | 'waketime' | 'quality';
+type SleepYAxis = { min?: number; max?: number; baseline?: number | null; ticks?: { value: number; label: string }[] };
 
-function getSleepYAxis(metric: SleepMetricKey, validValues: number[]): YAxisConfig {
-  if (metric === 'duration') {
-    const dataMin = Math.min(...validValues);
-    const dataMax = Math.max(...validValues);
-    const min = Math.max(0, dataMin - 3600);
-    const max = dataMax + 3600;
-    const mid = Math.round((min + max) / 2 / 3600) * 3600;
-    return {
-      min, max, baseline: null,
-      yLabels: [
-        { value: max, label: `${Math.round(max / 3600)}h` },
-        { value: mid, label: `${Math.round(mid / 3600)}h` },
-        { value: min, label: `${Math.round(min / 3600)}h` },
-      ],
-    };
-  }
-  if (metric === 'bedtime') {
-    return {
-      min: 1260, max: 1500, baseline: 1380,
-      yLabels: [
-        { value: 1500, label: '01:00' },
-        { value: 1380, label: '23:00' },
-        { value: 1260, label: '21:00' },
-      ],
-    };
-  }
-  if (metric === 'waketime') {
-    return {
-      min: 240, max: 480, baseline: 360,
-      yLabels: [
-        { value: 480, label: '08:00' },
-        { value: 360, label: '06:00' },
-        { value: 240, label: '04:00' },
-      ],
-    };
-  }
-  return {
+function getSleepYAxis(metric: SleepMetricKey): SleepYAxis | undefined {
+  if (metric === 'duration') return undefined;          // pure auto-scale, no reference line
+  if (metric === 'bedtime')  return { baseline: 1380 }; // auto-scale + 23:00 reference
+  if (metric === 'waketime') return { baseline: 360 };  // auto-scale + 06:00 reference
+  return {                                              // quality: fixed -1/0/+1 scale
     min: -1, max: 1, baseline: 0,
-    yLabels: [
+    ticks: [
       { value: 1,  label: 'Good' },
       { value: 0,  label: 'OK' },
       { value: -1, label: 'Poor' },
@@ -172,7 +141,7 @@ export function SleepWidget({ globalFilter }: WidgetProps) {
     }).catch(() => { setError('Failed to load data.'); setLoading(false); });
   }, [globalFilter, viewMode, bucketsBack]);
 
-  // Prepare TrendChart props
+  // Prepare CssTrendChart props
   const values = trendData.map(d => getSleepValue(d.summary, metric));
   const validValues = values.filter((v): v is number => v !== null);
 
@@ -229,13 +198,12 @@ export function SleepWidget({ globalFilter }: WidgetProps) {
             <BucketSelector value={bucketsBack} onChange={setBucketsBack} />
           </div>
           {validValues.length > 0 ? (
-            <TrendChart
-              values={values}
+						<CssTrendChart
+              series={[{ values, color: isDark ? '#2dd4bf' : '#1d4ed8' }]}
               labels={trendData.map(d => d.label)}
-              yAxis={getSleepYAxis(metric, validValues)}
+              formatY={v => formatSleepValue(v, metric)}
               isDark={isDark}
-              alwaysShowLabels={bucketsBack <= 6}
-              formatValue={v => formatSleepValue(v, metric)}
+              yAxis={getSleepYAxis(metric)}
             />
           ) : (
             <p className="text-xs text-stone-400 dark:text-zinc-500">No data</p>

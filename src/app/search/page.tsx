@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -327,6 +327,53 @@ function DetailPanel({ entry, onClose }: { entry: LogEntry; onClose: () => void 
   );
 }
 
+// ── Result sorting ────────────────────────────────────────────────────────────
+
+type SortKey = 'date' | 'activity' | 'location' | 'purchase' | 'cost' | 'duration';
+type SortDir = 'asc' | 'desc';
+
+const RESULT_COLUMNS: { key: SortKey; label: string; align: 'left' | 'right'; width?: string }[] = [
+  { key: 'date',     label: '날짜 / 시간', align: 'right', width: 'w-24' },
+  { key: 'activity', label: '활동 / 내용', align: 'left'                 },
+  { key: 'location', label: '장소',        align: 'left',  width: 'w-24' },
+  { key: 'purchase', label: '구매',        align: 'left',  width: 'w-24' },
+  { key: 'cost',     label: '비용',        align: 'right', width: 'w-24' },
+  { key: 'duration', label: '소요',        align: 'right', width: 'w-20' },
+];
+
+// Numeric columns default to descending on first click (newest / biggest first);
+// text columns default to ascending. getVal returns null/'' for missing values,
+// which always sort to the bottom regardless of direction.
+const SORT_COLS: Record<SortKey, { numeric: boolean; getVal: (e: LogEntry) => number | string | null }> = {
+  date: {
+    numeric: true,
+    getVal: e => {
+      const s = e.start;
+      if (!s?.year) return null;
+      const ymd = s.year * 10000 + (s.month ?? 1) * 100 + (s.day ?? 1);
+      let mins = 0;
+      if (!e.allDay && s.hour) {
+        const m = s.hour.match(/(\d{1,2}):(\d{2})/);
+        if (m) mins = Number(m[1]) * 60 + Number(m[2]);
+      }
+      return ymd * 10000 + mins;
+    },
+  },
+	activity: { numeric: false, getVal: e => e.activity?.title || e.activity?.name || '' },
+  location: { numeric: false, getVal: e => e.location?.activity ?? '' },
+  purchase: {
+    numeric: false,
+    getVal: e => {
+      const items = (e.purchase ?? []).map(p => p.item).filter(Boolean) as string[];
+      return items.length ? items.slice().sort((a, b) => a.localeCompare(b, 'ko'))[0] : '';
+    },
+  },
+  cost:     { numeric: true, getVal: e => e.cost?.amountKRW ?? null },
+  duration: { numeric: true, getVal: e => e.duration?.totalSeconds ?? null },
+};
+
+const defaultDir = (key: SortKey): SortDir => (SORT_COLS[key].numeric ? 'desc' : 'asc');
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 let conditionIdCounter = 1;
@@ -340,7 +387,8 @@ export default function SearchPage() {
   const [response, setResponse] = useState<SearchResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedEntry, setSelectedEntry] = useState<LogEntry | null>(null);
+	const [selectedEntry, setSelectedEntry] = useState<LogEntry | null>(null);
+  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir } | null>(null);
 
   function addCondition() {
     setConditions(prev => [...prev, { id: conditionIdCounter++, field: 'activity.title', value: '' }]);
@@ -363,8 +411,9 @@ export default function SearchPage() {
 
     setLoading(true);
     setError(null);
-    setResponse(null);
+		setResponse(null);
     setSelectedEntry(null);
+    setSort(null);
 
     try {
       const params = new URLSearchParams();
@@ -387,6 +436,37 @@ export default function SearchPage() {
       setLoading(false);
     }
   }, [query, conditions, dateFrom, dateTo]);
+
+	function cycleSort(key: SortKey) {
+    setSort(prev => {
+      if (!prev || prev.key !== key) return { key, dir: defaultDir(key) };
+      if (prev.dir === defaultDir(key)) return { key, dir: defaultDir(key) === 'asc' ? 'desc' : 'asc' };
+      return null; // third click → back to original (relevance / newest-first) order
+    });
+  }
+
+  // Client-side sort over the (≤100) results already in hand. Stable, with
+  // missing values pinned to the bottom in either direction. null sort = API order.
+  const sortedResults = useMemo(() => {
+    if (!response) return [] as LogEntry[];
+    if (!sort) return response.results;
+    const { getVal } = SORT_COLS[sort.key];
+    const dir = sort.dir === 'asc' ? 1 : -1;
+    return response.results
+      .map((entry, i) => ({ entry, i, val: getVal(entry) }))
+      .sort((a, b) => {
+        const aE = a.val === null || a.val === undefined || a.val === '';
+        const bE = b.val === null || b.val === undefined || b.val === '';
+        if (aE && bE) return a.i - b.i;
+        if (aE) return 1;
+        if (bE) return -1;
+        let cmp: number;
+        if (typeof a.val === 'number' && typeof b.val === 'number') cmp = a.val - b.val;
+        else cmp = String(a.val).localeCompare(String(b.val), 'ko');
+        return cmp !== 0 ? cmp * dir : a.i - b.i;
+      })
+      .map(d => d.entry);
+  }, [response, sort]);
 
   const hasAggregations = response && Object.keys(response.aggregations).length > 0;
   const hasActiveFilters = conditions.some(c => c.value.trim()) || dateFrom || dateTo;
@@ -541,23 +621,37 @@ export default function SearchPage() {
           ) : (
             <div className="border border-stone-200 dark:border-zinc-700 rounded-lg overflow-x-auto shadow-sm">
               <table className="w-full text-sm min-w-[640px]">
-                <thead>
+								<thead>
                   <tr className="border-b border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800">
-                    <th className="text-right px-3 py-2 text-xs text-stone-500 dark:text-zinc-400 font-medium w-24">날짜 / 시간</th>
-                    <th className="text-left px-3 py-2 text-xs text-stone-500 dark:text-zinc-400 font-medium">활동 / 내용</th>
-                    <th className="text-left px-3 py-2 text-xs text-stone-500 dark:text-zinc-400 font-medium w-24">장소</th>
-                    <th className="text-left px-3 py-2 text-xs text-stone-500 dark:text-zinc-400 font-medium w-24">구매</th>
-                    <th className="text-right px-3 py-2 text-xs text-stone-500 dark:text-zinc-400 font-medium w-24">비용</th>
-                    <th className="text-right px-3 py-2 text-xs text-stone-500 dark:text-zinc-400 font-medium w-20">소요</th>
+                    {RESULT_COLUMNS.map(col => {
+                      const active = sort?.key === col.key;
+                      const arrow = active ? (sort!.dir === 'asc' ? '▲' : '▼') : '';
+                      return (
+                        <th
+                          key={col.key}
+                          onClick={() => cycleSort(col.key)}
+                          className={`${col.align === 'right' ? 'text-right' : 'text-left'} px-3 py-2 text-xs font-medium ${col.width ?? ''} cursor-pointer select-none transition-colors ${
+                            active
+                              ? 'text-stone-700 dark:text-zinc-200'
+                              : 'text-stone-500 dark:text-zinc-400 hover:text-stone-700 dark:hover:text-zinc-200'
+                          }`}
+                        >
+                          <span className={`inline-flex items-center gap-1 ${col.align === 'right' ? 'flex-row-reverse' : ''}`}>
+                            {col.label}
+                            <span className="text-[8px] w-2 inline-block leading-none">{arrow}</span>
+                          </span>
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody>
-                  {response.results.map((entry, i) => (
+									{sortedResults.map((entry, i) => (
                     <tr
                       key={entry._id}
                       onClick={() => setSelectedEntry(entry)}
                       className={`border-b border-stone-100 dark:border-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-800 dark:bg-zinc-800 cursor-pointer transition-colors ${
-                        i === response.results.length - 1 ? 'border-b-0' : ''
+                        i === sortedResults.length - 1 ? 'border-b-0' : ''
                       }`}
                     >
                       <td className="px-3 py-2 font-mono text-xs whitespace-nowrap text-right">
