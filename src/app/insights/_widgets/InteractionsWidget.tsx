@@ -17,6 +17,9 @@ import type { WidgetProps, WidgetViewMode } from '../_lib/types';
 
 type TrendMetric = 'interactions' | 'people' | 'relationType' | 'method' | 'top7';
 
+// Trend tabs that carry their own independent Method filter
+const METHOD_FILTER_TABS: TrendMetric[] = ['interactions', 'people', 'relationType'];
+
 interface TrendBucket {
   label: string;
   totalCount: number;
@@ -32,7 +35,7 @@ interface TrendBucket {
 const TREND_METRICS: { key: TrendMetric; label: string; desc: string }[] = [
   { key: 'interactions', label: 'Interactions', desc: 'Total number of interaction events over time'      },
   { key: 'people',       label: 'Unique',       desc: 'Number of unique people interacted with over time' },
-  { key: 'relationType', label: 'Relation',         desc: 'Mix of relation types over time (100%)'            },
+  { key: 'relationType', label: 'Relation',     desc: 'Mix of relation types over time (100%)'            },
   { key: 'method',       label: 'Method',       desc: 'Mix of interaction methods over time (100%)'       },
   { key: 'top7',         label: 'People',        desc: 'How your top 7 people change over time'            },
 ];
@@ -137,24 +140,49 @@ function PeopleBars({ topPeople, colorMap, isDark }: {
 
 export function InteractionsWidget({ globalFilter }: WidgetProps) {
   const isDark = useIsDark();
-	const [viewMode, setViewMode]       = useState<WidgetViewMode>('summary');
+  const [viewMode, setViewMode]       = useState<WidgetViewMode>('summary');
   const [trendMetric, setTrendMetric] = useState<TrendMetric>('interactions');
   const [bucketsBack, setBucketsBack] = useState(12);
 
-  // Draft filter state (updates on every checkbox click, no re-fetch)
+  // People-tab filters (unchanged): Relation + Method, draft → commit on close
   const [top7RelType, setTop7RelType]           = useState<string[]>([]);
   const [top7Method, setTop7Method]             = useState<string[]>([]);
-  // Committed filter state (triggers re-fetch — updated only when dropdown closes)
   const [committedRelType, setCommittedRelType] = useState<string[]>([]);
   const [committedMethod, setCommittedMethod]   = useState<string[]>([]);
-  // Refs so onClose callbacks always read the latest draft values
   const top7RelTypeRef = useRef<string[]>([]);
   const top7MethodRef  = useRef<string[]>([]);
+
+  // Per-tab Method filters (independent) for Interactions / Unique / Relation,
+  // keyed by metric. Draft → commit on close, same pattern as People.
+  const [tabMethodDraft, setTabMethodDraft]         = useState<Record<string, string[]>>({});
+  const [tabMethodCommitted, setTabMethodCommitted] = useState<Record<string, string[]>>({});
+  const tabMethodRef = useRef<Record<string, string[]>>({});
+
+  // Summary Method filter — independent from every Trend tab
+  const [summaryMethodDraft, setSummaryMethodDraft]         = useState<string[]>([]);
+  const [summaryMethodCommitted, setSummaryMethodCommitted] = useState<string[]>([]);
+  const summaryMethodRef = useRef<string[]>([]);
 
   const [summaryData, setSummaryData] = useState<any>(null);
   const [trendData, setTrendData]     = useState<TrendBucket[]>([]);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState<string | null>(null);
+
+  // Full method universe (byMethod stays full in both modes), used both for the
+  // dropdown options and to detect "all selected" so we can omit the param —
+  // keeping the default view byte-identical to today.
+  const summaryAllMethods = summaryData
+    ? Object.keys(summaryData.interactions.byMethod).filter(s => s.trim())
+    : [];
+  const trendAllMethods = [...new Set(trendData.flatMap(b => Object.keys(b.byMethod)))].filter(s => s.trim());
+
+  const subsetParam = (sel: string[] | undefined, universe: string[]) =>
+    sel && sel.length > 0 && sel.length < universe.length ? sel.join(',') : '';
+
+  const summaryMethodParam = subsetParam(summaryMethodCommitted, summaryAllMethods);
+  const pInteractions = subsetParam(tabMethodCommitted['interactions'], trendAllMethods);
+  const pUnique       = subsetParam(tabMethodCommitted['people'],       trendAllMethods);
+  const pRelation     = subsetParam(tabMethodCommitted['relationType'], trendAllMethods);
 
   const isPeriodMode = globalFilter.timeMode === 'period';
   useEffect(() => { if (isPeriodMode) setViewMode('summary'); }, [isPeriodMode]);
@@ -162,13 +190,20 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
   useEffect(() => {
     setLoading(true); setError(null);
     const url = viewMode === 'summary'
-      ? `/api/insights/stats?${buildParams({ metric: 'interactions.summary', mode: 'summary' }, globalFilter)}`
+      ? `/api/insights/stats?${buildParams({
+          metric: 'interactions.summary',
+          mode: 'summary',
+          ...(summaryMethodParam && { method: summaryMethodParam }),
+        }, globalFilter)}`
       : `/api/insights/stats?${buildParams({
           metric: 'interactions.summary',
           mode: 'trend',
           bucketsBack: String(bucketsBack),
           ...(committedRelType.length && { top7RelType: committedRelType.join(',') }),
           ...(committedMethod.length  && { top7Method:  committedMethod.join(',')  }),
+          ...(pInteractions && { mInteractions: pInteractions }),
+          ...(pUnique       && { mUnique:       pUnique }),
+          ...(pRelation     && { mRelation:     pRelation }),
         }, globalFilter)}`;
     fetch(url)
       .then(r => r.json())
@@ -178,25 +213,44 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
         setLoading(false);
       })
       .catch(() => { setError('Failed to load data.'); setLoading(false); });
-  }, [globalFilter, viewMode, bucketsBack, committedRelType, committedMethod]);
+  }, [globalFilter, viewMode, bucketsBack, committedRelType, committedMethod, pInteractions, pUnique, pRelation, summaryMethodParam]);
 
   // Keep refs in sync with draft state
   useEffect(() => { top7RelTypeRef.current = top7RelType; }, [top7RelType]);
   useEffect(() => { top7MethodRef.current  = top7Method;  }, [top7Method]);
+  useEffect(() => { tabMethodRef.current   = tabMethodDraft; }, [tabMethodDraft]);
+  useEffect(() => { summaryMethodRef.current = summaryMethodDraft; }, [summaryMethodDraft]);
 
-  // Initialise both draft and committed to all-selected when data first loads
+  // Initialise all Trend selections to all-selected when trend data first loads
   useEffect(() => {
     if (trendData.length === 0) return;
     const allRelTypes = [...new Set(trendData.flatMap(b => Object.keys(b.byRelationType)))].filter(s => s.trim());
     const allMethods  = [...new Set(trendData.flatMap(b => Object.keys(b.byMethod)))].filter(s => s.trim());
-    setTop7RelType(prev     => prev.length === 0 ? allRelTypes : prev);
-    setTop7Method(prev      => prev.length === 0 ? allMethods  : prev);
+    setTop7RelType(prev      => prev.length === 0 ? allRelTypes : prev);
+    setTop7Method(prev       => prev.length === 0 ? allMethods  : prev);
     setCommittedRelType(prev => prev.length === 0 ? allRelTypes : prev);
     setCommittedMethod(prev  => prev.length === 0 ? allMethods  : prev);
+    const initTab = (rec: Record<string, string[]>) => {
+      const next = { ...rec };
+      for (const k of METHOD_FILTER_TABS) {
+        if (!next[k] || next[k].length === 0) next[k] = allMethods;
+      }
+      return next;
+    };
+    setTabMethodDraft(initTab);
+    setTabMethodCommitted(initTab);
   }, [trendData]);
 
+  // Initialise the Summary Method filter to all-selected when summary data loads
+  useEffect(() => {
+    if (!summaryData) return;
+    const all = Object.keys(summaryData.interactions.byMethod).filter(s => s.trim());
+    setSummaryMethodDraft(prev     => prev.length === 0 ? all : prev);
+    setSummaryMethodCommitted(prev => prev.length === 0 ? all : prev);
+  }, [summaryData]);
+
   // Derived values
-	const relTypeColorMap = buildCategoryColorMap(trendData, 'byRelationType', isDark);
+  const relTypeColorMap = buildCategoryColorMap(trendData, 'byRelationType', isDark);
   const methodColorMap  = buildCategoryColorMap(trendData, 'byMethod', isDark);
   const relTypeStacked  = toStacked(toStackedBuckets(trendData, 'byRelationType'), relTypeColorMap, isDark);
   const methodStacked   = toStacked(toStackedBuckets(trendData, 'byMethod'),       methodColorMap,  isDark);
@@ -207,8 +261,8 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
   const validLineValues = lineValues.filter((v): v is number => v !== null);
   const activeDesc      = TREND_METRICS.find(m => m.key === trendMetric)?.desc;
 
-	const relTypeOptions  = [...new Set(trendData.flatMap(b => Object.keys(b.byRelationType)))].filter(s => s.trim());
-  const methodOptions   = [...new Set(trendData.flatMap(b => Object.keys(b.byMethod)))].filter(s => s.trim());
+  const relTypeOptions  = [...new Set(trendData.flatMap(b => Object.keys(b.byRelationType)))].filter(s => s.trim());
+  const methodOptions   = trendAllMethods;
 
   // Summary colour maps (relation type + method), shared across both columns and
   // the People table dot so each category keeps one colour. Auto-assigned.
@@ -231,6 +285,32 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
     isDark,
   );
 
+  // Summary Method filter row — between the header line and the contents
+  const summaryMethodRow = summaryAllMethods.length === 0 ? null : (
+    <div className="flex justify-end pb-2 -mt-1">
+      <MultiSelectDropdown
+        label="Method"
+        options={summaryAllMethods}
+        selected={summaryMethodDraft}
+        onChange={setSummaryMethodDraft}
+        onClose={() => setSummaryMethodCommitted([...summaryMethodRef.current])}
+      />
+    </div>
+  );
+
+  // Per-tab Method control (Interactions / Unique / Relation), shown by the chart
+  const tabMethodControl = (METHOD_FILTER_TABS.includes(trendMetric) && methodOptions.length > 0) ? (
+    <div className="flex justify-end -mt-1">
+      <MultiSelectDropdown
+        label="Method"
+        options={methodOptions}
+        selected={tabMethodDraft[trendMetric] ?? []}
+        onChange={vals => setTabMethodDraft(prev => ({ ...prev, [trendMetric]: vals }))}
+        onClose={() => setTabMethodCommitted(prev => ({ ...prev, [trendMetric]: tabMethodRef.current[trendMetric] ?? [] }))}
+      />
+    </div>
+  ) : null;
+
   return (
     <WidgetCard
       title="Interactions"
@@ -240,7 +320,8 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
       action={<ViewToggle value={viewMode} onChange={setViewMode} disabled={isPeriodMode} />}
     >
       {viewMode === 'summary' ? (
-				<>
+        <>
+          {summaryMethodRow}
           {!summaryData ? (
             <p className="text-xs text-stone-400 dark:text-zinc-500">No data</p>
           ) : (
@@ -293,12 +374,15 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
             <p className="text-[11px] text-stone-400 dark:text-zinc-500 -mt-1">{activeDesc}</p>
           )}
 
+          {/* Row 3: per-tab Method control (Interactions / Unique / Relation) */}
+          {tabMethodControl}
+
           {/* Row 4: chart */}
           {trendData.length === 0 ? (
             <p className="text-xs text-stone-400 dark:text-zinc-500">No data</p>
           ) : (trendMetric === 'interactions' || trendMetric === 'people') ? (
             validLineValues.length > 0 ? (
-							<CssTrendChart
+              <CssTrendChart
                 series={[{ values: lineValues, color: isDark ? '#2dd4bf' : '#1d4ed8' }]}
                 labels={trendData.map(b => b.label)}
                 formatY={v => String(v)}
@@ -307,11 +391,11 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
             ) : (
               <p className="text-xs text-stone-400 dark:text-zinc-500">No data</p>
             )
-					) : trendMetric === 'relationType' ? (
+          ) : trendMetric === 'relationType' ? (
             <StackedBars buckets={relTypeStacked.buckets} series={relTypeStacked.series} isDark={isDark} mode="percent" />
           ) : trendMetric === 'method' ? (
             <StackedBars buckets={methodStacked.buckets} series={methodStacked.series} isDark={isDark} mode="percent" />
-					) : (
+          ) : (
             <CssRankFlowChart
               buckets={trendData.map(b => ({ label: b.label, ranked: b.top7 }))}
               topN={7}

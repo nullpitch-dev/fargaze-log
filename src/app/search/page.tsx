@@ -17,8 +17,8 @@ interface LogEntry {
   purchase?: Array<{ item?: string; amount?: string; unit?: string }>;
   food?: {
     type?: string; carbs?: string; fat?: string; spiciness?: string;
-    drinks?: Array<{ item?: string; amount?: string; unit?: string; note?: string }>;
-    foods?: Array<{ item?: string; amount?: string; unit?: string; note?: string }>;
+		drinks?: Array<{ item?: string; amount?: string; unit?: string; note?: string; ingredients?: string[] }>;
+    foods?: Array<{ item?: string; amount?: string; unit?: string; note?: string; ingredients?: string[] }>;
     alcohols?: Array<{ item?: string; amount?: string; unit?: string; note?: string }>;
   };
   people?: Array<{ method?: string; category?: string; target?: string }>;
@@ -244,8 +244,8 @@ function DetailPanel({ entry, onClose }: { entry: LogEntry; onClose: () => void 
               <DetailRow label="탄수" value={entry.food.carbs} />
               <DetailRow label="지방" value={entry.food.fat} />
               <DetailRow label="맵기" value={entry.food.spiciness} />
-              {(entry.food.drinks ?? []).map((d, i) => <DetailRow key={`d${i}`} label="음료" value={[d.item, d.amount, d.unit, d.note].filter(Boolean).join(' ')} />)}
-              {(entry.food.foods ?? []).map((f, i) => <DetailRow key={`f${i}`} label="음식" value={[f.item, f.amount, f.unit, f.note].filter(Boolean).join(' ')} />)}
+							{(entry.food.drinks ?? []).map((d, i) => <DetailRow key={`d${i}`} label="음료" value={[d.item, d.ingredients?.length ? `(${d.ingredients.join(', ')})` : '', d.amount, d.unit, d.note].filter(Boolean).join(' ')} />)}
+              {(entry.food.foods ?? []).map((f, i) => <DetailRow key={`f${i}`} label="음식" value={[f.item, f.ingredients?.length ? `(${f.ingredients.join(', ')})` : '', f.amount, f.unit, f.note].filter(Boolean).join(' ')} />)}
               {(entry.food.alcohols ?? []).map((a, i) => <DetailRow key={`a${i}`} label="술" value={[a.item, a.amount, a.unit, a.note].filter(Boolean).join(' ')} />)}
             </DetailSection>
           )}

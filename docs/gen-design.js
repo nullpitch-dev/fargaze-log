@@ -15,7 +15,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze Log", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Data Design & Requirements Document", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 3.5  |  20 June 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 3.6  |  25 June 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
 );
 
 // ===== VERSION HISTORY =====
@@ -41,6 +41,7 @@ C(table(
     ["3.2","5 Jun 2026","Hyoje / Claude","Drink ingredient taxonomy added: food.drinks[].ingredients field (drinksItemSchema) populated from level2 values via the same parseFoodIngredients parser; new 음료 level1 group (커피, 디카페인 커피, 보이차, 홍차, 녹차, 허브차, 탄산, 카페인, 기타 음료); new 당류 level1 group with 초콜릿 (설탕/꿀 moved here from 양념; 쨈 moved here too); fill-historical-drinks.ts (278 reviewed drink entries) + inspect-drinks.ts; scan-bad-parens.ts extended to scan the drink column; ~5,460 drink items filled, 0 Not Defined; new Section 6.7; Sections 5.2, 8.7, 14, 15, 16 updated for drinks"],
     ["3.3","12 Jun 2026","Hyoje / Claude","Diet widget (WBS #61) Summary view complete: diet.summary API (computeDietSummary) reusing assignDrinkingDate 6am day-boundary and an ingredient_master level2→level1 join; seven summary metrics — distribution box plots (finish-eating time, daily 인분 with green/blue/red zone bands, carbs index), spiciness HeatStrip + Mon–Sun CalendarHeatmap, food & drink ingredient/item treemaps, with-whom companions — with tap-to-open daily-line and calendar modals; new chart components Treemap, CalendarHeatmap/HeatStrip, CssDailyChart; CssVerticalBoxPlotChart gained formatY + height props; taxonomy-agnostic CATEGORY_COLORS palette (categoryColors); new Section 13.8; Sections 13.2, 13.3, 13.4, 14.8, 14.9 updated. Trend view pending."],
     ["3.4","14 Jun 2026","Hyoje / Claude","Insights API restructured: route.ts (~1,400 lines) split into a thin GET dispatcher (~150 lines) plus one compute module per widget under src/lib/insights/ (dates, util, sleep, interactions, drinking, diet) — a pure no-op move, verified by diffing each metric's response before/after. Diet widget refinements: 4th box plot 'Caffeine cutoff' (latest 커피/카페인 drink time per day → finishCaffeine, computed in the drinks pass so it counts coffee without food); compact box plots (no y-axis, no Max/P75/Avg/P25/Min legend — value labels at max/avg/min instead) so four boxes fit one row; box-plot headers renamed EATING CUTOFF / CAFFEINE CUTOFF and centred; treemap label font capped at 11px; CssVerticalBoxPlotChart gained a compact prop. Sections 13.3, 13.4, 13.8, 14.4, 14.7 updated."],
+    ["3.6","25 Jun 2026","Hyoje / Claude","Insights polish pass complete (no schema or API-shape changes). Summary restructures: the Interactions and Drinking summaries drop their Stats/Top 10 tabs for always-on layouts. Interactions becomes a two-column stats grid (left interactions, right unique people — each Relation Type + Method) plus a full-width PeopleBars block (top 10 split ranks 1–5 left / 6–10 right, jointly normalised against one shared max, each bar coloured by the person's dominant relation type); TopPeopleTable, the summaryTab state and the SummaryTab type were removed. Drinking keeps its Drinking Days + Total Drinks counters, Drinks-Per-Day box plot, rest histogram and session-time rows, but reorganises its proportional-bar block into two columns (left Drink Type / Occasion, right Relation / People), renaming \"With Whom\" → Relation and folding the old Top 10 tab in as People bars. New shared chart module src/app/insights/_components/charts/bars.tsx exports Title, BarRow, BarSection (desc-sorted, max-normalised bars, {pct}% ({count}) value column); chart-colors.ts gains a dedicated bar palette BAR_COLORS_LIGHT/DARK + barColors(isDark) + autoColorMap(keys, isDark), kept separate from categoryColors and rankFlowColors; applied across the Diet, Drinking and Interactions summaries. Retired the legacy SVG module _lib/chart-components.tsx (TrendChart, StackedBarChart, RankedFlowChart) and removed CssStackedBarChart from css-chart-components.tsx; the StackedBarBucket type is now local to InteractionsWidget. Search: per-field exact-phrase conditions — each column condition value runs through the same parseQuery as the main box (quoted part → phrase scoped to that one field plus a contiguous escaped-regex on that field; unquoted remainder stays fuzzy), mirrored in both the Atlas and regex-fallback condition loops; and client-side tri-state sortable result columns in the search UI. Sections 9.5, 9.6 (new), 13.2, 13.3, 13.4, 14.1, 14.4, 14.7, 14.8, 14.9 updated."],
     ["3.5","20 Jun 2026","Hyoje / Claude","Diet widget (WBS #61) Trend view complete — eight tabs: four box-plot metrics (Eating/Caffeine/Servings/Carbs), three 100% stacked-composition tabs (Composition with Food/Drink × Ingredients/Items toggles, Spicy, Relation), and People (rank-flow of top-7 companions). New shared chart CssRankFlowChart — CSS-only ranked-flow (colour-tiles ranked top→bottom, dashed reference line, grey block listing people who dropped from the previous bucket's top-N, hover-to-trace, blur-names privacy toggle, luminance-adaptive tile text, controls slot); rankFlowColors two-tier palette. New reusable StackedBars (percent/absolute modes, legend hover-highlight). MultiSelectDropdown rebuilt to render its panel through a React portal on document.body with fixed positioning, so it escapes widget-card overflow:hidden and stays edge-/scroll-/resize-aware. Per-person people:{name:{category:count}} field added to the diet AND drinking trend buckets for client-side companion filtering and re-ranking. Diet companion scope widened to count drink-only meetups; 아침 (breakfast) records exempted from the 6am day-rollback. Backward-applied to existing widgets: Interactions now uses CssRankFlowChart (replacing the SVG RankedFlowChart) with its trend tabs renamed Type→Relation and Top 7→People (the unique-people count tab renamed Unique to avoid the clash) and a Relation filter; Drinking gained a People rank-flow tab and renamed its companion stacked tab People→Relation. Unified trend naming across Diet/Drinking/Interactions: Relation = relation-type stack, People = top-7 individual rank-flow, Relation = the relation filter. Default bucket count set to 12. Sections 13.3, 13.4, 13.5, 13.8 updated."],
   ],
   [1200, 1500, 1700, 4960]
@@ -722,7 +723,7 @@ C(table(["Parameter","Type","Required","Description"],[
   ["q","string","No*","Broad keyword — searched across all text fields with fuzzy matching. Supports quoted phrases (exact) mixed with free tokens (fuzzy), combined via compound.must (v3.1)."],
   ["dateFrom","string","No","Start date filter in YYYY-MM-DD format (inclusive)"],
   ["dateTo","string","No","End date filter in YYYY-MM-DD format (inclusive)"],
-  ["conditions","string","No","Pipe-separated AND field conditions: field1:value1|field2:value2"],
+  ["conditions","string","No","Pipe-separated AND field conditions: field1:value1|field2:value2. Each value is parsed with the same parseQuery as q (v3.6): a quoted segment becomes a phrase scoped to that single field; any unquoted remainder stays fuzzy — see the field-scoped phrase note below"],
 ],[1700,1200,1300,5160]));
 C(spacer());
 C(note("Note: At least one of q, dateFrom, dateTo, or conditions must be provided."));
@@ -742,6 +743,9 @@ C(table(["Key","Field"],[
   ["notes","메모"],
 ],[4680,4680]));
 C(spacer());
+C(bold("Field-scoped phrase matching (NEW v3.6)"));
+C(p("Each field condition value is parsed with the same parseQuery the main q box uses, but scoped to that single field. A quoted segment becomes an exact-phrase clause on that field's Atlas path (and, in the regex fallback, a contiguous escaped-regex on that field); any unquoted remainder keeps the prior fuzzy autocomplete (Atlas) or loose regex (fallback). The logic is mirrored in both the Atlas compound condition loop and the regex-fallback condition loop — so activity.title:\"team lunch\" matches that exact phrase within activity.title, while activity.title:team lunch stays loose."));
+C(note("Known limitation (out of scope): the main-query regex fallback still regexes the raw q including any quote characters. Because Atlas Search is primary and the fallback runs only when Atlas returns zero results, this path is rarely hit."));
 C(p("Response shape:"));
 C(table(["Field","Type","Description"],[
   ["query","string","The q parameter echoed back"],
@@ -750,6 +754,17 @@ C(table(["Field","Type","Description"],[
   ["results","array","Array of log documents with an additional score field (null for regex results)"],
   ["aggregations","object","Numeric aggregations (sum/avg/min/max/count) for fields that appear in results"],
 ],[2200,1600,5560]));
+C(spacer());
+C(h2("9.6 Search UI — Result Table Sorting (NEW v3.6)"));
+C(p("The search results table (src/app/search/page.tsx) supports client-side column sorting layered on top of the API result order. Sorting is purely presentational — it reorders the already-returned results and never re-queries the server."));
+C(
+  bullet("Tri-state per column header: first click sorts, second click reverses, third click returns to the original API/relevance order"),
+  bullet("Only one column is active at a time; the active header shows a ▲ / ▼ indicator"),
+  bullet("Text columns ascend first; date and numeric columns descend first"),
+  bullet("Missing or empty values always sink to the bottom regardless of direction; ties keep their original relative order (stable sort)"),
+  bullet("The 활동/내용 column sorts by activity.title || activity.name — the visible bold label"),
+  bullet("Running a new search resets the sort back to API/relevance order"),
+);
 C(spacer());
 
 // ===== 10. MIGRATION REQUIREMENTS =====
@@ -906,18 +921,16 @@ C(
   bullet("All widgets share: WidgetCard shell, global filter, Summary/Trend mode toggle"),
   bullet("Chart colour system: useIsDark() hook + chartColors(isDark); light: blue-700/stone; dark: teal-400/zinc"),
   bullet("Categorical palette (v3.3): CATEGORY_COLORS_LIGHT/DARK + categoryColors(isDark) — indexed, taxonomy-agnostic colours for grouped charts (treemaps, relationship bars); light = darker fills with white text, dark = lighter fills with near-black text; assigned by index over the groups present in the data, never keyed on domain values"),
+  bullet("Summary-bar palette (v3.6): BAR_COLORS_LIGHT/DARK + barColors(isDark) + autoColorMap(keys, isDark) in chart-colors.ts — a dedicated palette for the shared summary bars (bars.tsx), kept deliberately separate from categoryColors and rankFlowColors; omitting a colorMap auto-assigns colours by first-seen key order"),
   bullet("Spline tension for trend charts: 0.2 (confirmed optimal)"),
   bullet("Page layout: CSS columns (columns-1 md:columns-2 lg:columns-3) — masonry-style packing, no empty gaps under shorter widgets"),
 );
 C(h2("13.3 Shared Chart Components"));
 C(table(["Component","File","Description"],[
-  ["TrendChart","src/app/insights/_lib/chart-components.tsx","SVG spline line chart with hover/tap interaction"],
-  ["StackedBarChart","src/app/insights/_lib/chart-components.tsx","100% stacked bar chart with legend"],
-  ["RankedFlowChart","src/app/insights/_lib/chart-components.tsx","SVG ranked flow with transitioning block and connecting lines — SUPERSEDED v3.5 by CssRankFlowChart; no longer used by any widget"],
+  ["bars.tsx (Title / BarRow / BarSection)","src/app/insights/_components/charts/bars.tsx","(v3.6) Shared summary-bar primitives. BarSection { title, data: Record<string,number>, colorMap?, isDark } sorts desc and draws max-normalised bars (longest = full) with a {pct}% ({count}) value column; omit colorMap → auto-assign via autoColorMap. Geometry h-1.5 rounded-full; typography text-[11px], label stone-600/zinc-300, value stone-500/zinc-400. Shared by the Diet, Drinking and Interactions summaries (Interactions' PeopleBars is composed from these primitives)"],
   ["BoxPlot","src/app/insights/_components/charts/BoxPlot.tsx","CSS horizontal box plot; pr-5 right padding; label width w-10"],
   ["Histogram","src/app/insights/_components/charts/Histogram.tsx","CSS bar chart histogram; fixed font sizes"],
   ["CssTrendChart","src/app/insights/_components/charts/css-chart-components.tsx","CSS+SVG line chart with Catmull-Rom spline; multi-series; week label compression"],
-  ["CssStackedBarChart","src/app/insights/_components/charts/css-chart-components.tsx","100% stacked bar chart; categories sorted by total descending; week compression"],
   ["CssVerticalBoxPlotChart","src/app/insights/_components/charts/css-chart-components.tsx","Vertical box plots per bucket; hover tooltip; props: formatY, height, and compact (v3.4). Default shows the y-axis and a Max/P75/Avg/P25/Min name legend on the rightmost bucket; compact hides both and prints value labels at max/avg/min so several boxes fit one row"],
   ["CssDualLineChart","src/app/insights/_components/charts/css-chart-components.tsx","Dual line chart (From/To); shared HH:MM Y-axis; filled area; dashed arrows with duration; +HH:MM for post-midnight"],
   ["CssRestChart","src/app/insights/_components/charts/css-chart-components.tsx","Stacked histogram bars + avg spline overlay; unified SVG coordinate space; PLOT_T/PLOT_B bounds"],
@@ -938,17 +951,17 @@ C(
 );
 C(bold("Interactions Widget (WBS #56)"));
 C(
-  bullet("Summary view: Stats tab (horizontal bars for Relation Type + Method); Top 10 tab"),
+  bullet("Summary view (restructured v3.6 — no tabs): Row 1 is an always-on two-column stats grid — left column interactions (Relation Type + Method bars), right column unique people (Relation Type + Method bars). Row 2 is a full-width PeopleBars block showing the top 10 individuals split ranks 1–5 (left) / 6–10 (right), jointly normalised against one shared max across all 10, each bar coloured by that person's dominant relation type. The old Stats/Top 10 tabs, TopPeopleTable, the summaryTab state and the SummaryTab type were removed; PeopleBars is composed locally from the shared bars.tsx primitives (Title / BarRow / BarSection)"),
   bullet("Trend view: 5 metric tabs — Interactions, Unique, Relation, Method (stacked bar), People (CssRankFlowChart, v3.5)"),
   bullet("Widget-local filters: Relation + Method multi-select with AND logic; commit-on-close pattern with a server-side re-fetch (the People rank-flow is filtered on the server, unlike Diet/Drinking which filter client-side)"),
 );
 C(bold("Drinking Widget (WBS #57) — Complete"));
 C(
-  bullet("Summary view — Stats tab with 4-row layout:"),
+  bullet("Summary view (restructured v3.6 — no tabs; every block always-on). The Drinking Days + Total Drinks counters, Drinks-Per-Day box plot, Consecutive Rest Days histogram and Session Time rows are unchanged; only the proportional-bar block and the old Top 10 tab were reworked:"),
   bullet("Row 1 (35%:65%): [Drinking Days + Total Drinks stacked] | [Drinks Per Day box plot]", 1),
-  bullet("Row 2: [Drink Type | Occasion | With Whom] — proportional horizontal bar charts (3 columns)", 1),
+  bullet("Row 2 — bar block reorganised into two columns: left [Drink Type / Occasion], right [Relation / People]. \"With Whom\" was renamed Relation; the old Top 10 tab is folded in here as People bars, each person coloured by their dominant relation type", 1),
   bullet("Row 3 (65%:35%): [Consecutive Rest Days histogram] | [Session Time — From / To / For]", 1),
-  bullet("Summary view — Top 10 tab: companion table with dominant relation type"),
+  bullet("All four bar charts use the shared bars.tsx primitives + barColors palette (v3.6); the Stats/Top 10 tab toggle was removed", 1),
   bullet("Trend view — 9 metric tabs: Freq, Amt(all), Amt(day), Type, Occasion, Relation, People, Rest, Session — where Relation is the relation-type stack (formerly labelled People) and People (v3.5) is a CssRankFlowChart of the top-7 companions with a client-side Relation filter"),
 );
 C(bold("Diet Widget (WBS #61) — Complete"));
@@ -1061,7 +1074,7 @@ C(p("finishCaffeine is built in the same loop pass that counts drink ingredients
 // ===== 14. HANDOVER =====
 C(h1("14. Project Handover & Developer Context"));
 C(h2("14.1 Purpose"));
-C(p("This section is written for a future Claude session continuing development of FarGaze Log. When starting a new conversation, tell Claude: \"Please read the FarGaze Log design (v3.2) and WBS (v2.4) documents in my Google Drive and let's resume the development.\""));
+C(p("This section is written for a future Claude session continuing development of FarGaze Log. When starting a new conversation, tell Claude: \"Please read the FarGaze Log design (v3.6) and WBS (v2.7) documents in my Google Drive and let's resume the development.\""));
 C(h2("14.2 Repository & Deployment"));
 C(table(["Item","Value"],[
   ["GitHub repo","nullpitch-dev/fargaze-log"],
@@ -1088,16 +1101,16 @@ C(h2("14.4 Directory Structure"));
 C(table(["Path","Purpose"],[
   ["src/app/insights/page.tsx","Insights master page — CSS columns layout; widget registry (WIDGETS array)"],
   ["src/app/insights/_widgets/SleepWidget.tsx","Sleep widget"],
-  ["src/app/insights/_widgets/InteractionsWidget.tsx","Interactions widget"],
-  ["src/app/insights/_widgets/DrinkingWidget.tsx","Drinking widget — Summary + Trend views, 8 metric tabs, TrendTip component"],
+  ["src/app/insights/_widgets/InteractionsWidget.tsx","Interactions widget — Summary restructured v3.6 (two-column stats grid + full-width PeopleBars, no tabs); StackedBarBucket type now local here after the SVG-module retirement"],
+  ["src/app/insights/_widgets/DrinkingWidget.tsx","Drinking widget — Summary (restructured v3.6: two-column bar block + People bars, no tabs) + Trend (9 metric tabs), TrendTip component"],
   ["src/app/insights/_widgets/DietWidget.tsx","Diet widget (WBS #61) — Summary view: four compact box plots, spicy HeatStrip + calendar modal, treemap toggles, companions toggle (v3.3–v3.4)"],
   ["src/app/insights/_components/charts/BoxPlot.tsx","CSS horizontal box plot — props: min, max, avg, p25, p75, isDark"],
   ["src/app/insights/_components/charts/Histogram.tsx","CSS histogram — props: buckets[] ({label, count}), isDark"],
-  ["src/app/insights/_components/charts/css-chart-components.tsx","CSS+SVG chart components: CssTrendChart, CssStackedBarChart, CssVerticalBoxPlotChart (compact prop v3.4), CssDualLineChart, CssRestChart, CssDailyChart (v3.3), compressWeekLabels"],
+  ["src/app/insights/_components/charts/css-chart-components.tsx","CSS+SVG chart components: CssTrendChart, CssVerticalBoxPlotChart (compact prop v3.4), CssDualLineChart, CssRestChart, CssDailyChart (v3.3), compressWeekLabels (CssStackedBarChart removed v3.6)"],
   ["src/app/insights/_components/charts/Treemap.tsx","Squarified treemap (v3.3); ResizeObserver-measured cells; top-N + 기타 rollup; label font capped at 11px (v3.4)"],
   ["src/app/insights/_components/charts/CalendarHeatmap.tsx","CalendarHeatmap (Mon–Sun grid, modal) + HeatStrip (single-row inline) (v3.3)"],
-  ["src/app/insights/_lib/chart-components.tsx","SVG chart library: TrendChart, StackedBarChart, RankedFlowChart, smoothLinePath"],
-  ["src/app/insights/_lib/chart-colors.ts","chartColors(isDark), PERSON_COLORS_LIGHT/DARK"],
+  ["src/app/insights/_components/charts/bars.tsx","(v3.6) Shared summary-bar primitives Title / BarRow / BarSection; desc-sorted, max-normalised bars with {pct}% ({count}) values; used by the Diet, Drinking and Interactions summaries (replaces the retired SVG _lib/chart-components.tsx)"],
+  ["src/app/insights/_lib/chart-colors.ts","chartColors(isDark), PERSON_COLORS_LIGHT/DARK, categoryColors (v3.3), rankFlowColors (v3.5), BAR_COLORS_LIGHT/DARK + barColors(isDark) + autoColorMap (v3.6)"],
   ["src/app/insights/_lib/format.ts","formatDuration, formatBucketLabel (handles month, week raw/compressed, day)"],
   ["src/app/insights/_lib/hooks.ts","useIsDark()"],
   ["src/app/insights/_lib/date-helpers.ts","buildParams, currentMonthStr, todayStr, defaultPeriodFrom"],
@@ -1116,7 +1129,8 @@ C(table(["Path","Purpose"],[
   ["src/models/Log.ts","Mongoose model for log collection; food.spiciness added v3.0; food.foods[].ingredients (foodsItemSchema) added v3.1; food.drinks[].ingredients (drinksItemSchema) added v3.2; alcohols unchanged"],
   ["src/lib/migration/rowToDocument.ts","Maps Google Sheets row to MongoDB document; FOOD_ITEM col 45, DRINK_ITEM col 41; foods AND drinks post-processed via parseFoodIngredients (foods v3.1, drinks v3.2)"],
   ["src/lib/migration/transform.ts","Transformation utilities; v3.1 adds parseFoodIngredients(), loadValidLevel2(), resetValidLevel2(), IngredientValidationError"],
-  ["src/app/search/page.tsx","Search UI — LogEntry type and DetailPanel; food.spiciness added v3.0; mixed phrase/token query hint (v3.1)"],
+  ["src/app/search/page.tsx","Search UI — LogEntry type and DetailPanel; food.spiciness added v3.0; mixed phrase/token query hint (v3.1); client-side tri-state sortable result columns (v3.6)"],
+  ["src/app/api/search/route.ts","GET /api/search — Atlas Search primary + regex fallback; parseQuery mixed phrase/token (v3.1); per-field exact-phrase conditions mirrored across the Atlas and regex condition loops (v3.6)"],
   ["scripts/migrate.ts","Daily migration runner; calls loadValidLevel2 at start; uncomment ~2025 block for full re-migration"],
   ["scripts/migrate-alcohol-conversion.ts","One-time migration: reads AlcoholConv sheet → inserts into alcohol_conversion"],
   ["scripts/migrate-ingredient.ts","Seeds ingredient_master from the Ingredient sheet (NEW v3.1); run once, re-run only when the Ingredient sheet changes"],
@@ -1163,19 +1177,20 @@ C(
   bullet("Schema: duration.totalSeconds only (no d/h/m/s). Computed from start/end UTC timestamps using timezoneOffset."),
   bullet("Migration: delete-all + re-insert strategy (no unique index). Daily run on 2026 sheet only; full re-migration by uncommenting ~2025 block."),
   bullet("Ingredients: food.foods[].ingredients (v3.1) and food.drinks[].ingredients (v3.2) populated from level2 taxonomy. Source of truth is ingredient_master (seeded from the Ingredient sheet). parseFoodIngredients validates foods and drinks against the loaded vocabulary; the historical-fill scripts repair anything the parentheses do not cover. food.alcohols[] has no ingredients."),
-  bullet("Search: Atlas Search primary, regex fallback when Atlas returns 0 results. searchMode field in response indicates which was used."),
+  bullet("Search: Atlas Search primary, regex fallback when Atlas returns 0 results. searchMode field in response indicates which was used. Field conditions support scoped exact-phrase matching via parseQuery (v3.6); result-table sorting is client-side (v3.6)."),
   bullet("Spending page layout: category order, detail order, collapsed state persisted in localStorage under key \"fargaze-cost-layout\"."),
   bullet("Dark mode: Tailwind v4 with prefers-color-scheme media query. Light = stone palette, dark = zinc palette."),
   bullet("DnD: @dnd-kit/core + @dnd-kit/sortable. Category drag moves details with it. Detail drag scoped within category."),
   bullet("Spending dropdown: uses React createPortal to render into document.body, escaping table stacking context."),
   bullet("Insights API (v3.4): one compute module per widget under src/lib/insights/ (sleep, interactions, drinking, diet), each exporting its summary (and trend) function; route.ts is a thin GET dispatcher. Shared date/period helpers live in dates.ts, shared numerics in util.ts. Each widget keeps its own Log.find + aggregation (windows differ — drinking caps at yesterday, diet has a 6h lookback), so the fetch is deliberately not abstracted into one shared pass."),
+  bullet("Summary bars (v3.6): the Diet, Drinking and Interactions summaries share bars.tsx (Title / BarRow / BarSection) with a dedicated barColors palette in chart-colors.ts, kept separate from categoryColors/rankFlowColors. The legacy SVG module _lib/chart-components.tsx and CssStackedBarChart were retired in the same pass; the Interactions and Drinking summaries were restructured to drop their Stats/Top 10 tabs."),
 );
 C(h2("14.8 Current WBS Status"));
 C(table(["Phase","Status","Notes"],[
   ["Phase 1 — Infrastructure & Auth","Complete",""],
   ["Phase 2 — Data Structure Design","Complete",""],
   ["Phase 3 — Migration Tool","Complete",""],
-  ["Phase 4 — Analytics & Search","In progress","WBS #57, #60, #62 complete; #61 Diet — Summary view complete, Trend view pending. Remaining: #54 Weight, #58 Exercise, #59 Calendar, #61 Trend"],
+  ["Phase 4 — Analytics & Search","In progress","WBS #53, #56, #57, #60, #61, #62 complete; Insights polish pass (#1–#9) + bar standardisation complete (v3.6). Remaining: #54 Weight, #58 Exercise, #59 Calendar"],
   ["Phase 5 — Data Entry","Not started",""],
 ],[3000,1800,4560]));
 C(spacer());
@@ -1184,7 +1199,6 @@ C(
   bullet("#54 Widget: Weight trend — body.weight over time"),
   bullet("#58 Widget: Exercise trend — exercise.frequency metric"),
   bullet("#59 Native calendar view (historical and future entries) — can reuse the CalendarHeatmap component built for Diet"),
-  bullet("#61 Widget: Diet — Summary view complete (distribution box plots, spiciness calendar, food/drink treemaps, companions); Trend view pending"),
 );
 C(h2("14.10 Questions to Ask Hyoje When Starting a New Conversation"));
 C(
@@ -1278,7 +1292,7 @@ C(table(["Metric","Value"],[
 C(spacer());
 
 // ===== FOOTER =====
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v3.4 — 14 June 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v3.6 — 25 June 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 // ===== DOCUMENT ASSEMBLY =====
 const doc = new Document({
@@ -1314,6 +1328,6 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-Log-Data-Design-v3.5.docx", buffer);
-  console.log("Wrote FarGaze-Log-Data-Design-v3.5.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-Log-Data-Design-v3.6.docx", buffer);
+  console.log("Wrote FarGaze-Log-Data-Design-v3.6.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });

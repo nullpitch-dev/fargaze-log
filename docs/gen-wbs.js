@@ -11,7 +11,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Service Concept & Work Breakdown Structure", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 2.6  |  20 June 2026", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 2.7  |  25 June 2026", size: 24 })], spacing: { after: 240 } }),
 );
 
 // VERSION HISTORY
@@ -34,6 +34,7 @@ C(table(["Version","Date","Summary of Changes"],[
   ["2.4","5 Jun 2026","WBS #62 (Drink ingredient taxonomy) complete: food.drinks[].ingredients field (drinksItemSchema), same parseFoodIngredients parser reused for drinks; new 음료 level1 group (9 values) + 당류 level1 group (설탕/꿀 moved from 양념, 쨈 moved here, 초콜릿 added); fill-historical-drinks.ts (278 reviewed entries) + inspect-drinks.ts; scan-bad-parens.ts extended to drink column; ~5,460 drink items filled, 0 Not Defined, reconciliation 0 gap; documented in Design Doc v3.2"],
   ["2.5","12 Jun 2026","WBS #61 (Diet widget) Summary view complete: diet.summary API (computeDietSummary) reusing the 6am day-boundary and an ingredient_master level2→level1 join; seven summary metrics — distribution box plots (finish time / 인분 with zone bands / carbs), spiciness HeatStrip + Mon–Sun CalendarHeatmap, food & drink ingredient/item treemaps, with-whom companions — with tap-to-open daily-line and calendar modals; new chart components Treemap, CalendarHeatmap/HeatStrip, CssDailyChart; CssVerticalBoxPlotChart gained formatY+height; taxonomy-agnostic categoryColors palette; registered in page.tsx; documented in Design Doc v3.3. Trend view pending."],
   ["2.6","20 Jun 2026","WBS #61 (Diet widget) Trend view complete — eight tabs: four box-plot metrics (Eating/Caffeine/Servings/Carbs), three StackedBars composition tabs (Composition, Spicy, Relation), and People (top-7 companion rank-flow). New CssRankFlowChart (CSS-only ranked-flow: colour-tiles ranked top-to-bottom, dashed reference line, dropped-people block, hover-trace, blur-names, controls slot), reusable StackedBars (percent/absolute, legend hover-highlight), and a portal-based rebuild of MultiSelectDropdown (renders on document.body, escapes widget-card overflow, edge-aware). Per-person people:{name:{category:count}} field added to the diet and drinking trend buckets; diet companions now count drink-only meetups; 아침 (breakfast) records exempt from the 6am rollback. Backported: Interactions swapped to CssRankFlowChart with tabs renamed (Type→Relation, Top 7→People, the unique-count tab → Unique) and a Relation filter; Drinking gained a People rank-flow tab and renamed its companion stack People→Relation. Unified Relation/People naming across the three trend views; default bucket count 12. Documented in Design Doc v3.5."],
+  ["2.7","25 Jun 2026","Insights polish pass (#1–#9) + bar standardisation complete (no schema or API-shape changes). Interactions and Drinking summaries restructured to drop their Stats/Top 10 tabs: Interactions → always-on two-column stats grid (left interactions, right unique people, each Relation Type + Method) plus a full-width PeopleBars block (top 10 split ranks 1–5 / 6–10, jointly normalised against one shared max, each bar coloured by the person's dominant relation type) — TopPeopleTable, summaryTab state and SummaryTab type removed. Drinking keeps its Drinking Days + Total Drinks counters, Drinks-Per-Day box plot, rest histogram and session-time rows but reworks the bar block into two columns (left Drink Type / Occasion, right Relation / People), renaming \"With Whom\" → Relation and folding the old Top 10 in as People bars. New shared bars.tsx (Title / BarRow / BarSection — desc-sorted, max-normalised, {pct}% ({count})) + dedicated barColors palette (BAR_COLORS_LIGHT/DARK + barColors + autoColorMap) in chart-colors.ts, kept separate from categoryColors and rankFlowColors; applied across the Diet, Drinking and Interactions summaries. Legacy SVG module _lib/chart-components.tsx (TrendChart, StackedBarChart, RankedFlowChart) and CssStackedBarChart retired; StackedBarBucket now local to InteractionsWidget. Search: per-field exact-phrase conditions via parseQuery (mirrored in the Atlas and regex-fallback condition loops) and client-side tri-state sortable result columns. Documented in Design Doc v3.6."],
 ],[1100,1500,6760]));
 C(spacer());
 
@@ -129,15 +130,15 @@ C(
   bullet("\u2705 41. Schema update: remove duration.d/h/m/s; add duration.totalSeconds"),
   bullet("\u2705 42–44. Update rowToDocument.ts, Log.ts, re-migrate all data"),
   bullet("\u2705 45–46. Define and create Atlas Search index (log_search)"),
-  bullet("\u2705 47. API route: GET /api/search — keyword search, field conditions, date range, regex fallback"),
+  bullet("\u2705 47. API route: GET /api/search — keyword search, field conditions, date range, regex fallback (v2.7: per-field exact-phrase conditions via parseQuery, mirrored across the Atlas and regex condition loops)"),
   bullet("\u2705 48. Search result aggregation: sum / average / min / max for numeric fields"),
-  bullet("\u2705 49. Search UI: search box, advanced filters, aggregation cards, result table, detail panel"),
+  bullet("\u2705 49. Search UI: search box, advanced filters, aggregation cards, result table, detail panel (v2.7: client-side tri-state sortable result columns)"),
   bullet("\u2705 50. Auth middleware: all pages protected, unauthenticated users redirected to sign in"),
   bullet("\u2705 51. Codebase cleanup: removed dead files"),
   bullet("\u2705 52. Cost analysis dashboard"),
   bullet("\u2705 53. Widget framework and Insights dashboard"),
-  bullet("\u2705 56. Widget: Interactions — Summary view (Stats tab + Top 10 tab) + full Trend view"),
-  bullet("\u2705 57. Widget: Drinking — Summary view (Stats + Top 10) + full Trend view (9 metrics)"),
+  bullet("\u2705 56. Widget: Interactions — Summary view (v2.7: two-column stats grid + full-width PeopleBars, no tabs) + full Trend view"),
+  bullet("\u2705 57. Widget: Drinking — Summary view (v2.7: two-column bar block + People bars, no tabs) + full Trend view (9 metrics)"),
   bullet("\u2705 60. Food ingredient taxonomy (NEW) — see dedicated sub-items below"),
   bullet("\u2705 61. Widget: Diet — Summary view + full Trend view (8 metric tabs) complete — see dedicated sub-items below"),
 );
@@ -153,14 +154,14 @@ C(
   bullet("\u2705 File structure: page.tsx split into 11 files across _lib/, _components/, _widgets/"),
   bullet("\u2705 GET /api/insights/stats — supports sleep.all, interactions.summary, drinking.summary"),
   bullet("\u2705 Widget: Sleep — Summary + Trend (4 metrics, dark mode)"),
-  bullet("\u2705 Widget: Interactions — Stats tab + Top 10 tab + full Trend view (5 chart types)"),
-  bullet("\u2705 Shared chart library: TrendChart, StackedBarChart, RankedFlowChart (RankedFlowChart superseded v2.6 by CssRankFlowChart); CssRankFlowChart and reusable StackedBars added v2.6"),
+  bullet("\u2705 Widget: Interactions — Stats tab + Top 10 tab + full Trend view (5 chart types) — framework-era state; Summary later restructured v2.7 (see #56 sub-items)"),
+  bullet("\u2705 Shared chart library: CssRankFlowChart and reusable StackedBars added v2.6; shared summary-bar primitives bars.tsx (Title / BarRow / BarSection) + barColors palette added v2.7. The legacy SVG module _lib/chart-components.tsx (TrendChart, StackedBarChart, RankedFlowChart) and CssStackedBarChart were retired in v2.7"),
   bullet("\u2705 Shared UI component: MultiSelectDropdown — rebuilt v2.6 to render its panel through a React portal on document.body (escapes widget-card overflow:hidden; edge-/scroll-/resize-aware)"),
 );
 C(h3("Sub-items for WBS #56 (Interactions Widget):"));
 C(
   bullet("\u2705 API: interactions.summary — summary mode and trend mode"),
-  bullet("\u2705 Summary view: Stats tab + Top 10 tab"),
+  bullet("\u2705 Summary view: restructured v2.7 — Stats/Top 10 tabs dropped for an always-on two-column stats grid (left interactions, right unique people; each Relation Type + Method) plus a full-width PeopleBars block (top 10 split ranks 1–5 / 6–10, jointly normalised against one shared max, each bar coloured by the person's dominant relation type). TopPeopleTable, the summaryTab state and the SummaryTab type were removed; PeopleBars composed from the shared bars.tsx primitives"),
   bullet("\u2705 Trend view: 5 metric tabs (Interactions, Unique, Relation, Method, People) — People is the CssRankFlowChart rank-flow (swapped from the SVG RankedFlowChart v2.6); tabs renamed v2.6 (People→Unique, Type→Relation, Top 7→People)"),
   bullet("\u2705 People widget-local filters: Relation + Method; AND logic; commit-on-close, server-side re-fetch"),
 );
@@ -169,10 +170,9 @@ C(
   bullet("\u2705 alcohol_conversion collection seeded (54 rows as of v2.3; 와인/ml added)"),
   bullet("\u2705 API: drinking.summary — summary mode with 6am threshold, drinks stats, drinkType, occasions, companions, session time"),
   bullet("\u2705 API: drinking.summary trend mode — 8 bucket fields including histogram for Rest chart"),
-  bullet("\u2705 Summary view: Stats tab (4-row layout) — BoxPlot, Histogram, proportional bars"),
-  bullet("\u2705 Summary view: Top 10 tab (companion table)"),
+  bullet("\u2705 Summary view: restructured v2.7 — tabs dropped, all blocks always-on. The Drinking Days + Total Drinks counters, Drinks-Per-Day box plot, rest histogram and session-time rows are unchanged; the bar block was reorganised into two columns (left Drink Type / Occasion, right Relation / People), \"With Whom\" renamed Relation, and the old Top 10 tab folded in as People bars (each person coloured by dominant relation type) using the shared bars.tsx + barColors palette"),
   bullet("\u2705 Trend view: 9 metric tabs — Freq, Amt(all), Amt(day), Type, Occasion, Relation, People, Rest, Session (v2.6: added People rank-flow via CssRankFlowChart + per-person people field with client-side Relation filter; renamed the companion stack People→Relation)"),
-  bullet("\u2705 CSS chart components: CssTrendChart, CssStackedBarChart, CssVerticalBoxPlotChart, CssDualLineChart, CssRestChart"),
+  bullet("\u2705 CSS chart components: CssTrendChart, CssVerticalBoxPlotChart, CssDualLineChart, CssRestChart (CssStackedBarChart retired v2.7)"),
   bullet("\u2705 Week label compression (compressWeekLabels) applied to all 5 CSS charts"),
   bullet("\u2705 ISO week fix in stepBack() and currentPeriod() — Jan-4-based calculation"),
   bullet("\u2705 formatBucketLabel() updated to handle compressed week label format"),
@@ -216,6 +216,15 @@ C(
   bullet("\u2705 Trend view (v2.6) — 8 tabs: four box-plot metrics (Eating/Caffeine/Servings/Carbs), three StackedBars tabs (Composition with Food/Drink × Ingredients/Items toggles, Spicy, Relation), and People (CssRankFlowChart of top-7 companions with a client-side Relation filter); per-person people:{name:{category:count}} trend field; drink-only companions counted; 아침 6am-rollback exception; trendLoadedRef keeps the active tab across bucket-size changes"),
   bullet("\u2B1C foodsItemSchema.amount String → Number (optional housekeeping; API uses parseFloat, so not blocking)"),
 );
+C(h3("Sub-items for Insights Polish Pass (#1–#9) + Bar Standardisation — NEW v2.7:"));
+C(
+  bullet("\u2705 Bar standardisation: new src/app/insights/_components/charts/bars.tsx (Title, BarRow, BarSection) — desc-sorted, max-normalised bars with a {pct}% ({count}) value column; chart-colors.ts gains BAR_COLORS_LIGHT/DARK + barColors(isDark) + autoColorMap(keys, isDark), kept separate from categoryColors and rankFlowColors; applied across the Diet, Drinking and Interactions summaries"),
+  bullet("\u2705 #6 Drinking Summary restructure — Stats/Top 10 tabs dropped; bar block into two columns (Drink Type / Occasion | Relation / People); \"With Whom\" → Relation; old Top 10 folded in as People bars; box plot, rest histogram and session-time rows retained"),
+  bullet("\u2705 #7 Interactions Summary restructure — tabs dropped; two-column stats grid (interactions | unique people) + full-width PeopleBars (ranks 1–5 / 6–10, jointly normalised, dominant-relation colour); TopPeopleTable, summaryTab state and SummaryTab type removed"),
+  bullet("\u2705 Retired legacy SVG module _lib/chart-components.tsx (TrendChart, StackedBarChart, RankedFlowChart) and removed CssStackedBarChart from css-chart-components.tsx; StackedBarBucket type now local to InteractionsWidget"),
+  bullet("\u2705 #8 Search — per-field exact-phrase conditions: each column condition runs through parseQuery (quoted → field-scoped phrase + contiguous escaped-regex; unquoted remainder fuzzy), mirrored in the Atlas and regex-fallback loops. Known out-of-scope: the main-query regex fallback still regexes raw q incl. quote chars (Atlas is primary, so rarely hit)"),
+  bullet("\u2705 #9 Search — client-side tri-state sortable result columns (sort → reverse → relevance; one active column with ▲/▼; text ascends first, date/numeric descends first; missing values sink; stable ties; 활동/내용 sorts by activity.title || activity.name; a new search resets the sort)"),
+);
 C(h3("Remaining Phase 4 Items:"));
 C(
   bullet("\u2B1C 54. Widget: Weight trend — body.weight over time"),
@@ -252,7 +261,7 @@ C(h1("Appendix — Development Rules & No-Regression Policy"));
 C(h2("A.1 Core Development Rules"));
 C(
   bullet("Never work on two widgets simultaneously — complete and verify one before starting another"),
-  bullet("Never give full file replacements for shared files (stats/route.ts, chart-components.tsx, GlobalFilterBar.tsx) — always provide targeted str_replace patches"),
+  bullet("Never give full file replacements for shared files (stats/route.ts, bars.tsx, GlobalFilterBar.tsx) — always provide targeted str_replace patches"),
   bullet("Exception: full replacement is acceptable when Hyoje explicitly requests it AND uploads the latest version of the file first"),
   bullet("When a full replacement is unavoidable, explicitly state which other widgets or features may be affected"),
   bullet("Never assume the output directory file is the same as what is deployed — always ask Hyoje to upload the current file when working on shared code"),
@@ -260,7 +269,7 @@ C(
 C(h2("A.2 Shared File Change Protocol"));
 C(table(["File","Used by","Rule"],[
   ["src/app/api/insights/stats/route.ts","All widgets","Targeted patches only. Always read current version first. Verify session?.user?.userId is used."],
-  ["src/app/insights/_lib/chart-components.tsx","Sleep, Interactions, future widgets","Only append new exports. Never modify TrendChart, smoothLinePath, or CHART exports."],
+  ["src/app/insights/_components/charts/bars.tsx","Diet, Drinking, Interactions summaries","Targeted patches only. Shared summary-bar primitives (Title / BarRow / BarSection). Changing the geometry or the {pct}% ({count}) value format affects all three summaries. (The legacy SVG _lib/chart-components.tsx was retired in v2.7.)"],
   ["src/app/insights/_components/charts/css-chart-components.tsx","DrinkingWidget, future widgets","Full replacement acceptable when Hyoje uploads latest version. compressWeekLabels() is shared — preserve it."],
   ["src/app/insights/_lib/format.ts","All widgets via chart-components","Targeted patches only. formatBucketLabel handles month, week (raw + compressed), and day formats."],
   ["src/app/insights/_components/GlobalFilterBar.tsx","Insights page","Targeted patches only. Activity Type filter commits on Apply."],
@@ -271,8 +280,8 @@ C(spacer());
 C(h2("A.3 Regression Prevention Checklist"));
 C(
   bullet("Sleep widget: Summary shows duration/bedtime/wake/quality. Trend shows all 4 metrics with correct week labels."),
-  bullet("Interactions widget: Summary Stats tab and Top 10 tab work. Trend shows all 5 chart types with correct week labels."),
-  bullet("Drinking widget: Summary Stats tab and Top 10 tab work. Trend shows all 8 metrics correctly."),
+  bullet("Interactions widget: Summary shows the two-column stats grid + full-width PeopleBars (no tabs). Trend shows all 5 chart types with correct week labels."),
+  bullet("Drinking widget: Summary shows the box plot, the two-column bar block (Drink Type / Occasion | Relation / People), the rest histogram and session time (no tabs). Trend shows all 9 metrics correctly."),
   bullet("Ingredients: after migrate + fill, inspect shows 0 Not Defined and reconcile shows 0 gap. Spot-check new-notation rows parse from parentheses."),
   bullet("Global filter: All 4 time modes work including Week mode (ISO week numbers). Activity Type multi-select commits on Apply."),
   bullet("Auth: All widgets return data (not 403). Confirm session?.user?.userId is read correctly."),
@@ -296,7 +305,7 @@ C(
 );
 
 // FOOTER
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze — Service Concept & WBS v2.5 — 12 June 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze — Service Concept & WBS v2.7 — 25 June 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 // ASSEMBLY
 const doc = new Document({
@@ -323,6 +332,6 @@ const doc = new Document({
   sections: [{ properties: { page: PAGE }, children }],
 });
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-WBS-v2.6.docx", buffer);
-  console.log("Wrote FarGaze-WBS-v2.6.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-WBS-v2.7.docx", buffer);
+  console.log("Wrote FarGaze-WBS-v2.7.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });

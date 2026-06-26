@@ -31,8 +31,12 @@ export async function GET(req: NextRequest) {
   const dateTo      = sp.get('dateTo');
   const bucketsBack     = parseInt(sp.get('bucketsBack') ?? '6');
   const crossActivities = sp.get('crossActivities')?.split(',').filter(Boolean) ?? [];
-  const top7RelType     = sp.get('top7RelType')?.split(',').filter(Boolean) ?? [];
+	const top7RelType     = sp.get('top7RelType')?.split(',').filter(Boolean) ?? [];
   const top7Method      = sp.get('top7Method')?.split(',').filter(Boolean)  ?? [];
+	const summaryMethod   = sp.get('method')?.split(',').filter(Boolean)      ?? [];
+  const mInteractions   = sp.get('mInteractions')?.split(',').filter(Boolean) ?? [];
+  const mUnique         = sp.get('mUnique')?.split(',').filter(Boolean)        ?? [];
+  const mRelation       = sp.get('mRelation')?.split(',').filter(Boolean)      ?? [];
 
   // ── interactions.summary ──────────────────────────────────────────────────
   if (metric === 'interactions.summary') {
@@ -54,7 +58,13 @@ export async function GET(req: NextRequest) {
             filter['activity.crossActivity'] = { $in: crossActivities };
           }
           const docs = await Log.find(filter).lean();
-          const bucket = computeInteractionsTrendBucket(docs, top7RelType, top7Method);
+					const bucket = computeInteractionsTrendBucket(docs, {
+            relTypeFilter:      top7RelType,
+            peopleMethod:       top7Method,
+            interactionsMethod: mInteractions,
+            uniqueMethod:       mUnique,
+            relationMethod:     mRelation,
+          });
           return { label: labelForPeriod(timeMode, period), ...bucket };
         }),
       );
@@ -73,8 +83,8 @@ export async function GET(req: NextRequest) {
     if (crossActivities.length) {
       filter['activity.crossActivity'] = { $in: crossActivities };
     }
-    const docs = await Log.find(filter).lean();
-    const summary = computeInteractionsSummary(docs);
+		const docs = await Log.find(filter).lean();
+    const summary = computeInteractionsSummary(docs, summaryMethod);
     return NextResponse.json({ summary });
   }
 

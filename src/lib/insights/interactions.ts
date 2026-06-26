@@ -1,21 +1,29 @@
 // src/lib/insights/interactions.ts
 
 
-export function computeInteractionsSummary(docs: any[]) {
+export function computeInteractionsSummary(docs: any[], methodFilter: string[] = []) {
   const interactions = docs.filter(d => d.activity?.relationship === '함께');
+  const methodOK = (m: string) => methodFilter.length === 0 || methodFilter.includes(m);
 
-  const intByMethod:   Record<string, number> = {};
-  const intByCategory: Record<string, number> = {};
+  const intByMethod:   Record<string, number> = {};   // FULL method mix — drives the filter list, unaffected by the filter
+  const intByCategory: Record<string, number> = {};   // reflects selected methods
 
-  // Per-person tracking: name → { methods: {m: count}, categories: {c: count} }
+  // Per-person tracking: name → { methods, categories, total } — selected methods only
   const personMap: Record<string, { methods: Record<string, number>; categories: Record<string, number>; total: number }> = {};
 
-  for (const doc of interactions) {
+  const eventHit = new Set<number>();   // events with ≥1 selected-method group
+
+  interactions.forEach((doc, evIdx) => {
     for (const group of (doc.people ?? [])) {
       const method   = group.method ?? '기타';
       const category = group.category ?? '기타';
-      intByMethod[method]     = (intByMethod[method] ?? 0) + 1;
+
+      // Full method breakdown — always counted, so the filter list stays stable
+      intByMethod[method] = (intByMethod[method] ?? 0) + 1;
+
+      if (!methodOK(method)) continue;   // everything below reflects the selected methods
       intByCategory[category] = (intByCategory[category] ?? 0) + 1;
+      eventHit.add(evIdx);
 
       const targets: string[] = Array.isArray(group.targets)
         ? group.targets
@@ -26,12 +34,12 @@ export function computeInteractionsSummary(docs: any[]) {
       for (const name of targets) {
         if (!name || name === '등') continue;
         if (!personMap[name]) personMap[name] = { methods: {}, categories: {}, total: 0 };
-        personMap[name].methods[method]     = (personMap[name].methods[method] ?? 0) + 1;
+        personMap[name].methods[method]      = (personMap[name].methods[method] ?? 0) + 1;
         personMap[name].categories[category] = (personMap[name].categories[category] ?? 0) + 1;
         personMap[name].total++;
       }
     }
-  }
+  });
 
   const dominantKey = (counts: Record<string, number>): string =>
     Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '기타';
@@ -60,13 +68,17 @@ export function computeInteractionsSummary(docs: any[]) {
   }));
 
   const top10Total = top10.reduce((s, p) => s + p.total, 0);
-  const othersTotal = interactions.length - top10Total;
+  const allPeopleTotal = Object.values(personMap).reduce((s, p) => s + p.total, 0);
+  const othersTotal = allPeopleTotal - top10Total;
 
   const othersMethodCounts:   Record<string, number> = {};
   const othersCategoryCounts: Record<string, number> = {};
   const top10Names = new Set(top10.map(p => p.name));
   for (const doc of interactions) {
     for (const group of (doc.people ?? [])) {
+      const method   = group.method ?? '기타';
+      const category = group.category ?? '기타';
+      if (!methodOK(method)) continue;
       const targets: string[] = Array.isArray(group.targets)
         ? group.targets
         : typeof group.target === 'string'
@@ -74,17 +86,15 @@ export function computeInteractionsSummary(docs: any[]) {
           : [];
       for (const name of targets) {
         if (!name || name === '등' || top10Names.has(name)) continue;
-        const m = group.method ?? '기타';
-        const c = group.category ?? '기타';
-        othersMethodCounts[m]   = (othersMethodCounts[m] ?? 0) + 1;
-        othersCategoryCounts[c] = (othersCategoryCounts[c] ?? 0) + 1;
+        othersMethodCounts[method]     = (othersMethodCounts[method] ?? 0) + 1;
+        othersCategoryCounts[category] = (othersCategoryCounts[category] ?? 0) + 1;
       }
     }
   }
 
   return {
     interactions: {
-      total:      interactions.length,
+      total:      methodFilter.length === 0 ? interactions.length : eventHit.size,
       byMethod:   intByMethod,
       byCategory: intByCategory,
     },
@@ -95,26 +105,49 @@ export function computeInteractionsSummary(docs: any[]) {
     },
     topPeople: top10,
     others: {
-      total:           othersTotal,
-      dominantMethod:  dominantKey(othersMethodCounts),
+      total:            othersTotal,
+      dominantMethod:   dominantKey(othersMethodCounts),
       dominantCategory: dominantKey(othersCategoryCounts),
     },
   };
 }
 
-// Compute per-bucket data for trend mode
-export function computeInteractionsTrendBucket(docs: any[], relTypeFilter: string[] = [], methodFilter: string[] = []) {
-  const interactions = docs.filter(d => d.activity?.relationship === '함께');
-  const byRelationType: Record<string, number> = {};
-  const byMethod:       Record<string, number> = {};
-  const personCounts:   Record<string, number> = {};
+// Compute per-bucket data for trend mode.
+// Each tab carries its own independent Method filter, so we apply a separate
+// method filter per metric. byMethod stays full (Method tab = reference);
+// People keeps its relation + method filters unchanged.
+export function computeInteractionsTrendBucket(
+  docs: any[],
+  opts: {
+    relTypeFilter?: string[];
+    peopleMethod?: string[];
+    interactionsMethod?: string[];
+    uniqueMethod?: string[];
+    relationMethod?: string[];
+  } = {},
+) {
+  const {
+    relTypeFilter = [],
+    peopleMethod = [],
+    interactionsMethod = [],
+    uniqueMethod = [],
+    relationMethod = [],
+  } = opts;
 
-  for (const doc of interactions) {
+  const interactions = docs.filter(d => d.activity?.relationship === '함께');
+  const ok = (filter: string[], v: string) => filter.length === 0 || filter.includes(v);
+
+  const byRelationType: Record<string, number> = {};   // relationMethod → Relation tab
+  const byMethod:       Record<string, number> = {};   // FULL → Method tab (reference)
+  const uniqueNames  = new Set<string>();              // uniqueMethod → Unique tab
+  const personCounts: Record<string, number> = {};     // relType + peopleMethod → People tab (unchanged)
+  const eventHit     = new Set<number>();              // interactionsMethod → Interactions tab
+
+  interactions.forEach((doc, evIdx) => {
     for (const group of (doc.people ?? [])) {
       const method   = group.method ?? '기타';
       const category = group.category ?? '기타';
-      byMethod[method]       = (byMethod[method] ?? 0) + 1;
-      byRelationType[category] = (byRelationType[category] ?? 0) + 1;
+      byMethod[method] = (byMethod[method] ?? 0) + 1;   // full, always
 
       const targets: string[] = Array.isArray(group.targets)
         ? group.targets
@@ -122,32 +155,45 @@ export function computeInteractionsTrendBucket(docs: any[], relTypeFilter: strin
           ? [group.target]
           : [];
 
-      // Apply top7 filters (AND logic) — only affects person ranking
-      if (relTypeFilter.length && !relTypeFilter.includes(category)) continue;
-      if (methodFilter.length  && !methodFilter.includes(method))    continue;
+      // Interactions tab (events with ≥1 matching group)
+      if (ok(interactionsMethod, method)) eventHit.add(evIdx);
 
-      for (const name of targets) {
-        if (!name || name === '등') continue;
-        personCounts[name] = (personCounts[name] ?? 0) + 1;
+      // Relation tab
+      if (ok(relationMethod, method)) {
+        byRelationType[category] = (byRelationType[category] ?? 0) + 1;
+      }
+
+      // Unique tab
+      if (ok(uniqueMethod, method)) {
+        for (const name of targets) {
+          if (!name || name === '등') continue;
+          uniqueNames.add(name);
+        }
+      }
+
+      // People tab (unchanged) → relType AND peopleMethod
+      if (ok(relTypeFilter, category) && ok(peopleMethod, method)) {
+        for (const name of targets) {
+          if (!name || name === '등') continue;
+          personCounts[name] = (personCounts[name] ?? 0) + 1;
+        }
       }
     }
-  }
+  });
 
-  const sorted = Object.entries(personCounts)
-    .sort((a, b) => b[1] - a[1]);
-
-  const top7 = sorted.slice(0, 7).map(([name, count]) => ({ name, count }));
-  const uniquePeopleCount = Object.keys(personCounts).length;
+  const top7 = Object.entries(personCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 7)
+    .map(([name, count]) => ({ name, count }));
 
   return {
-    totalCount:        interactions.length,
-    uniquePeopleCount,
+    totalCount:        interactionsMethod.length === 0 ? interactions.length : eventHit.size,
+    uniquePeopleCount: uniqueNames.size,
     byRelationType,
     byMethod,
     top7,
   };
 }
-
 // Build transitioning arrays from ordered bucket data
 export function addTransitioning(
   buckets: { label: string; top7: { name: string; count: number }[] }[],
@@ -175,4 +221,3 @@ export function addTransitioning(
     return { ...bucket, transitioning };
   });
 }
-
