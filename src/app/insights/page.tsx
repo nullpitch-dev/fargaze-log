@@ -12,6 +12,7 @@ import { SleepWidget } from './_widgets/SleepWidget';
 import { InteractionsWidget } from './_widgets/InteractionsWidget';
 import { DrinkingWidget } from './_widgets/DrinkingWidget';
 import { DietWidget } from './_widgets/DietWidget';
+import { WeightWidget } from './_widgets/WeightWidget';
 
 // ── Widget registry ───────────────────────────────────────────────────────────
 // Add new widgets here — one line per widget.
@@ -23,10 +24,11 @@ interface WidgetConfig {
 }
 
 const WIDGETS: WidgetConfig[] = [
-  { id: 'sleep',        size: 'md', component: SleepWidget },
   { id: 'interactions', size: 'md', component: InteractionsWidget },
   { id: 'drinking',     size: 'md', component: DrinkingWidget },
 	{ id: 'diet',         size: 'md', component: DietWidget },
+  { id: 'sleep',        size: 'md', component: SleepWidget },
+	{ id: 'weight',       size: 'md', component: WeightWidget },
 ];
 
 const SIZE_BREAK: Record<WidgetSize, string> = {

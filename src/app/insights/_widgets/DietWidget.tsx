@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { WidgetCard, ViewToggle } from '../_components/WidgetCard';
+import { Segmented } from '../_components/Segmented';
 import { useIsDark } from '../_lib/hooks';
 import { buildParams } from '../_lib/date-helpers';
 import { categoryColors, autoColorMap } from '../_lib/chart-colors';
@@ -82,25 +83,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     <div className="flex flex-col gap-1.5 min-w-0">
       <Title>{title}</Title>
       {children}
-    </div>
-  );
-}
-
-function Segmented<T extends string>({ value, onChange, options }: {
-  value: T; onChange: (v: T) => void; options: [T, string][];
-}) {
-  return (
-    <div className="flex rounded overflow-hidden border border-stone-200 dark:border-zinc-700 text-[11px] w-fit">
-      {options.map(([val, label]) => (
-        <button key={val} onClick={() => onChange(val)}
-          className={`px-2.5 py-1 transition-colors ${
-            value === val
-              ? 'bg-stone-800 dark:bg-zinc-200 text-white dark:text-zinc-900 font-medium'
-              : 'bg-white dark:bg-zinc-900 text-stone-500 dark:text-zinc-400 hover:bg-stone-50 dark:hover:bg-zinc-800'
-          }`}>
-          {label}
-        </button>
-      ))}
     </div>
   );
 }

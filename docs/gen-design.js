@@ -11,46 +11,53 @@ const PAGE = {
 const children = [];
 const C = (...xs) => xs.forEach(x => children.push(x));
 
+
 // ===== TITLE =====
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze Log", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Data Design & Requirements Document", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 3.6  |  25 June 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 4.1  |  18 July 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
 );
+C(p([new TextRun({ text: "Structure: ", bold: true }), new TextRun("Part I Foundations · Part II Data · Part III Features · Part IV Operations · Appendices. The body is the complete, always-current source of truth; the changelog below carries one line per version. Work status, open questions and the backlog live in the separate WBS, not here.")]));
 
 // ===== VERSION HISTORY =====
 C(h1("Version History"));
 C(table(
-  ["Version", "Date", "Author", "Summary of Changes"],
+  ["Version", "Date", "Headline"],
   [
-    ["1.0","25 Apr 2026","Hyoje / Claude","Initial version — complete data design and requirements"],
-    ["1.1","25 Apr 2026","Hyoje / Claude","Exercise changed to array; midnight-spanning entries clarified; incremental sync strategy defined; deduplication key confirmed"],
-    ["1.2","28 Apr 2026","Hyoje / Claude","Migration scope simplified to archive-only; Active/History/Future sheets descoped until Phase 5; deduplication strategy revised to delete-all + re-insert"],
-    ["1.3","29 Apr 2026","Hyoje / Claude","Phase 4 started; duration.d/h/m/s removed; duration.totalSeconds added; Atlas Search index defined"],
-    ["1.4","30 Apr 2026","Hyoje / Claude","Schema changes implemented; codebase cleanup — 5 dead files deleted; migration results updated"],
-    ["1.5","30 Apr 2026","Hyoje / Claude","Atlas Search index updated: autocomplete dual-mapping; GET /api/search with regex fallback; Section 8 expanded"],
-    ["1.6","30 Apr 2026","Hyoje / Claude","Authentication & access control documented; three-layer security model; new Section 2 added"],
-    ["1.7","1 May 2026","Hyoje / Claude","Cost data cleansing completed; cost analysis dashboard fully specified; new Section 12 added"],
-    ["1.8","2 May 2026","Hyoje / Claude","Spending dashboard implemented; security fix: userId from session email; new Section 13 (handover) added"],
-    ["2.0","17 May 2026","Hyoje / Claude","Insights dashboard and widget framework implemented (WBS #53, #56); chart colour system; shared chart library; Section 13 fully updated"],
-    ["2.7","20 May 2026","Hyoje / Claude","Drinking widget (WBS #57) in progress: alcohol_conversion collection designed; drinking.summary API implemented with 6am threshold, drinks stats, drinkType; widget Stats tab implemented"],
-    ["2.8","21 May 2026","Hyoje / Claude","Drinking widget (WBS #57) complete: CSS-based BoxPlot and Histogram components; responsive chart architecture; shared _components/charts/ folder; full Stats tab layout finalised"],
-    ["2.9","22 May 2026","Hyoje / Claude","Drinking widget Trend view complete: 8 metric tabs, CSS chart components (CssTrendChart, CssStackedBarChart, CssVerticalBoxPlotChart, CssDualLineChart, CssRestChart); page layout changed to CSS columns; week label compression; ISO week fix; formatBucketLabel fix; avgRestDays fix"],
-    ["3.0","29 May 2026","Hyoje / Claude","food.spiciness field added (H/M/L, optional); Google Sheets column AO inserted; all columns from previous AO onward shifted +1; rowToDocument.ts, Log.ts, and Search UI (page.tsx) updated; Section 5.2 rewritten from Log.ts"],
-    ["3.1","4 Jun 2026","Hyoje / Claude","Food ingredient taxonomy added: two-level (level1/level2) ingredient_master collection; food.foods[].ingredients field; parenthesis ingredient notation in source data; parseFoodIngredients parser with level2 validation; historical fill of ~6,150 food rows via fill-historical-ingredients.ts; alcohol_conversion 와인/ml row added; taxonomy renames (해물 육수, 채소 육수, 기타 해산물); 콩류/청국장 moved under 곡류 level1; new Sections 6.6, 8.7, 15, 16; daily routine and master-table update procedures documented"],
-    ["3.2","5 Jun 2026","Hyoje / Claude","Drink ingredient taxonomy added: food.drinks[].ingredients field (drinksItemSchema) populated from level2 values via the same parseFoodIngredients parser; new 음료 level1 group (커피, 디카페인 커피, 보이차, 홍차, 녹차, 허브차, 탄산, 카페인, 기타 음료); new 당류 level1 group with 초콜릿 (설탕/꿀 moved here from 양념; 쨈 moved here too); fill-historical-drinks.ts (278 reviewed drink entries) + inspect-drinks.ts; scan-bad-parens.ts extended to scan the drink column; ~5,460 drink items filled, 0 Not Defined; new Section 6.7; Sections 5.2, 8.7, 14, 15, 16 updated for drinks"],
-    ["3.3","12 Jun 2026","Hyoje / Claude","Diet widget (WBS #61) Summary view complete: diet.summary API (computeDietSummary) reusing assignDrinkingDate 6am day-boundary and an ingredient_master level2→level1 join; seven summary metrics — distribution box plots (finish-eating time, daily 인분 with green/blue/red zone bands, carbs index), spiciness HeatStrip + Mon–Sun CalendarHeatmap, food & drink ingredient/item treemaps, with-whom companions — with tap-to-open daily-line and calendar modals; new chart components Treemap, CalendarHeatmap/HeatStrip, CssDailyChart; CssVerticalBoxPlotChart gained formatY + height props; taxonomy-agnostic CATEGORY_COLORS palette (categoryColors); new Section 13.8; Sections 13.2, 13.3, 13.4, 14.8, 14.9 updated. Trend view pending."],
-    ["3.4","14 Jun 2026","Hyoje / Claude","Insights API restructured: route.ts (~1,400 lines) split into a thin GET dispatcher (~150 lines) plus one compute module per widget under src/lib/insights/ (dates, util, sleep, interactions, drinking, diet) — a pure no-op move, verified by diffing each metric's response before/after. Diet widget refinements: 4th box plot 'Caffeine cutoff' (latest 커피/카페인 drink time per day → finishCaffeine, computed in the drinks pass so it counts coffee without food); compact box plots (no y-axis, no Max/P75/Avg/P25/Min legend — value labels at max/avg/min instead) so four boxes fit one row; box-plot headers renamed EATING CUTOFF / CAFFEINE CUTOFF and centred; treemap label font capped at 11px; CssVerticalBoxPlotChart gained a compact prop. Sections 13.3, 13.4, 13.8, 14.4, 14.7 updated."],
-    ["3.6","25 Jun 2026","Hyoje / Claude","Insights polish pass complete (no schema or API-shape changes). Summary restructures: the Interactions and Drinking summaries drop their Stats/Top 10 tabs for always-on layouts. Interactions becomes a two-column stats grid (left interactions, right unique people — each Relation Type + Method) plus a full-width PeopleBars block (top 10 split ranks 1–5 left / 6–10 right, jointly normalised against one shared max, each bar coloured by the person's dominant relation type); TopPeopleTable, the summaryTab state and the SummaryTab type were removed. Drinking keeps its Drinking Days + Total Drinks counters, Drinks-Per-Day box plot, rest histogram and session-time rows, but reorganises its proportional-bar block into two columns (left Drink Type / Occasion, right Relation / People), renaming \"With Whom\" → Relation and folding the old Top 10 tab in as People bars. New shared chart module src/app/insights/_components/charts/bars.tsx exports Title, BarRow, BarSection (desc-sorted, max-normalised bars, {pct}% ({count}) value column); chart-colors.ts gains a dedicated bar palette BAR_COLORS_LIGHT/DARK + barColors(isDark) + autoColorMap(keys, isDark), kept separate from categoryColors and rankFlowColors; applied across the Diet, Drinking and Interactions summaries. Retired the legacy SVG module _lib/chart-components.tsx (TrendChart, StackedBarChart, RankedFlowChart) and removed CssStackedBarChart from css-chart-components.tsx; the StackedBarBucket type is now local to InteractionsWidget. Search: per-field exact-phrase conditions — each column condition value runs through the same parseQuery as the main box (quoted part → phrase scoped to that one field plus a contiguous escaped-regex on that field; unquoted remainder stays fuzzy), mirrored in both the Atlas and regex-fallback condition loops; and client-side tri-state sortable result columns in the search UI. Sections 9.5, 9.6 (new), 13.2, 13.3, 13.4, 14.1, 14.4, 14.7, 14.8, 14.9 updated."],
-    ["3.5","20 Jun 2026","Hyoje / Claude","Diet widget (WBS #61) Trend view complete — eight tabs: four box-plot metrics (Eating/Caffeine/Servings/Carbs), three 100% stacked-composition tabs (Composition with Food/Drink × Ingredients/Items toggles, Spicy, Relation), and People (rank-flow of top-7 companions). New shared chart CssRankFlowChart — CSS-only ranked-flow (colour-tiles ranked top→bottom, dashed reference line, grey block listing people who dropped from the previous bucket's top-N, hover-to-trace, blur-names privacy toggle, luminance-adaptive tile text, controls slot); rankFlowColors two-tier palette. New reusable StackedBars (percent/absolute modes, legend hover-highlight). MultiSelectDropdown rebuilt to render its panel through a React portal on document.body with fixed positioning, so it escapes widget-card overflow:hidden and stays edge-/scroll-/resize-aware. Per-person people:{name:{category:count}} field added to the diet AND drinking trend buckets for client-side companion filtering and re-ranking. Diet companion scope widened to count drink-only meetups; 아침 (breakfast) records exempted from the 6am day-rollback. Backward-applied to existing widgets: Interactions now uses CssRankFlowChart (replacing the SVG RankedFlowChart) with its trend tabs renamed Type→Relation and Top 7→People (the unique-people count tab renamed Unique to avoid the clash) and a Relation filter; Drinking gained a People rank-flow tab and renamed its companion stacked tab People→Relation. Unified trend naming across Diet/Drinking/Interactions: Relation = relation-type stack, People = top-7 individual rank-flow, Relation = the relation filter. Default bucket count set to 12. Sections 13.3, 13.4, 13.5, 13.8 updated."],
+    ["1.0","25 Apr 2026","Initial data design & requirements"],
+    ["1.1","25 Apr 2026","Exercise → array; incremental sync; dedup key"],
+    ["1.2","28 Apr 2026","Migration scope → archive-only; dedup → delete + re-insert"],
+    ["1.3","29 Apr 2026","Phase 4 start; duration.totalSeconds; Atlas Search index"],
+    ["1.4","30 Apr 2026","Schema implemented; dead-file cleanup"],
+    ["1.5","30 Apr 2026","Atlas autocomplete dual-mapping; regex fallback"],
+    ["1.6","30 Apr 2026","Auth & three-layer security model"],
+    ["1.7","1 May 2026","Cost analysis dashboard specified"],
+    ["1.8","2 May 2026","Spending dashboard; userId from session; handover added"],
+    ["2.0","17 May 2026","Insights framework & first widgets (#53, #56)"],
+    ["2.7","20 May 2026","Drinking widget started; alcohol_conversion; 6am threshold"],
+    ["2.8","21 May 2026","Drinking widget complete; CSS BoxPlot / Histogram"],
+    ["2.9","22 May 2026","Drinking Trend (8 tabs); CSS chart suite"],
+    ["3.0","29 May 2026","food.spiciness field added"],
+    ["3.1","4 Jun 2026","Food ingredient taxonomy; daily routine & master-table procedures"],
+    ["3.2","5 Jun 2026","Drink ingredient taxonomy"],
+    ["3.3","12 Jun 2026","Diet widget Summary; categoryColors palette"],
+    ["3.4","14 Jun 2026","Insights API split into per-widget compute modules"],
+    ["3.5","20 Jun 2026","Diet widget Trend; CssRankFlowChart; unified Relation/People naming"],
+    ["3.6","25 Jun 2026","Insights polish pass; bars.tsx; search per-field phrase + sortable columns"],
+    ["4.0","27 Jun 2026","Full restructure into Parts I–IV; durable spec separated from status; Transformation merged into a single transitional Migration section (Field Mapping · Strategy · History) with durable derivations moved to the Schema; uniform widget template; search ingredient display and per-tab Trend Method filter captured"],
+  ["4.1","18 Jul 2026","Weight widget Summary (#54) — new \u00a79.3.5; bodyFatPercent corrected to a stored percent (was documented as a decimal) in \u00a75.2 and \u00a710.1.4; non-compact CssVerticalBoxPlotChart now prints max/avg/min values on the last bucket instead of the name legend, tooltip gained P75/P25"],
   ],
-  [1200, 1500, 1700, 4960]
+  [1100, 1300, 6960]
 ));
 C(spacer());
 
-// ===== 1. OVERVIEW =====
-C(h1("1. Overview"));
-C(p("This document captures the data design decisions and requirements for FarGaze Log — a personal life analytics platform. It covers the source data structure, MongoDB schema design, data transformation rules, supporting collections, and migration requirements."));
+C(new Paragraph({ children: [new TextRun({ text: "Part I · Foundations", bold: true, size: 28 })], spacing: { before: 280, after: 140 } }));
+
+// ===== 1. OVERVIEW & GOALS =====
+C(h1("1. Overview & Goals"));
+C(p("This document is the durable specification for FarGaze Log — a personal life-analytics platform built on ~7 years of daily logs. It describes what the system is: source data, schema, transformation rules, supporting collections, search, the dashboards, and the operational procedures. It deliberately excludes work status and open questions, which live in the WBS."));
+
 C(h2("1.1 Source Data Summary"));
 C(
   bullet("~43,000 rows, 84 columns of daily life activity data (84 from v3.1; was 83 in v3.0 after column AO insertion — no new source column was added for ingredients, which are embedded in the existing food item column via parenthesis notation)"),
@@ -58,18 +65,78 @@ C(
   bullet("Maintained in two Google Sheets files across five data sheets"),
   bullet("Supporting master data in five additional sheets (Ingredient sheet added v3.1)"),
 );
-C(h2("1.2 Target Database"));
+
+C(h2("1.2 Data Summary"));
+C(table(["Item","Value"],[
+  ["Total log documents","~43,123 (41,326 from ~2025, 1,797 from 2026)"],
+  ["Documents with foods","6,154"],
+  ["Food items total","15,375 — all with ingredients populated, 0 Not Defined (v3.1)"],
+  ["Documents with drinks","~5,006"],
+  ["Drink items total","~5,462 — all with ingredients populated, 0 Not Defined (v3.2)"],
+  ["Date range","2018 to present"],
+  ["Cost categories","22 clean categories (see Section 8.2)"],
+  ["Ingredient taxonomy","73 level2 values across 16 level1 groups (ingredient_master) — food + drinks"],
+  ["Primary currency","KRW — cost.amountKRW always populated; foreign amounts also stored"],
+  ["User","userId = hyoje"],
+  ["Atlas Search index","log_search — autocomplete + text dual-mapping on all text fields"],
+],[3000,6360]));
+C(spacer());
+
+// ===== 2. ARCHITECTURE & STACK =====
+C(h1("2. Architecture & Stack"));
+C(p("How the system is built and deployed. The data model itself is covered in Part II."));
+
+C(h2("2.1 Target Database"));
 C(
   bullet("Database: MongoDB Atlas (M0 free tier, AWS Europe Ireland)"),
   bullet("Cluster: fargaze-log"),
   bullet("Architecture: user-isolated collections — each user manages their own schema"),
 );
 
-// ===== 2. AUTH =====
-C(h1("2. Authentication & Access Control"));
-C(h2("2.1 Overview"));
+
+C(h2("2.2 Repository & Deployment"));
+C(table(["Item","Value"],[
+  ["GitHub repo","nullpitch-dev/fargaze-log"],
+  ["Production URL","https://log.fargaze.co"],
+  ["Local dev","~/projects/fargaze-log on WSL2 (Ubuntu)"],
+  ["Deployment","Vercel — auto-deploys from main branch"],
+  ["Node version","24.x (Vercel runtime)"],
+],[2600,6760]));
+C(spacer());
+
+C(h2("2.3 Tech Stack"));
+C(table(["Layer","Technology","Notes"],[
+  ["Framework","Next.js 15 (App Router)","src/app directory structure"],
+  ["Language","TypeScript","Strict mode"],
+  ["Styling","Tailwind CSS v4","Dark mode via prefers-color-scheme; light: stone palette, dark: zinc palette"],
+  ["Database","MongoDB Atlas M0","AWS Europe Ireland; mongoose ODM"],
+  ["Search","MongoDB Atlas Search","Index: log_search; autocomplete + text dual-mapping"],
+  ["Auth","Auth.js (NextAuth) v5","Google OAuth; EMAIL_TO_USER_ID in src/auth.ts"],
+  ["Drag & Drop","@dnd-kit/core + @dnd-kit/sortable","Used in spending pivot table"],
+  ["Charts","Custom CSS + SVG components","CSS-first; SVG only for curved line paths in trend charts"],
+  ["Hosting","Vercel","Environment variables set in Vercel dashboard"],
+],[2000,2800,4560]));
+C(spacer());
+
+C(h2("2.4 Environment Variables"));
+C(table(["Variable","Where","Purpose"],[
+  ["MONGODB_URI","Vercel + .env.local","MongoDB Atlas connection string"],
+  ["GOOGLE_CLIENT_ID","Vercel + .env.local","Google OAuth client ID"],
+  ["GOOGLE_CLIENT_SECRET","Vercel + .env.local","Google OAuth client secret"],
+  ["NEXTAUTH_SECRET","Vercel + .env.local","Auth.js session encryption key"],
+  ["NEXTAUTH_URL","Vercel + .env.local","https://log.fargaze.co"],
+  ["GOOGLE_OWNER_EMAIL","Vercel + .env.local","hyoje.choi@gmail.com — maps to userId hyoje"],
+  ["GOOGLE_SERVICE_ACCOUNT_FILE","Vercel + .env.local","Service account JSON filename (in /myfiles) for Google Sheets API"],
+  ["SPREADSHEET_ID_ACTIVE","Vercel + .env.local","Google Sheets file ID for Active spreadsheet (incl. AlcoholConv, Ingredient sheets)"],
+  ["SPREADSHEET_ID_ARCHIVE","Vercel + .env.local","Google Sheets file ID for Full Archive (~2025 + 2026)"],
+  ["ANTHROPIC_API_KEY","Vercel + .env.local","Anthropic API key (for future LLM features)"],
+],[3000,2400,3960]));
+C(spacer());
+
+C(h1("3. Authentication & Access Control"));
+C(h2("3.1 Overview"));
 C(p("FarGaze Log uses Google OAuth via NextAuth (Auth.js v5) for authentication. Access is restricted to explicitly whitelisted Google accounts mapped to internal userIds."));
-C(h2("2.2 Google Account to userId Mapping"));
+C(h2("3.2 Google Account to userId Mapping"));
 C(p("The mapping from Google email to internal userId is maintained in src/auth.ts as a static lookup table (EMAIL_TO_USER_ID). The actual email values are stored in environment variables, not hardcoded in source. On first sign-in, the jwt callback receives the Google user object, looks up the email in EMAIL_TO_USER_ID, and stores the resulting userId in the JWT token cookie. On all subsequent requests, userId is read directly from the token."));
 C(table(
   ["Environment Variable", "Value", "Maps to userId"],
@@ -77,7 +144,7 @@ C(table(
   [3120, 3120, 3120]
 ));
 C(spacer());
-C(h2("2.3 Three-Layer Security Model"));
+C(h2("3.3 Three-Layer Security Model"));
 C(table(
   ["Layer", "Location", "What it does"],
   [
@@ -89,13 +156,13 @@ C(table(
 ));
 C(spacer());
 C(note("Note: Even if someone bypasses the middleware (e.g. direct API call), they still hit the API 403 and receive no data. Even if they bypass that, MongoDB only returns documents matching their userId."));
-C(h2("2.4 Access for Other Users (Current)"));
+C(h2("3.4 Access for Other Users (Current)"));
 C(
   bullet("Add their Google email and a new userId to EMAIL_TO_USER_ID in src/auth.ts"),
   bullet("Add GOOGLE_USER2_EMAIL (or similar) to environment variables on Vercel and in .env.local"),
   bullet("Ensure their data in MongoDB uses their userId as the owner field"),
 );
-C(h2("2.5 Multi-User Roadmap (Phase 5)"));
+C(h2("3.5 Multi-User Roadmap (Phase 5)"));
 C(
   bullet("A users collection in MongoDB will store Google email → userId mappings"),
   bullet("The EMAIL_TO_USER_ID lookup in auth.ts will be replaced by a database query"),
@@ -103,9 +170,11 @@ C(
   bullet("No code changes will be required to grant or revoke access"),
 );
 
-// ===== 3. SOURCE FILE STRUCTURE =====
-C(h1("3. Source File Structure"));
-C(h2("3.1 File 1: Active_2026Mar05"));
+
+C(new Paragraph({ children: [new TextRun({ text: "Part II · Data", bold: true, size: 28 })], spacing: { before: 280, after: 140 } }));
+
+C(h1("4. Source Data & Entry Types"));
+C(h2("4.1 File 1: Active_2026Mar05"));
 C(p("Contains current working data and all master/reference sheets."));
 C(table(
   ["Sheet", "Purpose", "Entry Types"],
@@ -122,7 +191,7 @@ C(table(
   [1700, 3400, 4260]
 ));
 C(spacer());
-C(h2("3.2 File 2: Full Archive_2026Mar06"));
+C(h2("4.2 File 2: Full Archive_2026Mar06"));
 C(table(
   ["Sheet", "Purpose", "Entry Types"],
   [
@@ -132,7 +201,7 @@ C(table(
   [1700, 4400, 3260]
 ));
 C(spacer());
-C(h2("3.3 Data Flow"));
+C(h2("4.3 Data Flow"));
 C(
   bullet("Daily activities are entered in the Active sheet"),
   bullet("Future appointments are entered in the Future sheet"),
@@ -144,9 +213,8 @@ C(
 C(note("Important: Movements between sheets are purely organisational and do not require any MongoDB sync action — the MongoDB record stays unchanged regardless of which sheet the row is in."));
 C(note("Note: Active, History, and Future sheets are managed directly in Google Sheets and are NOT migrated to MongoDB. These will be brought into scope in Phase 5 when the data entry feature is built."));
 
-// ===== 4. ENTRY TYPES =====
-C(h1("4. Entry Types & State Logic"));
-C(h2("4.1 Entry Types by Sheet"));
+
+C(h2("4.4 Entry Types by Sheet"));
 C(table(
   ["Sheet","Start time","End time","Duration","Meaning"],
   [
@@ -162,9 +230,9 @@ C(table(
   [1560, 1400, 1400, 1400, 3600]
 ));
 C(spacer());
-C(h2("4.2 Multi-day & Midnight-spanning Entries"));
+C(h2("4.5 Multi-day & Midnight-spanning Entries"));
 C(p("Entries that span midnight or multiple days are fully supported. Since start date and end date are stored as separate fields, the datetime computation naturally handles all cases. No special logic is required — compute start.datetime and end.datetime independently from their respective date/time fields."));
-C(h2("4.3 Dynamic State Computation"));
+C(h2("4.6 Dynamic State Computation"));
 C(p("Entry state is computed dynamically at query time based on the current datetime — not stored as a static flag. This prevents stale state values."));
 C(table(
   ["Condition","State"],
@@ -178,9 +246,9 @@ C(table(
   [5360, 4000]
 ));
 C(spacer());
-C(h2("4.4 The allDay Flag"));
+C(h2("4.7 The allDay Flag"));
 C(p("One static flag is stored: allDay (Boolean). Set to true when both start and end hour fields are empty, indicating a full-day event with no specific time."));
-C(h2("4.5 Rows to Skip During Migration"));
+C(h2("4.8 Rows to Skip During Migration"));
 C(p("Skip a row if ANY of the following conditions are true:"));
 C(
   bullet("activity category is null, empty, #N/A, or starts with #"),
@@ -194,7 +262,7 @@ C(
 );
 
 
-// ===== 5. SCHEMA =====
+
 C(h1("5. MongoDB Log Collection Schema"));
 C(h2("5.1 Design Principles"));
 C(
@@ -268,7 +336,7 @@ C(spacer());
 
 C(bold("duration"));
 C(table(["Field Path","Type","Source Column","Notes"],[
-  ["duration.totalSeconds","Number","start + end + offsets","Computed from UTC-normalised timestamps. null for single all-day events or missing end. See Section 6.1 for formula."],
+  ["duration.totalSeconds","Number","start + end + offsets","Computed from UTC-normalised timestamps. null for single all-day events or missing end. See Section 5.3 for formula."],
 ],[2400,1400,2000,3560]));
 C(spacer());
 
@@ -352,7 +420,7 @@ C(table(["Field Path","Type","Source Column","Notes"],[
   ["body.weight","Number","체중","kg"],
   ["body.muscleMass","Number","골격근량","kg"],
   ["body.bodyFat","Number","체지방량","kg"],
-  ["body.bodyFatPercent","Number","체지방률","Stored as decimal (0.207 = 20.7%)"],
+  ["body.bodyFatPercent","Number","체지방률","Stored as a PERCENT (21.265 = 21.3%), not a decimal. Verified against live data v4.1 — earlier versions of this document stated 0.207 = 20.7%, which was wrong."],
 ],[2400,1400,2000,3560]));
 C(spacer());
 
@@ -385,10 +453,13 @@ C(table(["Field Path","Type","Source Column","Notes"],[
 ],[2400,1400,2000,3560]));
 C(spacer());
 
-// ===== 6. TRANSFORMATION RULES =====
-C(h1("6. Data Transformation Rules"));
-C(h2("6.1 duration.totalSeconds Computation"));
-C(p("The source sheet stores duration as separate d/h/m/s columns derived from spreadsheet formulas. These fields are not stored in MongoDB. Instead, totalSeconds is computed directly from start and end timestamps."));
+
+
+// ===== 5.3 DERIVED FIELDS =====
+C(h2("5.3 Derived Fields"));
+C(p("A few fields are never entered directly — they are derived from other stored fields and stay valid regardless of how an entry was created (sheet migration today, native data entry in Phase 5). Entry state (Section 4.6) and the allDay flag (Section 4.7) are derived in the same spirit."));
+C(bold("duration.totalSeconds"));
+C(p("Computed from the start and end timestamps; the source sheet's d/h/m/s columns are never stored."));
 C(table(["Case","Condition","totalSeconds"],[
   ["Normal event","start and end both exist","(endUTC − startUTC) in seconds"],
   ["Same start and end","startUTC = endUTC","0"],
@@ -403,8 +474,583 @@ C(
   bullet("endUTC = end.datetime − (end.timezoneOffset × 3600 seconds)"),
   bullet("totalSeconds = endUTC − startUTC"),
 );
-C(note("Note: timezoneOffset is read directly from the sheet column (시차) — no timezone_master lookup is required at migration time."));
-C(h2("6.2 Multi-value Field Parsing"));
+C(note("timezoneOffset is stored per entry (read from the 시차 source column during migration); no separate timezone-master lookup is required."));
+
+C(h1("6. Supporting Collections"));
+C(h2("6.1 cost_master"));
+C(table(["Field","Type","Notes"],[
+  ["userId","String","Owner"],
+  ["category","String","Top-level cost category"],
+  ["detail","String","Detailed sub-category"],
+],[2400,2000,4960]));
+C(spacer());
+C(h2("6.2 activity_master"));
+C(table(["Field","Type","Notes"],[
+  ["userId","String","Owner"],
+  ["name","String","Activity name"],
+  ["category","String","Activity category"],
+],[2400,2000,4960]));
+C(note("Note: Unique index on userId + name + category. Same name can exist in different categories."));
+C(h2("6.3 reference_lists"));
+C(table(["Field","Type","Notes"],[
+  ["userId","String","Owner"],
+  ["listName","String","Reference list identifier (e.g. activity.crossActivity, food.alcohols.item)"],
+  ["values","String[]","Array of allowed values"],
+],[2400,2000,4960]));
+C(spacer());
+C(h2("6.4 timezone_master"));
+C(table(["Field","Type","Notes"],[
+  ["userId","String","Owner"],
+  ["code","String","Timezone abbreviation (e.g. KST, BST, GMT)"],
+  ["offsetUTC","Number","UTC offset in hours (e.g. 9 for KST, 1 for BST)"],
+  ["ianaTimezone","String","IANA timezone name (e.g. Asia/Seoul)"],
+  ["city","String","Representative city"],
+],[2400,2000,4960]));
+C(spacer());
+C(h2("6.5 exchange_rate"));
+C(table(["Field","Type","Notes"],[
+  ["userId","String","Owner"],
+  ["currency","String","Currency code (e.g. GBP, USD)"],
+  ["rateToKRW","Number","Exchange rate to Korean won"],
+],[2400,2000,4960]));
+C(spacer());
+C(h2("6.6 alcohol_conversion (added v2.7)"));
+C(p("A dedicated collection storing the unit conversion table for alcohol items. One document per item × unit combination (54 documents total as of v3.1, after the 와인/ml row was added)."));
+C(table(["Field","Type","Notes"],[
+  ["userId","String","Owner"],
+  ["item","String","Canonical alcohol item name (e.g. 소주, 맥주, 와인)"],
+  ["unit","String","Unit of measurement (e.g. 잔, 병, ml, l, 도쿠리, cc, pint, 캔, 컵, 통)"],
+  ["unitTo50ml","Number","How many 50ml soju-sized units this unit represents"],
+  ["alcoholRatio","Number","Alcohol content relative to standard soju (1.0 = same as soju)"],
+  ["drinks","Number","Final drinks value: unitTo50ml × alcoholRatio. Primary field used in calculations."],
+],[2200,1600,5560]));
+C(spacer());
+C(note("Note: 1 drink = 1 소주잔 equivalent (50ml at ~20% ABV). The drinks field on each alcohol entry = amount × convMap[item][unit].drinks."));
+C(p("Migration: npm run migrate-alcohol reads the AlcoholConv sheet from Active_2026Mar05."));
+C(p("Model: src/models/AlcoholConversion.ts. Unique index on { userId, item, unit }."));
+C(h2("6.7 ingredient_master"));
+C(p("A dedicated collection storing the two-level ingredient taxonomy for both food and drinks. One document per level2 value (73 documents as of v3.2). It is the single source of truth for the level2 vocabulary used by parseFoodIngredients() validation (for foods and drinks) and by the historical-fill scripts."));
+C(table(["Field","Type","Notes"],[
+  ["userId","String","Owner"],
+  ["level1","String","Top-level group (e.g. 곡류, 채소, 육류, 해산물, 양념, 유제품, 육수, 국물)"],
+  ["level2","String","Specific ingredient class (e.g. 쌀, 잎 채소, 돼지고기, 생선, 고기 국물). Unique within userId."],
+],[2200,1600,5560]));
+C(spacer());
+C(p("Model: src/models/IngredientMaster.ts (collection ingredient_master). Unique index on { userId, level2 }."));
+C(p("Migration: npm run migrate-ingredient reads the Ingredient sheet (level1 / level2 columns, header row 1) from Active_2026Mar05 and does delete-all + re-insert for the user."));
+C(bold("Taxonomy structure (73 level2 values across 16 level1 groups; v3.2 adds 음료 and 당류)"));
+C(table(["level1","level2 values"],[
+  ["곡류","기타 곡류, 메밀, 밀, 보리쌀, 쌀, 옥수수, 전분, 찹쌀, 콩류, 청국장 (콩류 and 청국장 moved here in v3.1)"],
+  ["과일","기타 과일, 단 과일, 베리류"],
+  ["국물","고기 국물, 생선 국물"],
+  ["기타","곤충, 기타"],
+  ["내장류","내장류"],
+  ["양념","간장, 겨자, 고추, 고추장, 과일 소스, 기름, 기타 소스, 된장, 마늘, 소금, 식초, 카레 (설탕 and 꿀 moved to 당류 in v3.2)"],
+  ["당류","설탕, 꿀, 초콜릿, 쨈 (NEW level1 in v3.2; 설탕/꿀 moved from 양념, 쨈 moved here, 초콜릿 added)"],
+  ["유제품","기타 유제품, 버터, 요거트, 우유, 치즈"],
+  ["육류","가공육, 기타 육류, 닭고기, 돼지고기, 소고기, 양고기, 오리고기"],
+  ["육수","고기 육수, 해물 육수 (was 생선 육수), 채소 육수 (was 야채 육수)"],
+  ["채소","기타 채소, 버섯, 뿌리 채소, 열매 채소, 잎 채소, 줄기 채소"],
+  ["해산물","갑각류, 기타 해산물 (was 기타해산물), 생선, 연체류, 조개류, 해조류"],
+  ["음료","커피, 디카페인 커피, 보이차, 홍차, 녹차, 허브차, 탄산, 카페인, 기타 음료 (NEW level1 in v3.2 — drink-specific values)"],
+  ["견과류","견과류"],
+  ["계란","계란"],
+],[1800,7560]));
+C(spacer());
+C(note("Note (v3.2): 음료 holds beverage-specific values. Many drink sub-ingredients reuse existing food values (우유, 콩류, 단 과일, 요거트, 기타 곡류, 설탕). 커피 implies caffeine; 카페인 is for added-caffeine drinks not in coffee/tea form (레드불, 박카스). 탄산 means pure carbonated water only — 콜라 maps to 탄산|설탕, zero-sugar sodas to 탄산|기타 소스. Sports/vitamin drinks (게토레이, 비타500) map to 기타 음료|설탕. 보이차 is kept as its own value (it is the most-consumed tea)."));
+C(note("Note: 국물 (고기 국물 / 생선 국물) and 육수 (고기 육수 / 해물 육수 / 채소 육수) are intentionally kept as separate level1 groups. 생선 국물 and 해물 육수 coexist as distinct values. 춘장 is also accepted as a sauce value used in some mappings (e.g. 짜장).")); 
+C(bold("Design philosophy"));
+C(
+  bullet("Practical, not strictly MECE — split where meaningful to Hyoje (e.g. 소고기/돼지고기/닭고기 kept separate), merge where not (오징어/낙지/문어 → 연체류)"),
+  bullet("Multi-value foods use the pipe (|) separator inside parentheses, e.g. 케익(밀|설탕|기름)"),
+  bullet("Items with no clean home map to 기타; 얼음 → 기타; 팥 → 콩류; 묵 types → 기타 곡류; 한천 → 해조류"),
+  bullet("\"국만\"/\"국물\"/\"국물만\" in a dish name means broth only (strip rice/noodle); explicit 밥 in a name must include 쌀; 라면 implies 밀; 당면 is 전분 (not 밀)"),
+);
+
+
+
+C(h1("7. Search — Index, API & UI"));
+C(h2("7.1 Overview"));
+C(p("MongoDB Atlas Search (Lucene-based) is used for full-text keyword search across all relevant log fields. A single search index named log_search is defined on the log collection."));
+C(p("Search behaviour:"));
+C(
+  bullet("Atlas Search runs first — fast, relevance-ranked results"),
+  bullet("If Atlas Search returns zero results, a MongoDB regex fallback runs automatically across the same fields"),
+  bullet("The API response includes a searchMode field: \"atlas\" or \"regex\""),
+  bullet("The UI shows a \"포함 검색\" label when the regex fallback is active"),
+);
+C(h2("7.2 Korean Tokenisation — Known Limitation"));
+C(p("Atlas Search uses edge n-gram tokenisation for autocomplete fields, which indexes from the start of each token. \"삼성\" matches \"삼성모바일스토어\" (prefix match) but \"모바일\" does NOT match \"삼성모바일스토어\" (mid-word). The regex fallback handles mid-word cases. Full n-gram tokenisation was deferred due to M0 free tier index size limits."));
+C(h2("7.3 Index Definition"));
+C(p("Index name: log_search. Field mappings:"));
+C(table(["Field","Type(s)","Notes"],[
+  ["userId","token","Exact match for user isolation filter"],
+  ["start.datetime","date","Used for date range filter in $search compound"],
+  ["activity.category","string + autocomplete",""],
+  ["activity.name","string + autocomplete",""],
+  ["activity.title","string + autocomplete","Primary keyword target"],
+  ["activity.additionalInfo","string + autocomplete",""],
+  ["location.activity","string + autocomplete","Physical place name"],
+  ["location.online","string + autocomplete",""],
+  ["location.other","string + autocomplete",""],
+  ["cost.category","string + autocomplete",""],
+  ["cost.categoryDetail","string + autocomplete",""],
+  ["purchase[].item","string + autocomplete","Purchase item name — key for product search"],
+  ["purchase[].unit","string + autocomplete",""],
+  ["food.drinks[].item","string + autocomplete",""],
+  ["food.foods[].item","string + autocomplete",""],
+  ["food.alcohols[].item","string + autocomplete",""],
+  ["people[].target","string + autocomplete","Person names"],
+  ["transport.from","string + autocomplete",""],
+  ["transport.to","string + autocomplete",""],
+  ["travel.city","string + autocomplete",""],
+  ["travel.theme","string + autocomplete",""],
+  ["exercise[].item","string + autocomplete",""],
+  ["reading.title","string + autocomplete",""],
+  ["movie.title","string + autocomplete",""],
+  ["notes","string + autocomplete","Catch-all free text"],
+],[2800,2800,3760]));
+C(spacer());
+C(note("Note: food.foods[].ingredients (v3.1) is not currently part of the search index. It is used for analytics (future eating-behaviour widget), not keyword search. A phrase/mixed-query search enhancement (quoted phrases combined with free tokens via compound.must) was also added to GET /api/search in this period."));
+C(h2("7.4 Numeric Fields for Aggregation"));
+C(table(["Field","Type","Use Case"],[
+  ["cost.amountKRW","Number","Total or average spending in KRW"],
+  ["cost.amountForeign","Number","Foreign currency spending"],
+  ["duration.totalSeconds","Number","Time spent — displayed in duration label format (e.g. 2h 30m)"],
+  ["income.gross","Number","Gross income"],
+  ["income.net","Number","Net income"],
+  ["body.weight","Number","Weight at time of entry"],
+  ["golf.score","Number","Golf score"],
+  ["golf.approach","Number","Golf approach shots"],
+  ["golf.putts","Number","Golf putts"],
+  ["exercise[].amount","Number","Exercise amount or intensity"],
+],[2800,1600,4960]));
+C(spacer());
+C(h2("7.5 Search API — GET /api/search"));
+C(p("Route: GET /api/search. Requires authentication. Returns up to 100 results."));
+C(table(["Parameter","Type","Required","Description"],[
+  ["q","string","No*","Broad keyword — searched across all text fields with fuzzy matching. Supports quoted phrases (exact) mixed with free tokens (fuzzy), combined via compound.must (v3.1)."],
+  ["dateFrom","string","No","Start date filter in YYYY-MM-DD format (inclusive)"],
+  ["dateTo","string","No","End date filter in YYYY-MM-DD format (inclusive)"],
+  ["conditions","string","No","Pipe-separated AND field conditions: field1:value1|field2:value2. Each value is parsed with the same parseQuery as q (v3.6): a quoted segment becomes a phrase scoped to that single field; any unquoted remainder stays fuzzy — see the field-scoped phrase note below"],
+],[1700,1200,1300,5160]));
+C(spacer());
+C(note("Note: At least one of q, dateFrom, dateTo, or conditions must be provided."));
+C(p("Available field keys for conditions parameter:"));
+C(table(["Key","Field"],[
+  ["activity.name","활동명"],
+  ["activity.title","제목"],
+  ["activity.additionalInfo","추가정보"],
+  ["activity.category","카테고리"],
+  ["location.activity","장소"],
+  ["purchase.item","구매항목"],
+  ["people.target","사람"],
+  ["cost.category","비용카테고리"],
+  ["transport.from","출발지"],
+  ["transport.to","도착지"],
+  ["travel.city","여행도시"],
+  ["notes","메모"],
+],[4680,4680]));
+C(spacer());
+C(bold("Field-scoped phrase matching (NEW v3.6)"));
+C(p("Each field condition value is parsed with the same parseQuery the main q box uses, but scoped to that single field. A quoted segment becomes an exact-phrase clause on that field's Atlas path (and, in the regex fallback, a contiguous escaped-regex on that field); any unquoted remainder keeps the prior fuzzy autocomplete (Atlas) or loose regex (fallback). The logic is mirrored in both the Atlas compound condition loop and the regex-fallback condition loop — so activity.title:\"team lunch\" matches that exact phrase within activity.title, while activity.title:team lunch stays loose."));
+C(note("Known limitation (out of scope): the main-query regex fallback still regexes the raw q including any quote characters. Because Atlas Search is primary and the fallback runs only when Atlas returns zero results, this path is rarely hit."));
+C(p("Response shape:"));
+C(table(["Field","Type","Description"],[
+  ["query","string","The q parameter echoed back"],
+  ["total","number","Number of results returned (max 100)"],
+  ["searchMode","string","\"atlas\" = Atlas Search used; \"regex\" = fallback regex used"],
+  ["results","array","Array of log documents with an additional score field (null for regex results)"],
+  ["aggregations","object","Numeric aggregations (sum/avg/min/max/count) for fields that appear in results"],
+],[2200,1600,5560]));
+C(spacer());
+C(h2("7.6 Search UI — Result Table Sorting"));
+C(p("The search results table (src/app/search/page.tsx) supports client-side column sorting layered on top of the API result order. Sorting is purely presentational — it reorders the already-returned results and never re-queries the server."));
+C(
+  bullet("Tri-state per column header: first click sorts, second click reverses, third click returns to the original API/relevance order"),
+  bullet("Only one column is active at a time; the active header shows a ▲ / ▼ indicator"),
+  bullet("Text columns ascend first; date and numeric columns descend first"),
+  bullet("Missing or empty values always sink to the bottom regardless of direction; ties keep their original relative order (stable sort)"),
+  bullet("The 활동/내용 column sorts by activity.title || activity.name — the visible bold label"),
+  bullet("Running a new search resets the sort back to API/relevance order"),
+);
+C(spacer());
+
+
+// ===== 8.7 SEARCH UI — RESULT DETAIL PANEL =====
+C(h2("7.7 Search UI — Result Detail Panel"));
+C(p("Selecting a result opens a detail panel (DetailPanel in src/app/search/page.tsx) listing the entry's fields. Food and drink items render their ingredients inline, in parentheses, between the item name and its amount — e.g. 밀크커피 (커피, 우유) 1잔 and 샌드위치 (밀, 가공육, 버터, 치즈, 잎채소) 1 인분. The ingredients come straight from food.foods[].ingredients / food.drinks[].ingredients (the level2 values); the parenthetical is omitted when the array is empty or absent, so alcohols and ingredient-less items are unaffected. The Atlas projection and the regex .select() are both exclusion-only, so these arrays reach the client without an API change."));
+
+
+C(new Paragraph({ children: [new TextRun({ text: "Part III · Features", bold: true, size: 28 })], spacing: { before: 280, after: 140 } }));
+
+
+C(h1("8. Cost Analysis Dashboard"));
+C(h2("8.1 Overview"));
+C(p("The cost analysis dashboard provides a pivot-table view of spending by category and categoryDetail across a selected time period. It supports drill-down to raw transactions and layout customisation."));
+C(h2("8.2 Cost Category Structure"));
+C(p("After data cleansing (May 2026), the following 22 cost categories are in use:"));
+C(table(["Category","Notes"],[
+  ["경조사/기부/선물","Gifts, donations, congratulatory expenses"],
+  ["골프/운동","Golf and sports"],
+  ["교통","Transport"],
+  ["기타","Miscellaneous"],
+  ["문화/취미","Culture and hobbies (incl. streaming subscriptions)"],
+  ["민아","Spending on wife 민아 — intentional person-based category"],
+  ["보험","Insurance"],
+  ["부모님/가족","Parents and family"],
+  ["사업","Business expenses"],
+  ["생활","Daily living expenses"],
+  ["세금","Tax"],
+  ["숙박","Accommodation"],
+  ["스키","Skiing"],
+  ["식음","Food and drink"],
+  ["윤지/윤희","Spending on children — intentional person-based category"],
+  ["의료비/건강","Medical and health"],
+  ["이사","Moving expenses"],
+  ["자동차","Car expenses"],
+  ["재테크","Investment and financial management"],
+  ["종교 활동","Religious activities"],
+  ["통신","Communication / mobile / internet"],
+  ["패션","Fashion and clothing"],
+],[3000,6360]));
+C(spacer());
+C(h2("8.3 Filters"));
+C(
+  bullet("Date range — from/to date pickers; default is last 12 months"),
+  bullet("Category — multi-select to show/hide specific categories"),
+  bullet("Category detail — multi-select filtered by selected categories"),
+  bullet("Purchase item — free text search against purchase[].item field"),
+);
+C(h2("8.4 Pivot Table Structure"));
+C(bold("Rows"));
+C(
+  bullet("Two-level hierarchy: category (parent) → categoryDetail (child, indented)"),
+  bullet("Categories are draggable; dragging a category moves all its detail rows with it"),
+  bullet("Details are draggable within their parent category only"),
+  bullet("Categories are collapsible/expandable"),
+  bullet("Row order and collapsed state are persisted in localStorage under key \"fargaze-cost-layout\""),
+  bullet("Rows sorted by total spending descending by default"),
+);
+C(bold("Columns"));
+C(
+  bullet("One column per month in the selected date range"),
+  bullet("Most recent month on the left, oldest on the right"),
+  bullet("Year prefix ('YY) shown only on the first month of each calendar year in the range"),
+  bullet("Bottom row shows column totals (sum per month across all visible categories)"),
+);
+C(bold("Cells"));
+C(
+  bullet("Each cell shows the sum of cost.amountKRW for that category+detail+month"),
+  bullet("Empty cells show — (dash)"),
+  bullet("Clicking a cell opens the drill-down sidebar"),
+);
+C(h2("8.5 Drill-Down Sidebar"));
+C(p("Clicking any cell opens a slide-in sidebar showing the raw transactions for that category + categoryDetail + month combination. Each transaction row shows: start date, activity name, title, purchase items, cost KRW. Clicking a transaction row opens a full record modal showing all non-null fields grouped by section."));
+C(h2("8.6 API Design"));
+C(bold("GET /api/cost-summary"));
+C(p("Returns aggregated spending data for the pivot table."));
+C(table(["Parameter","Type","Required","Description"],[
+  ["dateFrom","string","No","Start date in YYYY-MM-DD format; default 12 months ago"],
+  ["dateTo","string","No","End date in YYYY-MM-DD format; default today"],
+  ["categories","string","No","Comma-separated list of categories to include"],
+  ["categoryDetails","string","No","Comma-separated list of categoryDetails to include"],
+  ["purchaseItem","string","No","Text filter on purchase[].item"],
+],[1900,1200,1200,5060]));
+C(spacer());
+C(bold("GET /api/cost-transactions"));
+C(p("Returns raw log entries for a specific category + categoryDetail + month combination (drill-down)."));
+C(table(["Parameter","Type","Required","Description"],[
+  ["category","string","Yes","Cost category to filter by"],
+  ["categoryDetail","string","No","Cost categoryDetail to filter by"],
+  ["dateFrom","string","Yes","Start of month in YYYY-MM-DD format"],
+  ["dateTo","string","Yes","End of month in YYYY-MM-DD format"],
+],[1900,1200,1200,5060]));
+C(spacer());
+C(p("Response: array of log documents, sorted by start.datetime ascending."));
+C(h2("8.7 Currency Handling"));
+C(p("All amounts in the pivot table use cost.amountKRW exclusively. For descriptive analysis of foreign currency spending (especially GBP after January 2026), cost.amountForeign and cost.currency are available in the drill-down transaction detail view."));
+C(h2("8.8 Layout Persistence"));
+C(p("The following layout preferences are saved to localStorage under the key \"fargaze-cost-layout\": category row order, detail row order per category, collapsed/expanded state per category."));
+C(note("Note: localStorage is used for simplicity in Phase 4. In a future phase this may be migrated to a user preferences collection in MongoDB for cross-device persistence."));
+
+
+
+
+C(h1("9. Insights Dashboard"));
+C(h2("9.1 Overview"));
+C(p("The Insights dashboard provides widget-based analytics across multiple subject domains. Each widget is self-contained and uses a shared global filter bar for time range and cross-activity filtering."));
+
+C(h2("9.2 Platform"));
+C(p("Shared, widget-agnostic machinery — written once and reused by every widget. This tier grows rarely; new widgets live in Section 9.3."));
+
+C(h3("9.2.1 Widget Framework"));
+C(
+  bullet("Two-dimensional framework: horizontal axis = subject domain; vertical axis = analytical floor (0→4, increasing depth)"),
+  bullet("All widgets share: WidgetCard shell, global filter, Summary/Trend mode toggle"),
+  bullet("Page layout: CSS columns (columns-1 md:columns-2 lg:columns-3) — masonry-style packing, no empty gaps under shorter widgets"),
+);
+
+C(h3("9.2.2 Colour System"));
+C(
+  bullet("Chart colour system: useIsDark() hook + chartColors(isDark); light: blue-700/stone; dark: teal-400/zinc"),
+  bullet("Categorical palette (v3.3): CATEGORY_COLORS_LIGHT/DARK + categoryColors(isDark) — indexed, taxonomy-agnostic colours for grouped charts (treemaps, relationship bars); light = darker fills with white text, dark = lighter fills with near-black text; assigned by index over the groups present in the data, never keyed on domain values"),
+  bullet("Summary-bar palette (v3.6): BAR_COLORS_LIGHT/DARK + barColors(isDark) + autoColorMap(keys, isDark) in chart-colors.ts — a dedicated palette for the shared summary bars (bars.tsx), kept deliberately separate from categoryColors and rankFlowColors; omitting a colorMap auto-assigns colours by first-seen key order"),
+  bullet("Spline tension for trend charts: 0.2 (confirmed optimal)"),
+);
+
+C(h3("9.2.3 Shared Chart Components"));
+C(table(["Component","File","Description"],[
+  ["bars.tsx (Title / BarRow / BarSection)","src/app/insights/_components/charts/bars.tsx","(v3.6) Shared summary-bar primitives. BarSection { title, data: Record<string,number>, colorMap?, isDark } sorts desc and draws max-normalised bars (longest = full) with a {pct}% ({count}) value column; omit colorMap → auto-assign via autoColorMap. Geometry h-1.5 rounded-full; typography text-[11px], label stone-600/zinc-300, value stone-500/zinc-400. Shared by the Diet, Drinking and Interactions summaries (Interactions' PeopleBars is composed from these primitives)"],
+  ["BoxPlot","src/app/insights/_components/charts/BoxPlot.tsx","CSS horizontal box plot; pr-5 right padding; label width w-10"],
+  ["Histogram","src/app/insights/_components/charts/Histogram.tsx","CSS bar chart histogram; fixed font sizes"],
+  ["CssTrendChart","src/app/insights/_components/charts/css-chart-components.tsx","CSS+SVG line chart with Catmull-Rom spline; multi-series; week label compression"],
+  ["CssVerticalBoxPlotChart","src/app/insights/_components/charts/css-chart-components.tsx","Vertical box plots per bucket; hover tooltip (max/P75/avg/P25/min, v4.1); props: formatY, height, and compact (v3.4). Default keeps the y-axis and, since v4.1, prints max/avg/min VALUES centred on the last bucket — the Max/P75/Avg/P25/Min name legend was removed. compact hides the y-axis and prints the same three values, so several boxes fit one row. P75/P25 live in the tooltip in both modes, because printed on the chart they would fall inside the IQR box"],
+  ["CssDualLineChart","src/app/insights/_components/charts/css-chart-components.tsx","Dual line chart (From/To); shared HH:MM Y-axis; filled area; dashed arrows with duration; +HH:MM for post-midnight"],
+  ["CssRestChart","src/app/insights/_components/charts/css-chart-components.tsx","Stacked histogram bars + avg spline overlay; unified SVG coordinate space; PLOT_T/PLOT_B bounds"],
+  ["CssDailyChart","src/app/insights/_components/charts/css-chart-components.tsx","(v3.3) Single daily-series line; optional dashed average line + zone bands; tooltip floats above the marker showing value + date; baselineZero option"],
+  ["Treemap","src/app/insights/_components/charts/Treemap.tsx","(v3.3) Squarified treemap; CSS-positioned cells measured via ResizeObserver; top-N cap with a neutral 기타 (+N) rollup; per-mode cell text"],
+  ["CalendarHeatmap / HeatStrip","src/app/insights/_components/charts/CalendarHeatmap.tsx","(v3.3) Mon–Sun calendar grid (modal) + single-row day strip (inline); range expanded to whole weeks; out-of-range days dimmed; colour via fillFor(date)"],
+  ["StackedBars","src/app/insights/_components/charts/StackedBars.tsx","(v3.5) Reusable stacked bars; percent or absolute mode; legend hover-highlight dims the other series; shared by the Diet Composition / Spicy / Relation tabs"],
+  ["CssRankFlowChart","src/app/insights/_components/charts/CssRankFlowChart.tsx","(v3.5) CSS-only ranked-flow ('top-N over time'): colour-tiles ranked top→bottom per bucket, a dashed reference line, and a grey block listing people who dropped out of the previous bucket's top-N. Per-person colour (rankFlowColors, first-seen order); hover-to-trace highlights one person across all buckets and shows per-bucket counts; blur-names privacy toggle; luminance-adaptive tile text; optional controls slot for a filter. No SVG. Used by Diet, Drinking, and Interactions"],
+  ["MultiSelectDropdown","src/app/insights/_components/MultiSelectDropdown.tsx","Generic multi-select with Select-all / Deselect-all; onChange(draft) / onClose(commit). Rebuilt v3.5 to render its panel through a React portal on document.body with fixed positioning, so it escapes widget-card overflow:hidden; edge-aware (flips up, clamps horizontally, caps height with scroll) and re-measures on selection change, scroll, and resize"],
+],[2200,3400,3760]));
+C(spacer());
+C(note("Note: BoxPlot and Histogram use CSS/HTML exclusively (no SVG). CSS chart components use CSS for layout/dots/labels and thin SVG overlay only for curved line paths."));
+
+C(h3("9.2.4 CSS Chart Architecture"));
+C(
+  bullet("Bars, dots, labels, axes: CSS/HTML divs with pixel or percentage positioning"),
+  bullet("Curved lines: SVG with fixed pixel viewBox (e.g. \"0 0 500 160\") to avoid coordinate mismatch with CSS"),
+  bullet("Week label compression: compressWeekLabels() — first bucket shows YYWww, subsequent show Www; year change resets to YYWww"),
+  bullet("Y-axis overflow prevention: labels clamped (skip if outside plot bounds); Y-axis containers are overflow-hidden"),
+  bullet("CssRestChart: both axes use shared PLOT_T=12px / PLOT_B=REST_H-4px bounds; bars pre-calculated via for-loop"),
+  bullet("ISO week: stepBack() and currentPeriod() both use Jan-4-based ISO week calculation"),
+);
+
+C(h2("9.3 Widgets"));
+C(p("One sub-section per widget, each on the same template: Purpose · API / data shape · Summary · Trend · Filters · Notes. Slots that don't apply are omitted. Adding a widget means filling the same slots — the platform tier above does not change."));
+
+// ── 9.3.1 Sleep ──────────────────────────────────────────────────────────────
+C(h3("9.3.1 Sleep (WBS #53)"));
+C(bold("Purpose")); C(p("Sleep duration and quality analytics."));
+C(bold("Summary"));
+C(
+  bullet("Summary view: avg duration, bedtime, wake time, sleep quality counts and score"),
+);
+C(bold("Trend"));
+C(
+  bullet("Trend view: 4 metric tabs — Duration, Bedtime, Wake Time, Quality Score"),
+);
+
+// ── 9.3.2 Interactions ───────────────────────────────────────────────────────
+C(h3("9.3.2 Interactions (WBS #56)"));
+C(bold("Purpose")); C(p("Who you spend time with, by relation type and contact method, and how that changes over time."));
+C(bold("API / data shape")); C(p("computeInteractionsSummary and computeInteractionsTrendBucket in src/lib/insights/interactions.ts. Each people group carries one method + one category (relation type) and a target list; trend buckets expose totalCount, uniquePeopleCount, byRelationType, byMethod and top7."));
+C(bold("Summary"));
+C(
+  bullet("Summary view (restructured v3.6 — no tabs): Row 1 is an always-on two-column stats grid — left column interactions (Relation Type + Method bars), right column unique people (Relation Type + Method bars). Row 2 is a full-width PeopleBars block showing the top 10 individuals split ranks 1–5 (left) / 6–10 (right), jointly normalised against one shared max across all 10, each bar coloured by that person's dominant relation type. The old Stats/Top 10 tabs, TopPeopleTable, the summaryTab state and the SummaryTab type were removed; PeopleBars is composed locally from the shared bars.tsx primitives (Title / BarRow / BarSection)"),
+);
+C(bold("Trend"));
+C(
+  bullet("Trend view: 5 metric tabs — Interactions, Unique, Relation, Method (stacked bar), People (CssRankFlowChart, v3.5)"),
+);
+C(bold("Filters"));
+C(
+  bullet("Widget-local filters: Relation + Method multi-select with AND logic; commit-on-close pattern with a server-side re-fetch (the People rank-flow is filtered on the server, unlike Diet/Drinking which filter client-side)"),
+);
+C(p("The Interactions widget carries a Method filter that is recomputed server-side (a missing param means \"all methods\", so the default view is unchanged). The Summary and the Trend tabs each own an independent selection — switching tabs preserves each separately."));
+C(bold("Method filter — in Summary"));
+C(p("One Method control sits between the header line and the contents. Selecting a subset re-scopes the headline interactions count (events containing a selected-method group), the Relation Type bars, unique people, and the People bars. The left Method bars stay full as the filter's stable reference list."));
+C(bold("Method filter — in Trend"));
+C(
+  bullet("Interactions / Unique / Relation tabs: each shows its own Method dropdown (above the chart) and filters that tab's metric only — interactionsMethod, uniqueMethod and relationMethod are passed to computeInteractionsTrendBucket as separate per-metric filters."),
+  bullet("Method tab: unfiltered — it is the full reference breakdown."),
+  bullet("People tab: unchanged — keeps its own Relation + Method controls inside the rank-flow chart."),
+);
+C(note("Counts that depend on uniqueness (unique people) are recomputed on the server, never derived by subtracting method marginals."));
+
+// ── 9.3.3 Drinking ───────────────────────────────────────────────────────────
+C(h3("9.3.3 Drinking (WBS #57)"));
+C(bold("Purpose")); C(p("Alcohol consumption: how much, how often, with whom and on what occasions, plus rest-day and session patterns."));
+C(bold("API / data shape"));
+C(bold("6am Date Assignment Rule"));
+C(p("Alcohol records with start.datetime between 00:00–05:59 are attributed to the previous calendar day. Implemented via assignDrinkingDate() in the API route. The fetch window is expanded by 6 hours at the start of the period to capture midnight records."));
+C(bold("Drinks Quantity Calculation"));
+C(table(["Field","Description"],[
+  ["total","Sum of all drinks across the period"],
+  ["min","Minimum per-day drinks total (drinking days only)"],
+  ["max","Maximum per-day drinks total (drinking days only)"],
+  ["avg","Average per-day drinks (drinking days only)"],
+  ["p25","25th percentile of per-day drinks distribution"],
+  ["p75","75th percentile of per-day drinks distribution"],
+  ["n","Number of drinking days used in per-day stats"],
+],[2400,6960]));
+C(spacer());
+C(bold("Drink Type Calculation"));
+C(p("Each record contributes exactly 1.0 to the total across all types. If a record contains multiple alcohol items, the 1.0 is split proportionally by drinks value. E.g. a record with 와인 (2.43 drinks) and 사케 (0.94 drinks) gives: 와인 += 0.72, 사케 += 0.28. Results are rounded to integers for display."));
+C(bold("Rest Day Score & Histogram Buckets"));
+C(p("score(D) = diffDays(D, lastDrinkBeforeD) - 1 + (D is rest ? 1 : 0). If no prior drinking day exists, anchor to datasetFirstDate."));
+C(table(["Bucket","Range","Meaning"],[
+  ["0d","0 rest days","Drank on consecutive days"],
+  ["1d","Exactly 1 rest day",""],
+  ["2–3d","2–3 consecutive rest days",""],
+  ["4–6d","4–6 consecutive rest days",""],
+  ["1–2w","7–13 consecutive rest days",""],
+  ["2–4w","14–29 consecutive rest days",""],
+  ["1m+","30+ consecutive rest days",""],
+],[2000,3400,3960]));
+C(spacer());
+C(bold("Trend Mode API — drinking.summary"));
+C(p("mode=trend returns per-bucket data: drinkingDays, daysInPeriod, totalDrinks, avgDrinksPerDay, drinksBox {min/max/avg/p25/p75}, avgRestDays (computed via dailyScores), histogram (Record<string,number> with all 7 buckets), drinkType, occasions, companions, people, avgStartMins, avgEndMins, avgDurationSeconds. companions is the relation-type stack (Record<string,number>) behind the Relation tab; people (added v3.5) is the per-person, per-relation-type breakdown Record<string, Record<string,number>> that drives the People rank-flow tab and its client-side Relation filter — built from the same per-event dedupe and category rules as the summary's topPeople."));
+C(bold("Summary"));
+C(
+  bullet("Summary view (restructured v3.6 — no tabs; every block always-on). The Drinking Days + Total Drinks counters, Drinks-Per-Day box plot, Consecutive Rest Days histogram and Session Time rows are unchanged; only the proportional-bar block and the old Top 10 tab were reworked:"),
+  bullet("Row 1 (35%:65%): [Drinking Days + Total Drinks stacked] | [Drinks Per Day box plot]", 1),
+  bullet("Row 2 — bar block reorganised into two columns: left [Drink Type / Occasion], right [Relation / People]. \"With Whom\" was renamed Relation; the old Top 10 tab is folded in here as People bars, each person coloured by their dominant relation type", 1),
+  bullet("Row 3 (65%:35%): [Consecutive Rest Days histogram] | [Session Time — From / To / For]", 1),
+  bullet("All four bar charts use the shared bars.tsx primitives + barColors palette (v3.6); the Stats/Top 10 tab toggle was removed", 1),
+);
+C(bold("Trend"));
+C(
+  bullet("Trend view — 9 metric tabs: Freq, Amt(all), Amt(day), Type, Occasion, Relation, People, Rest, Session — where Relation is the relation-type stack (formerly labelled People) and People (v3.5) is a CssRankFlowChart of the top-7 companions with a client-side Relation filter"),
+);
+C(bold("Filters"));
+C(p("The Trend People rank-flow carries a client-side Relation multi-select that re-ranks the top-7 from the per-bucket people map (commit on close)."));
+
+// ── 9.3.4 Diet ───────────────────────────────────────────────────────────────
+C(h3("9.3.4 Diet (WBS #61)"));
+C(bold("Purpose")); C(p("Eating and drinking patterns: timing (eating / caffeine cutoff), quantity (인분, carbs), spiciness, ingredient/item composition, and companions."));
+C(bold("API / data shape"));
+C(bold("API — diet.summary"));
+C(p("computeDietSummary(userId, periodStart, periodEnd, crossActivities) returns one summary object for the whole period. It reuses assignDrinkingDate() as the shared 6am day-boundary helper (00:00–05:59 → previous day) across every per-day metric, fetches food/drink-bearing records (food.foods[] or food.drinks[] non-empty) with a 6-hour early lookback, and joins level2 → level1 from ingredient_master in JS (same pattern as the alcohol convMap). Per-day arrays are capped at yesterday; rangeStart/rangeEnd carry the full (uncapped) filter range for the calendar grid."));
+C(table(["Field","Description"],[
+  ["finishEating","[{date, endMins}] — latest end time among food-bearing records per day; endMins +1440 for post-midnight"],
+  ["finishCaffeine","[{date, endMins}] — latest end time among records with a caffeinated drink (ingredient 커피/카페인) per day; computed in the drinks pass, so coffee taken without food still counts (v3.4)"],
+  ["servings","[{date, total}] — Σ food.foods[].amount (인분); parseFloat so it works on String or Number"],
+  ["carbsIndex","[{date, value}] — Σ (carbs H=2/M=1/L=0 × that meal's 인분); drinks excluded"],
+  ["spiciness","[{date, level}] — per eating day, max of H/M/L (L = ate but not spicy); a day absent from the array had no meal logged"],
+  ["ateIngredients / drankIngredients","[{level2, level1, count}] — frequency; level1 joined from ingredient_master"],
+  ["ateItems / drankItems","[{item, count}] — frequency by item name"],
+  ["companions","{alone, total, byRelationType, topPeople[]} — scoped to food- OR drink-bearing records; drink-only meetups (e.g. coffee) now count (v3.5)"],
+  ["averages","{finishEatingMins, finishCaffeineMins, servings, carbsIndex} — mean over days present (drives the average line/marker)"],
+  ["rangeStart / rangeEnd","full filter range (uncapped) — for the spiciness calendar grid"],
+],[2700,6660]));
+C(spacer());
+C(bold("Scope rules"));
+C(
+  bullet("\"Eating\" = a record with at least one non-null food.foods[].item. A drink-only record (e.g. a midnight juice) is excluded from the eating metrics but still counts in the drink treemaps."),
+  bullet("Alcohol (food.alcohols[]) is excluded entirely — it has no ingredients and is covered by the Drinking widget. Drink treemaps read food.drinks[] only."),
+  bullet("Counting is frequency-based (each occurrence = 1)."),
+  bullet("The 6am day-boundary rule from the Drinking widget applies uniformly to every per-day Diet metric — with one exception (v3.5): records tagged food.type === '아침' (breakfast) are exempted from the previous-day rollback and the +1440 late-night shift, so an early-morning breakfast stays on its own calendar day."),
+);
+C(bold("Summary view = distribution, not trend"));
+C(p("The summary deliberately shows the distribution of daily values (box plots, with the full daily line one tap away in a modal) rather than a period trend — the average is the headline statistic. The Trend view (complete as of v3.5) rolls these same metrics into weekly/monthly buckets per the global filter; its eight tabs appear under this widget's Trend view below."));
+C(bold("Trend Mode API — diet.summary (NEW v3.5)"));
+C(p("mode=trend returns one object per bucket: label, daysInPeriod, the four box-plot arrays (eatingCutoff, caffeineCutoff, servings, carbs), the composition maps (ateIng, ateItems, drankIng, drankItems), spicy {H,M,L}, relation (Record<string,number>, behind the Relation tab), and people (Record<string, Record<string,number>>). people is the per-person, per-relation-type companion breakdown that the People rank-flow tab filters and re-ranks client-side; it is built from the same personMap category counts the summary uses for topPeople, so the 아침 exception and the food-or-drink scope apply identically."));
+C(bold("Summary"));
+C(
+  bullet("Summary view is distribution-oriented (not a trend): four compact vertical box plots in one row — EATING CUTOFF, CAFFEINE CUTOFF, SERVINGS (인분), CARBS — each tappable to open a modal with the full daily line (CssDailyChart); the 인분 line carries green/light-blue/red zone bands (<3 소식 / 3–6 적당 / >6 과식)"),
+  bullet("CAFFEINE CUTOFF = the latest time each day a caffeinated drink (ingredient 커피 or 카페인) was finished — computed in the same pass as the drink treemaps, so it counts coffee taken without any food", 1),
+  bullet("Compact box plots drop the y-axis and the Max/P75/Avg/P25/Min name legend, printing value labels at max / avg / min instead, so four boxes fit a single row", 1),
+  bullet("Spicy days: an inline single-row HeatStrip (one cell per day) with a summary count (e.g. \"0 H and 4 M out of 31 days\"), tappable to open the Mon–Sun CalendarHeatmap modal", 1),
+  bullet("Treemaps shown one at a time via two toggles — Food/Drink × Ingredients/Items; ingredient cells coloured by level1 group (categoryColors), item cells by a single accent; top-N cap with a 기타 rollup; cell-label font capped at 11px", 1),
+  bullet("With whom I eat: toggle between relationship bars (혼자 + categories) and a top-companions list", 1),
+  bullet("Uppercase, centred section titles; compact layout (four-box row, single-treemap toggles) tuned to keep the widget near a single widget's height"),
+);
+C(bold("Trend"));
+C(
+  bullet("Eating · Caffeine · Servings · Carbs — four box-plot-per-bucket tabs, each rendering CssVerticalBoxPlotChart (non-compact) across the weekly/monthly buckets"),
+  bullet("Composition · Spicy · Relation — three tabs built on the reusable StackedBars: Composition (Food/Drink × Ingredients/Items toggles; dynamic 30%-threshold 'others' rollup, capped at palette size), Spicy (absolute H/M/L day counts), Relation (relation-type mix, 100%; 혼자 neutral)"),
+  bullet("People — a CssRankFlowChart of the top-7 companions over time, with a Relation multi-select that re-ranks client-side (each person summed over the selected relation types, zeros dropped, top-7 re-taken)"),
+  bullet("Tab persistence: a trendLoadedRef in DietWidget keeps the view mounted across bucket-size changes so the active tab is not reset"),
+);
+C(note("Naming convention (unified v3.5) across the Diet, Drinking, and Interactions trend views: the relation-type 100% stacked tab is Relation; the top-7 individual rank-flow tab is People; the relation multi-select is the Relation filter. Diet and Drinking filter the rank-flow client-side from the per-bucket people map; Interactions filters server-side (committed on close, then re-fetch)."));
+C(bold("Filters"));
+C(p("The Trend People rank-flow carries a client-side Relation multi-select (re-ranks from the per-bucket people map)."));
+C(bold("Notes"));
+C(bold("Spiciness calendar — one rule for all filter modes"));
+C(p("Expand [rangeStart, rangeEnd] to whole Mon–Sun weeks and dim any day outside the range. Month → 1st to month-end with adjacent-month days dimmed; week → one row; day → that day's full week with only the one day solid; period → a continuous grid. Cell colours: red (any H), amber (M, no H), blue (ate, not spicy), empty (no meal logged). The inline HeatStrip uses the same fillFor() colouring in a single dateless/headerless row."));
+C(bold("Colour assignment"));
+C(p("Ingredient-group and relationship colours are assigned at runtime by indexing categoryColors(isDark) over the groups present in the data (locale-sorted for stability) — no domain values are hard-coded in the widget, so taxonomy changes flow through automatically. A future option is to return the canonical level1 order from ingredient_master for permanently pinned colours."));
+C(bold("Components introduced"));
+C(
+  bullet("Treemap.tsx — squarified layout, CSS-positioned cells measured by ResizeObserver, top-N cap + neutral 기타 (+N) rollup"),
+  bullet("CalendarHeatmap.tsx — CalendarHeatmap (full Mon–Sun grid, reusable for WBS #59) and HeatStrip (compact inline row)"),
+  bullet("CssDailyChart (in css-chart-components.tsx) — daily line with average line, zone bands, above-marker value+date tooltip"),
+  bullet("CssVerticalBoxPlotChart gained formatY (e.g. HH:MM axis), height, and compact (v3.4 — drops the y-axis and the name legend, labelling max/avg/min directly) so four boxes fit one row"),
+);
+C(bold("Caffeine cutoff — placement (v3.4)"));
+C(p("finishCaffeine is built in the same loop pass that counts drink ingredients (before the food-only cut), not inside the finish-eating block. The finish-eating block runs only for food-bearing records, so computing caffeine there would silently drop coffees taken without food. The check is: any food.drinks[] entry whose ingredients include 커피 or 카페인 → take that record's end time as a candidate for the day's caffeine cutoff."));
+
+// ── 9.3.5 Weight ──────────────────────────────────────────
+C(h3("9.3.5 Weight (WBS #54)"));
+
+C(bold("Purpose"));
+C(p("Body weight and composition: the distribution of daily weight across the filter period, the average make-up of that weight, and the most recent measurement — so that a stable weight number can be read against the composition changing underneath it."));
+
+C(bold("API / data shape"));
+C(p("computeWeightSummary(userId, periodStart, periodEnd, crossActivities) in src/lib/insights/weight.ts, dispatched as metric=weight.summary. Documents carrying body.weight are fetched with the standard $expr + $dateFromParts local-date filter, then collapsed to one record per calendar day by collapseToDays() — repeat readings on the same day are averaged, so a double weigh-in day does not count twice."));
+C(table(["Field","Description"],[
+  ["weightBox","{min, max, avg, p25, p75, n} over per-day weight values — period scoped"],
+  ["avgComposition","Composition + n — period scoped. When any day in the period carries a full triple the average is taken over those days ONLY, so the three segments always sum exactly to the bar total"],
+  ["latest","Composition + date — the most recent measurement overall, NOT period scoped (see Notes)"],
+  ["deltaFromAvg","{weight, muscleMass, bodyFat, bodyFatPercent} — latest minus average; the segment deltas are null unless both bars are segmented"],
+  ["compositionMax","max(latest.weight, avgComposition.weight) — the shared scale that makes the two bar lengths comparable"],
+],[2400,6960]));
+C(spacer());
+C(p("Composition is {weight, muscleMass, bodyFat, other, bodyFatPercent, musclePct, fatPct, otherPct, hasComposition}. When muscleMass or bodyFat is absent the object is still returned with hasComposition false and weight populated, so the widget always has a bar to draw rather than a hole."));
+
+C(bold("Segment semantics (InBody Dial)"));
+C(table(["Source field","Meaning"],[
+  ["체중 — weight","Total body weight"],
+  ["골격근량 — muscleMass","SKELETAL muscle only. Bone is NOT included — it falls into other. Labelling this segment plain \"Muscle\" would overstate it, since total muscle mass (근육량, which the Dial does not report) is higher"],
+  ["체지방량 — bodyFat","Derived in the source sheet as weight × 체지방률, so it is never an independent measurement"],
+  ["기타 — other","weight − muscleMass − bodyFat: organs, body water outside skeletal muscle, smooth and cardiac muscle, and bone mineral. Around 34% of body weight — a legitimate, large, fairly stable component, NOT a residual error bucket"],
+],[2400,6960]));
+C(spacer());
+
+C(bold("Day boundary"));
+C(p("Unlike the Drinking and Diet widgets, Weight does NOT apply the 6am assignDrinkingDate rule. Weigh-ins happen in the morning, so a 06:30 reading belongs to its own calendar day; rolling it back would attribute it to the day before."));
+
+C(bold("Summary"));
+C(
+  bullet("Two columns. Left (25–35% width): WEIGHT (KG) — a single-bucket non-compact CssVerticalBoxPlotChart showing min / p25 / avg / p75 / max for the filter period, with the values printed on the last-bucket labels (v4.1) and P75/P25 available on hover"),
+  bullet("Right: BODY COMPOSITION — one titled block holding two horizontal stacked bars, AVERAGE and LATEST (with its date and year), each bar length scaled against compositionMax and each segment carrying its kg and (%) inside"),
+  bullet("Between the two bars sits a delta strip — weight and body-fat movement from the period average to the latest reading; a zero delta renders as an em dash rather than disappearing, so the row does not jump as the filter changes"),
+  bullet("A single shared legend (Skeletal Muscle / Fat / Other) sits under both bars — the two rows were merged into one block specifically to avoid printing the same legend twice"),
+  bullet("Pre-InBody ranges: both bars render as a single un-segmented weight bar labelled \"weight only\", and the legend is suppressed entirely"),
+);
+
+C(bold("Trend"));
+C(p("Not built. The Summary is distribution-oriented in the same spirit as the Diet widget — the average is the headline statistic. A Trend view would roll weight and the three composition segments into the weekly/monthly buckets of the global filter; the metric=weight.summary dispatcher has no mode=trend branch yet."));
+
+C(bold("Filters"));
+C(p("Global filter bar only — no widget-local filter. crossActivities applies to BOTH the period query and the latest-ever lookup, so the two bars never differ in scope along that axis."));
+
+C(bold("Notes"));
+C(bold("Latest is deliberately outside the global filter"));
+C(p("weightBox and avgComposition are period scoped; latest is the most recent measurement in the whole dataset. Comparing a past month's average against that same month's final reading answers nothing useful — the comparison people actually want is \"where am I now against how I was then\". findLatestDay() therefore runs its own unbounded query, sorted on start.year/month/day descending, then re-fetches that whole day so repeat readings collapse the same way. When the selected period is the current one, latest falls inside it anyway and nothing changes."));
+C(note("Consequence: filtering to a pre-InBody range pairs a weight-only AVERAGE bar with a fully segmented LATEST bar. The segment deltas null out, so nothing breaks, but the two bars look structurally different. Accepted deliberately."));
+
+C(bold("One fat percentage, not two"));
+C(p("bodyFatPercent (measured) and fatPct (derived as bodyFat / weight) are identical on any single day, because the sheet derives 체지방량 from 체지방률. They diverge only in the average, where one is a mean of daily ratios and the other a ratio of means — a gap of roughly 0.03 percentage points. avgComposition therefore passes null for bodyFatPercent so that buildComposition derives it, guaranteeing the widget shows ONE fat percentage that agrees with the three segment shares."));
+
+C(bold("Pinned segment colours"));
+C(p("Muscle / Fat / Other are three fixed semantic segments, so their colours are hard-coded in the widget rather than assigned through barColors / autoColorMap, which exist for dynamic key sets whose membership varies. Orange always means fat. Same rationale as QualityPie in SleepWidget. The values are drawn from the existing palette: primary blue/teal for muscle, the box plot's own average orange for fat, stone/zinc neutral for other."));
+
+C(bold("Measured label fitting"));
+C(p("A segment's share is a percentage, but whether its figures fit is a question of pixels. CompositionRow measures its track with a ResizeObserver (the same approach as Treemap.tsx) and shows the kg line only above MIN_KG_PX, adding the (%) line only above MIN_PCT_PX. On a narrow card the Fat segment may therefore show kg alone; the full figures stay available in the segment's title tooltip."));
+
+C(new Paragraph({ children: [new TextRun({ text: "Part IV · Operations", bold: true, size: 28 })], spacing: { before: 280, after: 140 } }));
+
+
+// ===== 10. MIGRATION (merged from old §6 Transformation + §11 Migration) =====
+C(h1("10. Migration"));
+C(p("Everything that lifts the Google Sheets data into MongoDB. This whole section is transitional: once the Phase 5 data-entry feature lands, entries are created natively and the field-mapping and migration machinery here retire together. Durable derivations (e.g. duration.totalSeconds) live with the schema in Section 5, not here."));
+C(h2("10.1 Field Mapping"));
+C(p("How each source cell becomes a document field. These rules run inside the migration tool only."));
+C(h3("10.1.1 Multi-value Field Parsing"));
 C(p("Comma-separated values across corresponding columns are zipped into arrays. Applies to: purchase, drinks, foods, alcohols, exercise."));
 C(p("Example — purchase columns:"));
 C(
@@ -412,9 +1058,9 @@ C(
   bullet("량: \"2,1,1,1\""),
   bullet("단위: \"개,개,개,개\""),
 );
-C(h2("6.2.1 Plus-sign Concatenation Rule"));
+C(h3("10.1.2 Plus-sign Concatenation Rule"));
 C(p("Items containing a plus sign (e.g. \"와인+사케\") are split into separate array entries at migration time via zipMultiValueWithPlusSplit(). The amount is divided evenly across all split items. purchase[].item is explicitly excluded from this treatment. MongoDB never contains + in any item fields."));
-C(h2("6.3 People Field Parsing"));
+C(h3("10.1.3 People Field Parsing"));
 C(p("The people fields use pipe (|) as a group separator and comma (,) as a value separator within each group. Each group is one method/category/target combination. \"등\" is filtered out from target lists."));
 C(p("Example:"));
 C(
@@ -423,15 +1069,15 @@ C(
   bullet("대상 (targets): \"민아,윤지|Mariana,아버지\""),
   bullet("Result: two people documents — (대면, 가족, 민아), (대면, 가족, 윤지) and (영상, 생활, Mariana), (영상, 생활, 아버지)"),
 );
-C(h2("6.4 Other Transformation Rules"));
+C(h3("10.1.4 Other Parsing Rules"));
 C(
   bullet("Numeric fields: remove thousand-separator commas before parsing (e.g. \"1,500,000\" → 1500000)"),
-  bullet("bodyFatPercent: stored as decimal (0.207 = 20.7%) — Google Sheets stores the underlying decimal value"),
+  bullet("bodyFatPercent: stored as a PERCENT (21.265 = 21.3%). Corrected in v4.1 — earlier versions documented a decimal (0.207); live data shows the percent form. Consumers should treat a value under 1 as a decimal and multiply by 100, otherwise use it as-is."),
   bullet("allDay flag: true when both start and end hour fields are empty"),
   bullet("H/M/L values (carbs, fat, spiciness): stored as-is as strings"),
   bullet("Null/empty strings: parseString() returns null for empty, #N/A, or #-prefixed values"),
 );
-C(h2("6.5 Google Sheets Column Layout (v3.0)"));
+C(h3("10.1.5 Google Sheets Column Layout"));
 C(p("A new column AO (spiciness) was inserted between AN (fat) and the previous AO (drink item). All columns from the previous AO onward are shifted by one position. The migration script fetch range is A:CG."));
 C(table(["Column","0-based Index","Field"],[
   ["A–AL","0–37","activity category through food.type (unchanged)"],
@@ -483,7 +1129,7 @@ C(table(["Column","0-based Index","Field"],[
   ["CF","83","sync.eventId (was col 82)"],
 ],[2200,2200,4960]));
 C(spacer());
-C(h2("6.6 Food Ingredient Parsing (NEW v3.1)"));
+C(h3("10.1.6 Food Ingredient Parsing"));
 C(p("Food items in column AT may carry an inline ingredient list in parentheses, using the pipe (|) separator inside the parentheses. This is parsed at migration time by parseFoodIngredients() in transform.ts, which runs AFTER the comma-split and plus-split steps, on each individual food token."));
 C(bold("Parsing rules"));
 C(table(["Source token","Parsed item","Parsed ingredients"],[
@@ -495,19 +1141,19 @@ C(table(["Source token","Parsed item","Parsed ingredients"],[
 C(spacer());
 C(p("A composite cell such as \"밥(쌀)+계란(계란)+스팸(가공육)+꼬리곰탕(고기 국물)+양상추(잎 채소)\" is first split on + into five tokens (amount divided evenly), then each token is parsed for its own parenthesis ingredients."));
 C(bold("Validation and row-skip rule"));
-C(p("Each ingredient inside the parentheses is validated against the level2 vocabulary loaded from ingredient_master (see Section 8.7). If any value is not a valid level2 term, parseFoodIngredients() throws IngredientValidationError. The per-row try/catch in migrate.ts catches it, skips the entire row, and logs the offending value and row number. The user then corrects the source row (or adds the missing taxonomy term) and re-migrates."));
+C(p("Each ingredient inside the parentheses is validated against the level2 vocabulary loaded from ingredient_master (see Section 6.7). If any value is not a valid level2 term, parseFoodIngredients() throws IngredientValidationError. The per-row try/catch in migrate.ts catches it, skips the entire row, and logs the offending value and row number. The user then corrects the source row (or adds the missing taxonomy term) and re-migrates."));
 C(bold("Vocabulary loading — single source of truth"));
 C(p("VALID_LEVEL2 is NOT hard-coded. loadValidLevel2(userId) is awaited once at migration start (after Mongo connection and index sync, before any sheet is migrated). It reads all level2 values from ingredient_master and caches them, plus the \"Not Defined\" sentinel. parseFoodIngredients() is synchronous and reads this cache; it throws if called before the vocabulary is loaded (fail-fast). Because the vocabulary comes from the Ingredient sheet via ingredient_master, adding or renaming a level2 value requires only: edit the Ingredient sheet → npm run migrate-ingredient → re-run migration. No code change."));
 C(bold("Scope"));
 C(p("As of v3.1 this parsing applied only to food.foods[]. As of v3.2 the same parser is also applied to food.drinks[] (see Section 6.7). food.alcohols[] is the only food sub-array that is NOT parsed for ingredients."));
 
 // ===== 6.7 DRINK INGREDIENT PARSING =====
-C(h2("6.7 Drink Ingredient Parsing (NEW v3.2)"));
+C(h3("10.1.7 Drink Ingredient Parsing"));
 C(p("Drink items in column AP may carry the same inline parenthesis ingredient notation as food items, e.g. 라떼(커피|우유). The generic parseFoodIngredients() function (Section 6.6) is reused unchanged — in rowToDocument.ts the food.drinks array is post-processed with the same .map() that food.foods uses, stripping the parentheses from the item name and populating food.drinks[].ingredients with the validated level2 values."));
 C(p("Key points specific to drinks:"));
 C(
   bullet("The existing drink note tag (커피 / 차 / blank in column AS) is preserved — ingredients are added alongside it, not in place of it."),
-  bullet("Validation uses the same VALID_LEVEL2 vocabulary loaded from ingredient_master, which in v3.2 includes the new 음료 and 당류 level2 values (see Section 8.7)."),
+  bullet("Validation uses the same VALID_LEVEL2 vocabulary loaded from ingredient_master, which in v3.2 includes the new 음료 and 당류 level2 values (see Section 6.7)."),
   bullet("A drink item with no parentheses becomes [\"Not Defined\"] and is repaired by scripts/fill-historical-drinks.ts (278 reviewed drink entries, with 아이스/핫 normalisation and a substring fallback)."),
   bullet("food.alcohols[] is still NOT parsed — alcohols keep the plain schema with no ingredients field."),
 );
@@ -523,10 +1169,9 @@ C(table(["Drink item","ingredients"],[
   ["보이차","[\"보이차\"]"],
 ],[3000,6360]));
 C(spacer());
-
-// ===== 7. MIGRATION STRATEGY =====
-C(h1("7. Migration Strategy"));
-C(h2("7.1 Overview"));
+C(h2("10.2 Strategy"));
+C(p("How a migration run is executed and re-run safely."));
+C(h3("10.2.1 Overview"));
 C(p("Migration covers the two archive sheets only: ~2025 and 2026. Active, History, and Future sheets are out of scope until Phase 5. Re-migration uses delete-all + re-insert — Log.deleteMany({ userId }) then bulk insert. No deduplication check required."));
 C(p("This strategy was chosen because:"));
 C(
@@ -534,248 +1179,17 @@ C(
   bullet("Row numbers in Google Sheets are not stable (rows are inserted, deleted, and moved regularly)"),
   bullet("Active/History/Future sheets are managed separately in Google Sheets until Phase 5"),
 );
-C(h2("7.2 Supporting Collections"));
+C(h3("10.2.2 Supporting Collections"));
 C(p("Supporting collections (cost_master, activity_master, reference_lists, timezone_master, exchange_rate) use a delete-all + re-insert strategy per collection. activity_master uses a unique index on userId + name + category. alcohol_conversion is seeded via npm run migrate-alcohol from the AlcoholConv sheet. ingredient_master (added v3.1) is seeded via npm run migrate-ingredient from the Ingredient sheet. See Sections 15 and 16 for the daily routine and master-table update procedures."));
-C(h2("7.3 Incremental Sync — Deferred to Post-MVP"));
+C(h3("10.2.3 Incremental Sync — Deferred to Post-MVP"));
 C(p("The DB_Status/DB_ID column approach designed in v1.1 has been deferred to post-MVP. It will be implemented after the Phase 5 data entry feature is complete."));
-C(h2("7.4 v3.0 Re-migration Requirement"));
-C(p("After adding column AO (spiciness) to Google Sheets, a full re-migration of both 2026 and ~2025 archive sheets is required. Steps:"));
-C(
-  num("Add column AO (spiciness, values H/M/L) to both Active and Archive spreadsheets"),
-  num("Deploy updated rowToDocument.ts and Log.ts"),
-  num("In migrate.ts: uncomment the ~2025 block and run Log.deleteMany({ userId }) for both years"),
-  num("Run migration for both ~2025 and 2026"),
-  num("Verify document count and spot-check food.spiciness on sample records"),
-);
-C(h2("7.5 Codebase Cleanup (30 April 2026)"));
-C(p("The following dead files were removed during Phase 4 implementation:"));
-C(
-  bullet("src/lib/migration/migrate.ts — old unused migration wrapper, superseded by scripts/migrate.ts"),
-  bullet("src/app/api/migrate/route.ts — old API route"),
-  bullet("src/app/api/migrate-full/route.ts — old API route"),
-  bullet("src/app/api/test-transform/route.ts — old test route"),
-  bullet(".next/ cache — cleared to resolve stale TypeScript declaration errors"),
-);
-C(h2("7.6 v3.1 Ingredient Migration Requirement (NEW)"));
-C(p("After establishing the ingredient taxonomy and adopting parenthesis notation, the following one-time setup was performed. These steps are also the reference procedure for any future taxonomy change:"));
-C(
-  num("Populate the Ingredient sheet (level1 / level2, header row 1) — 73 level2 values across 16 level1 groups as of v3.2"),
-  num("Run npm run migrate-ingredient to seed ingredient_master"),
-  num("Deploy updated Log.ts (foodsItemSchema with ingredients), transform.ts (parseFoodIngredients + loadValidLevel2), rowToDocument.ts (foods post-processing), migrate.ts (loadValidLevel2 call)"),
-  num("Historical fill: run npx tsx scripts/fill-historical-ingredients.ts to populate food.foods[].ingredients for all existing rows from the embedded reviewed map (see Section 16.3)"),
-  num("Verify with scripts/inspect-ingredients.ts and reconcile with scripts/reconcile-foods.ts"),
-);
-C(note("Note: Old source rows that used descriptive parentheses such as (국만), (국물), (밥만), or a content list like 회(도다리 세꼬시와 광어) must be cleaned before re-migration, because parseFoodIngredients() reads anything in parentheses as an ingredient list and will reject non-level2 values. scripts/scan-bad-parens.ts lists every offending row."));
-
-// ===== 8. SUPPORTING COLLECTIONS =====
-C(h1("8. Supporting Collections"));
-C(h2("8.1 cost_master"));
-C(table(["Field","Type","Notes"],[
-  ["userId","String","Owner"],
-  ["category","String","Top-level cost category"],
-  ["detail","String","Detailed sub-category"],
-],[2400,2000,4960]));
-C(spacer());
-C(h2("8.2 activity_master"));
-C(table(["Field","Type","Notes"],[
-  ["userId","String","Owner"],
-  ["name","String","Activity name"],
-  ["category","String","Activity category"],
-],[2400,2000,4960]));
-C(note("Note: Unique index on userId + name + category. Same name can exist in different categories."));
-C(h2("8.3 reference_lists"));
-C(table(["Field","Type","Notes"],[
-  ["userId","String","Owner"],
-  ["listName","String","Reference list identifier (e.g. activity.crossActivity, food.alcohols.item)"],
-  ["values","String[]","Array of allowed values"],
-],[2400,2000,4960]));
-C(spacer());
-C(h2("8.4 timezone_master"));
-C(table(["Field","Type","Notes"],[
-  ["userId","String","Owner"],
-  ["code","String","Timezone abbreviation (e.g. KST, BST, GMT)"],
-  ["offsetUTC","Number","UTC offset in hours (e.g. 9 for KST, 1 for BST)"],
-  ["ianaTimezone","String","IANA timezone name (e.g. Asia/Seoul)"],
-  ["city","String","Representative city"],
-],[2400,2000,4960]));
-C(spacer());
-C(h2("8.5 exchange_rate"));
-C(table(["Field","Type","Notes"],[
-  ["userId","String","Owner"],
-  ["currency","String","Currency code (e.g. GBP, USD)"],
-  ["rateToKRW","Number","Exchange rate to Korean won"],
-],[2400,2000,4960]));
-C(spacer());
-C(h2("8.6 alcohol_conversion (added v2.7)"));
-C(p("A dedicated collection storing the unit conversion table for alcohol items. One document per item × unit combination (54 documents total as of v3.1, after the 와인/ml row was added)."));
-C(table(["Field","Type","Notes"],[
-  ["userId","String","Owner"],
-  ["item","String","Canonical alcohol item name (e.g. 소주, 맥주, 와인)"],
-  ["unit","String","Unit of measurement (e.g. 잔, 병, ml, l, 도쿠리, cc, pint, 캔, 컵, 통)"],
-  ["unitTo50ml","Number","How many 50ml soju-sized units this unit represents"],
-  ["alcoholRatio","Number","Alcohol content relative to standard soju (1.0 = same as soju)"],
-  ["drinks","Number","Final drinks value: unitTo50ml × alcoholRatio. Primary field used in calculations."],
-],[2200,1600,5560]));
-C(spacer());
-C(note("Note: 1 drink = 1 소주잔 equivalent (50ml at ~20% ABV). The drinks field on each alcohol entry = amount × convMap[item][unit].drinks."));
-C(p("Migration: npm run migrate-alcohol reads the AlcoholConv sheet from Active_2026Mar05."));
-C(p("Model: src/models/AlcoholConversion.ts. Unique index on { userId, item, unit }."));
-C(h2("8.7 ingredient_master (NEW v3.1; extended for drinks v3.2)"));
-C(p("A dedicated collection storing the two-level ingredient taxonomy for both food and drinks. One document per level2 value (73 documents as of v3.2). It is the single source of truth for the level2 vocabulary used by parseFoodIngredients() validation (for foods and drinks) and by the historical-fill scripts."));
-C(table(["Field","Type","Notes"],[
-  ["userId","String","Owner"],
-  ["level1","String","Top-level group (e.g. 곡류, 채소, 육류, 해산물, 양념, 유제품, 육수, 국물)"],
-  ["level2","String","Specific ingredient class (e.g. 쌀, 잎 채소, 돼지고기, 생선, 고기 국물). Unique within userId."],
-],[2200,1600,5560]));
-C(spacer());
-C(p("Model: src/models/IngredientMaster.ts (collection ingredient_master). Unique index on { userId, level2 }."));
-C(p("Migration: npm run migrate-ingredient reads the Ingredient sheet (level1 / level2 columns, header row 1) from Active_2026Mar05 and does delete-all + re-insert for the user."));
-C(bold("Taxonomy structure (73 level2 values across 16 level1 groups; v3.2 adds 음료 and 당류)"));
-C(table(["level1","level2 values"],[
-  ["곡류","기타 곡류, 메밀, 밀, 보리쌀, 쌀, 옥수수, 전분, 찹쌀, 콩류, 청국장 (콩류 and 청국장 moved here in v3.1)"],
-  ["과일","기타 과일, 단 과일, 베리류"],
-  ["국물","고기 국물, 생선 국물"],
-  ["기타","곤충, 기타"],
-  ["내장류","내장류"],
-  ["양념","간장, 겨자, 고추, 고추장, 과일 소스, 기름, 기타 소스, 된장, 마늘, 소금, 식초, 카레 (설탕 and 꿀 moved to 당류 in v3.2)"],
-  ["당류","설탕, 꿀, 초콜릿, 쨈 (NEW level1 in v3.2; 설탕/꿀 moved from 양념, 쨈 moved here, 초콜릿 added)"],
-  ["유제품","기타 유제품, 버터, 요거트, 우유, 치즈"],
-  ["육류","가공육, 기타 육류, 닭고기, 돼지고기, 소고기, 양고기, 오리고기"],
-  ["육수","고기 육수, 해물 육수 (was 생선 육수), 채소 육수 (was 야채 육수)"],
-  ["채소","기타 채소, 버섯, 뿌리 채소, 열매 채소, 잎 채소, 줄기 채소"],
-  ["해산물","갑각류, 기타 해산물 (was 기타해산물), 생선, 연체류, 조개류, 해조류"],
-  ["음료","커피, 디카페인 커피, 보이차, 홍차, 녹차, 허브차, 탄산, 카페인, 기타 음료 (NEW level1 in v3.2 — drink-specific values)"],
-  ["견과류","견과류"],
-  ["계란","계란"],
-],[1800,7560]));
-C(spacer());
-C(note("Note (v3.2): 음료 holds beverage-specific values. Many drink sub-ingredients reuse existing food values (우유, 콩류, 단 과일, 요거트, 기타 곡류, 설탕). 커피 implies caffeine; 카페인 is for added-caffeine drinks not in coffee/tea form (레드불, 박카스). 탄산 means pure carbonated water only — 콜라 maps to 탄산|설탕, zero-sugar sodas to 탄산|기타 소스. Sports/vitamin drinks (게토레이, 비타500) map to 기타 음료|설탕. 보이차 is kept as its own value (it is the most-consumed tea)."));
-C(note("Note: 국물 (고기 국물 / 생선 국물) and 육수 (고기 육수 / 해물 육수 / 채소 육수) are intentionally kept as separate level1 groups. 생선 국물 and 해물 육수 coexist as distinct values. 춘장 is also accepted as a sauce value used in some mappings (e.g. 짜장).")); 
-C(bold("Design philosophy"));
-C(
-  bullet("Practical, not strictly MECE — split where meaningful to Hyoje (e.g. 소고기/돼지고기/닭고기 kept separate), merge where not (오징어/낙지/문어 → 연체류)"),
-  bullet("Multi-value foods use the pipe (|) separator inside parentheses, e.g. 케익(밀|설탕|기름)"),
-  bullet("Items with no clean home map to 기타; 얼음 → 기타; 팥 → 콩류; 묵 types → 기타 곡류; 한천 → 해조류"),
-  bullet("\"국만\"/\"국물\"/\"국물만\" in a dish name means broth only (strip rice/noodle); explicit 밥 in a name must include 쌀; 라면 implies 밀; 당면 is 전분 (not 밀)"),
-);
-
-// ===== 9. ATLAS SEARCH =====
-C(h1("9. Atlas Search Index"));
-C(h2("9.1 Overview"));
-C(p("MongoDB Atlas Search (Lucene-based) is used for full-text keyword search across all relevant log fields. A single search index named log_search is defined on the log collection."));
-C(p("Search behaviour:"));
-C(
-  bullet("Atlas Search runs first — fast, relevance-ranked results"),
-  bullet("If Atlas Search returns zero results, a MongoDB regex fallback runs automatically across the same fields"),
-  bullet("The API response includes a searchMode field: \"atlas\" or \"regex\""),
-  bullet("The UI shows a \"포함 검색\" label when the regex fallback is active"),
-);
-C(h2("9.2 Korean Tokenisation — Known Limitation"));
-C(p("Atlas Search uses edge n-gram tokenisation for autocomplete fields, which indexes from the start of each token. \"삼성\" matches \"삼성모바일스토어\" (prefix match) but \"모바일\" does NOT match \"삼성모바일스토어\" (mid-word). The regex fallback handles mid-word cases. Full n-gram tokenisation was deferred due to M0 free tier index size limits."));
-C(h2("9.3 Index Definition"));
-C(p("Index name: log_search. Field mappings:"));
-C(table(["Field","Type(s)","Notes"],[
-  ["userId","token","Exact match for user isolation filter"],
-  ["start.datetime","date","Used for date range filter in $search compound"],
-  ["activity.category","string + autocomplete",""],
-  ["activity.name","string + autocomplete",""],
-  ["activity.title","string + autocomplete","Primary keyword target"],
-  ["activity.additionalInfo","string + autocomplete",""],
-  ["location.activity","string + autocomplete","Physical place name"],
-  ["location.online","string + autocomplete",""],
-  ["location.other","string + autocomplete",""],
-  ["cost.category","string + autocomplete",""],
-  ["cost.categoryDetail","string + autocomplete",""],
-  ["purchase[].item","string + autocomplete","Purchase item name — key for product search"],
-  ["purchase[].unit","string + autocomplete",""],
-  ["food.drinks[].item","string + autocomplete",""],
-  ["food.foods[].item","string + autocomplete",""],
-  ["food.alcohols[].item","string + autocomplete",""],
-  ["people[].target","string + autocomplete","Person names"],
-  ["transport.from","string + autocomplete",""],
-  ["transport.to","string + autocomplete",""],
-  ["travel.city","string + autocomplete",""],
-  ["travel.theme","string + autocomplete",""],
-  ["exercise[].item","string + autocomplete",""],
-  ["reading.title","string + autocomplete",""],
-  ["movie.title","string + autocomplete",""],
-  ["notes","string + autocomplete","Catch-all free text"],
-],[2800,2800,3760]));
-C(spacer());
-C(note("Note: food.foods[].ingredients (v3.1) is not currently part of the search index. It is used for analytics (future eating-behaviour widget), not keyword search. A phrase/mixed-query search enhancement (quoted phrases combined with free tokens via compound.must) was also added to GET /api/search in this period."));
-C(h2("9.4 Numeric Fields for Aggregation"));
-C(table(["Field","Type","Use Case"],[
-  ["cost.amountKRW","Number","Total or average spending in KRW"],
-  ["cost.amountForeign","Number","Foreign currency spending"],
-  ["duration.totalSeconds","Number","Time spent — displayed in duration label format (e.g. 2h 30m)"],
-  ["income.gross","Number","Gross income"],
-  ["income.net","Number","Net income"],
-  ["body.weight","Number","Weight at time of entry"],
-  ["golf.score","Number","Golf score"],
-  ["golf.approach","Number","Golf approach shots"],
-  ["golf.putts","Number","Golf putts"],
-  ["exercise[].amount","Number","Exercise amount or intensity"],
-],[2800,1600,4960]));
-C(spacer());
-C(h2("9.5 Search API — GET /api/search"));
-C(p("Route: GET /api/search. Requires authentication. Returns up to 100 results."));
-C(table(["Parameter","Type","Required","Description"],[
-  ["q","string","No*","Broad keyword — searched across all text fields with fuzzy matching. Supports quoted phrases (exact) mixed with free tokens (fuzzy), combined via compound.must (v3.1)."],
-  ["dateFrom","string","No","Start date filter in YYYY-MM-DD format (inclusive)"],
-  ["dateTo","string","No","End date filter in YYYY-MM-DD format (inclusive)"],
-  ["conditions","string","No","Pipe-separated AND field conditions: field1:value1|field2:value2. Each value is parsed with the same parseQuery as q (v3.6): a quoted segment becomes a phrase scoped to that single field; any unquoted remainder stays fuzzy — see the field-scoped phrase note below"],
-],[1700,1200,1300,5160]));
-C(spacer());
-C(note("Note: At least one of q, dateFrom, dateTo, or conditions must be provided."));
-C(p("Available field keys for conditions parameter:"));
-C(table(["Key","Field"],[
-  ["activity.name","활동명"],
-  ["activity.title","제목"],
-  ["activity.additionalInfo","추가정보"],
-  ["activity.category","카테고리"],
-  ["location.activity","장소"],
-  ["purchase.item","구매항목"],
-  ["people.target","사람"],
-  ["cost.category","비용카테고리"],
-  ["transport.from","출발지"],
-  ["transport.to","도착지"],
-  ["travel.city","여행도시"],
-  ["notes","메모"],
-],[4680,4680]));
-C(spacer());
-C(bold("Field-scoped phrase matching (NEW v3.6)"));
-C(p("Each field condition value is parsed with the same parseQuery the main q box uses, but scoped to that single field. A quoted segment becomes an exact-phrase clause on that field's Atlas path (and, in the regex fallback, a contiguous escaped-regex on that field); any unquoted remainder keeps the prior fuzzy autocomplete (Atlas) or loose regex (fallback). The logic is mirrored in both the Atlas compound condition loop and the regex-fallback condition loop — so activity.title:\"team lunch\" matches that exact phrase within activity.title, while activity.title:team lunch stays loose."));
-C(note("Known limitation (out of scope): the main-query regex fallback still regexes the raw q including any quote characters. Because Atlas Search is primary and the fallback runs only when Atlas returns zero results, this path is rarely hit."));
-C(p("Response shape:"));
-C(table(["Field","Type","Description"],[
-  ["query","string","The q parameter echoed back"],
-  ["total","number","Number of results returned (max 100)"],
-  ["searchMode","string","\"atlas\" = Atlas Search used; \"regex\" = fallback regex used"],
-  ["results","array","Array of log documents with an additional score field (null for regex results)"],
-  ["aggregations","object","Numeric aggregations (sum/avg/min/max/count) for fields that appear in results"],
-],[2200,1600,5560]));
-C(spacer());
-C(h2("9.6 Search UI — Result Table Sorting (NEW v3.6)"));
-C(p("The search results table (src/app/search/page.tsx) supports client-side column sorting layered on top of the API result order. Sorting is purely presentational — it reorders the already-returned results and never re-queries the server."));
-C(
-  bullet("Tri-state per column header: first click sorts, second click reverses, third click returns to the original API/relevance order"),
-  bullet("Only one column is active at a time; the active header shows a ▲ / ▼ indicator"),
-  bullet("Text columns ascend first; date and numeric columns descend first"),
-  bullet("Missing or empty values always sink to the bottom regardless of direction; ties keep their original relative order (stable sort)"),
-  bullet("The 활동/내용 column sorts by activity.title || activity.name — the visible bold label"),
-  bullet("Running a new search resets the sort back to API/relevance order"),
-);
-C(spacer());
-
-// ===== 10. MIGRATION REQUIREMENTS =====
-C(h1("10. Migration Requirements"));
-C(h2("10.1 Source Sheets to Migrate"));
+C(h3("10.2.4 Source Sheets to Migrate"));
 C(table(["Sheet","File","Priority"],[
   ["~2025","Full Archive_2026Mar06","1 — largest historical dataset"],
   ["2026","Full Archive_2026Mar06","2 — current year archive"],
 ],[2400,3400,3560]));
 C(note("Note: Active, History, and Future sheets are NOT migrated. They are managed in Google Sheets until Phase 5."));
-C(h2("10.2 Supporting Collections to Migrate"));
+C(h3("10.2.5 Supporting Collections to Migrate"));
 C(
   bullet("cost_master — from Cost sheet in Active_2026Mar05"),
   bullet("activity_master — from Activity sheet in Active_2026Mar05"),
@@ -785,25 +1199,57 @@ C(
   bullet("alcohol_conversion — from AlcoholConv sheet in Active_2026Mar05 (npm run migrate-alcohol)"),
   bullet("ingredient_master — from Ingredient sheet in Active_2026Mar05 (npm run migrate-ingredient) — NEW v3.1"),
 );
-C(h2("10.3 Migration Tool Requirements"));
+C(h3("10.2.6 Migration Tool Requirements"));
 C(
   bullet("Connect to Google Sheets via Google Sheets API / service account"),
   bullet("Read all rows from each sheet (skip first header rows)"),
-  bullet("Apply row filtering rules per Section 4.5"),
-  bullet("Apply all transformation rules per Section 6"),
+  bullet("Apply row filtering rules per Section 4.8"),
+  bullet("Apply all transformation rules per Section 10.1 (Field Mapping)"),
   bullet("Compute duration.totalSeconds from UTC-normalised start and end timestamps"),
   bullet("Clear all existing log documents for the user before inserting (delete-all + re-insert)"),
   bullet("Write transformed documents to MongoDB using bulk insert"),
   bullet("Report migration statistics: total rows, skipped rows, inserted rows, error rows"),
   bullet("Log any rows that fail validation with row number and reason (includes ingredient validation errors, v3.1)"),
 );
-C(h2("10.4 Performance Target"));
+C(h3("10.2.7 Performance Target"));
 C(
   bullet("Migrate ~43,000 rows in under 5 minutes"),
   bullet("Use MongoDB bulk insert operations (not one-by-one)"),
 );
-C(h2("10.5 Migration Results"));
-C(note("Note: Re-migration completed 30 April 2026 with v1.4 schema (43,123 documents). A full re-migration was performed after v3.0 column AO insertion, and again after v3.1 ingredient adoption. The figures below are the v1.4 baseline; the v3.1 food-row reconciliation result is recorded in Section 16.4."));
+C(h2("10.3 History & Results"));
+C(p("Dated, one-time events, recorded for traceability."));
+C(h3("10.3.1 v3.0 Re-migration"));
+C(p("After adding column AO (spiciness) to Google Sheets, a full re-migration of both 2026 and ~2025 archive sheets is required. Steps:"));
+C(
+  num("Add column AO (spiciness, values H/M/L) to both Active and Archive spreadsheets"),
+  num("Deploy updated rowToDocument.ts and Log.ts"),
+  num("In migrate.ts: uncomment the ~2025 block and run Log.deleteMany({ userId }) for both years"),
+  num("Run migration for both ~2025 and 2026"),
+  num("Verify document count and spot-check food.spiciness on sample records"),
+);
+C(h3("10.3.2 Codebase Cleanup (30 April 2026)"));
+C(p("The following dead files were removed during Phase 4 implementation:"));
+C(
+  bullet("src/lib/migration/migrate.ts — old unused migration wrapper, superseded by scripts/migrate.ts"),
+  bullet("src/app/api/migrate/route.ts — old API route"),
+  bullet("src/app/api/migrate-full/route.ts — old API route"),
+  bullet("src/app/api/test-transform/route.ts — old test route"),
+  bullet(".next/ cache — cleared to resolve stale TypeScript declaration errors"),
+);
+C(h3("10.3.3 v3.1 Ingredient Migration"));
+C(p("After establishing the ingredient taxonomy and adopting parenthesis notation, the following one-time setup was performed. These steps are also the reference procedure for any future taxonomy change:"));
+C(
+  num("Populate the Ingredient sheet (level1 / level2, header row 1) — 73 level2 values across 16 level1 groups as of v3.2"),
+  num("Run npm run migrate-ingredient to seed ingredient_master"),
+  num("Deploy updated Log.ts (foodsItemSchema with ingredients), transform.ts (parseFoodIngredients + loadValidLevel2), rowToDocument.ts (foods post-processing), migrate.ts (loadValidLevel2 call)"),
+  num("Historical fill: run npx tsx scripts/fill-historical-ingredients.ts to populate food.foods[].ingredients for all existing rows from the embedded reviewed map (see Section 12.3)"),
+  num("Verify with scripts/inspect-ingredients.ts and reconcile with scripts/reconcile-foods.ts"),
+);
+C(note("Note: Old source rows that used descriptive parentheses such as (국만), (국물), (밥만), or a content list like 회(도다리 세꼬시와 광어) must be cleaned before re-migration, because parseFoodIngredients() reads anything in parentheses as an ingredient list and will reject non-level2 values. scripts/scan-bad-parens.ts lists every offending row."));
+
+
+C(h3("10.3.4 Migration Results"));
+C(note("Note: Re-migration completed 30 April 2026 with v1.4 schema (43,123 documents). A full re-migration was performed after v3.0 column AO insertion, and again after v3.1 ingredient adoption. The figures below are the v1.4 baseline; the v3.1 food-row reconciliation result is recorded in Section 12.4."));
 C(table(["Sheet","Total rows","Skipped","Inserted","Errors"],[
   ["~2025","41,327","1","41,326","0"],
   ["2026","1,797","0","1,797","0"],
@@ -811,293 +1257,136 @@ C(table(["Sheet","Total rows","Skipped","Inserted","Errors"],[
 ],[2160,2000,1700,1900,1600]));
 C(spacer());
 
-// ===== 11. OPEN QUESTIONS =====
-C(h1("11. Open Questions"));
-C(table(["#","Question","Status"],[
-  ["1","Master collections — user-editable via UI in Phase 5?","Pending — Phase 5 concern"],
-  ["2","DB_Status/DB_ID columns — manual or by migration tool?","Resolved — deferred to post-MVP"],
-  ["3","Atlas Search index — dynamic mapping or explicit field mapping?","Pending"],
-  ["4","Should food.foods[].ingredients be added to the Atlas Search index, or kept analytics-only?","Pending — analytics-only for now"],
-],[700,4900,3760]));
+
+
+C(h1("11. Daily Data Routine"));
+C(h2("11.1 Overview"));
+C(p("This section documents the day-to-day workflow for keeping MongoDB in sync with the Google Sheets source, including ingredient population. The routine applies whenever source data changes — most commonly when yesterday's entries are moved from the Active sheet into the 2026 archive sheet."));
+C(h2("11.2 The Routine — Step by Step"));
+C(table(["Step","Command","What it does"],[
+  ["1. Drop in new data","(manual, in Google Sheets)","Move yesterday's completed entries from the Active sheet into the 2026 archive sheet. Use the parenthesis ingredient notation on food AND drink items, e.g. 밥(쌀)+계란(계란) and 라떼(커피|우유). Items without parentheses become [\"Not Defined\"] and are repaired in steps 3-4."],
+  ["2. Migrate","npm run migrate","Deletes all 2026 documents (Log.deleteMany({ userId, 'start.year': 2026 })) and rebuilds them from the 2026 sheet. Foods with parenthesis notation get their ingredients directly from parseFoodIngredients; foods without get [\"Not Defined\"]."],
+  ["3. Fill ingredients","npx tsx scripts/fill-historical-ingredients.ts","Repairs every food item whose ingredients are missing or [\"Not Defined\"] using the embedded REVIEWED_MAP + bestGuess fallback. Skips items that already have real ingredients (including today's properly-parenthesised rows)."],
+  ["4. Fill drinks","npx tsx scripts/fill-historical-drinks.ts","Same as step 3 but for food.drinks[].ingredients, using the DRINK_MAP. Independent of the foods fill; order between them does not matter."],
+  ["5. Inspect","npx tsx scripts/inspect-ingredients.ts + inspect-drinks.ts","Surveys both foods and drinks: items with ingredients vs Not Defined, top level2 distribution, samples."],
+  ["6. Reconcile","npx tsx scripts/reconcile-foods.ts","Re-reads the source sheets with the live parser and compares against MongoDB. Reports source-vs-DB gap and any per-row parse errors. Target: gap = 0, errors = 0."],
+],[1700,2900,4760]));
+C(spacer());
+C(h2("11.3 Why migrate then fill?"));
+C(p("The main migrate rebuilds 2026 from the sheet, where ingredients can only come from parentheses. Older rows without parentheses would become [\"Not Defined\"]. The fill script then tops these up from the reviewed map. Running both in sequence guarantees that both new-style (parenthesised) and old-style (parenthesis-less) rows end up with correct ingredients."));
+C(note("Note (Case A — no stale ingredients): Because the user always runs migrate after any source change, every 2026 document is deleted and rebuilt each time. Old ingredient values can never linger from a previous state — there is no scenario where the sheet says one thing and MongoDB shows a stale ingredient from a deleted item."));
+C(h2("11.4 Idempotency & the Not-Defined Rule"));
+C(p("The fill script's skip condition treats [\"Not Defined\"] as unfilled, so re-runs repair items that a migration reset to Not Defined. Items that already hold real ingredients are skipped. This makes the fill step safe to run every day:"));
+C(
+  bullet("Items with real ingredients (from parentheses or a prior fill) → skipped, untouched"),
+  bullet("Items that are [\"Not Defined\"] → re-filled from the reviewed map"),
+  bullet("Items with no ingredients field at all → filled"),
+);
+C(h2("11.5 Cleaning Legacy Parentheses"));
+C(p("Old source rows that used descriptive (non-ingredient) parentheses — e.g. 소고기 국밥(국만), 짬뽕(국물만), 소고기 미역국(밥만), 아이스크림(와일드바디), 회(도다리 세꼬시와 광어) — will be rejected by parseFoodIngredients because the text in parentheses is not a valid level2 value. Run scripts/scan-bad-parens.ts to list every offending row, then fix them in the sheet (remove the descriptive parentheses, or convert to real ingredient notation), and re-migrate. After cleaning, reconcile should report gap = 0 and errors = 0."));
+
+
+
+C(h1("12. Master-Table Update Procedures"));
+C(p("FarGaze has two food-related master tables that are seeded from the Active spreadsheet: the alcohol conversion table and the ingredient taxonomy. This section is the canonical procedure for updating each."));
+C(h2("12.1 Updating the Alcohol Conversion Table (alcohol_conversion)"));
+C(p("The alcohol_conversion collection maps each (item, unit) pair to a drinks value (see Section 6.6). To add or change a conversion:"));
+C(
+  num("Open the AlcoholConv sheet in the Active_2026Mar05 spreadsheet (range AlcoholConv!A2:E)"),
+  num("Add or edit a row: item, unit, unitTo50ml, alcoholRatio. The drinks value is unitTo50ml × alcoholRatio. Example added in v3.1: 와인 / ml."),
+  num("If precision matters, increase the decimal places shown in the sheet cell before migrating — the migration reads the displayed value"),
+  num("Run npm run migrate-alcohol — this does delete-all + re-insert for the alcohol_conversion collection"),
+  num("Verify the collection document count in MongoDB Atlas (54 documents as of v3.1)"),
+);
+C(note("Note: 1 drink = 1 소주잔 = 50ml soju equivalent. The drinks field on each alcohol log entry = amount × convMap[item][unit].drinks. Changing a conversion does NOT require re-migrating the log collection — the drinking widget reads alcohol_conversion at query time."));
+C(h2("12.2 Updating the Ingredient Taxonomy (ingredient_master)"));
+C(note("Note (v3.2): the same ingredient_master taxonomy now serves both foods and drinks. Adding a drink value (e.g. a new tea under 음료) follows exactly the same procedure below. After any taxonomy change, re-run migrate, then both fill-historical-ingredients.ts and fill-historical-drinks.ts."));
+C(p("The ingredient_master collection holds the level1/level2 taxonomy and is the single source of truth for the level2 vocabulary used by parseFoodIngredients validation (see Section 6.7). To add, rename, or regroup an ingredient class:"));
+C(
+  num("Open the Ingredient sheet in the Active_2026Mar05 spreadsheet (columns level1 / level2, header row 1)"),
+  num("Add a new row (new level1+level2), rename a level2 value, or move a level2 to a different level1 group"),
+  num("Run npm run migrate-ingredient — this does delete-all + re-insert for ingredient_master, refreshing the level2 vocabulary"),
+  num("Re-run the main migration (npm run migrate) so that parseFoodIngredients validates against the updated vocabulary; otherwise new-data rows using a renamed value would be rejected"),
+  num("Run the fill script and reconcile per Section 11 to repair and verify"),
+);
+C(bold("Important sequencing rule"));
+C(p("The main migrate (npm run migrate) calls loadValidLevel2() at startup, which reads ingredient_master. If ingredient_master is empty (migrate-ingredient never run) or stale (renames not re-seeded), migration will reject rows using the new/renamed values. Therefore: always run migrate-ingredient at least once before relying on migrate, and re-run it after any change to the Ingredient sheet. Run migrate-ingredient once; re-run only when the Ingredient sheet changes."));
+C(bold("Taxonomy renames performed in v3.1"));
+C(table(["Old level2","New level2","level1"],[
+  ["생선 육수","해물 육수","육수"],
+  ["야채 육수","채소 육수","육수"],
+  ["기타해산물","기타 해산물","해산물"],
+  ["콩류 (was under 채소-like grouping)","콩류 (unchanged name)","moved to 곡류"],
+  ["청국장","청국장 (unchanged name)","moved to 곡류"],
+],[3000,3000,3360]));
+C(spacer());
+C(h2("12.3 The Historical-Fill Reviewed Map"));
+C(p("scripts/fill-historical-ingredients.ts embeds two mappings that resolve a food item name to its level2 ingredient list:"));
+C(
+  bullet("ITEM_MAP — the original 357 common items"),
+  bullet("REVIEWED_MAP — 1,156 human-verified entries built over six review batches, merged on top of ITEM_MAP (reviewed entries take precedence)"),
+  bullet("bestGuess() — a substring fallback for any item in neither map; genuinely unknown items become [\"Not Defined\"]"),
+);
+C(p("Together these cover 1,292 distinct food item names. The review process (six batches) corrected systematic substring-matcher traps — for example: 스테이크 defaulting to 소고기 (fixed for 양고기/생선/돼지 variants); 수육 defaulting to 돼지고기 (fixed for 아귀수육/복수육 → 생선); 차돌 dishes needing 소고기; (국만)/(국물) dishes being broth-only; explicit 밥 requiring 쌀; 라면 requiring 밀; 당면 being 전분 not 밀."));
+C(note("Note: To extend coverage, run the script with --export-worklist to produce a TSV of distinct unmapped items with frequency and a suggested level2, fill in the final_level2 column, and fold the reviewed entries back into REVIEWED_MAP."));
+C(h2("12.4 Reconciliation Result (v3.1)"));
+C(p("After cleaning legacy parentheses, re-migrating, filling ingredients, and dropping in new-notation data, the food-row reconciliation reached full agreement:"));
+C(table(["Metric","Value"],[
+  ["Source food rows (all sheets)","6,154"],
+  ["Expected documents with foods","6,154"],
+  ["Actual MongoDB documents with foods","6,154"],
+  ["Unexplained gap","0 (fully reconciled)"],
+  ["Food items total","15,375"],
+  ["Items with ingredients","15,375"],
+  ["Items = \"Not Defined\"","0"],
+],[4000,5360]));
 C(spacer());
 
-// ===== 12. COST ANALYSIS DASHBOARD =====
-C(h1("12. Cost Analysis Dashboard"));
-C(h2("12.1 Overview"));
-C(p("The cost analysis dashboard provides a pivot-table view of spending by category and categoryDetail across a selected time period. It supports drill-down to raw transactions and layout customisation."));
-C(h2("12.2 Cost Category Structure"));
-C(p("After data cleansing (May 2026), the following 22 cost categories are in use:"));
-C(table(["Category","Notes"],[
-  ["경조사/기부/선물","Gifts, donations, congratulatory expenses"],
-  ["골프/운동","Golf and sports"],
-  ["교통","Transport"],
-  ["기타","Miscellaneous"],
-  ["문화/취미","Culture and hobbies (incl. streaming subscriptions)"],
-  ["민아","Spending on wife 민아 — intentional person-based category"],
-  ["보험","Insurance"],
-  ["부모님/가족","Parents and family"],
-  ["사업","Business expenses"],
-  ["생활","Daily living expenses"],
-  ["세금","Tax"],
-  ["숙박","Accommodation"],
-  ["스키","Skiing"],
-  ["식음","Food and drink"],
-  ["윤지/윤희","Spending on children — intentional person-based category"],
-  ["의료비/건강","Medical and health"],
-  ["이사","Moving expenses"],
-  ["자동차","Car expenses"],
-  ["재테크","Investment and financial management"],
-  ["종교 활동","Religious activities"],
-  ["통신","Communication / mobile / internet"],
-  ["패션","Fashion and clothing"],
-],[3000,6360]));
-C(spacer());
-C(h2("12.3 Filters"));
-C(
-  bullet("Date range — from/to date pickers; default is last 12 months"),
-  bullet("Category — multi-select to show/hide specific categories"),
-  bullet("Category detail — multi-select filtered by selected categories"),
-  bullet("Purchase item — free text search against purchase[].item field"),
-);
-C(h2("12.4 Pivot Table Structure"));
-C(bold("Rows"));
-C(
-  bullet("Two-level hierarchy: category (parent) → categoryDetail (child, indented)"),
-  bullet("Categories are draggable; dragging a category moves all its detail rows with it"),
-  bullet("Details are draggable within their parent category only"),
-  bullet("Categories are collapsible/expandable"),
-  bullet("Row order and collapsed state are persisted in localStorage under key \"fargaze-cost-layout\""),
-  bullet("Rows sorted by total spending descending by default"),
-);
-C(bold("Columns"));
-C(
-  bullet("One column per month in the selected date range"),
-  bullet("Most recent month on the left, oldest on the right"),
-  bullet("Year prefix ('YY) shown only on the first month of each calendar year in the range"),
-  bullet("Bottom row shows column totals (sum per month across all visible categories)"),
-);
-C(bold("Cells"));
-C(
-  bullet("Each cell shows the sum of cost.amountKRW for that category+detail+month"),
-  bullet("Empty cells show — (dash)"),
-  bullet("Clicking a cell opens the drill-down sidebar"),
-);
-C(h2("12.5 Drill-Down Sidebar"));
-C(p("Clicking any cell opens a slide-in sidebar showing the raw transactions for that category + categoryDetail + month combination. Each transaction row shows: start date, activity name, title, purchase items, cost KRW. Clicking a transaction row opens a full record modal showing all non-null fields grouped by section."));
-C(h2("12.6 API Design"));
-C(bold("GET /api/cost-summary"));
-C(p("Returns aggregated spending data for the pivot table."));
-C(table(["Parameter","Type","Required","Description"],[
-  ["dateFrom","string","No","Start date in YYYY-MM-DD format; default 12 months ago"],
-  ["dateTo","string","No","End date in YYYY-MM-DD format; default today"],
-  ["categories","string","No","Comma-separated list of categories to include"],
-  ["categoryDetails","string","No","Comma-separated list of categoryDetails to include"],
-  ["purchaseItem","string","No","Text filter on purchase[].item"],
-],[1900,1200,1200,5060]));
-C(spacer());
-C(bold("GET /api/cost-transactions"));
-C(p("Returns raw log entries for a specific category + categoryDetail + month combination (drill-down)."));
-C(table(["Parameter","Type","Required","Description"],[
-  ["category","string","Yes","Cost category to filter by"],
-  ["categoryDetail","string","No","Cost categoryDetail to filter by"],
-  ["dateFrom","string","Yes","Start of month in YYYY-MM-DD format"],
-  ["dateTo","string","Yes","End of month in YYYY-MM-DD format"],
-],[1900,1200,1200,5060]));
-C(spacer());
-C(p("Response: array of log documents, sorted by start.datetime ascending."));
-C(h2("12.7 Currency Handling"));
-C(p("All amounts in the pivot table use cost.amountKRW exclusively. For descriptive analysis of foreign currency spending (especially GBP after January 2026), cost.amountForeign and cost.currency are available in the drill-down transaction detail view."));
-C(h2("12.8 Layout Persistence"));
-C(p("The following layout preferences are saved to localStorage under the key \"fargaze-cost-layout\": category row order, detail row order per category, collapsed/expanded state per category."));
-C(note("Note: localStorage is used for simplicity in Phase 4. In a future phase this may be migrated to a user preferences collection in MongoDB for cross-device persistence."));
 
-// ===== 13. INSIGHTS DASHBOARD =====
-C(h1("13. Insights Dashboard"));
-C(h2("13.1 Overview"));
-C(p("The Insights dashboard provides widget-based analytics across multiple subject domains. Each widget is self-contained and uses a shared global filter bar for time range and cross-activity filtering."));
-C(h2("13.2 Widget Framework"));
-C(
-  bullet("Two-dimensional framework: horizontal axis = subject domain; vertical axis = analytical floor (0→4, increasing depth)"),
-  bullet("All widgets share: WidgetCard shell, global filter, Summary/Trend mode toggle"),
-  bullet("Chart colour system: useIsDark() hook + chartColors(isDark); light: blue-700/stone; dark: teal-400/zinc"),
-  bullet("Categorical palette (v3.3): CATEGORY_COLORS_LIGHT/DARK + categoryColors(isDark) — indexed, taxonomy-agnostic colours for grouped charts (treemaps, relationship bars); light = darker fills with white text, dark = lighter fills with near-black text; assigned by index over the groups present in the data, never keyed on domain values"),
-  bullet("Summary-bar palette (v3.6): BAR_COLORS_LIGHT/DARK + barColors(isDark) + autoColorMap(keys, isDark) in chart-colors.ts — a dedicated palette for the shared summary bars (bars.tsx), kept deliberately separate from categoryColors and rankFlowColors; omitting a colorMap auto-assigns colours by first-seen key order"),
-  bullet("Spline tension for trend charts: 0.2 (confirmed optimal)"),
-  bullet("Page layout: CSS columns (columns-1 md:columns-2 lg:columns-3) — masonry-style packing, no empty gaps under shorter widgets"),
-);
-C(h2("13.3 Shared Chart Components"));
-C(table(["Component","File","Description"],[
-  ["bars.tsx (Title / BarRow / BarSection)","src/app/insights/_components/charts/bars.tsx","(v3.6) Shared summary-bar primitives. BarSection { title, data: Record<string,number>, colorMap?, isDark } sorts desc and draws max-normalised bars (longest = full) with a {pct}% ({count}) value column; omit colorMap → auto-assign via autoColorMap. Geometry h-1.5 rounded-full; typography text-[11px], label stone-600/zinc-300, value stone-500/zinc-400. Shared by the Diet, Drinking and Interactions summaries (Interactions' PeopleBars is composed from these primitives)"],
-  ["BoxPlot","src/app/insights/_components/charts/BoxPlot.tsx","CSS horizontal box plot; pr-5 right padding; label width w-10"],
-  ["Histogram","src/app/insights/_components/charts/Histogram.tsx","CSS bar chart histogram; fixed font sizes"],
-  ["CssTrendChart","src/app/insights/_components/charts/css-chart-components.tsx","CSS+SVG line chart with Catmull-Rom spline; multi-series; week label compression"],
-  ["CssVerticalBoxPlotChart","src/app/insights/_components/charts/css-chart-components.tsx","Vertical box plots per bucket; hover tooltip; props: formatY, height, and compact (v3.4). Default shows the y-axis and a Max/P75/Avg/P25/Min name legend on the rightmost bucket; compact hides both and prints value labels at max/avg/min so several boxes fit one row"],
-  ["CssDualLineChart","src/app/insights/_components/charts/css-chart-components.tsx","Dual line chart (From/To); shared HH:MM Y-axis; filled area; dashed arrows with duration; +HH:MM for post-midnight"],
-  ["CssRestChart","src/app/insights/_components/charts/css-chart-components.tsx","Stacked histogram bars + avg spline overlay; unified SVG coordinate space; PLOT_T/PLOT_B bounds"],
-  ["CssDailyChart","src/app/insights/_components/charts/css-chart-components.tsx","(v3.3) Single daily-series line; optional dashed average line + zone bands; tooltip floats above the marker showing value + date; baselineZero option"],
-  ["Treemap","src/app/insights/_components/charts/Treemap.tsx","(v3.3) Squarified treemap; CSS-positioned cells measured via ResizeObserver; top-N cap with a neutral 기타 (+N) rollup; per-mode cell text"],
-  ["CalendarHeatmap / HeatStrip","src/app/insights/_components/charts/CalendarHeatmap.tsx","(v3.3) Mon–Sun calendar grid (modal) + single-row day strip (inline); range expanded to whole weeks; out-of-range days dimmed; colour via fillFor(date)"],
-  ["StackedBars","src/app/insights/_components/charts/StackedBars.tsx","(v3.5) Reusable stacked bars; percent or absolute mode; legend hover-highlight dims the other series; shared by the Diet Composition / Spicy / Relation tabs"],
-  ["CssRankFlowChart","src/app/insights/_components/charts/CssRankFlowChart.tsx","(v3.5) CSS-only ranked-flow ('top-N over time'): colour-tiles ranked top→bottom per bucket, a dashed reference line, and a grey block listing people who dropped out of the previous bucket's top-N. Per-person colour (rankFlowColors, first-seen order); hover-to-trace highlights one person across all buckets and shows per-bucket counts; blur-names privacy toggle; luminance-adaptive tile text; optional controls slot for a filter. No SVG. Used by Diet, Drinking, and Interactions"],
-  ["MultiSelectDropdown","src/app/insights/_components/MultiSelectDropdown.tsx","Generic multi-select with Select-all / Deselect-all; onChange(draft) / onClose(commit). Rebuilt v3.5 to render its panel through a React portal on document.body with fixed positioning, so it escapes widget-card overflow:hidden; edge-aware (flips up, clamps horizontally, caps height with scroll) and re-measures on selection change, scroll, and resize"],
-],[2200,3400,3760]));
-C(spacer());
-C(note("Note: BoxPlot and Histogram use CSS/HTML exclusively (no SVG). CSS chart components use CSS for layout/dots/labels and thin SVG overlay only for curved line paths."));
-C(h2("13.4 Implemented Widgets"));
-C(bold("Sleep Widget (WBS #53)"));
-C(
-  bullet("Summary view: avg duration, bedtime, wake time, sleep quality counts and score"),
-  bullet("Trend view: 4 metric tabs — Duration, Bedtime, Wake Time, Quality Score"),
-);
-C(bold("Interactions Widget (WBS #56)"));
-C(
-  bullet("Summary view (restructured v3.6 — no tabs): Row 1 is an always-on two-column stats grid — left column interactions (Relation Type + Method bars), right column unique people (Relation Type + Method bars). Row 2 is a full-width PeopleBars block showing the top 10 individuals split ranks 1–5 (left) / 6–10 (right), jointly normalised against one shared max across all 10, each bar coloured by that person's dominant relation type. The old Stats/Top 10 tabs, TopPeopleTable, the summaryTab state and the SummaryTab type were removed; PeopleBars is composed locally from the shared bars.tsx primitives (Title / BarRow / BarSection)"),
-  bullet("Trend view: 5 metric tabs — Interactions, Unique, Relation, Method (stacked bar), People (CssRankFlowChart, v3.5)"),
-  bullet("Widget-local filters: Relation + Method multi-select with AND logic; commit-on-close pattern with a server-side re-fetch (the People rank-flow is filtered on the server, unlike Diet/Drinking which filter client-side)"),
-);
-C(bold("Drinking Widget (WBS #57) — Complete"));
-C(
-  bullet("Summary view (restructured v3.6 — no tabs; every block always-on). The Drinking Days + Total Drinks counters, Drinks-Per-Day box plot, Consecutive Rest Days histogram and Session Time rows are unchanged; only the proportional-bar block and the old Top 10 tab were reworked:"),
-  bullet("Row 1 (35%:65%): [Drinking Days + Total Drinks stacked] | [Drinks Per Day box plot]", 1),
-  bullet("Row 2 — bar block reorganised into two columns: left [Drink Type / Occasion], right [Relation / People]. \"With Whom\" was renamed Relation; the old Top 10 tab is folded in here as People bars, each person coloured by their dominant relation type", 1),
-  bullet("Row 3 (65%:35%): [Consecutive Rest Days histogram] | [Session Time — From / To / For]", 1),
-  bullet("All four bar charts use the shared bars.tsx primitives + barColors palette (v3.6); the Stats/Top 10 tab toggle was removed", 1),
-  bullet("Trend view — 9 metric tabs: Freq, Amt(all), Amt(day), Type, Occasion, Relation, People, Rest, Session — where Relation is the relation-type stack (formerly labelled People) and People (v3.5) is a CssRankFlowChart of the top-7 companions with a client-side Relation filter"),
-);
-C(bold("Diet Widget (WBS #61) — Complete"));
-C(
-  bullet("Summary view is distribution-oriented (not a trend): four compact vertical box plots in one row — EATING CUTOFF, CAFFEINE CUTOFF, SERVINGS (인분), CARBS — each tappable to open a modal with the full daily line (CssDailyChart); the 인분 line carries green/light-blue/red zone bands (<3 소식 / 3–6 적당 / >6 과식)"),
-  bullet("CAFFEINE CUTOFF = the latest time each day a caffeinated drink (ingredient 커피 or 카페인) was finished — computed in the same pass as the drink treemaps, so it counts coffee taken without any food", 1),
-  bullet("Compact box plots drop the y-axis and the Max/P75/Avg/P25/Min name legend, printing value labels at max / avg / min instead, so four boxes fit a single row", 1),
-  bullet("Spicy days: an inline single-row HeatStrip (one cell per day) with a summary count (e.g. \"0 H and 4 M out of 31 days\"), tappable to open the Mon–Sun CalendarHeatmap modal", 1),
-  bullet("Treemaps shown one at a time via two toggles — Food/Drink × Ingredients/Items; ingredient cells coloured by level1 group (categoryColors), item cells by a single accent; top-N cap with a 기타 rollup; cell-label font capped at 11px", 1),
-  bullet("With whom I eat: toggle between relationship bars (혼자 + categories) and a top-companions list", 1),
-  bullet("Uppercase, centred section titles; compact layout (four-box row, single-treemap toggles) tuned to keep the widget near a single widget's height"),
-);
-C(bold("Diet — Trend view (8 tabs, complete v3.5)"));
-C(
-  bullet("Eating · Caffeine · Servings · Carbs — four box-plot-per-bucket tabs, each rendering CssVerticalBoxPlotChart (non-compact) across the weekly/monthly buckets"),
-  bullet("Composition · Spicy · Relation — three tabs built on the reusable StackedBars: Composition (Food/Drink × Ingredients/Items toggles; dynamic 30%-threshold 'others' rollup, capped at palette size), Spicy (absolute H/M/L day counts), Relation (relation-type mix, 100%; 혼자 neutral)"),
-  bullet("People — a CssRankFlowChart of the top-7 companions over time, with a Relation multi-select that re-ranks client-side (each person summed over the selected relation types, zeros dropped, top-7 re-taken)"),
-  bullet("Tab persistence: a trendLoadedRef in DietWidget keeps the view mounted across bucket-size changes so the active tab is not reset"),
-);
-C(note("Naming convention (unified v3.5) across the Diet, Drinking, and Interactions trend views: the relation-type 100% stacked tab is Relation; the top-7 individual rank-flow tab is People; the relation multi-select is the Relation filter. Diet and Drinking filter the rank-flow client-side from the per-bucket people map; Interactions filters server-side (committed on close, then re-fetch)."));
-C(h2("13.5 Drinking Widget — Data Model"));
-C(bold("6am Date Assignment Rule"));
-C(p("Alcohol records with start.datetime between 00:00–05:59 are attributed to the previous calendar day. Implemented via assignDrinkingDate() in the API route. The fetch window is expanded by 6 hours at the start of the period to capture midnight records."));
-C(bold("Drinks Quantity Calculation"));
-C(table(["Field","Description"],[
-  ["total","Sum of all drinks across the period"],
-  ["min","Minimum per-day drinks total (drinking days only)"],
-  ["max","Maximum per-day drinks total (drinking days only)"],
-  ["avg","Average per-day drinks (drinking days only)"],
-  ["p25","25th percentile of per-day drinks distribution"],
-  ["p75","75th percentile of per-day drinks distribution"],
-  ["n","Number of drinking days used in per-day stats"],
-],[2400,6960]));
-C(spacer());
-C(bold("Drink Type Calculation"));
-C(p("Each record contributes exactly 1.0 to the total across all types. If a record contains multiple alcohol items, the 1.0 is split proportionally by drinks value. E.g. a record with 와인 (2.43 drinks) and 사케 (0.94 drinks) gives: 와인 += 0.72, 사케 += 0.28. Results are rounded to integers for display."));
-C(bold("Rest Day Score & Histogram Buckets"));
-C(p("score(D) = diffDays(D, lastDrinkBeforeD) - 1 + (D is rest ? 1 : 0). If no prior drinking day exists, anchor to datasetFirstDate."));
-C(table(["Bucket","Range","Meaning"],[
-  ["0d","0 rest days","Drank on consecutive days"],
-  ["1d","Exactly 1 rest day",""],
-  ["2–3d","2–3 consecutive rest days",""],
-  ["4–6d","4–6 consecutive rest days",""],
-  ["1–2w","7–13 consecutive rest days",""],
-  ["2–4w","14–29 consecutive rest days",""],
-  ["1m+","30+ consecutive rest days",""],
-],[2000,3400,3960]));
-C(spacer());
-C(bold("Trend Mode API — drinking.summary"));
-C(p("mode=trend returns per-bucket data: drinkingDays, daysInPeriod, totalDrinks, avgDrinksPerDay, drinksBox {min/max/avg/p25/p75}, avgRestDays (computed via dailyScores), histogram (Record<string,number> with all 7 buckets), drinkType, occasions, companions, people, avgStartMins, avgEndMins, avgDurationSeconds. companions is the relation-type stack (Record<string,number>) behind the Relation tab; people (added v3.5) is the per-person, per-relation-type breakdown Record<string, Record<string,number>> that drives the People rank-flow tab and its client-side Relation filter — built from the same per-event dedupe and category rules as the summary's topPeople."));
-C(h2("13.6 CSS Chart Architecture"));
-C(
-  bullet("Bars, dots, labels, axes: CSS/HTML divs with pixel or percentage positioning"),
-  bullet("Curved lines: SVG with fixed pixel viewBox (e.g. \"0 0 500 160\") to avoid coordinate mismatch with CSS"),
-  bullet("Week label compression: compressWeekLabels() — first bucket shows YYWww, subsequent show Www; year change resets to YYWww"),
-  bullet("Y-axis overflow prevention: labels clamped (skip if outside plot bounds); Y-axis containers are overflow-hidden"),
-  bullet("CssRestChart: both axes use shared PLOT_T=12px / PLOT_B=REST_H-4px bounds; bars pre-calculated via for-loop"),
-  bullet("ISO week: stepBack() and currentPeriod() both use Jan-4-based ISO week calculation"),
-);
-C(h2("13.7 Bug Fixes in v2.9"));
-C(table(["Bug","Fix"],[
-  ["stepBack() week number off by one","Replaced Jan-1-based formula with ISO week calculation using Jan 4 as reference"],
-  ["currentPeriod() week number off by one","Same ISO fix applied; finds this week's Monday and counts from W01 Monday"],
-  ["formatBucketLabel() showing Wundefined","Updated to handle compressed format \"2026W21\" and \"W21\" in addition to raw \"2026-W21\""],
-  ["CssRestChart bars overflowing upward","Unified SVG pixel coordinate space; pre-calculated segments via for-loop; shared PLOT_T/PLOT_B bounds"],
-  ["avgRestDays in trend buckets incorrect","Now uses computeDailyScores() identical to computeDrinkingSummary()"],
-],[3400,5960]));
-C(spacer());
-C(h2("13.8 Diet Widget — Data Model (NEW v3.3; extended v3.4, v3.5)"));
-C(bold("API — diet.summary"));
-C(p("computeDietSummary(userId, periodStart, periodEnd, crossActivities) returns one summary object for the whole period. It reuses assignDrinkingDate() as the shared 6am day-boundary helper (00:00–05:59 → previous day) across every per-day metric, fetches food/drink-bearing records (food.foods[] or food.drinks[] non-empty) with a 6-hour early lookback, and joins level2 → level1 from ingredient_master in JS (same pattern as the alcohol convMap). Per-day arrays are capped at yesterday; rangeStart/rangeEnd carry the full (uncapped) filter range for the calendar grid."));
-C(table(["Field","Description"],[
-  ["finishEating","[{date, endMins}] — latest end time among food-bearing records per day; endMins +1440 for post-midnight"],
-  ["finishCaffeine","[{date, endMins}] — latest end time among records with a caffeinated drink (ingredient 커피/카페인) per day; computed in the drinks pass, so coffee taken without food still counts (v3.4)"],
-  ["servings","[{date, total}] — Σ food.foods[].amount (인분); parseFloat so it works on String or Number"],
-  ["carbsIndex","[{date, value}] — Σ (carbs H=2/M=1/L=0 × that meal's 인분); drinks excluded"],
-  ["spiciness","[{date, level}] — per eating day, max of H/M/L (L = ate but not spicy); a day absent from the array had no meal logged"],
-  ["ateIngredients / drankIngredients","[{level2, level1, count}] — frequency; level1 joined from ingredient_master"],
-  ["ateItems / drankItems","[{item, count}] — frequency by item name"],
-  ["companions","{alone, total, byRelationType, topPeople[]} — scoped to food- OR drink-bearing records; drink-only meetups (e.g. coffee) now count (v3.5)"],
-  ["averages","{finishEatingMins, finishCaffeineMins, servings, carbsIndex} — mean over days present (drives the average line/marker)"],
-  ["rangeStart / rangeEnd","full filter range (uncapped) — for the spiciness calendar grid"],
-],[2700,6660]));
-C(spacer());
-C(bold("Scope rules"));
-C(
-  bullet("\"Eating\" = a record with at least one non-null food.foods[].item. A drink-only record (e.g. a midnight juice) is excluded from the eating metrics but still counts in the drink treemaps."),
-  bullet("Alcohol (food.alcohols[]) is excluded entirely — it has no ingredients and is covered by the Drinking widget. Drink treemaps read food.drinks[] only."),
-  bullet("Counting is frequency-based (each occurrence = 1)."),
-  bullet("The 6am day-boundary rule from the Drinking widget applies uniformly to every per-day Diet metric — with one exception (v3.5): records tagged food.type === '아침' (breakfast) are exempted from the previous-day rollback and the +1440 late-night shift, so an early-morning breakfast stays on its own calendar day."),
-);
-C(bold("Summary view = distribution, not trend"));
-C(p("The summary deliberately shows the distribution of daily values (box plots, with the full daily line one tap away in a modal) rather than a period trend — the average is the headline statistic. The Trend view (complete as of v3.5) rolls these same metrics into weekly/monthly buckets per the global filter; its eight tabs are described in Section 13.4."));
-C(bold("Trend Mode API — diet.summary (NEW v3.5)"));
-C(p("mode=trend returns one object per bucket: label, daysInPeriod, the four box-plot arrays (eatingCutoff, caffeineCutoff, servings, carbs), the composition maps (ateIng, ateItems, drankIng, drankItems), spicy {H,M,L}, relation (Record<string,number>, behind the Relation tab), and people (Record<string, Record<string,number>>). people is the per-person, per-relation-type companion breakdown that the People rank-flow tab filters and re-ranks client-side; it is built from the same personMap category counts the summary uses for topPeople, so the 아침 exception and the food-or-drink scope apply identically."));
-C(bold("Spiciness calendar — one rule for all filter modes"));
-C(p("Expand [rangeStart, rangeEnd] to whole Mon–Sun weeks and dim any day outside the range. Month → 1st to month-end with adjacent-month days dimmed; week → one row; day → that day's full week with only the one day solid; period → a continuous grid. Cell colours: red (any H), amber (M, no H), blue (ate, not spicy), empty (no meal logged). The inline HeatStrip uses the same fillFor() colouring in a single dateless/headerless row."));
-C(bold("Colour assignment"));
-C(p("Ingredient-group and relationship colours are assigned at runtime by indexing categoryColors(isDark) over the groups present in the data (locale-sorted for stability) — no domain values are hard-coded in the widget, so taxonomy changes flow through automatically. A future option is to return the canonical level1 order from ingredient_master for permanently pinned colours."));
-C(bold("Components introduced"));
-C(
-  bullet("Treemap.tsx — squarified layout, CSS-positioned cells measured by ResizeObserver, top-N cap + neutral 기타 (+N) rollup"),
-  bullet("CalendarHeatmap.tsx — CalendarHeatmap (full Mon–Sun grid, reusable for WBS #59) and HeatStrip (compact inline row)"),
-  bullet("CssDailyChart (in css-chart-components.tsx) — daily line with average line, zone bands, above-marker value+date tooltip"),
-  bullet("CssVerticalBoxPlotChart gained formatY (e.g. HH:MM axis), height, and compact (v3.4 — drops the y-axis and the name legend, labelling max/avg/min directly) so four boxes fit one row"),
-);
-C(bold("Caffeine cutoff — placement (v3.4)"));
-C(p("finishCaffeine is built in the same loop pass that counts drink ingredients (before the food-only cut), not inside the finish-eating block. The finish-eating block runs only for food-bearing records, so computing caffeine there would silently drop coffees taken without food. The check is: any food.drinks[] entry whose ingredients include 커피 or 카페인 → take that record's end time as a candidate for the day's caffeine cutoff."));
 
-// ===== 14. HANDOVER =====
-C(h1("14. Project Handover & Developer Context"));
-C(h2("14.1 Purpose"));
-C(p("This section is written for a future Claude session continuing development of FarGaze Log. When starting a new conversation, tell Claude: \"Please read the FarGaze Log design (v3.6) and WBS (v2.7) documents in my Google Drive and let's resume the development.\""));
-C(h2("14.2 Repository & Deployment"));
-C(table(["Item","Value"],[
-  ["GitHub repo","nullpitch-dev/fargaze-log"],
-  ["Production URL","https://log.fargaze.co"],
-  ["Local dev","~/projects/fargaze-log on WSL2 (Ubuntu)"],
-  ["Deployment","Vercel — auto-deploys from main branch"],
-  ["Node version","24.x (Vercel runtime)"],
-],[2600,6760]));
-C(spacer());
-C(h2("14.3 Tech Stack"));
-C(table(["Layer","Technology","Notes"],[
-  ["Framework","Next.js 15 (App Router)","src/app directory structure"],
-  ["Language","TypeScript","Strict mode"],
-  ["Styling","Tailwind CSS v4","Dark mode via prefers-color-scheme; light: stone palette, dark: zinc palette"],
-  ["Database","MongoDB Atlas M0","AWS Europe Ireland; mongoose ODM"],
-  ["Search","MongoDB Atlas Search","Index: log_search; autocomplete + text dual-mapping"],
-  ["Auth","Auth.js (NextAuth) v5","Google OAuth; EMAIL_TO_USER_ID in src/auth.ts"],
-  ["Drag & Drop","@dnd-kit/core + @dnd-kit/sortable","Used in spending pivot table"],
-  ["Charts","Custom CSS + SVG components","CSS-first; SVG only for curved line paths in trend charts"],
-  ["Hosting","Vercel","Environment variables set in Vercel dashboard"],
-],[2000,2800,4560]));
-C(spacer());
-C(h2("14.4 Directory Structure"));
+C(new Paragraph({ children: [new TextRun({ text: "Appendices", bold: true, size: 28 })], spacing: { before: 280, after: 140 } }));
+
+// ===== APPENDICES =====
+C(h1("Appendix A — Conventions & Patterns"));
+C(p("Durable engineering conventions distilled from across the project. New work should follow these."));
+
+C(h3("A.1 Key Architecture Decisions"));
+C(
+  bullet("Auth: Google OAuth → EMAIL_TO_USER_ID map → userId in JWT cookie. Three-layer security: middleware + API 403 + MongoDB userId filter."),
+  bullet("Schema: duration.totalSeconds only (no d/h/m/s). Computed from start/end UTC timestamps using timezoneOffset."),
+  bullet("Migration: delete-all + re-insert strategy (no unique index). Daily run on 2026 sheet only; full re-migration by uncommenting ~2025 block."),
+  bullet("Ingredients: food.foods[].ingredients (v3.1) and food.drinks[].ingredients (v3.2) populated from level2 taxonomy. Source of truth is ingredient_master (seeded from the Ingredient sheet). parseFoodIngredients validates foods and drinks against the loaded vocabulary; the historical-fill scripts repair anything the parentheses do not cover. food.alcohols[] has no ingredients."),
+  bullet("Search: Atlas Search primary, regex fallback when Atlas returns 0 results. searchMode field in response indicates which was used. Field conditions support scoped exact-phrase matching via parseQuery (v3.6); result-table sorting is client-side (v3.6)."),
+  bullet("Spending page layout: category order, detail order, collapsed state persisted in localStorage under key \"fargaze-cost-layout\"."),
+  bullet("Dark mode: Tailwind v4 with prefers-color-scheme media query. Light = stone palette, dark = zinc palette."),
+  bullet("DnD: @dnd-kit/core + @dnd-kit/sortable. Category drag moves details with it. Detail drag scoped within category."),
+  bullet("Spending dropdown: uses React createPortal to render into document.body, escaping table stacking context."),
+  bullet("Insights API (v3.4): one compute module per widget under src/lib/insights/ (sleep, interactions, drinking, diet), each exporting its summary (and trend) function; route.ts is a thin GET dispatcher. Shared date/period helpers live in dates.ts, shared numerics in util.ts. Each widget keeps its own Log.find + aggregation (windows differ — drinking caps at yesterday, diet has a 6h lookback), so the fetch is deliberately not abstracted into one shared pass."),
+  bullet("Summary bars (v3.6): the Diet, Drinking and Interactions summaries share bars.tsx (Title / BarRow / BarSection) with a dedicated barColors palette in chart-colors.ts, kept separate from categoryColors/rankFlowColors. The legacy SVG module _lib/chart-components.tsx and CssStackedBarChart were retired in the same pass; the Interactions and Drinking summaries were restructured to drop their Stats/Top 10 tabs."),
+);
+
+C(h3("A.2 Data & Query Conventions"));
+C(
+  bullet("MongoDB date-range queries filter on the local date fields (start.year/month/day) via $expr + $dateFromParts, never on start.datetime (UTC), to avoid timezone-shift errors."),
+  bullet("Atlas aggregations always begin with userId as the first match condition."),
+  bullet("Filtered aggregations that depend on uniqueness (e.g. unique-people counts) are recomputed server-side — they cannot be derived from marginal totals."),
+  bullet("The 6am day boundary (assignDrinkingDate) is the canonical 'when did this day start' rule, shared by the drinking and diet widgets; 아침 (breakfast) records are exempt from the rollback."),
+);
+C(h3("A.3 Charting Conventions"));
+C(
+  bullet("CSS/HTML charts are the standard (bars, stacked bars, box plots, histograms, rank-flow). SVG is reserved for splines and overlays."),
+  bullet("Summary bars share bars.tsx (Title / BarRow / BarSection) with the barColors palette; trend stacks use StackedBars; ranked flows use CssRankFlowChart."),
+  bullet("Colour: useIsDark() + chartColors(isDark) for SVG; categoryColors, rankFlowColors and barColors are kept as separate palettes; spline tension is 0.2."),
+  bullet("Each Insights widget follows the same template — Purpose · API / data shape · Summary view · Trend view · Filters · Notes — so new widgets slot in mechanically."),
+);
+C(h3("A.4 Documentation & Delivery Conventions"));
+C(
+  bullet("Each regenerated doc is written out in full — every section present, never 'unchanged from vX.X'. The changelog keeps one line per version; the body is the source of truth."),
+  bullet("This design doc holds durable spec only. Work status, open questions and the backlog live in the WBS."),
+  bullet("Generators (gen-design.js, gen-wbs.js, docx-helpers.js) are patched with targeted edits; .docx outputs are validated before delivery."),
+);
+
+C(h1("Appendix B — Directory Map"));
 C(table(["Path","Purpose"],[
   ["src/app/insights/page.tsx","Insights master page — CSS columns layout; widget registry (WIDGETS array)"],
   ["src/app/insights/_widgets/SleepWidget.tsx","Sleep widget"],
@@ -1106,7 +1395,9 @@ C(table(["Path","Purpose"],[
   ["src/app/insights/_widgets/DietWidget.tsx","Diet widget (WBS #61) — Summary view: four compact box plots, spicy HeatStrip + calendar modal, treemap toggles, companions toggle (v3.3–v3.4)"],
   ["src/app/insights/_components/charts/BoxPlot.tsx","CSS horizontal box plot — props: min, max, avg, p25, p75, isDark"],
   ["src/app/insights/_components/charts/Histogram.tsx","CSS histogram — props: buckets[] ({label, count}), isDark"],
-  ["src/app/insights/_components/charts/css-chart-components.tsx","CSS+SVG chart components: CssTrendChart, CssVerticalBoxPlotChart (compact prop v3.4), CssDualLineChart, CssRestChart, CssDailyChart (v3.3), compressWeekLabels (CssStackedBarChart removed v3.6)"],
+  ["src/app/insights/_components/charts/css-chart-components.tsx","CSS+SVG chart components: CssTrendChart, CssVerticalBoxPlotChart (compact prop v3.4; last-bucket values v4.1), CssDualLineChart, CssRestChart, CssDailyChart (v3.3), compressWeekLabels (CssStackedBarChart removed v3.6)"],
+  ["src/app/insights/_widgets/WeightWidget.tsx","Weight widget (WBS #54, v4.1) — Summary view: period box plot (non-compact CssVerticalBoxPlotChart, single bucket) beside a Body Composition block of two stacked bars (Average / Latest) with a delta strip between them; local CompositionRow measures itself with a ResizeObserver to decide which figures fit inside each segment"],
+  ["src/lib/insights/weight.ts","computeWeightSummary (v4.1) — collapseToDays shared by the period query and the latest-ever lookup; buildComposition normalises bodyFatPercent and degrades to a weight-only bar when muscle/fat are absent"],
   ["src/app/insights/_components/charts/Treemap.tsx","Squarified treemap (v3.3); ResizeObserver-measured cells; top-N + 기타 rollup; label font capped at 11px (v3.4)"],
   ["src/app/insights/_components/charts/CalendarHeatmap.tsx","CalendarHeatmap (Mon–Sun grid, modal) + HeatStrip (single-row inline) (v3.3)"],
   ["src/app/insights/_components/charts/bars.tsx","(v3.6) Shared summary-bar primitives Title / BarRow / BarSection; desc-sorted, max-normalised bars with {pct}% ({count}) values; used by the Diet, Drinking and Interactions summaries (replaces the retired SVG _lib/chart-components.tsx)"],
@@ -1142,157 +1433,10 @@ C(table(["Path","Purpose"],[
   ["scripts/inspect-drinks.ts","Survey for drinks: docs with drinks, items with/without ingredients, Not Defined count, top level2 distribution, samples (NEW v3.2)"],
 ],[3400,5960]));
 C(spacer());
-C(h2("14.5 Environment Variables"));
-C(table(["Variable","Where","Purpose"],[
-  ["MONGODB_URI","Vercel + .env.local","MongoDB Atlas connection string"],
-  ["GOOGLE_CLIENT_ID","Vercel + .env.local","Google OAuth client ID"],
-  ["GOOGLE_CLIENT_SECRET","Vercel + .env.local","Google OAuth client secret"],
-  ["NEXTAUTH_SECRET","Vercel + .env.local","Auth.js session encryption key"],
-  ["NEXTAUTH_URL","Vercel + .env.local","https://log.fargaze.co"],
-  ["GOOGLE_OWNER_EMAIL","Vercel + .env.local","hyoje.choi@gmail.com — maps to userId hyoje"],
-  ["GOOGLE_SERVICE_ACCOUNT_FILE","Vercel + .env.local","Service account JSON filename (in /myfiles) for Google Sheets API"],
-  ["SPREADSHEET_ID_ACTIVE","Vercel + .env.local","Google Sheets file ID for Active spreadsheet (incl. AlcoholConv, Ingredient sheets)"],
-  ["SPREADSHEET_ID_ARCHIVE","Vercel + .env.local","Google Sheets file ID for Full Archive (~2025 + 2026)"],
-  ["ANTHROPIC_API_KEY","Vercel + .env.local","Anthropic API key (for future LLM features)"],
-],[3000,2400,3960]));
-C(spacer());
-C(h2("14.6 Data Summary"));
-C(table(["Item","Value"],[
-  ["Total log documents","~43,123 (41,326 from ~2025, 1,797 from 2026)"],
-  ["Documents with foods","6,154"],
-  ["Food items total","15,375 — all with ingredients populated, 0 Not Defined (v3.1)"],
-  ["Documents with drinks","~5,006"],
-  ["Drink items total","~5,462 — all with ingredients populated, 0 Not Defined (v3.2)"],
-  ["Date range","2018 to present"],
-  ["Cost categories","22 clean categories (see Section 12.2)"],
-  ["Ingredient taxonomy","73 level2 values across 16 level1 groups (ingredient_master) — food + drinks"],
-  ["Primary currency","KRW — cost.amountKRW always populated; foreign amounts also stored"],
-  ["User","userId = hyoje"],
-  ["Atlas Search index","log_search — autocomplete + text dual-mapping on all text fields"],
-],[3000,6360]));
-C(spacer());
-C(h2("14.7 Key Architecture Decisions"));
-C(
-  bullet("Auth: Google OAuth → EMAIL_TO_USER_ID map → userId in JWT cookie. Three-layer security: middleware + API 403 + MongoDB userId filter."),
-  bullet("Schema: duration.totalSeconds only (no d/h/m/s). Computed from start/end UTC timestamps using timezoneOffset."),
-  bullet("Migration: delete-all + re-insert strategy (no unique index). Daily run on 2026 sheet only; full re-migration by uncommenting ~2025 block."),
-  bullet("Ingredients: food.foods[].ingredients (v3.1) and food.drinks[].ingredients (v3.2) populated from level2 taxonomy. Source of truth is ingredient_master (seeded from the Ingredient sheet). parseFoodIngredients validates foods and drinks against the loaded vocabulary; the historical-fill scripts repair anything the parentheses do not cover. food.alcohols[] has no ingredients."),
-  bullet("Search: Atlas Search primary, regex fallback when Atlas returns 0 results. searchMode field in response indicates which was used. Field conditions support scoped exact-phrase matching via parseQuery (v3.6); result-table sorting is client-side (v3.6)."),
-  bullet("Spending page layout: category order, detail order, collapsed state persisted in localStorage under key \"fargaze-cost-layout\"."),
-  bullet("Dark mode: Tailwind v4 with prefers-color-scheme media query. Light = stone palette, dark = zinc palette."),
-  bullet("DnD: @dnd-kit/core + @dnd-kit/sortable. Category drag moves details with it. Detail drag scoped within category."),
-  bullet("Spending dropdown: uses React createPortal to render into document.body, escaping table stacking context."),
-  bullet("Insights API (v3.4): one compute module per widget under src/lib/insights/ (sleep, interactions, drinking, diet), each exporting its summary (and trend) function; route.ts is a thin GET dispatcher. Shared date/period helpers live in dates.ts, shared numerics in util.ts. Each widget keeps its own Log.find + aggregation (windows differ — drinking caps at yesterday, diet has a 6h lookback), so the fetch is deliberately not abstracted into one shared pass."),
-  bullet("Summary bars (v3.6): the Diet, Drinking and Interactions summaries share bars.tsx (Title / BarRow / BarSection) with a dedicated barColors palette in chart-colors.ts, kept separate from categoryColors/rankFlowColors. The legacy SVG module _lib/chart-components.tsx and CssStackedBarChart were retired in the same pass; the Interactions and Drinking summaries were restructured to drop their Stats/Top 10 tabs."),
-);
-C(h2("14.8 Current WBS Status"));
-C(table(["Phase","Status","Notes"],[
-  ["Phase 1 — Infrastructure & Auth","Complete",""],
-  ["Phase 2 — Data Structure Design","Complete",""],
-  ["Phase 3 — Migration Tool","Complete",""],
-  ["Phase 4 — Analytics & Search","In progress","WBS #53, #56, #57, #60, #61, #62 complete; Insights polish pass (#1–#9) + bar standardisation complete (v3.6). Remaining: #54 Weight, #58 Exercise, #59 Calendar"],
-  ["Phase 5 — Data Entry","Not started",""],
-],[3000,1800,4560]));
-C(spacer());
-C(h2("14.9 Remaining Phase 4 Items"));
-C(
-  bullet("#54 Widget: Weight trend — body.weight over time"),
-  bullet("#58 Widget: Exercise trend — exercise.frequency metric"),
-  bullet("#59 Native calendar view (historical and future entries) — can reuse the CalendarHeatmap component built for Diet"),
-);
-C(h2("14.10 Questions to Ask Hyoje When Starting a New Conversation"));
-C(
-  num("Which WBS item would you like to work on next?"),
-  num("Are there any bugs or UI issues to fix first?"),
-  num("Is the codebase compiling and running correctly on localhost?"),
-  num("Are there any design decisions from the previous session that you want to revisit?"),
-);
-
-// ===== 15. DAILY ROUTINE =====
-C(h1("15. Daily Data Routine (NEW v3.1)"));
-C(h2("15.1 Overview"));
-C(p("This section documents the day-to-day workflow for keeping MongoDB in sync with the Google Sheets source, including ingredient population. The routine applies whenever source data changes — most commonly when yesterday's entries are moved from the Active sheet into the 2026 archive sheet."));
-C(h2("15.2 The Routine — Step by Step"));
-C(table(["Step","Command","What it does"],[
-  ["1. Drop in new data","(manual, in Google Sheets)","Move yesterday's completed entries from the Active sheet into the 2026 archive sheet. Use the parenthesis ingredient notation on food AND drink items, e.g. 밥(쌀)+계란(계란) and 라떼(커피|우유). Items without parentheses become [\"Not Defined\"] and are repaired in steps 3-4."],
-  ["2. Migrate","npm run migrate","Deletes all 2026 documents (Log.deleteMany({ userId, 'start.year': 2026 })) and rebuilds them from the 2026 sheet. Foods with parenthesis notation get their ingredients directly from parseFoodIngredients; foods without get [\"Not Defined\"]."],
-  ["3. Fill ingredients","npx tsx scripts/fill-historical-ingredients.ts","Repairs every food item whose ingredients are missing or [\"Not Defined\"] using the embedded REVIEWED_MAP + bestGuess fallback. Skips items that already have real ingredients (including today's properly-parenthesised rows)."],
-  ["4. Fill drinks","npx tsx scripts/fill-historical-drinks.ts","Same as step 3 but for food.drinks[].ingredients, using the DRINK_MAP. Independent of the foods fill; order between them does not matter."],
-  ["5. Inspect","npx tsx scripts/inspect-ingredients.ts + inspect-drinks.ts","Surveys both foods and drinks: items with ingredients vs Not Defined, top level2 distribution, samples."],
-  ["6. Reconcile","npx tsx scripts/reconcile-foods.ts","Re-reads the source sheets with the live parser and compares against MongoDB. Reports source-vs-DB gap and any per-row parse errors. Target: gap = 0, errors = 0."],
-],[1700,2900,4760]));
-C(spacer());
-C(h2("15.3 Why migrate then fill?"));
-C(p("The main migrate rebuilds 2026 from the sheet, where ingredients can only come from parentheses. Older rows without parentheses would become [\"Not Defined\"]. The fill script then tops these up from the reviewed map. Running both in sequence guarantees that both new-style (parenthesised) and old-style (parenthesis-less) rows end up with correct ingredients."));
-C(note("Note (Case A — no stale ingredients): Because the user always runs migrate after any source change, every 2026 document is deleted and rebuilt each time. Old ingredient values can never linger from a previous state — there is no scenario where the sheet says one thing and MongoDB shows a stale ingredient from a deleted item."));
-C(h2("15.4 Idempotency & the Not-Defined Rule"));
-C(p("The fill script's skip condition treats [\"Not Defined\"] as unfilled, so re-runs repair items that a migration reset to Not Defined. Items that already hold real ingredients are skipped. This makes the fill step safe to run every day:"));
-C(
-  bullet("Items with real ingredients (from parentheses or a prior fill) → skipped, untouched"),
-  bullet("Items that are [\"Not Defined\"] → re-filled from the reviewed map"),
-  bullet("Items with no ingredients field at all → filled"),
-);
-C(h2("15.5 Cleaning Legacy Parentheses"));
-C(p("Old source rows that used descriptive (non-ingredient) parentheses — e.g. 소고기 국밥(국만), 짬뽕(국물만), 소고기 미역국(밥만), 아이스크림(와일드바디), 회(도다리 세꼬시와 광어) — will be rejected by parseFoodIngredients because the text in parentheses is not a valid level2 value. Run scripts/scan-bad-parens.ts to list every offending row, then fix them in the sheet (remove the descriptive parentheses, or convert to real ingredient notation), and re-migrate. After cleaning, reconcile should report gap = 0 and errors = 0."));
-
-// ===== 16. MASTER-TABLE UPDATE PROCEDURES =====
-C(h1("16. Master-Table Update Procedures (NEW v3.1)"));
-C(p("FarGaze has two food-related master tables that are seeded from the Active spreadsheet: the alcohol conversion table and the ingredient taxonomy. This section is the canonical procedure for updating each."));
-C(h2("16.1 Updating the Alcohol Conversion Table (alcohol_conversion)"));
-C(p("The alcohol_conversion collection maps each (item, unit) pair to a drinks value (see Section 8.6). To add or change a conversion:"));
-C(
-  num("Open the AlcoholConv sheet in the Active_2026Mar05 spreadsheet (range AlcoholConv!A2:E)"),
-  num("Add or edit a row: item, unit, unitTo50ml, alcoholRatio. The drinks value is unitTo50ml × alcoholRatio. Example added in v3.1: 와인 / ml."),
-  num("If precision matters, increase the decimal places shown in the sheet cell before migrating — the migration reads the displayed value"),
-  num("Run npm run migrate-alcohol — this does delete-all + re-insert for the alcohol_conversion collection"),
-  num("Verify the collection document count in MongoDB Atlas (54 documents as of v3.1)"),
-);
-C(note("Note: 1 drink = 1 소주잔 = 50ml soju equivalent. The drinks field on each alcohol log entry = amount × convMap[item][unit].drinks. Changing a conversion does NOT require re-migrating the log collection — the drinking widget reads alcohol_conversion at query time."));
-C(h2("16.2 Updating the Ingredient Taxonomy (ingredient_master)"));
-C(note("Note (v3.2): the same ingredient_master taxonomy now serves both foods and drinks. Adding a drink value (e.g. a new tea under 음료) follows exactly the same procedure below. After any taxonomy change, re-run migrate, then both fill-historical-ingredients.ts and fill-historical-drinks.ts."));
-C(p("The ingredient_master collection holds the level1/level2 taxonomy and is the single source of truth for the level2 vocabulary used by parseFoodIngredients validation (see Section 8.7). To add, rename, or regroup an ingredient class:"));
-C(
-  num("Open the Ingredient sheet in the Active_2026Mar05 spreadsheet (columns level1 / level2, header row 1)"),
-  num("Add a new row (new level1+level2), rename a level2 value, or move a level2 to a different level1 group"),
-  num("Run npm run migrate-ingredient — this does delete-all + re-insert for ingredient_master, refreshing the level2 vocabulary"),
-  num("Re-run the main migration (npm run migrate) so that parseFoodIngredients validates against the updated vocabulary; otherwise new-data rows using a renamed value would be rejected"),
-  num("Run the fill script and reconcile per Section 15 to repair and verify"),
-);
-C(bold("Important sequencing rule"));
-C(p("The main migrate (npm run migrate) calls loadValidLevel2() at startup, which reads ingredient_master. If ingredient_master is empty (migrate-ingredient never run) or stale (renames not re-seeded), migration will reject rows using the new/renamed values. Therefore: always run migrate-ingredient at least once before relying on migrate, and re-run it after any change to the Ingredient sheet. Run migrate-ingredient once; re-run only when the Ingredient sheet changes."));
-C(bold("Taxonomy renames performed in v3.1"));
-C(table(["Old level2","New level2","level1"],[
-  ["생선 육수","해물 육수","육수"],
-  ["야채 육수","채소 육수","육수"],
-  ["기타해산물","기타 해산물","해산물"],
-  ["콩류 (was under 채소-like grouping)","콩류 (unchanged name)","moved to 곡류"],
-  ["청국장","청국장 (unchanged name)","moved to 곡류"],
-],[3000,3000,3360]));
-C(spacer());
-C(h2("16.3 The Historical-Fill Reviewed Map"));
-C(p("scripts/fill-historical-ingredients.ts embeds two mappings that resolve a food item name to its level2 ingredient list:"));
-C(
-  bullet("ITEM_MAP — the original 357 common items"),
-  bullet("REVIEWED_MAP — 1,156 human-verified entries built over six review batches, merged on top of ITEM_MAP (reviewed entries take precedence)"),
-  bullet("bestGuess() — a substring fallback for any item in neither map; genuinely unknown items become [\"Not Defined\"]"),
-);
-C(p("Together these cover 1,292 distinct food item names. The review process (six batches) corrected systematic substring-matcher traps — for example: 스테이크 defaulting to 소고기 (fixed for 양고기/생선/돼지 variants); 수육 defaulting to 돼지고기 (fixed for 아귀수육/복수육 → 생선); 차돌 dishes needing 소고기; (국만)/(국물) dishes being broth-only; explicit 밥 requiring 쌀; 라면 requiring 밀; 당면 being 전분 not 밀."));
-C(note("Note: To extend coverage, run the script with --export-worklist to produce a TSV of distinct unmapped items with frequency and a suggested level2, fill in the final_level2 column, and fold the reviewed entries back into REVIEWED_MAP."));
-C(h2("16.4 Reconciliation Result (v3.1)"));
-C(p("After cleaning legacy parentheses, re-migrating, filling ingredients, and dropping in new-notation data, the food-row reconciliation reached full agreement:"));
-C(table(["Metric","Value"],[
-  ["Source food rows (all sheets)","6,154"],
-  ["Expected documents with foods","6,154"],
-  ["Actual MongoDB documents with foods","6,154"],
-  ["Unexplained gap","0 (fully reconciled)"],
-  ["Food items total","15,375"],
-  ["Items with ingredients","15,375"],
-  ["Items = \"Not Defined\"","0"],
-],[4000,5360]));
-C(spacer());
 
 // ===== FOOTER =====
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v3.6 — 25 June 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.1 — 18 July 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+
 
 // ===== DOCUMENT ASSEMBLY =====
 const doc = new Document({
@@ -1328,6 +1472,6 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-Log-Data-Design-v3.6.docx", buffer);
-  console.log("Wrote FarGaze-Log-Data-Design-v3.6.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-Log-Data-Design-v4.1.docx", buffer);
+  console.log("Wrote FarGaze-Log-Data-Design-v4.1.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });

@@ -2,7 +2,7 @@
 // src/app/insights/_components/charts/css-chart-components.tsx
 // CSS-only chart components (no SVG except for line paths) for the Drinking Trend view.
 
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -55,6 +55,14 @@ function buildYTicks(yMin: number, yMax: number, count = 4): number[] {
   // Deduplicate
   return [...new Set(ticks)].filter(v => v >= yMin);
 }
+
+/**
+ * A tick may fall outside the plot box: buildYTicks pins the data max, which
+ * can sit above yMax. Labels already guard against this, gridlines did not —
+ * and since the plot divs are not clipped, a negative top painted the line
+ * upward out of the chart and into the widget header. Guard every call site.
+ */
+const inPlot = (t: number) => t >= 0 && t <= 100;
 
 const CHART_H    = 140;
 const Y_LABEL_W  = 36;
@@ -128,8 +136,10 @@ export function CssTrendChart({
         <div className="relative flex-1" style={{ height: CHART_H }}>
           {/* Grid lines */}
 					{ticks.map(tk => (
-            <div key={tk.value} className="absolute inset-x-0 pointer-events-none"
-              style={{ top: `${yPct(tk.value)}%`, height: 1, background: gc, opacity: 0.7 }} />
+						inPlot(yPct(tk.value)) ? (
+              <div key={tk.value} className="absolute inset-x-0 pointer-events-none"
+                style={{ top: `${yPct(tk.value)}%`, height: 1, background: gc, opacity: 0.7 }} />
+            ) : null
           ))}
 
           {/* Baseline reference line (optional) */}
@@ -267,14 +277,6 @@ export function CssVerticalBoxPlotChart({
   const compressedLabels = formatBucketLabels(buckets.map(b => b.label));
   const hasXLabels = compressedLabels.some(l => l && l.length > 0);
 
-  const LEGEND_LABELS: { key: keyof BoxPlotBucket; name: string; color: (b: BoxPlotBucket) => string }[] = [
-    { key: 'max', name: 'Max', color: () => lc },
-    { key: 'p75', name: 'P75', color: () => lc },
-    { key: 'avg', name: 'Avg', color: () => avgC },
-    { key: 'p25', name: 'P25', color: () => lc },
-    { key: 'min', name: 'Min', color: () => lc },
-  ];
-
   return (
     <div className="flex flex-col gap-1 w-full select-none">
       <div className="flex w-full">
@@ -296,9 +298,11 @@ export function CssVerticalBoxPlotChart({
 
         {/* Plot */}
         <div className="relative flex-1" style={{ height }}>
-          {!compact && yTicks.map(tick => (
-            <div key={tick} className="absolute inset-x-0 pointer-events-none"
-              style={{ top: `${yPct(tick)}%`, height: 1, background: gc, opacity: 0.7 }} />
+					{!compact && yTicks.map(tick => (
+            inPlot(yPct(tick)) ? (
+              <div key={tick} className="absolute inset-x-0 pointer-events-none"
+                style={{ top: `${yPct(tick)}%`, height: 1, background: gc, opacity: 0.7 }} />
+            ) : null
           ))}
 
           <div className="absolute inset-0 flex">
@@ -370,28 +374,35 @@ export function CssVerticalBoxPlotChart({
                         background: isDark ? '#27272a' : '#fff',
                         border: `1px solid ${isDark ? '#3f3f46' : '#e7e5e4'}`,
                         boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}>
-                      <span style={{ color: lc }}>Max <span style={{ color: valueColor(isDark), fontWeight: 600 }}>{formatY(b.max)}</span></span>
+											<span style={{ color: lc }}>Max <span style={{ color: valueColor(isDark), fontWeight: 600 }}>{formatY(b.max)}</span></span>
+                      <span style={{ color: lc }}>P75 <span style={{ color: valueColor(isDark), fontWeight: 600 }}>{formatY(b.p75)}</span></span>
                       <span style={{ color: avgC }}>Avg <span style={{ fontWeight: 600 }}>{formatY(b.avg)}</span></span>
+                      <span style={{ color: lc }}>P25 <span style={{ color: valueColor(isDark), fontWeight: 600 }}>{formatY(b.p25)}</span></span>
                       <span style={{ color: lc }}>Min <span style={{ color: valueColor(isDark), fontWeight: 600 }}>{formatY(b.min)}</span></span>
                     </div>
                   )}
 
-                  {/* Rightmost: legend names (hidden in compact) */}
-                  {!compact && isLast && !isActive && LEGEND_LABELS.map(({ key, name, color }) => {
-                    const pct = yPct(b[key] as number);
-                    const isAvg = key === 'avg';
-                    const offsetMap: Record<string, string> = {
-                      max: 'translateY(-13px)', p75: 'translateY(-11px)', avg: 'translateY(-11px)',
-                      p25: 'translateY(2px)', min: 'translateY(3px)',
-                    };
-                    return (
-                      <div key={name} className="absolute text-[9px] leading-none whitespace-nowrap pointer-events-none"
-                        style={{ left: '62%', top: `${pct}%`, transform: offsetMap[key as string],
-                          color: color(b), fontWeight: isAvg ? 600 : 400 }}>
-                        {name}
-                      </div>
-                    );
-                  })}
+									{/* Rightmost: centred value labels (hidden in compact).
+                      Same placement as compact, but max/min match avg's size.
+                      P75/P25 stay in the tooltip — printed here they would sit
+                      inside the IQR box and collide with its border. */}
+                  {!compact && isLast && !isActive && (
+                    <>
+                      <span className="absolute text-[10px] leading-none whitespace-nowrap pointer-events-none"
+                        style={{ left: '50%', top: `${topWhiskerPct}%`, transform: 'translate(-50%, -135%)', color: valueColor(isDark) }}>
+                        {formatY(b.max)}
+                      </span>
+                      <span className="absolute text-[10px] font-semibold leading-none whitespace-nowrap pointer-events-none rounded px-0.5"
+                        style={{ left: '50%', top: `${avgTopPct}%`, transform: 'translate(-50%, -50%)', color: avgC,
+                          background: isDark ? 'rgba(24,24,27,0.85)' : 'rgba(255,255,255,0.85)' }}>
+                        {formatY(b.avg)}
+                      </span>
+                      <span className="absolute text-[10px] leading-none whitespace-nowrap pointer-events-none"
+                        style={{ left: '50%', top: `${bottomWhiskerPct}%`, transform: 'translate(-50%, 55%)', color: valueColor(isDark) }}>
+                        {formatY(b.min)}
+                      </span>
+                    </>
+                  )}
                 </div>
               );
             })}
@@ -488,9 +499,11 @@ export function CssDualLineChart({ buckets, isDark }: CssDualLineChartProps) {
         {/* Plot */}
         <div className="relative flex-1" style={{ height: DUAL_H }}>
           {/* Grid lines */}
-          {yTicks.map(tick => (
-            <div key={tick} className="absolute inset-x-0 pointer-events-none"
-              style={{ top: `${yPct(tick)}%`, height: 1, background: gc, opacity: 0.7 }} />
+					{yTicks.map(tick => (
+            inPlot(yPct(tick)) ? (
+              <div key={tick} className="absolute inset-x-0 pointer-events-none"
+                style={{ top: `${yPct(tick)}%`, height: 1, background: gc, opacity: 0.6 }} />
+            ) : null
           ))}
 
           {/* SVG overlay */}
@@ -1107,3 +1120,359 @@ export function CssDailyChart({
   );
 }
 
+// ── CssStackedAreaChart ───────────────────────────────────────────────────────
+// Stacked area with a continuous total line. Built for Weight Trend (WBS #54)
+// but nothing here is weight-specific.
+//
+// The two things it exists to handle:
+//  1. Points may carry a total but NO segments (pre-InBody weigh-ins). The
+//     total line runs across them; the coloured fill simply does not start
+//     until segments appear. The gap is information, not a defect.
+//  2. In a mixed bucket the segment sum and the total legitimately differ —
+//     the total averages every day, the segments average only full-triple
+//     days. The fill top and the line separate slightly, and that separation
+//     IS the pre-InBody boundary. Do not "fix" it by forcing them to agree.
+//
+// Nulls break the line rather than interpolating across them. Inventing a
+// reading that never happened is worse than a visible gap.
+//
+// mode='percent' normalises each stack to 100, which flattens the tops and
+// makes a segment's share directly readable over time. The total line is
+// hidden there because a constant 100 carries no information.
+
+export interface StackedAreaSegmentDef {
+  key:   string;
+  label: string;
+  color: string;
+}
+
+export interface StackedAreaPoint {
+  /** already-shortened label; pass through formatBucketLabels-compatible forms */
+  label:     string;
+  total:     number | null;
+  /** keyed by StackedAreaSegmentDef.key; null when this point has no breakdown */
+  segments:  Record<string, number> | null;
+  /** optional extra tooltip line, e.g. 'n = 22 of 30 days' */
+  meta?:     string;
+}
+
+interface CssStackedAreaChartProps {
+  points:       StackedAreaPoint[];
+  /** bottom → top stacking order */
+  segmentDefs:  StackedAreaSegmentDef[];
+  isDark:       boolean;
+  mode?:        'absolute' | 'percent';
+  formatY?:     (v: number) => string;
+  height?:      number;
+  /** pin y-min to 0. Off by default — see the note in the widget. */
+  baselineZero?: boolean;
+  yPadPct?:     number;
+  /** cap on how many x labels are drawn; the last is always kept */
+  maxXLabels?:  number;
+}
+
+const AREA_H = 150;
+
+/** Closed band between an upper and a lower boundary, both splined. */
+function areaBandPath(
+  top:    { x: number; y: number }[],
+  bottom: { x: number; y: number }[],
+): string | null {
+  if (top.length < 2 || bottom.length < 2) return null;
+  const t = smoothPath(top);
+  const b = smoothPath([...bottom].reverse());
+  if (!t || !b) return null;
+  // b starts with 'M x,y'; turning that into 'L x,y' joins the two boundaries.
+  return `${t} L ${b.slice(1).trim()} Z`;
+}
+
+export function CssStackedAreaChart({
+  points, segmentDefs, isDark, mode = 'absolute', formatY = String,
+  height = AREA_H, baselineZero = false, yPadPct = 8, maxXLabels = 8,
+}: CssStackedAreaChartProps) {
+	const [activeIdx, setActiveIdx] = useState<number | null>(null);
+  const clipId = useId().replace(/:/g, '');   // ':' is illegal in a url(#…) ref
+
+  const n = points.length;
+  if (n === 0) {
+    return <p className="text-xs" style={{ color: labelColor(isDark) }}>No data</p>;
+  }
+
+  const percent = mode === 'percent';
+
+  /** Cumulative boundaries for one point, bottom → top. null when no segments. */
+  function boundariesAt(i: number): number[] | null {
+    const seg = points[i].segments;
+    if (!seg) return null;
+    const vals = segmentDefs.map(d => seg[d.key] ?? 0);
+    const sum  = vals.reduce((a, b) => a + b, 0);
+    if (sum <= 0) return null;
+    const scale = percent ? 100 / sum : 1;
+    const out: number[] = [0];
+    for (const v of vals) out.push(out[out.length - 1] + v * scale);
+    return out;
+  }
+
+  const allBoundaries = points.map((_, i) => boundariesAt(i));
+  const totals        = points.map(p => p.total);
+
+  // ── y range ────────────────────────────────────────────────────────────────
+  let yMin: number;
+  let yMax: number;
+  let ticks: number[];
+
+  if (percent) {
+    yMin = 0; yMax = 100;
+    ticks = [0, 25, 50, 75, 100];
+  } else {
+    const pool: number[] = [];
+    for (const t of totals) if (t !== null) pool.push(t);
+    for (const b of allBoundaries) if (b) pool.push(b[b.length - 1]);
+    if (pool.length === 0) {
+      return <p className="text-xs" style={{ color: labelColor(isDark) }}>No data</p>;
+    }
+    const lo  = Math.min(...pool);
+    const hi  = Math.max(...pool);
+    const pad = Math.max(0.5, (hi - lo) * (yPadPct / 100));
+    yMin  = baselineZero ? 0 : lo - pad;
+    yMax  = hi + pad;
+    ticks = buildYTicks(yMin, hi);
+  }
+
+  const yRange = yMax - yMin || 1;
+  const xPct = (i: number) => (n <= 1 ? 50 : (i / (n - 1)) * 100);
+  const yPct = (v: number) => (1 - (v - yMin) / yRange) * 100;
+
+  const gc = gridLineColor(isDark);
+  const lc = labelColor(isDark);
+  const vc = valueColor(isDark);
+  const tc = lineColor(isDark);
+
+  // ── contiguous runs of points that carry segments ──────────────────────────
+  const segRuns: number[][] = [];
+  {
+    let cur: number[] = [];
+    for (let i = 0; i < n; i++) {
+      if (allBoundaries[i]) cur.push(i);
+      else { if (cur.length) segRuns.push(cur); cur = []; }
+    }
+    if (cur.length) segRuns.push(cur);
+  }
+
+  // ── contiguous runs of points that carry a total (line breaks on gaps) ─────
+  const lineRuns: number[][] = [];
+  if (!percent) {
+    let cur: number[] = [];
+    for (let i = 0; i < n; i++) {
+      if (totals[i] !== null) cur.push(i);
+      else { if (cur.length) lineRuns.push(cur); cur = []; }
+    }
+    if (cur.length) lineRuns.push(cur);
+  }
+
+  // Width of a lone-point run, drawn as a narrow column so it does not vanish.
+  const soloW = n <= 1 ? 40 : Math.min(3, (100 / n) * 0.7);
+
+	// ── x labels — thin FIRST, then shorten ───────────────────────────────────
+  // formatBucketLabels drops a repeated leading year, so '25.06' becomes '06'
+  // once the previous label already carried '25'. Shortening before thinning
+  // meant the one label holding the year was often the one discarded, leaving
+  // a row of bare months. Thinning first makes those decisions against the
+  // labels that will actually be drawn.
+	// Fixed stride, walked backwards from the last bucket. Dividing the range
+  // evenly produced uneven gaps (2 months, 1, 2, 1) because the rounded
+  // positions do not land on a whole number of buckets, and the separately
+  // pinned last label could land next to its neighbour and overlap it
+  // ('W26W27'). Stepping back from the end pins the newest label by
+  // construction and makes every gap identical.
+  const keep: number[] = [];
+  {
+    const stride = Math.max(1, Math.ceil(n / Math.max(1, maxXLabels)));
+    for (let i = n - 1; i >= 0; i -= stride) keep.push(i);
+    keep.reverse();
+  }
+  const keptShort = formatBucketLabels(keep.map(i => points[i].label));
+  const shortAt   = new Map<number, string>(keep.map((i, k) => [i, keptShort[k]]));
+
+  return (
+    <div className="flex flex-col gap-1 w-full select-none">
+      <div className="flex w-full">
+        {/* Y axis */}
+        <div className="relative shrink-0 overflow-hidden" style={{ width: Y_LABEL_W, height }}>
+          {ticks.map(tk => {
+            const t = yPct(tk);
+            if (t < 3 || t > 97) return null;
+            return (
+              <span key={tk} className="absolute text-[10px] leading-none"
+                style={{ right: 4, top: `${t}%`, transform: 'translateY(-50%)', color: lc }}>
+                {percent ? `${tk}%` : formatY(tk)}
+              </span>
+            );
+          })}
+        </div>
+
+        {/* Plot */}
+        <div className="relative flex-1" style={{ height }}>
+          {/* Grid */}
+					{ticks.map(tk => (
+            inPlot(yPct(tk)) ? (
+              <div key={tk} className="absolute inset-x-0 pointer-events-none"
+                style={{ top: `${yPct(tk)}%`, height: 1, background: gc, opacity: 0.7 }} />
+            ) : null
+          ))}
+
+					<svg className="absolute inset-0 w-full h-full overflow-visible"
+            preserveAspectRatio="none" viewBox="0 0 100 100">
+            {/* Bands are clipped to the plot box. Without this, a band whose
+                base sits below yMin paints straight down over the x labels,
+                the legend and the caption. */}
+            <defs>
+              <clipPath id={clipId}>
+                <rect x="0" y="0" width="100" height="100" />
+              </clipPath>
+            </defs>
+            <g clipPath={`url(#${clipId})`}>
+            {/* Stacked bands */}
+            {segRuns.map((run, ri) =>
+              segmentDefs.map((def, k) => {
+                if (run.length === 1) {
+                  const i = run[0];
+                  const b = allBoundaries[i]!;
+                  const yTop = yPct(b[k + 1]);
+                  const yBot = yPct(b[k]);
+                  return (
+                    <rect key={`${ri}-${k}`}
+                      x={xPct(i) - soloW / 2} width={soloW}
+                      y={Math.min(yTop, yBot)} height={Math.abs(yBot - yTop)}
+                      fill={def.color} opacity={0.85} />
+                  );
+                }
+                const top = run.map(i => ({ x: xPct(i), y: yPct(allBoundaries[i]![k + 1]) }));
+                const bot = run.map(i => ({ x: xPct(i), y: yPct(allBoundaries[i]![k]) }));
+                const d = areaBandPath(top, bot);
+                if (!d) return null;
+                return <path key={`${ri}-${k}`} d={d} fill={def.color} opacity={0.85} />;
+              }),
+            )}
+            </g>
+
+            {/* Total line — absolute mode only */}
+            {!percent && lineRuns.map((run, ri) => {
+              const pts = run.map(i => ({ x: xPct(i), y: yPct(totals[i] as number) }));
+              if (pts.length === 1) {
+                return <circle key={ri} cx={pts[0].x} cy={pts[0].y} r={1.2} fill={tc} />;
+              }
+              const d = smoothPath(pts);
+              if (!d) return null;
+              return (
+                <path key={ri} d={d} fill="none" stroke={tc} strokeWidth="1.5"
+                  strokeLinejoin="round" strokeLinecap="round"
+                  vectorEffect="non-scaling-stroke" opacity={0.95} />
+              );
+            })}
+          </svg>
+
+          {/* Hover columns */}
+          {points.map((p, i) => {
+            const isActive = activeIdx === i;
+            const b = allBoundaries[i];
+            const empty = p.total === null && !b;
+            return (
+              <div key={p.label + i} className="absolute top-0 bottom-0"
+                style={{ left: `${xPct(i)}%`, width: `${Math.max(100 / n, 2)}%`,
+                  transform: 'translateX(-50%)', cursor: 'pointer', zIndex: 2 }}
+                onMouseEnter={() => setActiveIdx(i)}
+                onMouseLeave={() => setActiveIdx(null)}
+                onClick={() => setActiveIdx(isActive ? null : i)}>
+
+                {isActive && (
+                  <>
+                    <div className="absolute inset-y-0 pointer-events-none"
+                      style={{ left: '50%', width: 1, background: lc, opacity: 0.5 }} />
+                    <div className="absolute rounded px-2 py-1 leading-tight whitespace-nowrap pointer-events-none"
+                      style={{ left: '50%', top: 4,
+                        transform: i > n * 0.6
+                          ? 'translateX(calc(-100% - 6px))'
+                          : 'translateX(6px)',
+                        background: isDark ? '#27272a' : '#ffffff',
+                        border: `1px solid ${isDark ? '#3f3f46' : '#e7e5e4'}`,
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.12)', zIndex: 6 }}>
+                      <div style={{ fontSize: 10, color: lc }}>{p.label}</div>
+
+                      {empty && (
+                        <div style={{ fontSize: 11, color: lc, marginTop: 2 }}>No reading</div>
+                      )}
+
+                      {p.total !== null && (
+                        <div style={{ fontSize: 12, fontWeight: 700, color: vc, marginTop: 2 }}>
+                          {formatY(p.total)}
+                        </div>
+                      )}
+
+                      {b && segmentDefs.map((def, k) => {
+                        const raw = p.segments?.[def.key] ?? 0;
+                        const span = b[k + 1] - b[k];
+                        return (
+                          <div key={def.key} className="flex items-center gap-1"
+                            style={{ fontSize: 10, color: lc, marginTop: 1 }}>
+                            <span className="inline-block rounded-full"
+                              style={{ width: 7, height: 7, background: def.color }} />
+                            <span style={{ minWidth: 52 }}>{def.label}</span>
+                            <span style={{ color: vc }}>
+                              {percent ? `${span.toFixed(1)}%` : formatY(raw)}
+                            </span>
+                          </div>
+                        );
+                      })}
+
+                      {!b && p.total !== null && (
+                        <div style={{ fontSize: 10, color: lc, marginTop: 2 }}>
+                          Weight only
+                        </div>
+                      )}
+
+                      {p.meta && (
+                        <div style={{ fontSize: 10, color: lc, marginTop: 2 }}>{p.meta}</div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* X labels */}
+      <div className="flex w-full" style={{ paddingLeft: Y_LABEL_W }}>
+        <div className="relative flex-1" style={{ height: 16 }}>
+					{keep.map(i => (
+            <span key={i} className="absolute text-[10px] leading-none whitespace-nowrap"
+              style={{ left: `${xPct(i)}%`, transform: 'translateX(-50%)',
+                color: i === n - 1 ? vc : lc,
+                fontWeight: i === n - 1 ? 600 : 400 }}>
+              {shortAt.get(i)}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div className="flex gap-3 flex-wrap" style={{ paddingLeft: Y_LABEL_W }}>
+        {segmentDefs.map(def => (
+          <span key={def.key} className="flex items-center gap-1 text-[10px]" style={{ color: lc }}>
+            <span className="inline-block rounded-full"
+              style={{ width: 8, height: 8, background: def.color }} />
+            {def.label}
+          </span>
+        ))}
+        {!percent && (
+          <span className="flex items-center gap-1 text-[10px]" style={{ color: lc }}>
+            <span className="inline-block" style={{ width: 10, height: 2, background: tc }} />
+            Total
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
