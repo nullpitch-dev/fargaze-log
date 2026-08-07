@@ -11,7 +11,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Service Concept & Work Breakdown Structure", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 3.4  |  29 July 2026", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 3.5  |  7 August 2026", size: 24 })], spacing: { after: 240 } }),
 );
 
 C(h1("Version History"));
@@ -39,6 +39,7 @@ C(table(["Version","Date","Headline"],[
   ["3.2","19 Jul 2026","#54 complete — Weight Trend shipped (metric=weight.trend, CssStackedAreaChart, three-state unit toggle); Segmented extracted to a shared component; weight-colors.ts extracted; inPlot gridline guard across all four CSS charts; mirrors Design Doc v4.2"],
   ["3.3","26 Jul 2026","#58 data preparation complete — source columns 부하/방식 added, exercise[].loadKg and exercise[].setStyle in Log.ts and rowToDocument.ts, fetch range A:CI, full re-migration verified; Google Calendar sync Apps Script write targets corrected to CG/CH; new Appendix A.6 on column-insertion safety. Widget design NOT started. Mirrors Design Doc v4.3"],
   ["3.4","29 Jul 2026","#58 Exercise widget COMPLETE \u2014 exercise.ts, stats/route.ts branch, ExerciseWidget.tsx, registered in page.tsx. ModalShell extracted from DietWidget; emphasizeLast added to CssVerticalBoxPlotChart. \uacc4\ub2e8 \uc624\ub974\uae30 \ucda9 records converted to \ubd84, so every item now carries one unit; the per-item table below is re-surveyed and the earlier counts were stale. \ucd1d CORRECTED \u2014 it marks a day total with an unknown set split, not a rest-pause set. Trend view and the load line deferred. Mirrors Design Doc v4.4"],
+  ["3.5","7 Aug 2026","#58 Exercise Trend view COMPLETE \u2014 exercise-trend.ts (exercise.trend / exercise.itemTrend), ExerciseTrendView.tsx, ViewToggle wired into ExerciseWidget. Weight-style grain \u00d7 buckets window; frequency chart aligned over a five-zone Gantt-style item timeline grouped by activity.name; per-item modal averages per active day with the load line on a new CssTrendChart right axis \u2014 the v3.4 load-line deferral is resolved. CssTrendChart gained xBand, maxXLabels, showValues, compressXLabels, a two-line hover tooltip, tiled hover zones and index keys, all default-off or behaviour-preserving. Mirrors Design Doc v4.5"],
 ],[1100,1300,6960]));
 C(spacer());
 
@@ -92,11 +93,11 @@ C(table(["Phase","Status","Detail"],[
   ["1 — Base Infrastructure & Auth","\u2705 Complete","Subscription-architecture placeholder still pending"],
   ["2 — Data Structure Design","\u2705 Complete","Schema, supporting collections, Mongoose models"],
   ["3 — Migration Tool","\u2705 Complete","Delete-all + re-insert; incremental sync deferred to post-MVP"],
-  ["4 — Analytics & Search","\u2B1C In progress","Done: search, cost dashboard, Sleep / Interactions / Drinking / Diet / Weight widgets (all with Summary and Trend), food + drink ingredient taxonomies. Done: #58 Exercise (Summary only). Remaining: #59 Calendar"],
+  ["4 — Analytics & Search","\u2B1C In progress","Done: search, cost dashboard, Sleep / Interactions / Drinking / Diet / Weight widgets (all with Summary and Trend), food + drink ingredient taxonomies. Done: #58 Exercise (Summary and Trend, complete 7 Aug). Remaining: #59 Calendar"],
   ["5 — Data Entry","\u2B1C Not started","Post-MVP"],
 ],[2900,1700,4760]));
 C(spacer());
-C(p([new TextRun({ text: "Current focus: ", bold: true }), new TextRun("#59 Calendar view. #58 Exercise shipped its Summary view on 29 July; its Trend view is deferred and undesigned. Phase 5 (data entry) follows #59.")]));
+C(p([new TextRun({ text: "Current focus: ", bold: true }), new TextRun("#59 Calendar view. #58 Exercise is complete — Summary shipped 29 July, Trend shipped 7 August. Phase 5 (data entry) follows #59.")]));
 
 C(h1("5. Work Breakdown Structure"));
 C(p("\u2705 = Complete   \u2B1C = Pending   DESCOPED = out of MVP scope. Each line states current state, not how it evolved (see the changelog for history)."));
@@ -227,12 +228,21 @@ C(
   bullet("\u2705 emphasizeLast added to CssVerticalBoxPlotChart, defaulting true so no existing call site changes; Exercise passes false because Set and Day are categories, not periods, and bolding the last of them means nothing"),
   bullet("\u2705 \ucda9 semantics established and documented \u2014 a day total with an unknown set split, NOT a rest-pause set. Excluded from the Set box, dailySetMax and bestSet; included in the Day box, total and bestDay"),
 );
+C(bold("Done \u2014 Trend view (7 Aug, v3.5)"));
+C(
+  bullet("\u2705 src/lib/insights/exercise-trend.ts \u2014 computeExerciseTrend (frequency + grouped item timeline) and computeExerciseItemTrend (per-item bucket averages), same unbounded-fetch, cut-in-memory approach as the Summary; the \ucd1d marker is named DAY_TOTAL_MARK here, not the old misnomer"),
+  bullet("\u2705 stats/route.ts \u2014 one branch for both metrics; resolves the Weight-style grain \u00d7 buckets window with anchor min(end of selected period, today) and the start snapped to a bucket boundary"),
+  bullet("\u2705 ExerciseTrendView.tsx \u2014 owns its own fetches; grain \u00d7 count controls with Weight's exact options and defaults; resolved-range line; frequency chart hidden at day grain; five-zone timeline (\u22645 / \u226435 / \u226465 / \u226495 / >95%) as opacity steps on the Summary's pinned accent, grouped under activity.name headers, zero-day items hidden, per-cell hover tooltip (n/bucketDays days + bucket name)"),
+  bullet("\u2705 Per-item modal \u2014 averages per ACTIVE day (intensity, not volume); Day total includes \ucd1d, Biggest set is max reps with ties to the heavier load and \ucd1d-only days excluded; collapse rule scoped to the window; load drawn dashed on the right axis, day-average load treats nulls as zero and never sums across sets"),
+  bullet("\u2705 CssTrendChart extended for all of it \u2014 rightSeries/formatYRight (the dual axis the v3.4 deferral asked for), xBand for grid alignment, maxXLabels thinning, showValues off above 16 buckets with hover reveal, compressXLabels off so every printed label carries its year, two-line tooltip on a backdrop always above the dot, hovered column lifted over neighbours, hover zones one bucket wide, columns keyed by index. Every addition default-off or behaviour-preserving; Sleep and Drinking regression-checked twice"),
+  bullet("\u2705 Verified in the browser across grains, counts, collapsed and multi-set items, \ucd1d-only stretches (2019 day totals with no biggest set), load pass-through, empty items and leading-trim behaviour"),
+);
 C(bold("Deferred \u2014 not built"));
 C(
-  bullet("\u2B1C Trend view \u2014 out of scope for #58; no design proposed"),
-  bullet("\u2B1C Load-in-kg line on the daily chart \u2014 no existing component carries two y-axes (CssDualLineChart is hard-wired to session times, CssRestChart to the rest histogram). Load exists on 2 items of 12 and \uc2a4\ucffc\ud2b8 carries it on only 15 of 33 records, so the line would be mostly gaps. See Design Doc \u00a79.3.6"),
-  bullet("\u2B1C Rename REST_PAUSE / restPauseCount / bestSetRestPause \u2014 misnomers left over from the earlier reading of \ucda9. bestSetRestPause is still computed and returned, but deliberately not rendered"),
+  bullet("\u2B1C Rename REST_PAUSE / restPauseCount / bestSetRestPause \u2014 misnomers left over from the earlier reading of \ucda9; the new exercise-trend.ts already uses DAY_TOTAL_MARK instead. bestSetRestPause is still computed and returned, but deliberately not rendered"),
   bullet("\u2B1C Set-box exclusion caption \u2014 present in the widget but near-unreachable, since it needs both a \ucda9 record and 3+ days for the item in the same period. Left as-is deliberately"),
+  bullet("\u2B1C Trend view labels derive from the CONTROL's grain, not the data's \u2014 for one frame after a grain switch, old buckets render under the new format before the refetch lands. Invisible in practice (the loading state replaces it immediately) and the duplicate-key symptom is fixed by index keys in CssTrendChart; the clean fix is formatting from the payload's own grain, a small patch whenever the view is next touched"),
+  bullet("\u2B1C Load line on the SUMMARY's daily modal \u2014 the Trend resolved the load line at bucket level; a daily load line remains unbuilt and its natural home is an optional second series on CssDailyChart"),
 );
 C(h3("Sub-items for #54 (Weight Widget):"));
 C(
@@ -374,7 +384,7 @@ C(h2("A.2 Shared File Change Protocol"));
 C(table(["File","Used by","Rule"],[
   ["src/app/api/insights/stats/route.ts","All widgets","Targeted patches only. Always read current version first. Verify session?.user?.userId is used."],
   ["src/app/insights/_components/charts/bars.tsx","Diet, Drinking, Interactions summaries","Targeted patches only. Shared summary-bar primitives (Title / BarRow / BarSection). Changing the geometry or the {pct}% ({count}) value format affects all three summaries."],
-  ["src/app/insights/_components/charts/css-chart-components.tsx","DrinkingWidget, DietWidget, WeightWidget","Full replacement acceptable when Hyoje uploads latest version. compressWeekLabels() is shared — preserve it. CssVerticalBoxPlotChart has THREE call sites (Diet Summary compact, Diet Trend, Drinking Amt(day)) plus Weight Summary and, from v3.4, Exercise (one chart per box) — check all six before changing its label layout. WARNING: the bold-last-label style block is duplicated across FIVE chart components in this file; anchor any patch on a uniquely-named identifier such as hasXLabels, never on the style line alone."],
+  ["src/app/insights/_components/charts/css-chart-components.tsx","DrinkingWidget, DietWidget, WeightWidget","Full replacement acceptable when Hyoje uploads latest version. compressWeekLabels() is shared — preserve it. CssVerticalBoxPlotChart has THREE call sites (Diet Summary compact, Diet Trend, Drinking Amt(day)) plus Weight Summary and, from v3.4, Exercise (one chart per box) — check all six before changing its label layout. CssTrendChart is consumed by Sleep, Drinking AND (v3.5) ExerciseTrendView \u2014 its v3.5 props (rightSeries, xBand, maxXLabels, showValues, compressXLabels) are default-off and must stay that way, and the whole-section replacement between the CssTrendChart and CssVerticalBoxPlotChart header comments is the proven safe patch shape for it. WARNING: the bold-last-label style block is duplicated across FIVE chart components in this file; anchor any patch on a uniquely-named identifier such as hasXLabels, never on the style line alone."],
   ["src/app/insights/_lib/format.ts","All widgets via chart-components","Targeted patches only. formatBucketLabel handles month, week (raw + compressed), and day formats."],
   ["src/app/insights/_components/GlobalFilterBar.tsx","Insights page","Targeted patches only. Activity Type filter commits on Apply."],
   ["src/app/insights/_components/WidgetCard.tsx","All widgets","Targeted patches only. Changes affect every widget simultaneously."],
@@ -426,7 +436,7 @@ C(
 );
 C(spacer());
 
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze — Service Concept & WBS v3.4 — 29 July 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze — Service Concept & WBS v3.5 — 7 August 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 const doc = new Document({
   styles: {
@@ -452,6 +462,6 @@ const doc = new Document({
   sections: [{ properties: { page: PAGE }, children }],
 });
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-WBS-v3.4.docx", buffer);
-  console.log("Wrote FarGaze-WBS-v3.4.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-WBS-v3.5.docx", buffer);
+  console.log("Wrote FarGaze-WBS-v3.5.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });

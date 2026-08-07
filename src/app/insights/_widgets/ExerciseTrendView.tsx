@@ -214,7 +214,7 @@ export function ExerciseTrendView({ globalFilter, isDark }: Props) {
     setLoading(true);
     setError(null);
     const url = `/api/insights/stats?${buildParams(
-      { metric: 'exercise.trend', grain, buckets: count },
+			{ metric: 'exercise.trend', grain, buckets: String(count) },
       globalFilter,
     )}`;
     fetch(url)
@@ -232,7 +232,7 @@ export function ExerciseTrendView({ globalFilter, isDark }: Props) {
     setItemLoading(true);
     setItemData(null);
     const url = `/api/insights/stats?${buildParams(
-      { metric: 'exercise.itemTrend', item: openItem, grain, buckets: count },
+			{ metric: 'exercise.itemTrend', item: openItem, grain, buckets: String(count) },
       globalFilter,
     )}`;
     fetch(url)

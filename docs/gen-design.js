@@ -16,7 +16,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze Log", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Data Design & Requirements Document", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 4.4  |  29 July 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 4.5  |  7 August 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
 );
 C(p([new TextRun({ text: "Structure: ", bold: true }), new TextRun("Part I Foundations · Part II Data · Part III Features · Part IV Operations · Appendices. The body is the complete, always-current source of truth; the changelog below carries one line per version. Work status, open questions and the backlog live in the separate WBS, not here.")]));
 
@@ -50,6 +50,7 @@ C(table(
   ["4.2","19 Jul 2026","Weight widget Trend completes #54 — \u00a79.3.5 Trend written; new metric=weight.trend (granularity × buckets × optional end) in \u00a79.2; new shared CssStackedAreaChart and Segmented components; weight-colors.ts extracted; gridline inPlot guard applied across all four CSS charts; x-label thinning changed to a fixed stride walked back from the newest bucket"],
   ["4.3","26 Jul 2026","Exercise source columns BU (\ubd80\ud558) and BV (\ubc29\uc2dd) inserted \u2014 exercise[].loadKg and exercise[].setStyle added in \u00a75.2 and \u00a77.4; \u00a710.1.5 column layout rewritten, total columns 84 \u2192 86 and migration fetch range A:CG \u2192 A:CI; new \u00a713 documents the Google Calendar sync Apps Script, whose write targets moved to CG/CH"],
   ["4.4","29 Jul 2026","Exercise widget (WBS #58) shipped \u2014 new \u00a79.3.6, src/lib/insights/exercise.ts and ExerciseWidget.tsx; ModalShell extracted from DietWidget to \u00a7_components; emphasizeLast prop added to CssVerticalBoxPlotChart; \u00a75.2 setStyle CORRECTED \u2014 \ucd1d marks a day total with an unknown set split, not a rest-pause set; \uacc4\ub2e8 \uc624\ub974\uae30 \ucda9 records converted to \ubd84 so every item now carries exactly one unit"],
+  ["4.5","7 Aug 2026","Exercise Trend view completes the widget \u2014 \u00a79.3.6 Trend written; new metric=exercise.trend and exercise.itemTrend (Weight-style grain \u00d7 buckets window) in src/lib/insights/exercise-trend.ts; new ExerciseTrendView.tsx and the Summary/Trend toggle in ExerciseWidget; CssTrendChart extended \u2014 optional right-axis series (the load line, resolving the v4.4 deferral), band-centred x positions, label thinning, hideable point values, uncompressed labels, a two-line hover tooltip, tiled hover zones and index keys"],
   ],
   [1100, 1300, 6960]
 ));
@@ -813,7 +814,7 @@ C(table(["Component","File","Description"],[
   ["bars.tsx (Title / BarRow / BarSection)","src/app/insights/_components/charts/bars.tsx","(v3.6) Shared summary-bar primitives. BarSection { title, data: Record<string,number>, colorMap?, isDark } sorts desc and draws max-normalised bars (longest = full) with a {pct}% ({count}) value column; omit colorMap → auto-assign via autoColorMap. Geometry h-1.5 rounded-full; typography text-[11px], label stone-600/zinc-300, value stone-500/zinc-400. Shared by the Diet, Drinking and Interactions summaries (Interactions' PeopleBars is composed from these primitives)"],
   ["BoxPlot","src/app/insights/_components/charts/BoxPlot.tsx","CSS horizontal box plot; pr-5 right padding; label width w-10"],
   ["Histogram","src/app/insights/_components/charts/Histogram.tsx","CSS bar chart histogram; fixed font sizes"],
-  ["CssTrendChart","src/app/insights/_components/charts/css-chart-components.tsx","CSS+SVG line chart with Catmull-Rom spline; multi-series; week label compression"],
+  ["CssTrendChart","src/app/insights/_components/charts/css-chart-components.tsx","CSS+SVG line chart with Catmull-Rom spline; multi-series; week label compression. Extended v4.5, every addition off by default so older call sites render unchanged: rightSeries + formatYRight draw ONE extra series dashed with hollow dots against its own right-hand axis in the series colour (the Exercise load line); xBand centres points over n equal cells instead of spanning edge-to-edge, so the chart can align with a cell grid below it; maxXLabels thins x labels on a fixed stride walked back from the newest bucket; showValues=false hides the printed point values on dense windows; compressXLabels=false prints every label whole, because year-compression breaks once labels are thinned \u2014 the label carrying the year can be a thinned one. The hovered point shows a two-line tooltip (value over bucket name) on a translucent backdrop, always above the dot, with the whole hovered column lifted over its neighbours; hover zones are one bucket wide so they tile instead of overlapping; columns are keyed by index because labels can transiently duplicate for one frame when a parent switches grain before its refetch lands"],
   ["CssVerticalBoxPlotChart","src/app/insights/_components/charts/css-chart-components.tsx","Vertical box plots per bucket; hover tooltip (max/P75/avg/P25/min, v4.1); props: formatY, height, and compact (v3.4). Default keeps the y-axis and, since v4.1, prints max/avg/min VALUES centred on the last bucket — the Max/P75/Avg/P25/Min name legend was removed. compact hides the y-axis and prints the same three values, so several boxes fit one row. P75/P25 live in the tooltip in both modes, because printed on the chart they would fall inside the IQR box. emphasizeLast (v4.4) defaults true and bolds the final bucket label \u2014 correct when buckets are periods and the last one is the newest, meaningless when they are categories, so the Exercise widget passes false"],
   ["CssDualLineChart","src/app/insights/_components/charts/css-chart-components.tsx","Dual line chart (From/To); shared HH:MM Y-axis; filled area; dashed arrows with duration; +HH:MM for post-midnight"],
   ["inPlot(t) guard","src/app/insights/_components/charts/css-chart-components.tsx","(v4.2) Shared predicate, t >= 0 && t <= 100, applied at every gridline call site. buildYTicks pins the data max and can therefore return a tick above yMax; the y-axis labels always guarded against this but the gridlines did not, and because the plot containers are not clipped a negative top painted the line upward out of the chart and into the widget header. Applied to CssTrendChart, CssVerticalBoxPlotChart, CssStackedAreaChart and CssDailyChart"],
@@ -1092,10 +1093,10 @@ C(p("A segment's share is a percentage, but whether its figures fit is a questio
 C(h3("9.3.6 Exercise (WBS #58)"));
 
 C(bold("Purpose"));
-C(p("Exercise volume and consistency over the filter period, one block per item, with all-time personal bests printed beside the period figures so a good month can be read against the ceiling rather than in isolation."));
+C(p("Exercise volume and consistency. The Summary shows the filter period, one block per item, with all-time personal bests printed beside the period figures so a good month can be read against the ceiling rather than in isolation. The Trend (v4.5) shows the routine over a longer window: how often per bucket, which items in which stretches, and how the per-day amounts moved."));
 
 C(bold("API / data shape"));
-C(p("computeExerciseSummary(userId, periodStart, periodEnd, crossActivities) in src/lib/insights/exercise.ts, dispatched as metric=exercise.summary. Summary only — #58 ships no Trend view, and duration.totalSeconds is not read at all. Scope is activity.category === 운동, which excludes the six 걷기 rows filed under 문화/취미 and 육아."));
+C(p("computeExerciseSummary(userId, periodStart, periodEnd, crossActivities) in src/lib/insights/exercise.ts, dispatched as metric=exercise.summary. duration.totalSeconds is not read at all. Scope is activity.category === 운동, which excludes the six 걷기 rows filed under 문화/취미 and 육아. The Trend metrics below share the same scope and the same fetch approach from src/lib/insights/exercise-trend.ts."));
 C(p("The query is deliberately UNBOUNDED. The personal bests are all-time while everything else is period-scoped, so one fetch of every 운동 record is taken and the period is cut in memory rather than issuing a second query. At roughly 1,210 records that is far cheaper than the round trip it replaces; the approach should be revisited above about 20,000."));
 C(note("Consequence: the date filter never reaches MongoDB. Dates are compared as YYYY-MM-DD strings built from start.year/month/day, so this widget needs no $expr + $dateFromParts filter and no UTC boundary can shift a day. It satisfies the Appendix A local-date convention by construction rather than by guard."));
 C(table(["Response field","Meaning"],[
@@ -1129,8 +1130,34 @@ C(
   bullet("Under three days in the period the box plot is suppressed and the raw values are listed as plain text instead — there is no distribution worth drawing"),
 );
 
+C(bold("API — exercise.trend and exercise.itemTrend (v4.5)"));
+C(p("computeExerciseTrend(userId, start, end, grain, crossActivities) and computeExerciseItemTrend(userId, item, start, end, grain, crossActivities) in src/lib/insights/exercise-trend.ts, dispatched as metric=exercise.trend and metric=exercise.itemTrend. The window is Weight-style: grain (day | week | month) \u00d7 buckets (a count), resolved in the route by counting back from min(end of the selected filter period, today) — the same anchor rule as weight.trend, for the same reasons — landing on a bucket boundary (Monday or the 1st) so the first bucket is whole. The end cap at today means the current partial bucket reports only its elapsed days and is scored fairly. Both metrics reuse the unbounded-fetch, cut-in-memory approach; everything here is period-scoped, but at ~1.2k records one plain fetch stays cheaper than a date-filtered one and keeps the YYYY-MM-DD string discipline."));
+C(table(["exercise.trend field","Meaning"],[
+  ["grain / buckets[] / bucketDays[]","Echoed grain; bucket start dates ascending; PERIOD days inside each bucket — a bucket straddling the window edge counts only its real days, so activity ratios stay honest"],
+  ["frequency[]","Days exercised per bucket, any item"],
+  ["groups[]","Items grouped under their activity.name (근육 운동 / 유산소 운동 / 계단 오르기) — the grouping is read from the data, never a hardcoded list. Groups sort by their items' combined days desc; items by totalDays desc. Items with zero days in the window never appear"],
+  ["groups[].items[]","{item, unit, totalDays, activeDays[]} — activeDays is days exercised per bucket, aligned to buckets[]"],
+],[2800,6560]));
+C(table(["exercise.itemTrend field","Meaning"],[
+  ["collapsed","True when, within the window, every active day holds exactly one record and none are 총 — the Summary collapse test, period-scoped. The biggest-set series is then null because it would repeat the day total"],
+  ["buckets[]","Same bucketing as the main call, but leading emptiness is trimmed by THIS item's data — the modal owes the timeline no alignment, and opening on months of nothing helps nobody"],
+  ["dayTotal {value[], load[]}","value = average day total per active day in the bucket, 총 included; null = no active day. load = the day's set loads averaged with nulls as zero (3\u00d750 reps at 10 kg is 150 reps at 10 kg, not 30 kg), then averaged across active days; the whole array is null when the item carries no load at all"],
+  ["biggestSet {value[], load[]}","value = average of each day's biggest straight set — max reps, a tie going to the heavier load; 총-only days contribute nothing. load = that chosen set's own load, nulls as zero, averaged the same way"],
+],[2800,6560]));
+C(spacer());
+C(note("Leading empty buckets are trimmed (by any-item activity for the main call); interior empties are kept — a gap inside the window is information, per the standing convention."));
+
+C(bold("Trend"));
+C(
+  bullet("Controls are grain \u00d7 bucket count, Weight-style, with the SAME options and defaults as the Weight widget — Day 14/30/60/90 (default 30), Week 12/26/52/104 (26), Month 12/24/60/120 (24). Switching grain resets the count to that grain's default, and a resolved-range line above the charts states the span the window produced, clamped to today"),
+  bullet("Frequency — days exercised per bucket as a CssTrendChart, y-axis pinned to zero, drawn in band mode and left-padded so each point sits exactly over its timeline column below. Hidden entirely at day grain, where a 0/1 square wave would merely repeat the timeline"),
+  bullet("Item timeline — a Gantt-style grid. One row per item under small group headers taken from activity.name; whole row tappable. Each cell is coloured by activeDays \u00f7 bucketDays on a single accent (the Summary's pinned blue/teal) through five opacity zones: \u22645% barely-there, \u226435% seldom, \u226465% so-so, \u226495% routine, >95% treated as 100%. A zone legend sits below; at day grain every filled cell is 100%, so the legend hides too. Hovering a cell shows a two-line tooltip — n/bucketDays days over the bucket name"),
+  bullet("Dense windows stay readable: above 16 buckets the charts hide their printed point values (hover shows a value with its bucket name); above 60 buckets the timeline tightens its cell gap from 2px to 1px. Timeline x labels thin on the fixed newest-anchored stride, and every printed label carries its year (26.03 style) — the charts pass compressXLabels false for the same reason"),
+  bullet("Tapping a row opens a ModalShell holding the item's bucket-average charts: one chart when collapsed, otherwise Day total and Biggest set stacked, each on its own scale. Where load exists it is drawn by CssTrendChart's right-axis extension — dashed, hollow dots, amber (the palette's existing average colour), its own right-hand axis — resolving the load line deferred at v4.4. A caption states the averaging rule and, for set-based items, the 총 handling in the Summary's public wording (combined-total records)"),
+);
+
 C(bold("Filters"));
-C(p("Global filter bar only — no widget-local filter, and the Summary/Trend toggle is absent rather than disabled, since no Trend view exists. crossActivities applies to the all-time bests as well as to the period figures, so a filtered view never reports a best drawn from records the filter excludes."));
+C(p("Global filter bar plus the ViewToggle in the card header (added v4.5 — the toggle was absent at v4.4 because no Trend view existed). The Summary behaves as before. The Trend takes crossActivities from the global filter but, like Weight, treats the period only as the window's ANCHOR: grain \u00d7 count is its span, and selecting a past period slides the whole window back rather than filtering inside it. The card's loading and error states stay scoped to the Summary because the Trend view owns its own fetches — the main call on every filter, grain or count change, and the per-item call on tap."));
 
 C(bold("Notes"));
 C(bold("총 marks a day total with an unknown set split, NOT a rest-pause set"));
@@ -1152,8 +1179,10 @@ C(bold("Units: 층 converted to 분, and the travel-time caveat"));
 C(p("계단 오르기 was logged in 층 (floors) on some records and 분 on others. The 층 records were converted to 분 at roughly four floors per minute before the widget was built, leaving exactly one unit per item across the whole dataset. The per-item counts still quoted in older WBS revisions (걷기 74, 스텝퍼 15) predate that pass and are stale."));
 C(note("Amount in 분 is actual activity time, which is NOT the same idea as duration — end minus start, including travel. Older 분 records were back-filled from (end − start), so their amounts carry travel time and run slightly high. 분 totals are therefore not strictly comparable across the whole history."));
 
-C(bold("Deferred: the load line"));
-C(p("The approved design put a second load-in-kg line on the daily chart with its own y-axis. CssDualLineChart cannot carry it — despite the name it is hard-wired to session start/end times on a single shared HH:MM axis — and CssRestChart, the only component with genuine dual axes, is hard-wired to the rest-day histogram. Building the extension was not worth blocking the widget on: load exists on two items of twelve, and 스쿼트 carries it on only 15 of its 33 records, so that line would be mostly gaps. If it is built later, the natural home is an optional second series plus right axis on CssDailyChart, not a new component."));
+C(bold("The load line — deferred at v4.4, built at v4.5"));
+C(p("The Summary deferred the load line because no component carried two y-axes (CssDualLineChart is hard-wired to session times, CssRestChart to the rest histogram) and load was too sparse for a daily chart to be worth blocking on. The Trend resolved it differently on both counts: the second axis went into CssTrendChart as an optional right-axis series — off by default, so the two shipped widgets using that chart render unchanged — and the Trend's bucket averaging turns sparse daily loads into a line worth drawing. The Summary's daily modal still has no load line; if one is ever wanted there, the natural home remains an optional second series on CssDailyChart."));
+C(bold("Trend rendering decisions (v4.5)"));
+C(p("The timeline shows one cell per bucket rather than merged bars, because merged bars hide the per-bucket intensity that the zones exist to show. Presence and intensity share one hue — the zone ramp is opacity on the Summary's pinned accent — so the timeline and the heat strip read as the same language. The frequency chart's y-axis is raw days, not percent: raw days are concrete, and the percent framing lives in the zone colours instead. The modal averages per ACTIVE day (11 km per run, not 110 km per month) because intensity, not volume, is the question a trend answers; days off are absent, not zeros."));
 
 
 C(new Paragraph({ children: [new TextRun({ text: "Part IV · Operations", bold: true, size: 28 })], spacing: { before: 280, after: 140 } }));
@@ -1589,12 +1618,13 @@ C(table(["Path","Purpose"],[
   ["src/app/insights/_widgets/DietWidget.tsx","Diet widget (WBS #61) — Summary view: four compact box plots, spicy HeatStrip + calendar modal, treemap toggles, companions toggle (v3.3–v3.4); its local ModalShell was extracted to _components/ModalShell.tsx at v4.4"],
   ["src/app/insights/_components/charts/BoxPlot.tsx","CSS horizontal box plot — props: min, max, avg, p25, p75, isDark"],
   ["src/app/insights/_components/charts/Histogram.tsx","CSS histogram — props: buckets[] ({label, count}), isDark"],
-  ["src/app/insights/_components/charts/css-chart-components.tsx","CSS+SVG chart components: CssTrendChart, CssVerticalBoxPlotChart (compact prop v3.4; last-bucket values v4.1), CssDualLineChart, CssRestChart, CssDailyChart (v3.3), CssStackedAreaChart (v4.2), formatBucketLabels, inPlot gridline guard (v4.2) (CssStackedBarChart removed v3.6)"],
+  ["src/app/insights/_components/charts/css-chart-components.tsx","CSS+SVG chart components: CssTrendChart (right-axis series, xBand, maxXLabels, showValues, compressXLabels, two-line hover tooltip, tiled hover zones, index keys — all v4.5), CssVerticalBoxPlotChart (compact prop v3.4; last-bucket values v4.1), CssDualLineChart, CssRestChart, CssDailyChart (v3.3), CssStackedAreaChart (v4.2), formatBucketLabels, inPlot gridline guard (v4.2) (CssStackedBarChart removed v3.6)"],
   ["src/app/insights/_components/Segmented.tsx","(v4.2) Shared multi-state toggle extracted from DietWidget; generic over string | number; used by DietWidget and WeightTrendView"],
   ["src/app/insights/_components/ModalShell.tsx","(v4.4) Shared portal modal extracted from DietWidget; used by DietWidget and ExerciseWidget"],
   ["src/app/insights/_widgets/WeightWidget.tsx","Weight widget (WBS #54) — shell holding both views and their fetches. Summary: period box plot (non-compact CssVerticalBoxPlotChart, single bucket) beside a Body Composition block of two stacked bars (Average / Latest) with a delta strip between them; local CompositionRow measures itself with a ResizeObserver to decide which figures fit inside each segment. Trend (v4.2) delegates to WeightTrendView and owns granularity, bucket count and unit state, resetting the count when granularity changes"],
   ["src/app/insights/_widgets/WeightTrendView.tsx","(v4.2) Weight Trend view — one CssStackedAreaChart with a three-state unit control (Weight / kg / %), granularity and bucket-count selectors, ISO-to-short label conversion, and the resolved-range header clamped to today"],
-  ["src/app/insights/_widgets/ExerciseWidget.tsx","(v4.4) Exercise widget (WBS #58) \u2014 Summary only. Period counter + HeatStrip row opening a CalendarHeatmap modal; a two-column grid of item blocks, each with its bests line and one chart per box; tapping a block opens a modal holding the daily-total and biggest-set charts. Local helpers fmt, mean, monthYear, bestLines, plainValues"],
+  ["src/app/insights/_widgets/ExerciseWidget.tsx","(v4.4, toggle v4.5) Exercise widget (WBS #58). Summary: period counter + HeatStrip row opening a CalendarHeatmap modal; a two-column grid of item blocks, each with its bests line and one chart per box; tapping a block opens a modal holding the daily-total and biggest-set charts. Local helpers fmt, mean, monthYear, bestLines, plainValues. v4.5 adds the ViewToggle in the card header and mounts ExerciseTrendView as the trend branch; card loading/error stay scoped to the Summary"],
+  ["src/app/insights/_widgets/ExerciseTrendView.tsx","(v4.5) Exercise Trend view — owns its own fetches. Grain \u00d7 count controls (Weight's options and defaults), resolved-range line, frequency CssTrendChart in band mode left-padded to align over the timeline, Gantt-style item timeline (group headers from activity.name, five-zone opacity cells, per-cell hover tooltip, adaptive cell gap), and a per-item ModalShell with bucket-average charts carrying the dashed right-axis load line"],
   ["src/app/insights/_widgets/weight-colors.ts","(v4.2) SEG / SEG_ORDER / segColor / soloColor — the pinned muscle-fat-other palette, extracted from WeightWidget so the Trend view can import it without a circular dependency"],
   ["src/lib/insights/weight.ts","computeWeightSummary (v4.1) and computeWeightTrend (v4.2) — collapseToDays and buildComposition shared by both; the trend path issues ONE query for the whole span and buckets in memory rather than one query per bucket, because a 400-bucket day request would otherwise be 400 round trips"],
   ["src/app/insights/_components/charts/Treemap.tsx","Squarified treemap (v3.3); ResizeObserver-measured cells; top-N + 기타 rollup; label font capped at 11px (v3.4)"],
@@ -1607,7 +1637,7 @@ C(table(["Path","Purpose"],[
   ["src/app/insights/_components/WidgetCard.tsx","WidgetCard, ViewToggle, BucketSelector, FloorBadge"],
   ["src/app/insights/_components/GlobalFilterBar.tsx","Global filter bar — 4 time modes, cross-activity multi-select"],
   ["src/app/insights/_components/MultiSelectDropdown.tsx","Reusable multi-select dropdown"],
-  ["src/app/api/insights/stats/route.ts","GET /api/insights/stats — thin dispatcher (~150 lines, v3.4): auth + param parsing; routes metric/mode to the per-widget compute modules below; exercise.summary branch added v4.4 (summary mode only, no date filter passed through \u2014 the compute module cuts the period itself)"],
+  ["src/app/api/insights/stats/route.ts","GET /api/insights/stats — thin dispatcher (v3.4): auth + param parsing; routes metric/mode to the per-widget compute modules below; exercise.summary branch added v4.4 (no date filter passed through \u2014 the compute module cuts the period itself); exercise.trend / exercise.itemTrend branch added v4.5 — resolves the Weight-style grain \u00d7 buckets window (anchor min(period end, today), start snapped to a bucket boundary) and passes it down"],
   ["src/lib/insights/dates.ts","Shared date/period helpers (v3.4): buildDateRange, stepBack, labelForPeriod, currentPeriod, assignDrinkingDate, assignSleepDate, hourStringToMinutes, yesterdayStr, diffDays, SLEEP_THRESHOLD_HOUR"],
   ["src/lib/insights/util.ts","Shared numeric helper (v3.4): percentile"],
   ["src/lib/insights/sleep.ts","computeSleepSummary + QUALITY_SCORE (v3.4)"],
@@ -1615,6 +1645,7 @@ C(table(["Path","Purpose"],[
   ["src/lib/insights/drinking.ts","computeDrinkingSummary, computeDrinkingTrendBucket + drinking helpers (computeDailyScores, bucketScore, classifyOccasion, hourStrToDecimal, SCORE_BUCKET_ORDER) (v3.4)"],
   ["src/lib/insights/diet.ts","computeDietSummary (v3.4; computeDietTrend to follow with the Trend view)"],
   ["src/lib/insights/exercise.ts","(v4.4) computeExerciseSummary \u2014 one UNBOUNDED fetch of every \uc6b4\ub3d9 record, period cut in memory on YYYY-MM-DD strings so no MongoDB date filter is needed; boxOf / bestOf / groupByItem / sumByDate helpers; REST_PAUSE and MIN_BOX_DAYS constants"],
+  ["src/lib/insights/exercise-trend.ts","(v4.5) computeExerciseTrend and computeExerciseItemTrend \u2014 same unbounded-fetch, cut-in-memory approach; bucketKey/buildBuckets (day / ISO-Monday week / month) with per-bucket period-day counts; grouping read from activity.name; names the \ucd1d marker DAY_TOTAL_MARK rather than repeating the REST_PAUSE misnomer; private date-helper mirrors of exercise.ts — a third copy is the signal to extract them to dates.ts"],
   ["src/models/AlcoholConversion.ts","Mongoose model for alcohol_conversion collection"],
   ["src/models/IngredientMaster.ts","Mongoose model for ingredient_master collection (NEW v3.1); unique index { userId, level2 }"],
   ["src/models/Log.ts","Mongoose model for log collection; food.spiciness added v3.0; food.foods[].ingredients (foodsItemSchema) added v3.1; food.drinks[].ingredients (drinksItemSchema) added v3.2; exercise[].loadKg and exercise[].setStyle added v4.3 to both ILog and LogSchema; alcohols unchanged"],
@@ -1637,7 +1668,7 @@ C(table(["Path","Purpose"],[
 C(spacer());
 
 // ===== FOOTER =====
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.4 — 29 July 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.5 — 7 August 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 
 // ===== DOCUMENT ASSEMBLY =====
@@ -1674,6 +1705,6 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-Log-Data-Design-v4.4.docx", buffer);
-  console.log("Wrote FarGaze-Log-Data-Design-v4.4.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-Log-Data-Design-v4.5.docx", buffer);
+  console.log("Wrote FarGaze-Log-Data-Design-v4.5.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });
