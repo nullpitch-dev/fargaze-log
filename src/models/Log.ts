@@ -91,10 +91,12 @@ export interface ILog extends Document {
   sleep?: {
     quality?: string;
   };
-  exercise?: Array<{
+	exercise?: Array<{
     item?: string;
     amount?: number;
     unit?: string;
+    loadKg?: number;
+    setStyle?: string;
   }>;
   reading?: {
     title?: string;
@@ -238,10 +240,12 @@ const LogSchema = new Schema<ILog>({
   sleep: {
     quality: String,
   },
-  exercise: [{
+	exercise: [{
     item: String,
     amount: Number,
     unit: String,
+    loadKg: Number,
+    setStyle: String,
   }],
   reading: { title: String },
   movie: { title: String },

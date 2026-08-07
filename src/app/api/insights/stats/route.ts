@@ -1,6 +1,6 @@
 // src/app/api/insights/stats/route.ts
 // Thin dispatcher: auth + param parsing, routing to per-widget compute
-// modules under @/lib/insights (sleep, interactions, drinking, diet).
+// modules under @/lib/insights (sleep, interactions, drinking, diet, weight, exercise).
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
@@ -14,6 +14,9 @@ import { computeDrinkingSummary, computeDrinkingTrendBucket } from '@/lib/insigh
 import { computeDietSummary, computeDietTrendBucket } from '@/lib/insights/diet';
 import { computeWeightSummary, computeWeightTrend } from '@/lib/insights/weight';
 import type { WeightGranularity } from '@/lib/insights/weight';
+import { computeExerciseSummary } from '@/lib/insights/exercise';
+import { computeExerciseTrend, computeExerciseItemTrend } from '@/lib/insights/exercise-trend';
+import type { ExerciseTrendGrain } from '@/lib/insights/exercise-trend';
 
 // ── Main route ────────────────────────────────────────────────────────────────
 
@@ -238,5 +241,62 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ trend });
   }
 
+  // ── exercise.summary ──────────────────────────────────────────────────────
+  // Summary mode only — no Trend view in #58. The compute module fetches all
+  // 운동 records unbounded and cuts the period itself, because the personal
+  // bests are all-time, so no date filter is applied here.
+  if (metric === 'exercise.summary') {
+    const { start, end } = buildDateRange(timeMode, timePeriod, dateFrom, dateTo);
+    const summary = await computeExerciseSummary(userId, start, end, crossActivities);
+    return NextResponse.json({ summary });
+  }
+
+  // ── exercise.trend / exercise.itemTrend ───────────────────────────────────
+  // Weight-style controls: grain × bucket count, not the filter's span. The
+  // window is counted back from min(end of the selected period, today) — the
+  // same anchor rule as weight.trend, for the same reason: a gap in recent
+  // activity should show as empty buckets, but a deliberately selected past
+  // period must not run to today. The compute module still cuts in memory;
+  // this branch only decides the window.
+  if (metric === 'exercise.trend' || metric === 'exercise.itemTrend') {
+    const gRaw = sp.get('grain') ?? 'week';
+    const grain: ExerciseTrendGrain =
+      gRaw === 'day' || gRaw === 'week' || gRaw === 'month' ? gRaw : 'week';
+
+    const bucketCount = parseInt(sp.get('buckets') ?? '12');
+    const safeCount   = Math.min(Number.isFinite(bucketCount) ? Math.max(1, bucketCount) : 12, 400);
+
+    // Anchor read from UTC fields — the same BST-shift guard as weight.trend.
+    const { end: periodEnd } = buildDateRange(timeMode, timePeriod, dateFrom, dateTo);
+    const periodAnchor = new Date(Date.UTC(
+      periodEnd.getUTCFullYear(), periodEnd.getUTCMonth(), periodEnd.getUTCDate(),
+    ));
+    const now   = new Date();
+    const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+    const end   = periodAnchor < today ? periodAnchor : today;
+
+    // Step back to the window start, landing on a bucket boundary (Monday /
+    // the 1st) so the first bucket is whole rather than a partial edge.
+    const start = new Date(end);
+    if (grain === 'day') {
+      start.setUTCDate(start.getUTCDate() - (safeCount - 1));
+    } else if (grain === 'week') {
+      start.setUTCDate(start.getUTCDate() - ((start.getUTCDay() + 6) % 7));
+      start.setUTCDate(start.getUTCDate() - (safeCount - 1) * 7);
+    } else {
+      start.setUTCDate(1);
+      start.setUTCMonth(start.getUTCMonth() - (safeCount - 1));
+    }
+
+    if (metric === 'exercise.itemTrend') {
+      const item = sp.get('item') ?? '';
+      if (!item) return NextResponse.json({ error: 'item is required' }, { status: 400 });
+      const itemTrend = await computeExerciseItemTrend(userId, item, start, end, grain, crossActivities);
+      return NextResponse.json({ itemTrend });
+    }
+
+    const trend = await computeExerciseTrend(userId, start, end, grain, crossActivities);
+    return NextResponse.json({ trend });
+  }
   return NextResponse.json({ error: 'Unknown metric' }, { status: 400 });
 }

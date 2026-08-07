@@ -31,7 +31,7 @@ async function getSheetData(
   const sheets = google.sheets({ version: 'v4', auth: client as any });
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${sheetName}!A${startRow}:CG`,
+    range: `${sheetName}!A${startRow}:CI`,
   });
   return response.data.values || [];
 }

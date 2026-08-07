@@ -81,20 +81,42 @@ interface CssTrendChartProps {
   labels:            string[];
   formatY:           (v: number) => string;
   isDark:            boolean;
-	alwaysShowLabels?: boolean;
+  alwaysShowLabels?: boolean;
   yPadPct?:          number;
   yAxis?:            { min?: number; max?: number; baseline?: number | null; ticks?: { value: number; label: string }[] };
+  // Optional second series against its OWN right-hand axis (v4.5 — the
+  // Exercise Trend load line). Drawn dashed so the two scales cannot be
+  // read as one; ignored entirely when absent or all-null, so every
+  // existing call site renders pixel-identically.
+  rightSeries?:      CssTrendSeries;
+  formatYRight?:     (v: number) => string;
+  // Band-centred x positions (v4.5): points sit over the centre of n equal
+  // cells instead of spanning edge-to-edge, so the chart can align with a
+  // cell grid drawn below it. Off by default — existing charts span as before.
+  xBand?:            boolean;
+  // Label thinning (v4.5): a fixed stride walked back from the newest bucket,
+  // per the shared convention. Default keeps every label, as before.
+  maxXLabels?:       number;
+  // Per-point printed values (v4.5): default on, as before. When off, a
+  // point's value still appears on hover/tap.
+  showValues?:       boolean;
+  // Year compression (v4.5): by default formatBucketLabels prints the year
+  // only where it changes, which breaks once labels are thinned — the label
+  // carrying the year can be one of the thinned ones. Pass false to print
+  // every label whole.
+  compressXLabels?:  boolean;
 }
 
 export function CssTrendChart({
-	series, labels, formatY, isDark, yPadPct = 10, yAxis,
+  series, labels, formatY, isDark, yPadPct = 10, yAxis, rightSeries, formatYRight,
+  xBand = false, maxXLabels, showValues = true, compressXLabels = true,
 }: CssTrendChartProps) {
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
 
   const allVals = series.flatMap(s => s.values).filter((v): v is number => v !== null);
   if (!allVals.length) return <p className="text-xs" style={{ color: labelColor(isDark) }}>No data</p>;
 
-	const baseline = yAxis?.baseline ?? null;
+  const baseline = yAxis?.baseline ?? null;
   // fold an optional reference line into the auto-range so it stays visible
   const lo = baseline !== null ? Math.min(...allVals, baseline) : Math.min(...allVals);
   const hi = baseline !== null ? Math.max(...allVals, baseline) : Math.max(...allVals);
@@ -106,21 +128,43 @@ export function CssTrendChart({
     ? yAxis.ticks
     : buildYTicks(yMin, hi).map(v => ({ value: v, label: formatY(v) }));
 
+  // Right axis — its own range and scale, never mixed into the left one.
+  const rightVals = (rightSeries?.values ?? []).filter((v): v is number => v !== null);
+  const hasRight  = rightVals.length > 0;
+  const fmtR      = formatYRight ?? formatY;
+  const loR    = hasRight ? Math.min(...rightVals) : 0;
+  const hiR    = hasRight ? Math.max(...rightVals) : 1;
+  const padR   = Math.max(1, (hiR - loR) * (yPadPct / 100));
+  const yMinR  = loR - padR;
+  const yMaxR  = hiR + padR;
+  const yRangeR = yMaxR - yMinR || 1;
+  const ticksR = hasRight ? buildYTicks(yMinR, hiR).map(v => ({ value: v, label: fmtR(v) })) : [];
+
   const n = labels.length;
-  const displayLabels = formatBucketLabels(labels);
-  function xPct(i: number) { return n <= 1 ? 50 : (i / (n - 1)) * 100; }
-  function yPct(v: number) { return (1 - (v - yMin) / yRange) * 100; }
+  const displayLabels = compressXLabels ? formatBucketLabels(labels) : labels;
+  function xPct(i: number)  {
+    if (xBand) return n <= 0 ? 50 : ((i + 0.5) / n) * 100;
+    return n <= 1 ? 50 : (i / (n - 1)) * 100;
+  }
+  const labelStride = maxXLabels ? Math.max(1, Math.ceil(n / maxXLabels)) : 1;
+  const showXLabel  = (i: number) => (n - 1 - i) % labelStride === 0;
+  function yPct(v: number)  { return (1 - (v - yMin) / yRange) * 100; }
+  function yPctR(v: number) { return (1 - (v - yMinR) / yRangeR) * 100; }
 
   const gc = gridLineColor(isDark);
   const lc = labelColor(isDark);
   const vc = valueColor(isDark);
+
+  // With a right axis (or several left series) every value label takes its
+  // series colour, so the two scales stay attributable.
+  const multiColored = series.length > 1 || hasRight;
 
   return (
     <div className="flex flex-col gap-1 w-full select-none">
       <div className="flex w-full">
         {/* Y-axis labels */}
         <div className="relative shrink-0 overflow-hidden" style={{ width: Y_LABEL_W, height: CHART_H }}>
-					{ticks.map(tk => {
+          {ticks.map(tk => {
             const t = yPct(tk.value);
             if (t < 3 || t > 97) return null;
             return (
@@ -134,9 +178,9 @@ export function CssTrendChart({
 
         {/* Plot area */}
         <div className="relative flex-1" style={{ height: CHART_H }}>
-          {/* Grid lines */}
-					{ticks.map(tk => (
-						inPlot(yPct(tk.value)) ? (
+          {/* Grid lines — left ticks only; a second grid would be noise */}
+          {ticks.map(tk => (
+            inPlot(yPct(tk.value)) ? (
               <div key={tk.value} className="absolute inset-x-0 pointer-events-none"
                 style={{ top: `${yPct(tk.value)}%`, height: 1, background: gc, opacity: 0.7 }} />
             ) : null
@@ -163,12 +207,35 @@ export function CssTrendChart({
                   vectorEffect="non-scaling-stroke" opacity={0.85} />
               );
             })}
+            {hasRight && rightSeries && (() => {
+              const pts = rightSeries.values
+                .map((v, i) => v !== null ? { x: xPct(i), y: yPctR(v) } : null)
+                .filter((p): p is { x: number; y: number } => p !== null);
+              const d = smoothPath(pts);
+              if (!d) return null;
+              return (
+                <path d={d} fill="none" stroke={rightSeries.color}
+                  strokeWidth="1.5" strokeDasharray="5 3"
+                  strokeLinejoin="round" strokeLinecap="round"
+                  vectorEffect="non-scaling-stroke" opacity={0.85} />
+              );
+            })()}
           </svg>
 
           {/* Dots + hover zones */}
-          {labels.map((lbl, i) => (
-            <div key={lbl} className="absolute top-0 bottom-0 flex items-stretch"
-              style={{ left: `${xPct(i)}%`, width: 28, transform: 'translateX(-50%)', cursor: 'pointer', zIndex: 2 }}
+          {labels.map((_, i) => (
+            // Key by position, not label text — labels can transiently
+            // duplicate for one frame when a parent switches formats before
+            // its refetch lands, and columns are positional anyway.
+            <div key={i} className="absolute top-0 bottom-0 flex items-stretch"
+              style={{ left: `${xPct(i)}%`,
+                // One bucket wide, so zones tile instead of overlapping —
+                // a fixed 28px zone buried dots under their right-hand
+                // neighbour's zone whenever buckets sat closer than that.
+                width: `${100 / Math.max(1, xBand ? n : n - 1)}%`,
+                minWidth: 10,
+                transform: 'translateX(-50%)', cursor: 'pointer',
+                zIndex: activeIdx === i ? 10 : 2 }}
               onMouseEnter={() => setActiveIdx(i)}
               onMouseLeave={() => setActiveIdx(null)}
               onClick={() => setActiveIdx(activeIdx === i ? null : i)}>              {series.map((s, si) => {
@@ -176,7 +243,7 @@ export function CssTrendChart({
                 if (v === null) return null;
                 const top        = `${yPct(v)}%`;
                 const isActive   = activeIdx === i;
-								const showLabel  = true;   // value labels always shown (all line charts)
+                const showLabel  = showValues || isActive;   // hidden values reappear on hover
                 const labelBelow = yPct(v) < 18;
                 return (
                   <React.Fragment key={si}>
@@ -185,44 +252,115 @@ export function CssTrendChart({
                         width: isActive ? 9 : 7, height: isActive ? 9 : 7,
                         background: s.color, opacity: isActive ? 1 : 0.9, zIndex: 3 }} />
                     {showLabel && (
-                      <div className="absolute text-[10px] font-semibold leading-none whitespace-nowrap"
-                        style={{ left: '50%', top,
-                          transform: labelBelow ? 'translate(-50%, 8px)' : 'translate(-50%, -18px)',
-                          color: series.length > 1 ? s.color : vc, zIndex: 4, pointerEvents: 'none' }}>
-                        {formatY(v)}
-                      </div>
+                      isActive && si === 0 ? (
+                        // Two-line tooltip: value over bucket name, floated
+                        // well clear of the dot (and the pointer resting on
+                        // it), on a translucent backdrop so it stays readable
+                        // over lines and grid. Always ABOVE the dot — nothing
+                        // clips the plot's top, so a high point just overlaps
+                        // the caption for a moment, which beats a tooltip
+                        // that jumps sides.
+                        <div className="absolute text-[10px] font-semibold leading-tight whitespace-nowrap text-center rounded"
+                          style={{ left: '50%', top,
+                            transform: 'translate(-50%, -34px)',
+                            color: multiColored ? s.color : vc,
+                            background: isDark ? 'rgba(24,24,27,0.92)' : 'rgba(255,255,255,0.92)',
+                            padding: '1px 4px',
+                            zIndex: 5, pointerEvents: 'none' }}>
+                          {formatY(v)}
+                          <div className="font-normal" style={{ color: lc }}>{displayLabels[i]}</div>
+                        </div>
+                      ) : (
+                        <div className="absolute text-[10px] font-semibold leading-none whitespace-nowrap"
+                          style={{ left: '50%', top,
+                            transform: labelBelow ? 'translate(-50%, 8px)' : 'translate(-50%, -18px)',
+                            color: multiColored ? s.color : vc, zIndex: 4, pointerEvents: 'none' }}>
+                          {formatY(v)}
+                        </div>
+                      )
                     )}
                   </React.Fragment>
                 );
               })}
+              {hasRight && rightSeries && rightSeries.values[i] !== null && (() => {
+                const v = rightSeries.values[i] as number;
+                const top        = `${yPctR(v)}%`;
+                const isActive   = activeIdx === i;
+                const labelBelow = yPctR(v) < 18;
+                return (
+                  <React.Fragment>
+                    {/* hollow dot — the dashed series keeps its own shape language */}
+                    <div className="absolute rounded-full"
+                      style={{ left: '50%', top, transform: 'translate(-50%, -50%)',
+                        width: isActive ? 9 : 7, height: isActive ? 9 : 7,
+                        background: isDark ? '#18181b' : '#ffffff',
+                        border: `1.5px solid ${rightSeries.color}`,
+                        opacity: isActive ? 1 : 0.9, zIndex: 3 }} />
+                    {(showValues || isActive) && (
+                      <div className="absolute text-[10px] font-semibold leading-none whitespace-nowrap"
+                        style={{ left: '50%', top,
+                          transform: labelBelow ? 'translate(-50%, 8px)' : 'translate(-50%, -18px)',
+                          color: rightSeries.color, zIndex: 4, pointerEvents: 'none' }}>
+                        {fmtR(v)}
+                      </div>
+                    )}
+                  </React.Fragment>
+                );
+              })()}
             </div>
           ))}
         </div>
+
+        {/* Right y-axis labels (only when a right series exists) */}
+        {hasRight && (
+          <div className="relative shrink-0 overflow-hidden" style={{ width: Y_LABEL_WR, height: CHART_H }}>
+            {ticksR.map(tk => {
+              const t = yPctR(tk.value);
+              if (t < 3 || t > 97) return null;
+              return (
+                <span key={tk.value} className="absolute text-[10px] leading-none"
+                  style={{ left: 4, top: `${t}%`, transform: 'translateY(-50%)',
+                    color: rightSeries?.color ?? lc }}>
+                  {tk.label}
+                </span>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* X labels */}
-      <div className="flex w-full" style={{ paddingLeft: Y_LABEL_W }}>
+      <div className="flex w-full"
+        style={{ paddingLeft: Y_LABEL_W, paddingRight: hasRight ? Y_LABEL_WR : 0 }}>
         <div className="relative flex-1" style={{ height: 16 }}>
-          {displayLabels.map((lbl, i) => (
-            <span key={i} className="absolute text-[10px] leading-none"
+          {displayLabels.map((lbl, i) => showXLabel(i) ? (
+            <span key={i} className="absolute text-[10px] leading-none whitespace-nowrap"
               style={{ left: `${xPct(i)}%`, transform: 'translateX(-50%)',
                 color: i === n - 1 ? (isDark ? '#f4f4f5' : '#292524') : lc,
                 fontWeight: i === n - 1 ? 600 : 400 }}>
               {lbl}
             </span>
-          ))}
+          ) : null)}
         </div>
       </div>
 
-      {/* Legend (multi-series only) */}
-      {series.length > 1 && (
-        <div className="flex gap-3 flex-wrap" style={{ paddingLeft: Y_LABEL_W }}>
+      {/* Legend (multi-series, or a labelled right series) */}
+      {(series.length > 1 || (hasRight && rightSeries?.label)) && (
+        <div className="flex gap-3 flex-wrap"
+          style={{ paddingLeft: Y_LABEL_W, paddingRight: hasRight ? Y_LABEL_WR : 0 }}>
           {series.map((s, i) => s.label ? (
             <span key={i} className="flex items-center gap-1 text-[10px]" style={{ color: lc }}>
               <span className="inline-block rounded-full" style={{ width: 8, height: 8, background: s.color }} />
               {s.label}
             </span>
           ) : null)}
+          {hasRight && rightSeries?.label && (
+            <span className="flex items-center gap-1 text-[10px]" style={{ color: lc }}>
+              <span className="inline-block"
+                style={{ width: 12, height: 0, borderTop: `2px dashed ${rightSeries.color}` }} />
+              {rightSeries.label}
+            </span>
+          )}
         </div>
       )}
     </div>
@@ -245,14 +383,18 @@ interface CssVerticalBoxPlotChartProps {
   isDark:   boolean;
   yPadPct?: number;
   formatY?: (v: number) => string;
-  height?:  number;
+	height?:  number;
   compact?: boolean;
+  // Trend charts bold the newest bucket. Categorical buckets (Set / Day) have
+  // no newest, so the emphasis is meaningless there — pass false.
+  emphasizeLast?: boolean;
 }
 
 const VBOX_H = 140;
 
 export function CssVerticalBoxPlotChart({
   buckets, isDark, yPadPct = 10, formatY = String, height = VBOX_H, compact = false,
+  emphasizeLast = true,
 }: CssVerticalBoxPlotChartProps) {
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
 
@@ -411,13 +553,13 @@ export function CssVerticalBoxPlotChart({
       </div>
 
       {/* X labels (skipped when every bucket label is empty, e.g. Diet's single box) */}
-      {hasXLabels && (
+			{hasXLabels && (
         <div className="flex w-full" style={{ paddingLeft: compact ? 0 : Y_LABEL_W }}>
           <div className="flex flex-1">
             {compressedLabels.map((lbl, i) => (
               <div key={i} className="flex-1 text-center text-[10px] leading-none"
-                style={{ color: i === n - 1 ? (isDark ? '#f4f4f5' : '#292524') : lc,
-                  fontWeight: i === n - 1 ? 600 : 400 }}>
+                style={{ color: emphasizeLast && i === n - 1 ? (isDark ? '#f4f4f5' : '#292524') : lc,
+                  fontWeight: emphasizeLast && i === n - 1 ? 600 : 400 }}>
                 {lbl}
               </div>
             ))}

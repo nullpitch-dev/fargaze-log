@@ -80,18 +80,20 @@ const C = {
   EXERCISE_ITEM: 69,
   EXERCISE_AMOUNT: 70,
   EXERCISE_UNIT: 71,
-  READING_TITLE: 72,
-  MOVIE_TITLE: 73,
-  GOLF_SCORE: 74,
-  GOLF_APPROACH: 75,
-  GOLF_PUTTS: 76,
-  INCOME_GROSS: 77,
-  INCOME_NET: 78,
-  TRAVEL_CITY: 79,
-  TRAVEL_THEME: 80,
-  NOTES: 81,
-  SYNC_STATUS: 82,
-  EVENT_ID: 83,
+  EXERCISE_LOAD: 72,   // BU 부하(kg) — NEW
+  EXERCISE_STYLE: 73,  // BV 방식 — NEW
+  READING_TITLE: 74,
+  MOVIE_TITLE: 75,
+  GOLF_SCORE: 76,
+  GOLF_APPROACH: 77,
+  GOLF_PUTTS: 78,
+  INCOME_GROSS: 79,
+  INCOME_NET: 80,
+  TRAVEL_CITY: 81,
+  TRAVEL_THEME: 82,
+  NOTES: 83,
+  SYNC_STATUS: 84,
+  EVENT_ID: 85,
 };
 
 function get(row: any[], index: number): string {
@@ -169,11 +171,37 @@ export function rowToDocument(row: any[], userId: string): any {
     get(row, C.ALCOHOL_NOTE)
   );
 
+	// 부하(kg) and 방식 are per-item, like amount and unit.
+  // zipMultiValueWithPlusSplit can turn "A+B" into two entries, so repeat
+  // each load/style across its own split items. Amount is divided by the
+  // splitter; load and style are NOT — a 10kg bag is 10kg for both halves.
+  const exItemTokens = get(row, C.EXERCISE_ITEM)
+    .split(',')
+    .map(s => s.trim())
+    .filter(s => s !== '');
+  const loadTokens = get(row, C.EXERCISE_LOAD).split(',').map(s => s.trim());
+  const styleTokens = get(row, C.EXERCISE_STYLE).split(',').map(s => s.trim());
+
+  const loadPerItem: string[] = [];
+  const stylePerItem: string[] = [];
+  exItemTokens.forEach((tok, i) => {
+    const splits = tok.split('+').filter(s => s.trim() !== '').length || 1;
+    for (let k = 0; k < splits; k++) {
+      loadPerItem.push(loadTokens[i] ?? '');
+      stylePerItem.push(styleTokens[i] ?? '');
+    }
+  });
+
   const exercise = zipMultiValueWithPlusSplit(
     get(row, C.EXERCISE_ITEM),
     get(row, C.EXERCISE_AMOUNT),
     get(row, C.EXERCISE_UNIT)
-  ).map(e => ({ ...e, amount: parseNumber(e.amount) }));
+  ).map((e, i) => ({
+    ...e,
+    amount: parseNumber(e.amount),
+    loadKg: parseNumber(loadPerItem[i] ?? ''),
+    setStyle: parseString(stylePerItem[i] ?? ''),
+  }));
 
   const people = parsePeople(
     get(row, C.PEOPLE_METHOD),

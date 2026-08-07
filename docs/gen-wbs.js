@@ -11,7 +11,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Service Concept & Work Breakdown Structure", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 3.1  |  18 July 2026", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 3.4  |  29 July 2026", size: 24 })], spacing: { after: 240 } }),
 );
 
 C(h1("Version History"));
@@ -36,6 +36,9 @@ C(table(["Version","Date","Headline"],[
   ["2.7","25 Jun 2026","Insights polish pass; bars.tsx; search phrase + sortable columns"],
   ["3.0","27 Jun 2026","Restructure: status snapshot, task lines cleaned of embedded history, backlog absorbs open questions; per-tab Interactions Method filter and search ingredient display recorded; mirrors Design Doc v4.0"],
   ["3.1","18 Jul 2026","Weight widget Summary complete (#54); #55 closed as covered by the Sleep widget; box-plot last-bucket values; mirrors Design Doc v4.1"],
+  ["3.2","19 Jul 2026","#54 complete — Weight Trend shipped (metric=weight.trend, CssStackedAreaChart, three-state unit toggle); Segmented extracted to a shared component; weight-colors.ts extracted; inPlot gridline guard across all four CSS charts; mirrors Design Doc v4.2"],
+  ["3.3","26 Jul 2026","#58 data preparation complete — source columns 부하/방식 added, exercise[].loadKg and exercise[].setStyle in Log.ts and rowToDocument.ts, fetch range A:CI, full re-migration verified; Google Calendar sync Apps Script write targets corrected to CG/CH; new Appendix A.6 on column-insertion safety. Widget design NOT started. Mirrors Design Doc v4.3"],
+  ["3.4","29 Jul 2026","#58 Exercise widget COMPLETE \u2014 exercise.ts, stats/route.ts branch, ExerciseWidget.tsx, registered in page.tsx. ModalShell extracted from DietWidget; emphasizeLast added to CssVerticalBoxPlotChart. \uacc4\ub2e8 \uc624\ub974\uae30 \ucda9 records converted to \ubd84, so every item now carries one unit; the per-item table below is re-surveyed and the earlier counts were stale. \ucd1d CORRECTED \u2014 it marks a day total with an unknown set split, not a rest-pause set. Trend view and the load line deferred. Mirrors Design Doc v4.4"],
 ],[1100,1300,6960]));
 C(spacer());
 
@@ -89,11 +92,11 @@ C(table(["Phase","Status","Detail"],[
   ["1 — Base Infrastructure & Auth","\u2705 Complete","Subscription-architecture placeholder still pending"],
   ["2 — Data Structure Design","\u2705 Complete","Schema, supporting collections, Mongoose models"],
   ["3 — Migration Tool","\u2705 Complete","Delete-all + re-insert; incremental sync deferred to post-MVP"],
-  ["4 — Analytics & Search","\u2B1C In progress","Done: search, cost dashboard, Sleep / Interactions / Drinking / Diet / Weight widgets, food + drink ingredient taxonomies. Remaining: #58 Exercise, #59 Calendar. Weight (#54) ships Summary only — no Trend view yet"],
+  ["4 — Analytics & Search","\u2B1C In progress","Done: search, cost dashboard, Sleep / Interactions / Drinking / Diet / Weight widgets (all with Summary and Trend), food + drink ingredient taxonomies. Done: #58 Exercise (Summary only). Remaining: #59 Calendar"],
   ["5 — Data Entry","\u2B1C Not started","Post-MVP"],
 ],[2900,1700,4760]));
 C(spacer());
-C(p([new TextRun({ text: "Current focus: ", bold: true }), new TextRun("remaining Phase 4 widgets — #58 Exercise trend, #59 Calendar view; optionally a Trend view for #54 Weight.")]));
+C(p([new TextRun({ text: "Current focus: ", bold: true }), new TextRun("#59 Calendar view. #58 Exercise shipped its Summary view on 29 July; its Trend view is deferred and undesigned. Phase 5 (data entry) follows #59.")]));
 
 C(h1("5. Work Breakdown Structure"));
 C(p("\u2705 = Complete   \u2B1C = Pending   DESCOPED = out of MVP scope. Each line states current state, not how it evolved (see the changelog for history)."));
@@ -158,10 +161,78 @@ C(
   bullet("\u2705 60. Food ingredient taxonomy — see sub-items"),
   bullet("\u2705 61. Diet widget — Summary + Trend (8 tabs) — see sub-items"),
   bullet("\u2705 62. Drink ingredient taxonomy — see sub-items"),
-  bullet("\u2705 54. Weight widget — Summary complete (box plot + body composition); Trend not built — see sub-items"),
+  bullet("\u2705 54. Weight widget — Summary (box plot + body composition) and Trend (stacked area) both complete — see sub-items"),
   bullet("\u2705 55. Average bed-time widget — CLOSED as covered by the Sleep widget (Summary bedtime + Trend › Bedtime); no separate widget will be built"),
-  bullet("\u2B1C 58. Exercise trend widget — exercise.frequency"),
+  bullet("\u2705 58. Exercise widget — Summary complete (per-item box plots, all-time bests, daily charts in a modal); Trend view deferred — see sub-items"),
   bullet("\u2B1C 59. Native calendar view — reuses the CalendarHeatmap built for #61"),
+);
+C(h3("Sub-items for #58 (Exercise Widget):"));
+C(p("Data preparation, the compute module, the API branch and the Summary view are all complete and in use. The Trend view is deferred and has no agreed design. Design Doc \u00a79.3.6 carries the full widget specification and the reasoning behind each decision."));
+C(bold("Done — source data"));
+C(
+  bullet("\u2705 Two new columns inserted at BU (부하) and BV (방식) in all five sheets; every column after them shifts by two; total 86"),
+  bullet("\u2705 Exercise item names and units cleaned in the sheets"),
+  bullet("\u2705 27 부하 values and 51 총 markers entered"),
+  bullet("\u2705 activity.name keeps three values: 근육 운동 / 계단 오르기 / 유산소 운동. 계단 오르기 stays on its own because it is both cardio and leg strength — settled, do not fold it into 유산소 운동"),
+  bullet("\u2705 달리기 and 달리기(Treadmill) stay as two separate items — outdoor and treadmill running are different — settled"),
+  bullet("\u2705 Leg extension stays in English, although every other item name is Korean — settled"),
+);
+C(bold("Done — schema and migration"));
+C(
+  bullet("\u2705 Log.ts — exercise[].loadKg (Number) and exercise[].setStyle (String) added to both ILog and LogSchema"),
+  bullet("\u2705 rowToDocument.ts — every index after col 71 shifted by +2; loadKg (72) and setStyle (73) read per item. Both are repeated across plus-split items, not divided the way amount is"),
+  bullet("\u2705 scripts/migrate.ts — fetch range widened from A:CG to A:CI"),
+  bullet("\u2705 Full re-migration of ~2025 and 2026; 43,123 documents, unchanged total"),
+  bullet("\u2705 ~2025 block re-commented after the re-migration, so the daily run stays incremental"),
+  bullet("\u2705 scripts/check-exercise-fields.ts — confirms both fields reached MongoDB. Result: 27 loads (Leg extension 40/45/50kg, 스쿼트 10kg) and 51 총 markers, matching the sheets exactly"),
+  bullet("\u2705 Google Calendar sync Apps Script — getRange write targets moved from 83/84 to 85/86 (CG / CH). The staging formula rewrote itself; the script did not. See Design Doc §13"),
+);
+C(bold("Known facts about the data"));
+C(p("Re-surveyed at v3.4 by scripts/inspect-exercise-units.ts, after the 층 to 분 conversion. These are measurements, not decisions. The counts quoted in v3.3 were taken before that conversion and before the 운동 scoping was tightened, and are superseded."));
+C(table(["Item","Unit","Records","Days","With load","총"],[
+  ["턱걸이","개","411","207","0","19"],
+  ["딥스","개","295","115","0","8"],
+  ["계단 오르기","분","283","247","0","0"],
+  ["걷기","km","68","68","0","0"],
+  ["팔굽혀펴기","개","62","61","0","19"],
+  ["스쿼트","개","33","33","15","5"],
+  ["달리기","km","22","22","0","0"],
+  ["스텝퍼","분","17","17","0","0"],
+  ["Leg extension","개","12","12","12","0"],
+  ["요가","분","4","4","0","0"],
+  ["매달리기","초","2","1","0","0"],
+  ["달리기(Treadmill)","km","1","1","0","0"],
+],[2400,1200,1440,1440,1440,1440]));
+C(spacer());
+C(table(["Fact","Value"],[
+  ["Exercise entries","1,210 within activity.category = 운동, one item per document"],
+  ["Distinct items","12"],
+  ["Distinct units","4 — 개 813, 분 304, km 91, 초 2. One unit per item, from v3.4. The units are not comparable to each other"],
+  ["duration.totalSeconds coverage","100% — every exercise record now carries a duration (was 42.9% at v3.3)"],
+  ["Records with a load","27 — Leg extension 12 (40/45/50kg) and 스쿼트 15 (10kg) only"],
+  ["총 markers","51 — 턱걸이 19, 팔굽혀펴기 19, 딥스 8, 스쿼트 5. setStyle takes exactly two values across the collection: null (1,159) and 총 (51)"],
+  ["Multi-record days","Only 턱걸이 and 딥스 hold more than one record per day; together they are 58% of all records"],
+  ["Records outside activity.category = 운동","6 rows contain 걷기 under 문화/취미 and 육아. These are excluded from the widget and from the table above"],
+  ["Per-year spread","2019: 105, 2020: 671, 2021: 185, 2022: 90, 2023: 1, 2024: 0, 2025: 83, 2026: 79 (v3.3 figures, not re-surveyed)"],
+],[3400,5960]));
+C(spacer());
+C(note("Note: 2020 alone holds 55% of all records, and 2023–24 is almost empty. The item vocabulary differs on each side of that gap — 턱걸이 and 딥스 before, 스텝퍼 after. Treat this as three separate periods of practice, not one continuous habit."));
+C(bold("Done \u2014 widget"));
+C(
+  bullet("\u2705 src/lib/insights/exercise.ts \u2014 computeExerciseSummary. ONE unbounded fetch of every \uc6b4\ub3d9 record with the period cut in memory, because the personal bests are all-time and the rest is period-scoped. No MongoDB date filter is used at all; dates are compared as YYYY-MM-DD strings built from start.year/month/day"),
+  bullet("\u2705 stats/route.ts \u2014 metric=exercise.summary branch, summary mode only"),
+  bullet("\u2705 ExerciseWidget.tsx, registered in the page.tsx WIDGETS array"),
+  bullet("\u2705 Summary \u2014 period counter and HeatStrip opening a CalendarHeatmap modal, then a two-column grid of item blocks carrying an all-time bests line, one chart per box, and the period total. Tapping a block opens a modal with the daily-total chart and, where it differs, the biggest-set chart"),
+  bullet("\u2705 ModalShell extracted from DietWidget to _components/ModalShell.tsx \u2014 a second consumer, so extracted rather than copied, per A.1"),
+  bullet("\u2705 emphasizeLast added to CssVerticalBoxPlotChart, defaulting true so no existing call site changes; Exercise passes false because Set and Day are categories, not periods, and bolding the last of them means nothing"),
+  bullet("\u2705 \ucda9 semantics established and documented \u2014 a day total with an unknown set split, NOT a rest-pause set. Excluded from the Set box, dailySetMax and bestSet; included in the Day box, total and bestDay"),
+);
+C(bold("Deferred \u2014 not built"));
+C(
+  bullet("\u2B1C Trend view \u2014 out of scope for #58; no design proposed"),
+  bullet("\u2B1C Load-in-kg line on the daily chart \u2014 no existing component carries two y-axes (CssDualLineChart is hard-wired to session times, CssRestChart to the rest histogram). Load exists on 2 items of 12 and \uc2a4\ucffc\ud2b8 carries it on only 15 of 33 records, so the line would be mostly gaps. See Design Doc \u00a79.3.6"),
+  bullet("\u2B1C Rename REST_PAUSE / restPauseCount / bestSetRestPause \u2014 misnomers left over from the earlier reading of \ucda9. bestSetRestPause is still computed and returned, but deliberately not rendered"),
+  bullet("\u2B1C Set-box exclusion caption \u2014 present in the widget but near-unreachable, since it needs both a \ucda9 record and 3+ days for the item in the same period. Left as-is deliberately"),
 );
 C(h3("Sub-items for #54 (Weight Widget):"));
 C(
@@ -174,7 +245,18 @@ C(
   bullet("\u2705 CompositionRow measures itself via ResizeObserver to decide which figures fit inside each segment"),
   bullet("\u2705 Registered in page.tsx WIDGETS array (floor 1)"),
   bullet("\u2705 css-chart-components.tsx — non-compact CssVerticalBoxPlotChart prints max/avg/min values on the last bucket (name legend removed); tooltip gained P75/P25. Affects Diet Trend and Drinking Amt(day) — both verified"),
-  bullet("\u2B1C Trend view — not built; would bucket weight and the three segments over the global filter period"),
+  bullet("\u2705 lib/insights/weight.ts — computeWeightTrend; one query for the whole span, bucketed in memory (a 400-bucket day request would otherwise be 400 round trips); buckets clamped at 400 server-side"),
+  bullet("\u2705 stats/route.ts — metric=weight.trend branch; params granularity × buckets × optional end; responds under the key trend, not summary"),
+  bullet("\u2705 Trend anchor = min(end of selected period, today). Anchoring on the newest weigh-in would hide a gap in readings; anchoring on today would override a deliberate past-period selection. Taking the earlier of the two satisfies both"),
+  bullet("\u2705 Leading empty buckets trimmed; interior empty buckets kept and drawn as a break in the line"),
+  bullet("\u2705 CssStackedAreaChart — new shared component: continuous total line plus a fill that starts where composition data begins; null-tolerant; absolute / percent modes; bands clipped to the plot box"),
+  bullet("\u2705 WeightTrendView.tsx — one chart with a three-state unit control (Weight / kg / %), granularity and bucket-count selectors, ISO-to-short label conversion, resolved-range header clamped to today"),
+  bullet("\u2705 kg mode sits on a zero baseline — a cropped axis pushed every internal stack boundary off-screen, leaving one band covering the plot. Weight mode restores the zoomed line the zero baseline flattens"),
+  bullet("\u2705 Composition buckets average full-triple days only, so segments sum exactly to the bar. Where the total line and the fill top diverge, that divergence IS the pre-InBody boundary — deliberate, not to be reconciled"),
+  bullet("\u2705 weight-colors.ts — SEG palette extracted from WeightWidget so the Trend view can import it without a circular dependency; stack order bottom-to-top matches the Summary bar left-to-right"),
+  bullet("\u2705 Segmented extracted to _components/Segmented.tsx (generic over string | number); DietWidget migrated to the shared copy and re-verified"),
+  bullet("\u2705 inPlot() gridline guard added to CssTrendChart, CssVerticalBoxPlotChart, CssStackedAreaChart and CssDailyChart — buildYTicks can return a tick above yMax and the unclipped plot painted it up into the widget header"),
+  bullet("\u2705 x-label thinning changed to a fixed stride walked back from the newest bucket, and labels are thinned BEFORE being shortened — previously the one label carrying the year was often the one discarded, and pinned labels could collide"),
 );
 C(h3("Sub-items for #53 (Widget Framework):"));
 C(
@@ -274,7 +356,8 @@ C(
   bullet("\u2B1C Drinking / Interactions Summary-vs-Trend colour sources differ (Summary uses barColors; Trend keeps its own) — intentional for now, may revisit"),
   bullet("\u2B1C Companions rank-flow bump chart for the Diet Trend tab — placeholder idea"),
   bullet("\u2B1C Insights page: widgets render in fixed WIDGETS-array order. The CSS-columns layout repacks by height but there is no drag-to-reorder — the Cost dashboard has @dnd-kit + localStorage persistence that could be ported"),
-  bullet("\u2B1C Weight Trend view (#54) — deferred, not descoped"),
+  bullet("\u2B1C WidgetCard header divider — briefly removed on a wrong diagnosis, then restored. The stray line was a chart gridline escaping upward, not the divider; no change is outstanding"),
+  bullet("\u2B1C Search UI — no numeric filter for exercise[].loadKg. The field is listed in Design Doc §7.4 as available to aggregate, but the search page offers no control for it"),
 );
 C(spacer());
 
@@ -291,10 +374,11 @@ C(h2("A.2 Shared File Change Protocol"));
 C(table(["File","Used by","Rule"],[
   ["src/app/api/insights/stats/route.ts","All widgets","Targeted patches only. Always read current version first. Verify session?.user?.userId is used."],
   ["src/app/insights/_components/charts/bars.tsx","Diet, Drinking, Interactions summaries","Targeted patches only. Shared summary-bar primitives (Title / BarRow / BarSection). Changing the geometry or the {pct}% ({count}) value format affects all three summaries."],
-  ["src/app/insights/_components/charts/css-chart-components.tsx","DrinkingWidget, DietWidget, WeightWidget","Full replacement acceptable when Hyoje uploads latest version. compressWeekLabels() is shared — preserve it. CssVerticalBoxPlotChart has THREE call sites (Diet Summary compact, Diet Trend, Drinking Amt(day)) plus Weight Summary — check all four before changing its label layout."],
+  ["src/app/insights/_components/charts/css-chart-components.tsx","DrinkingWidget, DietWidget, WeightWidget","Full replacement acceptable when Hyoje uploads latest version. compressWeekLabels() is shared — preserve it. CssVerticalBoxPlotChart has THREE call sites (Diet Summary compact, Diet Trend, Drinking Amt(day)) plus Weight Summary and, from v3.4, Exercise (one chart per box) — check all six before changing its label layout. WARNING: the bold-last-label style block is duplicated across FIVE chart components in this file; anchor any patch on a uniquely-named identifier such as hasXLabels, never on the style line alone."],
   ["src/app/insights/_lib/format.ts","All widgets via chart-components","Targeted patches only. formatBucketLabel handles month, week (raw + compressed), and day formats."],
   ["src/app/insights/_components/GlobalFilterBar.tsx","Insights page","Targeted patches only. Activity Type filter commits on Apply."],
   ["src/app/insights/_components/WidgetCard.tsx","All widgets","Targeted patches only. Changes affect every widget simultaneously."],
+  ["src/app/insights/_components/ModalShell.tsx","Diet, Exercise","(v3.4) Targeted patches only. Portal modal on document.body; it exists specifically to escape widget-card overflow:hidden, so do not reparent it into the card."],
   ["src/lib/migration/transform.ts","migrate, fill, reconcile, scan scripts","Targeted patches only. parseFoodIngredients / loadValidLevel2 are shared. Keep IngredientMaster import at top of file."],
 ],[3000,2600,3760]));
 C(spacer());
@@ -326,7 +410,23 @@ C(
   bullet("To update alcohol_conversion: edit AlcoholConv sheet → npm run migrate-alcohol (no log re-migration needed)."),
 );
 
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze — Service Concept & WBS v3.1 — 18 July 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(h2("A.6 Google Sheets Column Insertion Rules"));
+C(p("Inserting a column into the source sheets moves every column after it. Three places depend on column position, and they do not all update themselves."));
+C(table(["Place","Updates itself?","What to do"],[
+  ["Calendar staging sheet formula","Yes","Uses A1-style references (Active!CG:CG). Google Sheets rewrites them on insert. Open the sheet and confirm, but no edit is normally needed."],
+  ["Calendar sync Apps Script","No","Uses getRange(row, number). Edit finalizeSourceRow and clearSourceStatus by hand. Remember getRange is 1-based while the design doc index is 0-based — add one."],
+  ["rowToDocument.ts and migrate.ts","No","Shift every affected index, and widen the fetch range."],
+],[2600,1800,4960]));
+C(spacer());
+C(
+  bullet("Do not tick Q1 on the Calendar sheet until the Apps Script is patched and saved. An unpatched run writes Synced markers and event IDs into whichever columns now sit at the old positions, and then re-inserts every event as a duplicate."),
+  bullet("Run one test row before a full sync."),
+  bullet("Re-comment the ~2025 block in migrate.ts after any full re-migration."),
+  bullet("Update Design Doc §10.1.5 and §13 in the same session as the code change."),
+);
+C(spacer());
+
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze — Service Concept & WBS v3.4 — 29 July 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 const doc = new Document({
   styles: {
@@ -352,6 +452,6 @@ const doc = new Document({
   sections: [{ properties: { page: PAGE }, children }],
 });
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-WBS-v3.1.docx", buffer);
-  console.log("Wrote FarGaze-WBS-v3.1.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-WBS-v3.4.docx", buffer);
+  console.log("Wrote FarGaze-WBS-v3.4.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });

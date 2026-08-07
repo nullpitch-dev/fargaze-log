@@ -16,7 +16,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze Log", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Data Design & Requirements Document", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 4.1  |  18 July 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 4.4  |  29 July 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
 );
 C(p([new TextRun({ text: "Structure: ", bold: true }), new TextRun("Part I Foundations · Part II Data · Part III Features · Part IV Operations · Appendices. The body is the complete, always-current source of truth; the changelog below carries one line per version. Work status, open questions and the backlog live in the separate WBS, not here.")]));
 
@@ -47,6 +47,9 @@ C(table(
     ["3.6","25 Jun 2026","Insights polish pass; bars.tsx; search per-field phrase + sortable columns"],
     ["4.0","27 Jun 2026","Full restructure into Parts I–IV; durable spec separated from status; Transformation merged into a single transitional Migration section (Field Mapping · Strategy · History) with durable derivations moved to the Schema; uniform widget template; search ingredient display and per-tab Trend Method filter captured"],
   ["4.1","18 Jul 2026","Weight widget Summary (#54) — new \u00a79.3.5; bodyFatPercent corrected to a stored percent (was documented as a decimal) in \u00a75.2 and \u00a710.1.4; non-compact CssVerticalBoxPlotChart now prints max/avg/min values on the last bucket instead of the name legend, tooltip gained P75/P25"],
+  ["4.2","19 Jul 2026","Weight widget Trend completes #54 — \u00a79.3.5 Trend written; new metric=weight.trend (granularity × buckets × optional end) in \u00a79.2; new shared CssStackedAreaChart and Segmented components; weight-colors.ts extracted; gridline inPlot guard applied across all four CSS charts; x-label thinning changed to a fixed stride walked back from the newest bucket"],
+  ["4.3","26 Jul 2026","Exercise source columns BU (\ubd80\ud558) and BV (\ubc29\uc2dd) inserted \u2014 exercise[].loadKg and exercise[].setStyle added in \u00a75.2 and \u00a77.4; \u00a710.1.5 column layout rewritten, total columns 84 \u2192 86 and migration fetch range A:CG \u2192 A:CI; new \u00a713 documents the Google Calendar sync Apps Script, whose write targets moved to CG/CH"],
+  ["4.4","29 Jul 2026","Exercise widget (WBS #58) shipped \u2014 new \u00a79.3.6, src/lib/insights/exercise.ts and ExerciseWidget.tsx; ModalShell extracted from DietWidget to \u00a7_components; emphasizeLast prop added to CssVerticalBoxPlotChart; \u00a75.2 setStyle CORRECTED \u2014 \ucd1d marks a day total with an unknown set split, not a rest-pause set; \uacc4\ub2e8 \uc624\ub974\uae30 \ucda9 records converted to \ubd84 so every item now carries exactly one unit"],
   ],
   [1100, 1300, 6960]
 ));
@@ -60,7 +63,7 @@ C(p("This document is the durable specification for FarGaze Log — a personal l
 
 C(h2("1.1 Source Data Summary"));
 C(
-  bullet("~43,000 rows, 84 columns of daily life activity data (84 from v3.1; was 83 in v3.0 after column AO insertion — no new source column was added for ingredients, which are embedded in the existing food item column via parenthesis notation)"),
+  bullet("~43,000 rows, 86 columns of daily life activity data (86 from v4.3 after columns BU/BV insertion; 84 from v3.1; was 83 in v3.0 after column AO insertion — no new source column was added for ingredients, which are embedded in the existing food item column via parenthesis notation)"),
   bullet("~7 years of continuous logging by Hyoje"),
   bullet("Maintained in two Google Sheets files across five data sheets"),
   bullet("Supporting master data in five additional sheets (Ingredient sheet added v3.1)"),
@@ -73,6 +76,9 @@ C(table(["Item","Value"],[
   ["Food items total","15,375 — all with ingredients populated, 0 Not Defined (v3.1)"],
   ["Documents with drinks","~5,006"],
   ["Drink items total","~5,462 — all with ingredients populated, 0 Not Defined (v3.2)"],
+  ["Documents with exercise","1,214 — one exercise item per document"],
+  ["Exercise days","613 distinct days; 282 of them hold two or more records"],
+  ["Exercise vocabulary","12 distinct items across 5 units (개, 층, km, 분, 초) — the units are not comparable to each other"],
   ["Date range","2018 to present"],
   ["Cost categories","22 clean categories (see Section 8.2)"],
   ["Ingredient taxonomy","73 level2 values across 16 level1 groups (ingredient_master) — food + drinks"],
@@ -434,7 +440,9 @@ C(bold("exercise[]"));
 C(table(["Field Path","Type","Source Column","Notes"],[
   ["exercise[].item","String","운동 항목","Exercise name. Plus-split applied at migration time."],
   ["exercise[].amount","Number","양/강도","Amount or intensity"],
-  ["exercise[].unit","String","운동단위","Unit"],
+  ["exercise[].unit","String","운동단위","Unit. From v4.4 every item carries exactly one unit: 계단 오르기 was logged in both 층 and 분 and the 층 records were converted to 분. See §9.3.6 for the travel-time caveat on back-filled 분 amounts."],
+  ["exercise[].loadKg","Number","부하","(v4.3) Weight lifted, in kg. Blank for bodyweight exercises. Repeated across plus-split items, not divided like amount."],
+  ["exercise[].setStyle","String","방식","(v4.3; meaning CORRECTED v4.4) Blank means one unbroken set. 총 marks a DAY TOTAL whose set breakdown is unknown — back-filled onto older records where the day's figure survives but the per-set split does not. It is NOT a rest-pause set. Verified distinct values across the whole collection: null (1,159) and 총 (51). Repeated across plus-split items."],
 ],[2400,1400,2000,3560]));
 C(spacer());
 
@@ -624,6 +632,7 @@ C(table(["Field","Type","Use Case"],[
   ["golf.approach","Number","Golf approach shots"],
   ["golf.putts","Number","Golf putts"],
   ["exercise[].amount","Number","Exercise amount or intensity"],
+  ["exercise[].loadKg","Number","(v4.3) Weight lifted in kg — supports load filtering and progressive-overload analysis per item"],
 ],[2800,1600,4960]));
 C(spacer());
 C(h2("7.5 Search API — GET /api/search"));
@@ -805,10 +814,14 @@ C(table(["Component","File","Description"],[
   ["BoxPlot","src/app/insights/_components/charts/BoxPlot.tsx","CSS horizontal box plot; pr-5 right padding; label width w-10"],
   ["Histogram","src/app/insights/_components/charts/Histogram.tsx","CSS bar chart histogram; fixed font sizes"],
   ["CssTrendChart","src/app/insights/_components/charts/css-chart-components.tsx","CSS+SVG line chart with Catmull-Rom spline; multi-series; week label compression"],
-  ["CssVerticalBoxPlotChart","src/app/insights/_components/charts/css-chart-components.tsx","Vertical box plots per bucket; hover tooltip (max/P75/avg/P25/min, v4.1); props: formatY, height, and compact (v3.4). Default keeps the y-axis and, since v4.1, prints max/avg/min VALUES centred on the last bucket — the Max/P75/Avg/P25/Min name legend was removed. compact hides the y-axis and prints the same three values, so several boxes fit one row. P75/P25 live in the tooltip in both modes, because printed on the chart they would fall inside the IQR box"],
+  ["CssVerticalBoxPlotChart","src/app/insights/_components/charts/css-chart-components.tsx","Vertical box plots per bucket; hover tooltip (max/P75/avg/P25/min, v4.1); props: formatY, height, and compact (v3.4). Default keeps the y-axis and, since v4.1, prints max/avg/min VALUES centred on the last bucket — the Max/P75/Avg/P25/Min name legend was removed. compact hides the y-axis and prints the same three values, so several boxes fit one row. P75/P25 live in the tooltip in both modes, because printed on the chart they would fall inside the IQR box. emphasizeLast (v4.4) defaults true and bolds the final bucket label \u2014 correct when buckets are periods and the last one is the newest, meaningless when they are categories, so the Exercise widget passes false"],
   ["CssDualLineChart","src/app/insights/_components/charts/css-chart-components.tsx","Dual line chart (From/To); shared HH:MM Y-axis; filled area; dashed arrows with duration; +HH:MM for post-midnight"],
+  ["inPlot(t) guard","src/app/insights/_components/charts/css-chart-components.tsx","(v4.2) Shared predicate, t >= 0 && t <= 100, applied at every gridline call site. buildYTicks pins the data max and can therefore return a tick above yMax; the y-axis labels always guarded against this but the gridlines did not, and because the plot containers are not clipped a negative top painted the line upward out of the chart and into the widget header. Applied to CssTrendChart, CssVerticalBoxPlotChart, CssStackedAreaChart and CssDailyChart"],
   ["CssRestChart","src/app/insights/_components/charts/css-chart-components.tsx","Stacked histogram bars + avg spline overlay; unified SVG coordinate space; PLOT_T/PLOT_B bounds"],
   ["CssDailyChart","src/app/insights/_components/charts/css-chart-components.tsx","(v3.3) Single daily-series line; optional dashed average line + zone bands; tooltip floats above the marker showing value + date; baselineZero option"],
+  ["CssStackedAreaChart","src/app/insights/_components/charts/css-chart-components.tsx","(v4.2) Stacked area with a continuous total line. A point is {label, total, segments?, meta?} and may carry a total with NO segments, in which case the line runs across it and the coloured fill starts later; nulls break the line rather than interpolating across a gap. Props: segmentDefs (bottom to top), mode 'absolute' | 'percent', baselineZero, formatY, height, maxXLabels. Percent mode normalises each stack to 100 and hides the total line. Bands are clipped to the plot box; a lone point renders as a narrow column so a single-bucket run does not vanish. Nothing in it is weight-specific"],
+  ["Segmented","src/app/insights/_components/Segmented.tsx","(v4.2) Shared multi-state toggle, generic over string | number so numeric option sets (bucket counts) work alongside string ones. Extracted from DietWidget when WeightTrendView needed the same control. ViewToggle in WidgetCard remains the dedicated Summary/Trend switch"],
+  ["ModalShell","src/app/insights/_components/ModalShell.tsx","(v4.4) Shared centred modal rendered through a React portal on document.body, so it escapes widget-card overflow:hidden. Backdrop click and \u00d7 both close; clicks inside the panel do not bubble. Extracted from DietWidget when ExerciseWidget needed the same shell \u2014 the same trigger that lifted Segmented out at v4.2"],
   ["Treemap","src/app/insights/_components/charts/Treemap.tsx","(v3.3) Squarified treemap; CSS-positioned cells measured via ResizeObserver; top-N cap with a neutral 기타 (+N) rollup; per-mode cell text"],
   ["CalendarHeatmap / HeatStrip","src/app/insights/_components/charts/CalendarHeatmap.tsx","(v3.3) Mon–Sun calendar grid (modal) + single-row day strip (inline); range expanded to whole weeks; out-of-range days dimmed; colour via fillFor(date)"],
   ["StackedBars","src/app/insights/_components/charts/StackedBars.tsx","(v3.5) Reusable stacked bars; percent or absolute mode; legend hover-highlight dims the other series; shared by the Diet Composition / Spicy / Relation tabs"],
@@ -991,6 +1004,15 @@ C(p("Body weight and composition: the distribution of daily weight across the fi
 
 C(bold("API / data shape"));
 C(p("computeWeightSummary(userId, periodStart, periodEnd, crossActivities) in src/lib/insights/weight.ts, dispatched as metric=weight.summary. Documents carrying body.weight are fetched with the standard $expr + $dateFromParts local-date filter, then collapsed to one record per calendar day by collapseToDays() — repeat readings on the same day are averaged, so a double weigh-in day does not count twice."));
+C(p("computeWeightTrend(userId, granularity, buckets, end, crossActivities) is dispatched as metric=weight.trend and responds under the key trend, not summary. Its parameters are granularity (day | week | month), buckets (a count, clamped server-side at 400) and an optional end anchor \u2014 deliberately NOT the shared timeMode / timePeriod pair the other trend metrics use. Both functions share collapseToDays() and buildComposition(), so the two views can never disagree about what a day is worth."));
+C(table(["Response field","Meaning"],[
+  ["granularity","Echo of the requested bucket size"],
+  ["rangeStart / rangeEnd","The resolved span actually returned, after leading-empty trimming. rangeEnd is the END of the last bucket and may legitimately fall in the future \u2014 the widget clamps the displayed value to today rather than making the API lie"],
+  ["buckets[]","Oldest to newest. Each is {label, start, end, weight, n, composition}"],
+  ["buckets[].weight","Average weight over EVERY day in the bucket; null when the bucket is empty"],
+  ["buckets[].n","Days carrying a weight reading"],
+  ["buckets[].composition","Composition & {n} averaged over full-triple days ONLY, so the segments always sum exactly to composition.weight; null when the bucket has no InBody day at all"],
+],[2600, 6760]));
 C(table(["Field","Description"],[
   ["weightBox","{min, max, avg, p25, p75, n} over per-day weight values — period scoped"],
   ["avgComposition","Composition + n — period scoped. When any day in the period carries a full triple the average is taken over those days ONLY, so the three segments always sum exactly to the bar total"],
@@ -1023,10 +1045,24 @@ C(
 );
 
 C(bold("Trend"));
-C(p("Not built. The Summary is distribution-oriented in the same spirit as the Diet widget — the average is the headline statistic. A Trend view would roll weight and the three composition segments into the weekly/monthly buckets of the global filter; the metric=weight.summary dispatcher has no mode=trend branch yet."));
+C(p("One chart, not a set of tabs. The top of a stacked area IS total weight, so weight and composition are the same picture by construction and separating them would have drawn the same data twice. A three-state unit control switches what that one chart is answering:"));
+C(table(["Mode","What it draws","Y-axis"],[
+  ["Weight","Total line only, no fill \u2014 the default","Zoomed to the data (roughly 63\u201371)"],
+  ["kg","Stacked area, muscle / fat / other, with the total line over it","Pinned to zero"],
+  ["%","Stacked area normalised to 100, total line hidden","0\u2013100"],
+],[1400, 5560, 2400]));
+C(p("The kg mode must sit on a zero baseline. The internal stack boundaries fall at roughly 31 (muscle), 46 (+fat) and 70 (+other); a cropped 63\u201371 window pushes every one of them below the floor, leaving a single band covering the whole plot. Zero baseline fixes that but flattens seven years of movement into a near-straight line \u2014 which is exactly what the Weight mode exists to restore. Each mode is honest about a different question, and none of them is a compromise between the two."));
+C(
+  bullet("Controls are granularity \u00d7 bucket count, not a time span. The span is the product of the two, so an unrenderable combination (Day granularity across seven years) cannot be expressed rather than having to be guarded against"),
+  bullet("Bucket counts offered per granularity: Day 14/30/60/90, Week 12/26/52/104, Month 12/24/60/120. Switching granularity resets the count to that granularity's default, since a valid month count is not necessarily a valid day count"),
+  bullet("The resolved range is printed above the chart: the control states a count, the header states the span it produced"),
+  bullet("Labels are shortened by formatBucketLabels, which expects yyWww / yy.mm / mm-dd, so WeightTrendView converts the API's ISO labels before passing them"),
+  bullet("The caption below the chart changes with the mode, so the total-versus-fill distinction is explained only where it applies"),
+);
 
 C(bold("Filters"));
 C(p("Global filter bar only — no widget-local filter. crossActivities applies to BOTH the period query and the latest-ever lookup, so the two bars never differ in scope along that axis."));
+C(p("The Trend view takes crossActivities from the same global filter, but ignores the selected period as a range: granularity \u00d7 buckets IS its span. The period still sets where the window ENDS \u2014 see the anchor rule below \u2014 so selecting a past month moves the whole window back rather than filtering inside it. The Summary/Trend toggle is therefore never disabled on this widget, unlike Diet, whose trend buckets are built from timeMode and timePeriod directly."));
 
 C(bold("Notes"));
 C(bold("Latest is deliberately outside the global filter"));
@@ -1036,11 +1072,89 @@ C(note("Consequence: filtering to a pre-InBody range pairs a weight-only AVERAGE
 C(bold("One fat percentage, not two"));
 C(p("bodyFatPercent (measured) and fatPct (derived as bodyFat / weight) are identical on any single day, because the sheet derives 체지방량 from 체지방률. They diverge only in the average, where one is a mean of daily ratios and the other a ratio of means — a gap of roughly 0.03 percentage points. avgComposition therefore passes null for bodyFatPercent so that buildComposition derives it, guaranteeing the widget shows ONE fat percentage that agrees with the three segment shares."));
 
+C(bold("The trend anchor is min(end of selected period, today)"));
+C(p("Buckets are counted back from an anchor, and the anchor is NOT the last measurement. Anchoring on the newest weigh-in would slide a stale reading to the right-hand edge and hide the fact that nothing has been recorded for a fortnight; anchoring on today makes that gap visible as empty recent buckets, which is the honest picture. But that rule must not override a deliberate period selection: choosing January 2026 should run the chart to 31 January even though the last reading that month was the 20th, and must not run it to today. Taking the earlier of the period end and today satisfies both \u2014 a past period ends where it ends, and the current period still stops at today rather than rendering a fortnight of empty future buckets."));
+C(note("buildDateRange returns a UTC instant, so the anchor date is read from its UTC fields. Reading it locally would turn 2026-07-31T23:59:59.999Z into 1 August under BST and shift every bucket boundary by one \u2014 precisely the failure the local-date-field convention exists to prevent."));
+
+C(bold("Empty buckets: trim the leading ones, keep the interior ones"));
+C(p("A request for 90 monthly buckets reaches back further than the data goes, and rendering twenty blank buckets before the first weigh-in wastes the width that the real data needs. Leading empties are therefore trimmed server-side. Interior empties are kept and rendered as a break in the line, because a gap inside the data is information \u2014 February and March 2026 carry no readings at all, and interpolating across them would invent weigh-ins that never happened."));
+
+C(bold("Where the total line and the fill separate, that IS the pre-InBody boundary"));
+C(p("A bucket's weight averages every day in it; its composition averages only the days carrying a full muscle/fat triple. In a bucket that mixes pre-InBody and post-InBody days the two differ slightly \u2014 April 2020 reports weight 66.0 over 30 days against composition.weight 66.1 over 22 \u2014 so the total line and the top of the fill part company. This is deliberate and must not be reconciled: forcing them to agree would require either dropping weight-only days from the total (throwing away real measurements) or attributing a composition to days that never had one. Buckets with no InBody day at all carry composition null, and the chart simply draws the line across them with no fill beneath."));
+
 C(bold("Pinned segment colours"));
 C(p("Muscle / Fat / Other are three fixed semantic segments, so their colours are hard-coded in the widget rather than assigned through barColors / autoColorMap, which exist for dynamic key sets whose membership varies. Orange always means fat. Same rationale as QualityPie in SleepWidget. The values are drawn from the existing palette: primary blue/teal for muscle, the box plot's own average orange for fat, stone/zinc neutral for other."));
+C(p("From v4.2 the palette lives in src/app/insights/_widgets/weight-colors.ts rather than inside WeightWidget, because WeightTrendView needs the same three colours and importing them from its own parent would be a circular import. SEG_ORDER is muscle, fat, other \u2014 read left to right in the Summary bars and bottom to top in the Trend stack. Keeping the two identical is deliberate: muscle sits at the bottom of the stack, so it is the only band that loses its base if the axis is ever cropped, and fat and other stay whole."));
 
 C(bold("Measured label fitting"));
 C(p("A segment's share is a percentage, but whether its figures fit is a question of pixels. CompositionRow measures its track with a ResizeObserver (the same approach as Treemap.tsx) and shows the kg line only above MIN_KG_PX, adding the (%) line only above MIN_PCT_PX. On a narrow card the Fat segment may therefore show kg alone; the full figures stay available in the segment's title tooltip."));
+
+C(h3("9.3.6 Exercise (WBS #58)"));
+
+C(bold("Purpose"));
+C(p("Exercise volume and consistency over the filter period, one block per item, with all-time personal bests printed beside the period figures so a good month can be read against the ceiling rather than in isolation."));
+
+C(bold("API / data shape"));
+C(p("computeExerciseSummary(userId, periodStart, periodEnd, crossActivities) in src/lib/insights/exercise.ts, dispatched as metric=exercise.summary. Summary only — #58 ships no Trend view, and duration.totalSeconds is not read at all. Scope is activity.category === 운동, which excludes the six 걷기 rows filed under 문화/취미 and 육아."));
+C(p("The query is deliberately UNBOUNDED. The personal bests are all-time while everything else is period-scoped, so one fetch of every 운동 record is taken and the period is cut in memory rather than issuing a second query. At roughly 1,210 records that is far cheaper than the round trip it replaces; the approach should be revisited above about 20,000."));
+C(note("Consequence: the date filter never reaches MongoDB. Dates are compared as YYYY-MM-DD strings built from start.year/month/day, so this widget needs no $expr + $dateFromParts filter and no UTC boundary can shift a day. It satisfies the Appendix A local-date convention by construction rather than by guard."));
+C(table(["Response field","Meaning"],[
+  ["dates[]","Every day in the period, ascending. The end is capped at today, so the current month is not scored against days that have not happened yet — the same rule as the Weight widget"],
+  ["exerciseDays","Days in the period carrying at least one 운동 record"],
+  ["periodDays","Length of dates[]"],
+  ["daysPerWeek","exerciseDays ÷ periodDays × 7"],
+  ["dayCounts","date → record count. Drives the HeatStrip and the calendar modal"],
+  ["items[]","One entry per item present in the period, sorted by days desc, then total desc, then name"],
+],[2400,6960]));
+C(table(["items[] field","Meaning"],[
+  ["item / unit","Item name and its unit. One unit per item is verified in the data; the first non-empty wins if that ever breaks"],
+  ["days / daysPerWeek / total","Period-scoped. total sums day totals; loadKg is never added in"],
+  ["restPauseCount","Period count of 총 records. The identifier is a misnomer — see Notes"],
+  ["boxes","One or two ExerciseBoxStats, or null when the item has fewer than 3 days in the period. Shaped exactly like BoxPlotBucket, so the widget passes it straight to CssVerticalBoxPlotChart"],
+  ["daily","Day totals aligned index-for-index to dates[]; null on a day with no record"],
+  ["dailySetMax","Biggest straight set per day, aligned the same way. null for the whole item when it would merely repeat daily"],
+  ["bestSet / bestDay","All-time {value, date}. bestSet excludes 총 records; bestDay includes them"],
+  ["bestSetRestPause","All-time best 총 record. Computed and returned but NOT rendered — see Notes"],
+  ["bestLoadKg","All-time heaviest load, or null for the ten items that never carry one"],
+],[2400,6960]));
+C(spacer());
+C(p("A dense daily array aligned to one shared dates[] is used rather than per-item {date, value} pairs, which would repeat the same 31 dates once per item. Ties on any best go to the EARLIEST date — the first time the figure was reached, not the most recent time it was matched."));
+
+C(bold("Summary"));
+C(
+  bullet("Row 1 — whole period: an exercise-days counter (23/30, with days-per-week beneath) beside a full-width HeatStrip. The whole row is a button opening a CalendarHeatmap modal"),
+  bullet("Row 2 onward — a two-column grid of item blocks, most-frequent item first. Each block carries the item name, its days and days-per-week, a one-line list of all-time bests with the month and year each was set, the box plot(s), and the period total"),
+  bullet("Each box is drawn as its OWN chart with its own scale, side by side. On a shared scale the day box always sits roughly three times higher than the set box, because a day holds roughly three sets — true, but it squashes both shapes flat. The figures printed on each box are what guard against reading the two as comparable"),
+  bullet("Tapping an item block opens a modal holding its daily-total chart and, where it differs, its biggest-set chart. The charts live in a modal because five items in a month is normal, and five inline charts made the card roughly four times taller than every other widget on the page"),
+  bullet("Under three days in the period the box plot is suppressed and the raw values are listed as plain text instead — there is no distribution worth drawing"),
+);
+
+C(bold("Filters"));
+C(p("Global filter bar only — no widget-local filter, and the Summary/Trend toggle is absent rather than disabled, since no Trend view exists. crossActivities applies to the all-time bests as well as to the period figures, so a filtered view never reports a best drawn from records the filter excludes."));
+
+C(bold("Notes"));
+C(bold("총 marks a day total with an unknown set split, NOT a rest-pause set"));
+C(p("Corrected at v4.4; the code identifiers still carry the old reading. 총 was back-filled onto older records where the day's total survives but the per-set breakdown does not — for example 42 pull-ups logged across more than thirty minutes, certainly several sets, with no record of how many. A 총 record is therefore a day total under another name."));
+C(p("The consequences all point the same way and are implemented: 총 records are excluded from the Set box, from dailySetMax and from bestSet, because none of those is a set; they are included in the Day box, in total and in bestDay, because all of those are day figures. bestSetRestPause is computed and returned but deliberately not rendered — a best 총 is a best day under another name, and printing both would report one fact twice."));
+C(note("Naming debt: REST_PAUSE, restPauseCount and bestSetRestPause in exercise.ts, and restPauseCount in ExerciseWidget.tsx, are misnomers introduced before the meaning was established. Rename to something like combinedCount / bestCombined when those files are next touched."));
+
+C(bold("Two boxes, collapsing to one"));
+C(p("The Set box and the Day box carry different numbers only when a day can hold more than one straight set. When an item has exactly one record per day and no 총 records the two are the same numbers drawn twice, so the server emits a single unlabelled box instead. 턱걸이 and 딥스 normally show two; 걷기, 달리기, 스텝퍼, 요가 and Leg extension show one. 스쿼트 has one record per day but carries 총 records, so its two boxes genuinely differ and it correctly keeps both — the rule handles it without a special case."));
+C(p("The same test drives dailySetMax and the bests line: wherever the two figures would coincide, one is printed rather than two identical ones."));
+
+C(bold("Average, not median"));
+C(p("CssVerticalBoxPlotChart marks avg, and its tooltip is labelled Avg. Carrying a median in that field would have printed a label contradicting the value, and adding a median marker would have meant patching a component two shipped widgets depend on, for a second centre line that mostly repeats what the IQR box already shows. Reps per set are skewed, so median is the better statistic in theory; the box carries the skew either way."));
+
+C(bold("Presence, not intensity, on the heat strip"));
+C(p("dayCounts returns a record count, but the strip and the calendar use a single accent colour for any non-zero day. Shading by count would imply that four 턱걸이 sets is a bigger day than one 걷기 — a ranking across incomparable units that the data cannot support. The count is returned anyway, so graded shading stays available later without an API change."));
+
+C(bold("Units: 층 converted to 분, and the travel-time caveat"));
+C(p("계단 오르기 was logged in 층 (floors) on some records and 분 on others. The 층 records were converted to 분 at roughly four floors per minute before the widget was built, leaving exactly one unit per item across the whole dataset. The per-item counts still quoted in older WBS revisions (걷기 74, 스텝퍼 15) predate that pass and are stale."));
+C(note("Amount in 분 is actual activity time, which is NOT the same idea as duration — end minus start, including travel. Older 분 records were back-filled from (end − start), so their amounts carry travel time and run slightly high. 분 totals are therefore not strictly comparable across the whole history."));
+
+C(bold("Deferred: the load line"));
+C(p("The approved design put a second load-in-kg line on the daily chart with its own y-axis. CssDualLineChart cannot carry it — despite the name it is hard-wired to session start/end times on a single shared HH:MM axis — and CssRestChart, the only component with genuine dual axes, is hard-wired to the rest-day histogram. Building the extension was not worth blocking the widget on: load exists on two items of twelve, and 스쿼트 carries it on only 15 of its 33 records, so that line would be mostly gaps. If it is built later, the natural home is an optional second series plus right axis on CssDailyChart, not a new component."));
+
 
 C(new Paragraph({ children: [new TextRun({ text: "Part IV · Operations", bold: true, size: 28 })], spacing: { before: 280, after: 140 } }));
 
@@ -1078,7 +1192,7 @@ C(
   bullet("Null/empty strings: parseString() returns null for empty, #N/A, or #-prefixed values"),
 );
 C(h3("10.1.5 Google Sheets Column Layout"));
-C(p("A new column AO (spiciness) was inserted between AN (fat) and the previous AO (drink item). All columns from the previous AO onward are shifted by one position. The migration script fetch range is A:CG."));
+C(p("Two insertions shape the current layout. In v3.0 a new column AO (spiciness) was inserted between AN (fat) and the previous AO (drink item), shifting every column after it by one. In v4.3 two new columns BU (부하) and BV (방식) were inserted after BT (운동단위), shifting every column after them by two. The total is now 86 columns. The migration script fetch range is A:CI — A:CH would be exact, and A:CI keeps one spare column."));
 C(table(["Column","0-based Index","Field"],[
   ["A–AL","0–37","activity category through food.type (unchanged)"],
   ["AM","38","food.carbs"],
@@ -1115,19 +1229,22 @@ C(table(["Column","0-based Index","Field"],[
   ["BR","69","exercise[].item (was col 68)"],
   ["BS","70","exercise[].amount (was col 69)"],
   ["BT","71","exercise[].unit (was col 70)"],
-  ["BU","72","reading.title (was col 71)"],
-  ["BV","73","movie.title (was col 72)"],
-  ["BW","74","golf.score (was col 73)"],
-  ["BX","75","golf.approach (was col 74)"],
-  ["BY","76","golf.putts (was col 75)"],
-  ["BZ","77","income.gross (was col 76)"],
-  ["CA","78","income.net (was col 77)"],
-  ["CB","79","travel.city (was col 78)"],
-  ["CC","80","travel.theme (was col 79)"],
-  ["CD","81","notes (was col 80)"],
-  ["CE","82","sync.status (was col 81)"],
-  ["CF","83","sync.eventId (was col 82)"],
+  ["BU (NEW v4.3)","72","exercise[].loadKg"],
+  ["BV (NEW v4.3)","73","exercise[].setStyle"],
+  ["BW","74","reading.title (was col 72)"],
+  ["BX","75","movie.title (was col 73)"],
+  ["BY","76","golf.score (was col 74)"],
+  ["BZ","77","golf.approach (was col 75)"],
+  ["CA","78","golf.putts (was col 76)"],
+  ["CB","79","income.gross (was col 77)"],
+  ["CC","80","income.net (was col 78)"],
+  ["CD","81","travel.city (was col 79)"],
+  ["CE","82","travel.theme (was col 80)"],
+  ["CF","83","notes (was col 81)"],
+  ["CG","84","sync.status (was col 82)"],
+  ["CH","85","sync.eventId (was col 83)"],
 ],[2200,2200,4960]));
+C(note("Two numbering systems are in use and they differ by one. The index column above is 0-based, as used by rowToDocument.ts. Google Apps Script getRange() is 1-based, so CG is column number 85 and CH is column number 86. See Section 13 for the sync script that writes to those two columns."));
 C(spacer());
 C(h3("10.1.6 Food Ingredient Parsing"));
 C(p("Food items in column AT may carry an inline ingredient list in parentheses, using the pipe (|) separator inside the parentheses. This is parsed at migration time by parseFoodIngredients() in transform.ts, which runs AFTER the comma-split and plus-split steps, on each individual food token."));
@@ -1344,6 +1461,82 @@ C(spacer());
 
 
 
+// ===== 13. GOOGLE CALENDAR SYNC =====
+C(h1("13. Google Calendar Sync"));
+C(p("A Google Apps Script pushes selected Active and Future rows into a Google Calendar. It predates the FarGaze Log project and is documented here from v4.3 because it reads and writes source-sheet columns by position, which makes it sensitive to any column insertion. It is independent of MongoDB \u2014 nothing in this section affects migration or the dashboards."));
+
+C(h2("13.1 Where the Script Lives"));
+C(table(["Item","Value"],[
+  ["Apps Script project","FarGazeLogMigration \u2014 bound to the Active spreadsheet, single file Code.gs"],
+  ["Entry point","migrateToCalendar(e)"],
+  ["Menu","\uD83D\uDE80 Far Gaze \u2192 Sync to Calendar (added by onOpen)"],
+  ["Trigger","Runs when the Calendar sheet cell Q1 is edited; exits immediately unless Q1 is TRUE"],
+  ["Advanced service","Calendar (Calendar.Events.insert / update / remove)"],
+  ["Target calendar","A shared family calendar, referenced by calendar ID inside the script"],
+  ["Source sheets","Active and Future only. Archive sheets (~2025, 2026) are never synced."],
+  ["Not in the Git repository","The script lives in the spreadsheet, not in nullpitch-dev/fargaze-log"],
+],[3000,6360]));
+C(spacer());
+
+C(h2("13.2 The Calendar Staging Sheet"));
+C(p("The script does not read the Active and Future sheets directly. It reads sixteen columns from a helper sheet named Calendar, which is produced by a single spilled ARRAYFORMULA + QUERY in that sheet. Only the anchor cell holds the formula; every other cell displays as plain text. The formula stacks an Active block and a Future block, tags each row with its source sheet name and source row number, then filters to rows where the export flag is Y or U, or where the flag is blank but an Event_ID exists (the deletion case)."));
+C(table(["Staging column","Index in script","Contents","Source"],[
+  ["A","row[0]","Source sheet name","Literal \"Active\" or \"Future\""],
+  ["B","row[1]","Export flag (Y / U / blank)","Column E"],
+  ["C","row[2]","Title","Column C"],
+  ["D","row[3]","Start date","DATE(I, J, K)"],
+  ["E","row[4]","Start time","Column M, blank when 0"],
+  ["F","row[5]","Start timezone","VLOOKUP of column H against the TimeDiff sheet; falls back to Europe/London"],
+  ["G","row[6]","End date","DATE(P, Q, R)"],
+  ["H","row[7]","End time","Column T, blank when 0"],
+  ["I","row[8]","End timezone","VLOOKUP of column O against TimeDiff; falls back to Europe/London"],
+  ["J","row[9]","All-day flag","TRUE when column M is blank"],
+  ["K","row[10]","Description","Column D"],
+  ["L","row[11]","Location","Column AA"],
+  ["M","row[12]","Participants","Column BD"],
+  ["N","row[13]","Sync_Status","Column CG (was CE before v4.3)"],
+  ["O","row[14]","Event_ID","Column CH (was CF before v4.3)"],
+  ["P","row[15]","Source row number","ROW()"],
+],[2000,1700,2600,3060]));
+C(spacer());
+C(note("Note: the description comes from column D, not from notes (\uBE44\uACE0) in column CF. The notes column is never read by this script."));
+
+C(h2("13.3 The Five Rules"));
+C(p("For each staging row the script compares the export flag against Sync_Status and decides what to do:"));
+C(table(["Flag","Sync_Status","Action"],[
+  ["blank","blank","Skip \u2014 the row was never meant to be synced"],
+  ["Y","Synced","Skip \u2014 already in the calendar and unchanged"],
+  ["blank","Synced","Delete the calendar event, then clear Sync_Status and Event_ID on the source row"],
+  ["Y","blank","Insert a new calendar event, then write Synced and the new Event_ID back"],
+  ["U","(any)","Update the existing event by Event_ID, then write Synced and the Event_ID back"],
+],[1300,1700,6360]));
+C(spacer());
+C(p("Anything that is neither Y nor U, and does not match the deletion case, is skipped. After each successful write the script sleeps 1.5 seconds to stay inside the Calendar API quota."));
+
+C(h2("13.4 Write-back Columns \u2014 the Position Hazard"));
+C(p("Two functions write back to the source sheet: finalizeSourceRow (on insert or update) and clearSourceStatus (on delete). Both address cells with getRange(rowNum, columnNumber), which is 1-based, whereas the index column in Section 10.1.5 is 0-based. The two numbering systems differ by one, and the column insertions in v3.0 and v4.3 moved both targets."));
+C(table(["What the script writes","0-based index","Column letter","getRange() number"],[
+  ["Export flag \u2014 set to Y","4","E","5 (never moved)"],
+  ["Sync_Status","84","CG","85 (was 83 before v4.3)"],
+  ["Event_ID","85","CH","86 (was 84 before v4.3)"],
+],[3000,1800,1700,2860]));
+C(spacer());
+C(note("Warning: the staging formula uses A1-style references (Active!CG:CG, Active!CH:CH), which Google Sheets rewrites automatically when columns are inserted. The getRange() numbers in the script are hard-coded and do NOT rewrite. After any column insertion the two sides disagree: the script reads the correct columns but writes to the old ones. Before v4.3 the stale write targets were CE (\uC8FC\uC81C) and CF (\uBE44\uACE0), so an unpatched run would have overwritten travel themes and notes with Synced markers and calendar event IDs, and would then have re-inserted every event as a duplicate because Sync_Status read back as blank."));
+
+C(h2("13.5 Procedure After Any Column Insertion"));
+C(
+  num("Insert the new columns in all five sheets"),
+  num("Open the Calendar sheet and confirm the staging formula rewrote its Sync_Status and Event_ID references to the new letters"),
+  num("Open Extensions \u2192 Apps Script and update the getRange() numbers in finalizeSourceRow and clearSourceStatus, remembering the +1 offset from the 0-based index"),
+  num("Save the script \u2014 no deployment step is required, the trigger picks up saved code"),
+  num("Update the migration fetch range in scripts/migrate.ts and the column indices in rowToDocument.ts"),
+  num("Only then tick Q1 on the Calendar sheet"),
+);
+C(note("Note: run a single test row before a full sync. If Sync_Status and Event_ID land in the intended columns and no duplicate events appear in the calendar, the patch is correct."));
+C(spacer());
+
+
+
 C(new Paragraph({ children: [new TextRun({ text: "Appendices", bold: true, size: 28 })], spacing: { before: 280, after: 140 } }));
 
 // ===== APPENDICES =====
@@ -1378,6 +1571,7 @@ C(
   bullet("Summary bars share bars.tsx (Title / BarRow / BarSection) with the barColors palette; trend stacks use StackedBars; ranked flows use CssRankFlowChart."),
   bullet("Colour: useIsDark() + chartColors(isDark) for SVG; categoryColors, rankFlowColors and barColors are kept as separate palettes; spline tension is 0.2."),
   bullet("Each Insights widget follows the same template — Purpose · API / data shape · Summary view · Trend view · Filters · Notes — so new widgets slot in mechanically."),
+  bullet("Shared components are extended with optional props, never duplicated. A second widget needing an existing control is a signal to extract that control, not to copy it — Segmented was lifted out of DietWidget into _components/Segmented.tsx on exactly that trigger (v4.2). Where a case really is different, the difference is stated in the code rather than left implicit."),
 );
 C(h3("A.4 Documentation & Delivery Conventions"));
 C(
@@ -1388,16 +1582,21 @@ C(
 
 C(h1("Appendix B — Directory Map"));
 C(table(["Path","Purpose"],[
-  ["src/app/insights/page.tsx","Insights master page — CSS columns layout; widget registry (WIDGETS array)"],
+  ["src/app/insights/page.tsx","Insights master page — CSS columns layout; widget registry (WIDGETS array); ExerciseWidget registered v4.4"],
   ["src/app/insights/_widgets/SleepWidget.tsx","Sleep widget"],
   ["src/app/insights/_widgets/InteractionsWidget.tsx","Interactions widget — Summary restructured v3.6 (two-column stats grid + full-width PeopleBars, no tabs); StackedBarBucket type now local here after the SVG-module retirement"],
   ["src/app/insights/_widgets/DrinkingWidget.tsx","Drinking widget — Summary (restructured v3.6: two-column bar block + People bars, no tabs) + Trend (9 metric tabs), TrendTip component"],
-  ["src/app/insights/_widgets/DietWidget.tsx","Diet widget (WBS #61) — Summary view: four compact box plots, spicy HeatStrip + calendar modal, treemap toggles, companions toggle (v3.3–v3.4)"],
+  ["src/app/insights/_widgets/DietWidget.tsx","Diet widget (WBS #61) — Summary view: four compact box plots, spicy HeatStrip + calendar modal, treemap toggles, companions toggle (v3.3–v3.4); its local ModalShell was extracted to _components/ModalShell.tsx at v4.4"],
   ["src/app/insights/_components/charts/BoxPlot.tsx","CSS horizontal box plot — props: min, max, avg, p25, p75, isDark"],
   ["src/app/insights/_components/charts/Histogram.tsx","CSS histogram — props: buckets[] ({label, count}), isDark"],
-  ["src/app/insights/_components/charts/css-chart-components.tsx","CSS+SVG chart components: CssTrendChart, CssVerticalBoxPlotChart (compact prop v3.4; last-bucket values v4.1), CssDualLineChart, CssRestChart, CssDailyChart (v3.3), compressWeekLabels (CssStackedBarChart removed v3.6)"],
-  ["src/app/insights/_widgets/WeightWidget.tsx","Weight widget (WBS #54, v4.1) — Summary view: period box plot (non-compact CssVerticalBoxPlotChart, single bucket) beside a Body Composition block of two stacked bars (Average / Latest) with a delta strip between them; local CompositionRow measures itself with a ResizeObserver to decide which figures fit inside each segment"],
-  ["src/lib/insights/weight.ts","computeWeightSummary (v4.1) — collapseToDays shared by the period query and the latest-ever lookup; buildComposition normalises bodyFatPercent and degrades to a weight-only bar when muscle/fat are absent"],
+  ["src/app/insights/_components/charts/css-chart-components.tsx","CSS+SVG chart components: CssTrendChart, CssVerticalBoxPlotChart (compact prop v3.4; last-bucket values v4.1), CssDualLineChart, CssRestChart, CssDailyChart (v3.3), CssStackedAreaChart (v4.2), formatBucketLabels, inPlot gridline guard (v4.2) (CssStackedBarChart removed v3.6)"],
+  ["src/app/insights/_components/Segmented.tsx","(v4.2) Shared multi-state toggle extracted from DietWidget; generic over string | number; used by DietWidget and WeightTrendView"],
+  ["src/app/insights/_components/ModalShell.tsx","(v4.4) Shared portal modal extracted from DietWidget; used by DietWidget and ExerciseWidget"],
+  ["src/app/insights/_widgets/WeightWidget.tsx","Weight widget (WBS #54) — shell holding both views and their fetches. Summary: period box plot (non-compact CssVerticalBoxPlotChart, single bucket) beside a Body Composition block of two stacked bars (Average / Latest) with a delta strip between them; local CompositionRow measures itself with a ResizeObserver to decide which figures fit inside each segment. Trend (v4.2) delegates to WeightTrendView and owns granularity, bucket count and unit state, resetting the count when granularity changes"],
+  ["src/app/insights/_widgets/WeightTrendView.tsx","(v4.2) Weight Trend view — one CssStackedAreaChart with a three-state unit control (Weight / kg / %), granularity and bucket-count selectors, ISO-to-short label conversion, and the resolved-range header clamped to today"],
+  ["src/app/insights/_widgets/ExerciseWidget.tsx","(v4.4) Exercise widget (WBS #58) \u2014 Summary only. Period counter + HeatStrip row opening a CalendarHeatmap modal; a two-column grid of item blocks, each with its bests line and one chart per box; tapping a block opens a modal holding the daily-total and biggest-set charts. Local helpers fmt, mean, monthYear, bestLines, plainValues"],
+  ["src/app/insights/_widgets/weight-colors.ts","(v4.2) SEG / SEG_ORDER / segColor / soloColor — the pinned muscle-fat-other palette, extracted from WeightWidget so the Trend view can import it without a circular dependency"],
+  ["src/lib/insights/weight.ts","computeWeightSummary (v4.1) and computeWeightTrend (v4.2) — collapseToDays and buildComposition shared by both; the trend path issues ONE query for the whole span and buckets in memory rather than one query per bucket, because a 400-bucket day request would otherwise be 400 round trips"],
   ["src/app/insights/_components/charts/Treemap.tsx","Squarified treemap (v3.3); ResizeObserver-measured cells; top-N + 기타 rollup; label font capped at 11px (v3.4)"],
   ["src/app/insights/_components/charts/CalendarHeatmap.tsx","CalendarHeatmap (Mon–Sun grid, modal) + HeatStrip (single-row inline) (v3.3)"],
   ["src/app/insights/_components/charts/bars.tsx","(v3.6) Shared summary-bar primitives Title / BarRow / BarSection; desc-sorted, max-normalised bars with {pct}% ({count}) values; used by the Diet, Drinking and Interactions summaries (replaces the retired SVG _lib/chart-components.tsx)"],
@@ -1408,21 +1607,22 @@ C(table(["Path","Purpose"],[
   ["src/app/insights/_components/WidgetCard.tsx","WidgetCard, ViewToggle, BucketSelector, FloorBadge"],
   ["src/app/insights/_components/GlobalFilterBar.tsx","Global filter bar — 4 time modes, cross-activity multi-select"],
   ["src/app/insights/_components/MultiSelectDropdown.tsx","Reusable multi-select dropdown"],
-  ["src/app/api/insights/stats/route.ts","GET /api/insights/stats — thin dispatcher (~150 lines, v3.4): auth + param parsing; routes metric/mode to the per-widget compute modules below"],
+  ["src/app/api/insights/stats/route.ts","GET /api/insights/stats — thin dispatcher (~150 lines, v3.4): auth + param parsing; routes metric/mode to the per-widget compute modules below; exercise.summary branch added v4.4 (summary mode only, no date filter passed through \u2014 the compute module cuts the period itself)"],
   ["src/lib/insights/dates.ts","Shared date/period helpers (v3.4): buildDateRange, stepBack, labelForPeriod, currentPeriod, assignDrinkingDate, assignSleepDate, hourStringToMinutes, yesterdayStr, diffDays, SLEEP_THRESHOLD_HOUR"],
   ["src/lib/insights/util.ts","Shared numeric helper (v3.4): percentile"],
   ["src/lib/insights/sleep.ts","computeSleepSummary + QUALITY_SCORE (v3.4)"],
   ["src/lib/insights/interactions.ts","computeInteractionsSummary, computeInteractionsTrendBucket, addTransitioning (v3.4) — no external deps"],
   ["src/lib/insights/drinking.ts","computeDrinkingSummary, computeDrinkingTrendBucket + drinking helpers (computeDailyScores, bucketScore, classifyOccasion, hourStrToDecimal, SCORE_BUCKET_ORDER) (v3.4)"],
   ["src/lib/insights/diet.ts","computeDietSummary (v3.4; computeDietTrend to follow with the Trend view)"],
+  ["src/lib/insights/exercise.ts","(v4.4) computeExerciseSummary \u2014 one UNBOUNDED fetch of every \uc6b4\ub3d9 record, period cut in memory on YYYY-MM-DD strings so no MongoDB date filter is needed; boxOf / bestOf / groupByItem / sumByDate helpers; REST_PAUSE and MIN_BOX_DAYS constants"],
   ["src/models/AlcoholConversion.ts","Mongoose model for alcohol_conversion collection"],
   ["src/models/IngredientMaster.ts","Mongoose model for ingredient_master collection (NEW v3.1); unique index { userId, level2 }"],
-  ["src/models/Log.ts","Mongoose model for log collection; food.spiciness added v3.0; food.foods[].ingredients (foodsItemSchema) added v3.1; food.drinks[].ingredients (drinksItemSchema) added v3.2; alcohols unchanged"],
-  ["src/lib/migration/rowToDocument.ts","Maps Google Sheets row to MongoDB document; FOOD_ITEM col 45, DRINK_ITEM col 41; foods AND drinks post-processed via parseFoodIngredients (foods v3.1, drinks v3.2)"],
+  ["src/models/Log.ts","Mongoose model for log collection; food.spiciness added v3.0; food.foods[].ingredients (foodsItemSchema) added v3.1; food.drinks[].ingredients (drinksItemSchema) added v3.2; exercise[].loadKg and exercise[].setStyle added v4.3 to both ILog and LogSchema; alcohols unchanged"],
+  ["src/lib/migration/rowToDocument.ts","Maps Google Sheets row to MongoDB document; FOOD_ITEM col 45, DRINK_ITEM col 41; foods AND drinks post-processed via parseFoodIngredients (foods v3.1, drinks v3.2); v4.3 shifts every index after col 71 by +2 and reads exercise[].loadKg (col 72) and exercise[].setStyle (col 73) per item"],
   ["src/lib/migration/transform.ts","Transformation utilities; v3.1 adds parseFoodIngredients(), loadValidLevel2(), resetValidLevel2(), IngredientValidationError"],
   ["src/app/search/page.tsx","Search UI — LogEntry type and DetailPanel; food.spiciness added v3.0; mixed phrase/token query hint (v3.1); client-side tri-state sortable result columns (v3.6)"],
   ["src/app/api/search/route.ts","GET /api/search — Atlas Search primary + regex fallback; parseQuery mixed phrase/token (v3.1); per-field exact-phrase conditions mirrored across the Atlas and regex condition loops (v3.6)"],
-  ["scripts/migrate.ts","Daily migration runner; calls loadValidLevel2 at start; uncomment ~2025 block for full re-migration"],
+  ["scripts/migrate.ts","Daily migration runner; calls loadValidLevel2 at start; uncomment ~2025 block for full re-migration, and re-comment it afterwards; fetch range A:CI from v4.3 (was A:CG)"],
   ["scripts/migrate-alcohol-conversion.ts","One-time migration: reads AlcoholConv sheet → inserts into alcohol_conversion"],
   ["scripts/migrate-ingredient.ts","Seeds ingredient_master from the Ingredient sheet (NEW v3.1); run once, re-run only when the Ingredient sheet changes"],
   ["scripts/fill-historical-ingredients.ts","Fills food.foods[].ingredients on existing rows from embedded REVIEWED_MAP (1,156 entries) + bestGuess fallback; modes: --dry-run, --export-worklist, default write; treats [\"Not Defined\"] as refillable (NEW v3.1)"],
@@ -1431,11 +1631,13 @@ C(table(["Path","Purpose"],[
   ["scripts/scan-bad-parens.ts","Lists every source row whose FOOD or DRINK token has parentheses the parser rejects (NEW v3.1; extended to the drink column v3.2)"],
   ["scripts/fill-historical-drinks.ts","Fills food.drinks[].ingredients from embedded DRINK_MAP (278 reviewed entries) + 아이스/핫 normalisation + substring fallback; modes: --dry-run, --export-worklist, default write; treats [\"Not Defined\"] as refillable (NEW v3.2)"],
   ["scripts/inspect-drinks.ts","Survey for drinks: docs with drinks, items with/without ingredients, Not Defined count, top level2 distribution, samples (NEW v3.2)"],
+  ["scripts/inspect-exercise.ts","Survey for exercise: entry and day counts, distinct items and units, records per day, per-year distribution. Does not report loadKg or setStyle"],
+  ["scripts/check-exercise-fields.ts","Verifies loadKg and setStyle reached MongoDB after a migration; unwinds exercise[] and prints load by item plus setStyle counts (NEW v4.3)"],
 ],[3400,5960]));
 C(spacer());
 
 // ===== FOOTER =====
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.1 — 18 July 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.4 — 29 July 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 
 // ===== DOCUMENT ASSEMBLY =====
@@ -1472,6 +1674,6 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-Log-Data-Design-v4.1.docx", buffer);
-  console.log("Wrote FarGaze-Log-Data-Design-v4.1.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-Log-Data-Design-v4.4.docx", buffer);
+  console.log("Wrote FarGaze-Log-Data-Design-v4.4.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });

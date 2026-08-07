@@ -2,8 +2,8 @@
 // src/app/insights/_widgets/DietWidget.tsx
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { WidgetCard, ViewToggle } from '../_components/WidgetCard';
+import { ModalShell } from '../_components/ModalShell';
 import { Segmented } from '../_components/Segmented';
 import { useIsDark } from '../_lib/hooks';
 import { buildParams } from '../_lib/date-helpers';
@@ -98,24 +98,6 @@ function GroupLegend({ groups, colorMap }: { groups: string[]; colorMap: Record<
         </span>
       ))}
     </div>
-  );
-}
-
-function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  if (typeof document === 'undefined') return null;
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
-      <div className="w-full max-w-lg bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-700 rounded-xl shadow-xl p-4 flex flex-col gap-3"
-        onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-stone-900 dark:text-zinc-50 uppercase tracking-wide">{title}</p>
-          <button onClick={onClose}
-            className="text-stone-400 dark:text-zinc-500 hover:text-stone-700 dark:hover:text-zinc-200 text-lg leading-none">×</button>
-        </div>
-        {children}
-      </div>
-    </div>,
-    document.body,
   );
 }
 
