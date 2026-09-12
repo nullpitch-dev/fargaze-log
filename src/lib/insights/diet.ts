@@ -450,15 +450,32 @@ export async function computeDietTrend(
     return ymd(bucketStartFor(grain, y, m, d));
   };
 
-  const accByBucket = new Map<string, DietAccum>();
-  for (const s of starts) accByBucket.set(ymd(s), newDietAccum());
-
-  for (const { doc, date } of entries) {
-    const acc = accByBucket.get(keyOf(date));
-    if (acc) accumulateDietRecord(acc, doc, date);
+	const accByBucket  = new Map<string, DietAccum>();
+  const seenByBucket = new Map<string, number>();
+  for (const s of starts) {
+    accByBucket.set(ymd(s), newDietAccum());
+    seenByBucket.set(ymd(s), 0);
   }
 
-  const data: DietTrendBucket[] = starts.map(s => {
+  for (const { doc, date } of entries) {
+    const key = keyOf(date);
+    const acc = accByBucket.get(key);
+    if (acc) {
+      accumulateDietRecord(acc, doc, date);
+      seenByBucket.set(key, (seenByBucket.get(key) ?? 0) + 1);
+    }
+  }
+
+  // Leading empty buckets are trimmed; interior ones are kept. A window longer
+  // than the log itself would otherwise open with a run of blank buckets that
+  // says nothing except that logging had not started yet. An empty bucket in
+  // the MIDDLE is real information — a stretch where nothing was recorded — so
+  // it stays. Weight and Exercise trim the same way.
+  let first = 0;
+  while (first < starts.length && (seenByBucket.get(ymd(starts[first])) ?? 0) === 0) first++;
+  const visible = starts.slice(first);
+
+  const data: DietTrendBucket[] = visible.map(s => {
     const key = ymd(s);
     const a = accByBucket.get(key) as DietAccum;
 

@@ -1004,15 +1004,34 @@ export async function computeDrinkingTrend(
     restByBucket.set(k, []);
   }
 
-  for (const e of entries) entriesByBucket.get(keyOf(e.date))?.push(e);
+	for (const e of entries) entriesByBucket.get(keyOf(e.date))?.push(e);
   for (const day of restDayPool) drinkDaysByBucket.get(keyOf(day))?.add(day);
   for (const ev of restEvents) restByBucket.get(keyOf(ev.date))?.push(ev);
+
+  // Leading empty buckets are trimmed; interior ones are kept. A window longer
+  // than the log itself would otherwise open with a run of blank buckets that
+  // says nothing except that logging had not started yet. An empty bucket in
+  // the MIDDLE is real information — a dry stretch — so it stays.
+  //
+  // A bucket counts as empty only when it has neither records nor drinking
+  // days. The two can differ: rest scoring ignores the cross-activity filter,
+  // so a filtered request can leave a bucket with drinking days but no
+  // entries, and that bucket is not empty. Trimming is safe for the
+  // carry-forward below, because a bucket with no drinking days could not have
+  // moved lastDrinkSeen anyway.
+  let first = 0;
+  while (
+    first < starts.length &&
+    !entriesByBucket.get(ymd(starts[first]))?.length &&
+    !drinkDaysByBucket.get(ymd(starts[first]))?.size
+  ) first++;
+  const visible = starts.slice(first);
 
   // Walk oldest to newest, carrying the last drinking day forward so a dry
   // bucket can report how far the run had reached by its last day.
   let lastDrinkSeen: string | null = priorDrinkDate;
 
-  const data: DrinkingTrendBucket[] = starts.map(s => {
+	const data: DrinkingTrendBucket[] = visible.map(s => {
     const key          = ymd(s);
     const bucketDays   = drinkDaysByBucket.get(key) ?? new Set<string>();
     const bucketRest   = restByBucket.get(key) ?? [];

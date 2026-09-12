@@ -270,7 +270,21 @@ export function computeInteractionsTrend(
     byBucket.get(key)?.push(doc);
   }
 
-  const buckets = starts.map(s => {
+	// Leading empty buckets are trimmed; interior ones are kept. A window longer
+  // than the log itself would otherwise open with a run of blank buckets that
+  // says nothing except that logging had not started yet. An empty bucket in
+  // the MIDDLE is real information — a stretch with no contact — so it stays.
+  //
+  // Emptiness is measured on the RECORDS in the bucket, not on any one tab's
+  // numbers. A bucket holding records that are all solo activity is not empty:
+  // it says you logged those days and met nobody, which is the honest reading.
+  // Trimming here rather than after the map also keeps addTransitioning from
+  // reaching back into a bucket the view will never draw.
+  let first = 0;
+  while (first < starts.length && !byBucket.get(ymd(starts[first]))?.length) first++;
+  const visible = starts.slice(first);
+
+  const buckets = visible.map(s => {
     const bucket = computeInteractionsTrendBucket(byBucket.get(ymd(s)) ?? [], opts);
     return { label: bucketLabel(grain, s), start: ymd(s), ...bucket };
   });
