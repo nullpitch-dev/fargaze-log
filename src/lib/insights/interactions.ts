@@ -1,5 +1,14 @@
 // src/lib/insights/interactions.ts
 
+import {
+  TrendGrain,
+  buildBucketStarts,
+  bucketStartFor,
+  bucketLabel,
+  fromYMD,
+  ymd,
+} from './trend-window';
+
 
 export function computeInteractionsSummary(docs: any[], methodFilter: string[] = []) {
   const interactions = docs.filter(d => d.activity?.relationship === '함께');
@@ -220,4 +229,51 @@ export function addTransitioning(
 
     return { ...bucket, transitioning };
   });
+}
+
+
+// ── Grain × count trend (the Weight-style window) ────────────────────────────
+// One fetch for the whole window arrives here; bucketing happens in memory,
+// so 120 buckets never means 120 database round trips. The route fetches
+// with a one-day pad against timezone edge shift; the local-date test here
+// drops anything outside the window. Per-bucket numbers come from the same
+// computeInteractionsTrendBucket the old path uses, so the two paths cannot
+// disagree while both exist.
+export function computeInteractionsTrend(
+  docs: any[],
+  grain: TrendGrain,
+  windowStart: Date,
+  windowEnd: Date,
+  opts: {
+    relTypeFilter?: string[];
+    peopleMethod?: string[];
+    interactionsMethod?: string[];
+    uniqueMethod?: string[];
+    relationMethod?: string[];
+  } = {},
+) {
+  const starts = buildBucketStarts(grain, windowStart, windowEnd);
+  const byBucket = new Map<string, any[]>();
+  for (const s of starts) byBucket.set(ymd(s), []);
+
+  const startKey = ymd(windowStart);
+  const endKey = ymd(windowEnd);
+
+  for (const doc of docs) {
+    const y = doc.start?.year;
+    const m = doc.start?.month;
+    const d = doc.start?.day;
+    if (!y || !m || !d) continue;
+    const dayKey = ymd(fromYMD(y, m, d));
+    if (dayKey < startKey || dayKey > endKey) continue;
+    const key = ymd(bucketStartFor(grain, y, m, d));
+    byBucket.get(key)?.push(doc);
+  }
+
+  const buckets = starts.map(s => {
+    const bucket = computeInteractionsTrendBucket(byBucket.get(ymd(s)) ?? [], opts);
+    return { label: bucketLabel(grain, s), start: ymd(s), ...bucket };
+  });
+
+  return { grain, data: addTransitioning(buckets) };
 }

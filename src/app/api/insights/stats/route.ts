@@ -9,9 +9,10 @@ import Log from '@/models/Log';
 
 import { buildDateRange, stepBack, labelForPeriod, currentPeriod } from '@/lib/insights/dates';
 import { computeSleepSummary } from '@/lib/insights/sleep';
-import { computeInteractionsSummary, computeInteractionsTrendBucket, addTransitioning } from '@/lib/insights/interactions';
-import { computeDrinkingSummary, computeDrinkingTrendBucket } from '@/lib/insights/drinking';
-import { computeDietSummary, computeDietTrendBucket } from '@/lib/insights/diet';
+import { computeInteractionsSummary, computeInteractionsTrendBucket, addTransitioning, computeInteractionsTrend } from '@/lib/insights/interactions';
+import { parseGrain, anchorFrom, resolveWindow } from '@/lib/insights/trend-window';
+import { computeDrinkingSummary, computeDrinkingTrendBucket, computeDrinkingTrend } from '@/lib/insights/drinking';
+import { computeDietSummary, computeDietTrendBucket, computeDietTrend } from '@/lib/insights/diet';
 import { computeWeightSummary, computeWeightTrend } from '@/lib/insights/weight';
 import type { WeightGranularity } from '@/lib/insights/weight';
 import { computeExerciseSummary } from '@/lib/insights/exercise';
@@ -93,6 +94,44 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ summary });
   }
 
+  // ── interactions.trend ────────────────────────────────────────────────────
+  // Weight-style window: grain × bucket count, anchored at min(end of the
+  // selected period, today), start snapped to a bucket boundary. ONE fetch
+  // covers the whole window (padded a day each side against timezone edge
+  // shift); the compute module cuts precisely on local date fields and
+  // buckets in memory. The old mode=trend path above stays until the UI
+  // switches over, then retires with its parameters.
+  if (metric === 'interactions.trend') {
+    const grain = parseGrain(sp.get('grain'));
+    const bucketCount = parseInt(sp.get('buckets') ?? '12');
+    const safeCount = Math.min(Number.isFinite(bucketCount) ? Math.max(1, bucketCount) : 12, 400);
+
+    const { end: periodEnd } = buildDateRange(timeMode, timePeriod, dateFrom, dateTo);
+    const { start, end } = resolveWindow(grain, safeCount, anchorFrom(periodEnd));
+
+    const fetchFrom = new Date(start); fetchFrom.setUTCDate(fetchFrom.getUTCDate() - 1);
+    const fetchTo   = new Date(end);   fetchTo.setUTCDate(fetchTo.getUTCDate() + 2);
+
+    const filter: Record<string, any> = {
+      userId,
+      'activity.relationship': '함께',
+      'start.datetime': { $gte: fetchFrom, $lte: fetchTo },
+    };
+    if (crossActivities.length) {
+      filter['activity.crossActivity'] = { $in: crossActivities };
+    }
+    const docs = await Log.find(filter).lean();
+
+    const trend = computeInteractionsTrend(docs, grain, start, end, {
+      relTypeFilter:      top7RelType,
+      peopleMethod:       top7Method,
+      interactionsMethod: mInteractions,
+      uniqueMethod:       mUnique,
+      relationMethod:     mRelation,
+    });
+    return NextResponse.json(trend);
+  }
+
   // ── sleep.all ─────────────────────────────────────────────────────────────
   if (metric === 'sleep.all') {
     if (mode === 'trend') {
@@ -151,6 +190,26 @@ export async function GET(req: NextRequest) {
     const summary = await computeDrinkingSummary(userId, start, end, crossActivities);
     return NextResponse.json({ summary });
   }
+
+  // ── drinking.trend ──────────────────────────────────────────────────────────
+  // Weight-style window: grain × bucket count, anchored at min(end of the
+  // selected period, today), start snapped to a bucket boundary. Unlike
+  // interactions.trend the compute module runs its own queries — it needs the
+  // conversion table and the one drinking day before the window anyway — so it
+  // takes the window rather than documents. Three bounded queries per request
+  // whatever the bucket count, replacing three per bucket. The old
+  // mode=trend path above stays until the UI switches over.
+  if (metric === 'drinking.trend') {
+    const grain = parseGrain(sp.get('grain'));
+    const bucketCount = parseInt(sp.get('buckets') ?? '12');
+    const safeCount = Math.min(Number.isFinite(bucketCount) ? Math.max(1, bucketCount) : 12, 400);
+
+    const { end: periodEnd } = buildDateRange(timeMode, timePeriod, dateFrom, dateTo);
+    const { start, end } = resolveWindow(grain, safeCount, anchorFrom(periodEnd));
+
+    const trend = await computeDrinkingTrend(userId, grain, start, end, crossActivities);
+    return NextResponse.json(trend);
+  }
   
 	// ── diet.summary ──────────────────────────────────────────────────────────────
   if (metric === 'diet.summary') {
@@ -172,6 +231,25 @@ export async function GET(req: NextRequest) {
     const { start, end } = buildDateRange(timeMode, timePeriod, dateFrom, dateTo);
     const summary = await computeDietSummary(userId, start, end, crossActivities);
     return NextResponse.json({ summary });
+  }
+
+	// ── diet.trend ────────────────────────────────────────────────────────────
+  // Weight-style window: grain × bucket count, anchored at min(end of the
+  // selected period, today), start snapped to a bucket boundary. Like
+  // drinking.trend the compute module takes the window and runs its own query,
+  // so the 6 am padding lives next to the day-assignment rule that needs it.
+  // One bounded query per request whatever the bucket count. The old
+  // mode=trend path above stays until the UI switches over.
+  if (metric === 'diet.trend') {
+    const grain = parseGrain(sp.get('grain'));
+    const bucketCount = parseInt(sp.get('buckets') ?? '12');
+    const safeCount = Math.min(Number.isFinite(bucketCount) ? Math.max(1, bucketCount) : 12, 400);
+
+    const { end: periodEnd } = buildDateRange(timeMode, timePeriod, dateFrom, dateTo);
+    const { start, end } = resolveWindow(grain, safeCount, anchorFrom(periodEnd));
+
+    const trend = await computeDietTrend(userId, grain, start, end, crossActivities);
+    return NextResponse.json(trend);
   }
 
 	// ── weight.summary ────────────────────────────────────────────────────────

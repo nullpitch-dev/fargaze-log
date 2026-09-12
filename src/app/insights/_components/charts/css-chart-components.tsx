@@ -141,6 +141,7 @@ export function CssTrendChart({
   const ticksR = hasRight ? buildYTicks(yMinR, hiR).map(v => ({ value: v, label: fmtR(v) })) : [];
 
   const n = labels.length;
+  const dotD = dotSize(n);
   const displayLabels = compressXLabels ? formatBucketLabels(labels) : labels;
   function xPct(i: number)  {
     if (xBand) return n <= 0 ? 50 : ((i + 0.5) / n) * 100;
@@ -243,41 +244,21 @@ export function CssTrendChart({
                 if (v === null) return null;
                 const top        = `${yPct(v)}%`;
                 const isActive   = activeIdx === i;
-                const showLabel  = showValues || isActive;   // hidden values reappear on hover
+                const showLabel  = showValues;   // hover values now live in the card below
                 const labelBelow = yPct(v) < 18;
                 return (
                   <React.Fragment key={si}>
                     <div className="absolute rounded-full"
                       style={{ left: '50%', top, transform: 'translate(-50%, -50%)',
-                        width: isActive ? 9 : 7, height: isActive ? 9 : 7,
+                        width: isActive ? dotD + 2 : dotD, height: isActive ? dotD + 2 : dotD,
                         background: s.color, opacity: isActive ? 1 : 0.9, zIndex: 3 }} />
                     {showLabel && (
-                      isActive && si === 0 ? (
-                        // Two-line tooltip: value over bucket name, floated
-                        // well clear of the dot (and the pointer resting on
-                        // it), on a translucent backdrop so it stays readable
-                        // over lines and grid. Always ABOVE the dot — nothing
-                        // clips the plot's top, so a high point just overlaps
-                        // the caption for a moment, which beats a tooltip
-                        // that jumps sides.
-                        <div className="absolute text-[10px] font-semibold leading-tight whitespace-nowrap text-center rounded"
-                          style={{ left: '50%', top,
-                            transform: 'translate(-50%, -34px)',
-                            color: multiColored ? s.color : vc,
-                            background: isDark ? 'rgba(24,24,27,0.92)' : 'rgba(255,255,255,0.92)',
-                            padding: '1px 4px',
-                            zIndex: 5, pointerEvents: 'none' }}>
-                          {formatY(v)}
-                          <div className="font-normal" style={{ color: lc }}>{displayLabels[i]}</div>
-                        </div>
-                      ) : (
-                        <div className="absolute text-[10px] font-semibold leading-none whitespace-nowrap"
-                          style={{ left: '50%', top,
-                            transform: labelBelow ? 'translate(-50%, 8px)' : 'translate(-50%, -18px)',
-                            color: multiColored ? s.color : vc, zIndex: 4, pointerEvents: 'none' }}>
-                          {formatY(v)}
-                        </div>
-                      )
+                      <div className="absolute text-[10px] font-semibold leading-none whitespace-nowrap"
+                        style={{ left: '50%', top,
+                          transform: labelBelow ? 'translate(-50%, 8px)' : 'translate(-50%, -18px)',
+                          color: multiColored ? s.color : vc, zIndex: 4, pointerEvents: 'none' }}>
+                        {formatY(v)}
+                      </div>
                     )}
                   </React.Fragment>
                 );
@@ -292,11 +273,11 @@ export function CssTrendChart({
                     {/* hollow dot — the dashed series keeps its own shape language */}
                     <div className="absolute rounded-full"
                       style={{ left: '50%', top, transform: 'translate(-50%, -50%)',
-                        width: isActive ? 9 : 7, height: isActive ? 9 : 7,
+                        width: isActive ? dotD + 2 : dotD, height: isActive ? dotD + 2 : dotD,
                         background: isDark ? '#18181b' : '#ffffff',
                         border: `1.5px solid ${rightSeries.color}`,
                         opacity: isActive ? 1 : 0.9, zIndex: 3 }} />
-                    {(showValues || isActive) && (
+                    {showValues && (
                       <div className="absolute text-[10px] font-semibold leading-none whitespace-nowrap"
                         style={{ left: '50%', top,
                           transform: labelBelow ? 'translate(-50%, 8px)' : 'translate(-50%, -18px)',
@@ -307,6 +288,60 @@ export function CssTrendChart({
                   </React.Fragment>
                 );
               })()}
+
+              {/* Hover card — the same shape as the stacked-area tooltip: a
+                  line down the hovered column and one row per series, so a
+                  multi-line chart can be read by name instead of guessing
+                  which floating number belongs to which line. Flips to the
+                  left once past 60% across, as the area charts do. */}
+              {activeIdx === i && (
+                <>
+                  <div className="absolute inset-y-0 pointer-events-none"
+                    style={{ left: '50%', width: 2, marginLeft: -1,
+                      background: lc, opacity: 0.75 }} />
+                  <div className="absolute rounded px-2 py-1 leading-tight whitespace-nowrap pointer-events-none"
+                    style={{ left: '50%', top: 4,
+                      transform: i > n * 0.6
+                        ? 'translateX(calc(-100% - 16px))'
+                        : 'translateX(16px)',
+                      background: isDark ? '#27272a' : '#ffffff',
+                      border: `1px solid ${isDark ? '#3f3f46' : '#e7e5e4'}`,
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.12)', zIndex: 6 }}>
+                    <div style={{ fontSize: 10, color: lc }}>{displayLabels[i]}</div>
+
+                    {series.map((s, si) => {
+                      const v = s.values[i];
+                      return (
+                        <div key={si} className="flex items-center gap-1"
+                          style={{ fontSize: 10, color: lc, marginTop: 2 }}>
+                          <span className="inline-block rounded-full"
+                            style={{ width: 7, height: 7, background: s.color }} />
+                          {s.label && <span style={{ minWidth: 52 }}>{s.label}</span>}
+                          <span style={{ color: vc, fontWeight: 600 }}>
+                            {v === null ? '—' : formatY(v)}
+                          </span>
+                        </div>
+                      );
+                    })}
+
+                    {hasRight && rightSeries && (
+                      <div className="flex items-center gap-1"
+                        style={{ fontSize: 10, color: lc, marginTop: 2 }}>
+                        {/* hollow dot — the dashed right-axis series keeps its
+                            own shape language here too */}
+                        <span className="inline-block rounded-full"
+                          style={{ width: 7, height: 7,
+                            background: isDark ? '#18181b' : '#ffffff',
+                            border: `1.5px solid ${rightSeries.color}` }} />
+                        {rightSeries.label && <span style={{ minWidth: 52 }}>{rightSeries.label}</span>}
+                        <span style={{ color: vc, fontWeight: 600 }}>
+                          {rightSeries.values[i] === null ? '—' : fmtR(rightSeries.values[i] as number)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           ))}
         </div>
@@ -572,7 +607,14 @@ export function CssVerticalBoxPlotChart({
 
 
 // ── CssDualLineChart (Session Time) ──────────────────────────────────────────
-// From / To lines sharing Y-axis in HH:MM, with filled area + arrows + duration labels.
+// From / To lines sharing a time Y-axis in HH:MM, with the band between them
+// filled, plus an average Duration line on its OWN right-hand axis, dashed —
+// duration is an interval, not a clock time, so it cannot share the left axis.
+//
+// The per-bucket arrows and the per-bucket duration captions are gone: they
+// were legible at a dozen buckets and solid ink at a hundred. The duration
+// line carries the same information continuously, and exact figures live in
+// the hover card.
 
 interface SessionBucket {
   label:              string;
@@ -584,6 +626,23 @@ interface SessionBucket {
 interface CssDualLineChartProps {
   buckets: SessionBucket[];
   isDark:  boolean;
+  /** cap on how many x labels are drawn; the last is always kept */
+  maxXLabels?: number;
+  /** print the clock times beside every dot. Default on, as before. */
+  showValues?: boolean;
+}
+
+/**
+ * Dot diameter in px, shrinking as buckets crowd. At 120 buckets a 7px dot is
+ * wider than its slot, so the line reads as a string of beads rather than a
+ * line. The hovered dot keeps a +2px bump at every size so it stays findable.
+ */
+function dotSize(n: number): number {
+  if (n <= 16) return 7;
+  if (n <= 32) return 6;
+  if (n <= 64) return 5;
+  if (n <= 100) return 4;
+  return 3;
 }
 
 const DUAL_H          = 160;
@@ -592,7 +651,18 @@ const FROM_COLOR_D    = '#2dd4bf';
 const TO_COLOR_L      = '#7c3aed';
 const TO_COLOR_D      = '#f97316';
 
-export function CssDualLineChart({ buckets, isDark }: CssDualLineChartProps) {
+/** minutes → '2h30m' / '45m', for the duration axis and card. */
+function durStr(mins: number): string {
+  const t = Math.round(mins);
+  const h = Math.floor(t / 60);
+  const m = t % 60;
+  if (h <= 0) return `${m}m`;
+  return m === 0 ? `${h}h` : `${h}h${String(m).padStart(2, '0')}m`;
+}
+
+export function CssDualLineChart({
+  buckets, isDark, maxXLabels, showValues = true,
+}: CssDualLineChartProps) {
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
 
   const fromColor = isDark ? FROM_COLOR_D : FROM_COLOR_L;
@@ -614,25 +684,67 @@ export function CssDualLineChart({ buckets, isDark }: CssDualLineChartProps) {
   function xPct(i: number) { return buckets.length <= 1 ? 50 : (i / (buckets.length - 1)) * 100; }
 
   const n  = buckets.length;
-  const compressedLabels = formatBucketLabels(buckets.map(b => b.label));
+  const dotD = dotSize(n);
   const gc = gridLineColor(isDark);
   const lc = labelColor(isDark);
   const vc = valueColor(isDark);
-  const arrowColor = isDark ? '#71717a' : '#a8a29e';
-  const durColor   = isDark ? '#a1a1aa' : '#57534e'; // darker than before
+  const durColor   = isDark ? '#a1a1aa' : '#57534e';
+
+  // ── Right axis: duration in minutes, its own range ─────────────────────────
+  const durMins  = buckets.map(b =>
+    b.avgDurationSeconds !== null ? b.avgDurationSeconds / 60 : null);
+  const durPool  = durMins.filter((v): v is number => v !== null);
+  const hasDur   = durPool.length > 0;
+  const loD      = hasDur ? Math.min(...durPool) : 0;
+  const hiD      = hasDur ? Math.max(...durPool) : 1;
+  const padD     = Math.max(5, (hiD - loD) * 0.10);
+  const yMinD    = Math.max(0, loD - padD);
+  const yMaxD    = hiD + padD;
+  const yRangeD  = (yMaxD - yMinD) || 1;
+  const yPctD    = (v: number) => (1 - (v - yMinD) / yRangeD) * 100;
+  const durTicks = hasDur ? buildYTicks(yMinD, hiD) : [];
+
+  // Contiguous runs, so a bucket with no session breaks each line rather than
+  // being joined straight across.
+  function runsOf(vals: (number | null)[]): number[][] {
+    const out: number[][] = [];
+    let cur: number[] = [];
+    for (let i = 0; i < n; i++) {
+      if (vals[i] !== null) cur.push(i);
+      else { if (cur.length) out.push(cur); cur = []; }
+    }
+    if (cur.length) out.push(cur);
+    return out;
+  }
+  const fromVals = buckets.map(b => b.avgStartMins);
+  const toVals   = buckets.map(b => b.avgEndMins);
+  const bandRuns = runsOf(buckets.map(b =>
+    b.avgStartMins !== null && b.avgEndMins !== null ? 1 : null));
+
+  // ── x labels — fixed stride walked back from the newest bucket ─────────────
+  const keep: number[] = [];
+  {
+    const stride = maxXLabels
+      ? Math.max(1, Math.ceil(n / Math.max(1, maxXLabels)))
+      : 1;
+    for (let i = n - 1; i >= 0; i -= stride) keep.push(i);
+    keep.reverse();
+  }
+  const keptShort = formatBucketLabels(keep.map(i => buckets[i].label));
+  const shortAt   = new Map<number, string>(keep.map((i, k) => [i, keptShort[k]]));
 
   return (
     <div className="flex flex-col gap-1 w-full select-none">
       <div className="flex w-full">
         {/* Y-axis (time) */}
         <div className="relative shrink-0 overflow-hidden" style={{ width: Y_LABEL_W, height: DUAL_H }}>
-          {yTicks.map(tick => {
-            const t = yPct(tick);
+          {yTicks.map(tk => {
+            const t = yPct(tk);
             if (t < 3 || t > 97) return null;
             return (
-              <span key={tick} className="absolute text-[10px] leading-none"
+              <span key={tk} className="absolute text-[10px] leading-none"
                 style={{ right: 4, top: `${t}%`, transform: 'translateY(-50%)', color: lc }}>
-                {minsToClockStr(tick, tick >= 1440)}
+                {minsToClockStr(tk, tk >= 1440)}
               </span>
             );
           })}
@@ -640,75 +752,88 @@ export function CssDualLineChart({ buckets, isDark }: CssDualLineChartProps) {
 
         {/* Plot */}
         <div className="relative flex-1" style={{ height: DUAL_H }}>
-          {/* Grid lines */}
-					{yTicks.map(tick => (
-            inPlot(yPct(tick)) ? (
-              <div key={tick} className="absolute inset-x-0 pointer-events-none"
-                style={{ top: `${yPct(tick)}%`, height: 1, background: gc, opacity: 0.6 }} />
-            ) : null
-          ))}
+          {yTicks.map(tk => {
+            const t = yPct(tk);
+            if (t < 0 || t > 100) return null;
+            return (
+              <div key={tk} className="absolute inset-x-0 pointer-events-none"
+                style={{ top: `${t}%`, height: 1, background: gc, opacity: 0.7 }} />
+            );
+          })}
 
-          {/* SVG overlay */}
           <svg className="absolute inset-0 w-full h-full overflow-visible"
             preserveAspectRatio="none" viewBox="0 0 100 100">
 
-            {/* Fill area between From and To */}
-            {(() => {
-              const fromPts = buckets.map((b, i) =>
-                b.avgStartMins !== null ? { x: xPct(i), y: yPct(b.avgStartMins) } : null
-              ).filter((p): p is { x: number; y: number } => p !== null);
-              const toPts = buckets.map((b, i) =>
-                b.avgEndMins !== null ? { x: xPct(i), y: yPct(b.avgEndMins) } : null
-              ).filter((p): p is { x: number; y: number } => p !== null);
-              if (fromPts.length < 2 || toPts.length < 2) return null;
-              const top = fromPts.map(p => `${p.x},${p.y}`).join(' ');
-              const bot = [...toPts].reverse().map(p => `${p.x},${p.y}`).join(' ');
-              return <polygon points={`${top} ${bot}`} fill={fromColor} fillOpacity={0.07} />;
-            })()}
-
-            {/* From spline */}
-            {(() => {
-              const pts = buckets.map((b, i) =>
-                b.avgStartMins !== null ? { x: xPct(i), y: yPct(b.avgStartMins) } : null
-              ).filter((p): p is { x: number; y: number } => p !== null);
-              const d = smoothPath(pts);
-              return d ? <path d={d} fill="none" stroke={fromColor}
-                strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"
-                vectorEffect="non-scaling-stroke" opacity={0.85} /> : null;
-            })()}
-
-            {/* To spline */}
-            {(() => {
-              const pts = buckets.map((b, i) =>
-                b.avgEndMins !== null ? { x: xPct(i), y: yPct(b.avgEndMins) } : null
-              ).filter((p): p is { x: number; y: number } => p !== null);
-              const d = smoothPath(pts);
-              return d ? <path d={d} fill="none" stroke={toColor}
-                strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"
-                vectorEffect="non-scaling-stroke" opacity={0.85} /> : null;
-            })()}
-
-						{/* Vertical arrows (start → end) */}
-            {buckets.map((b, i) => {
-              if (b.avgStartMins === null || b.avgEndMins === null) return null;
-              const x  = xPct(i);
-              const y1 = yPct(b.avgStartMins);
-              const y2 = yPct(b.avgEndMins);
+            {/* Shaded band between From and To — kept: the gap between the two
+                lines IS the session, and the fill makes it readable at a
+                glance without the per-bucket arrows. */}
+            {bandRuns.map((run, ri) => {
+              if (run.length === 1) {
+                const i = run[0];
+                const x = xPct(i);
+                const w = Math.min(1.5, (100 / Math.max(1, n)) * 0.6);
+                return (
+                  <rect key={`band${ri}`} x={x - w / 2} width={w}
+                    y={yPct(buckets[i].avgEndMins as number)}
+                    height={Math.abs(yPct(buckets[i].avgStartMins as number)
+                      - yPct(buckets[i].avgEndMins as number))}
+                    fill={fromColor} fillOpacity={0.07} />
+                );
+              }
+              const top = run.map(i => `${xPct(i)},${yPct(buckets[i].avgEndMins as number)}`);
+              const bot = run.slice().reverse()
+                .map(i => `${xPct(i)},${yPct(buckets[i].avgStartMins as number)}`);
               return (
-								<g key={i} style={{ pointerEvents: 'none' }}>
-                  <line x1={x} y1={y1 + 1.5} x2={x} y2={y2}
-                    stroke={arrowColor} strokeWidth="1" strokeDasharray="2 2"
-                    vectorEffect="non-scaling-stroke" />
-                </g>
+                <polygon key={`band${ri}`} points={`${top.join(' ')} ${bot.join(' ')}`}
+                  fill={fromColor} fillOpacity={0.07} />
               );
+            })}
+
+            {/* Duration — dashed, right-hand axis. Drawn under the two clock
+                lines so it never hides them. */}
+            {hasDur && runsOf(durMins).map((run, ri) => {
+              const pts = run.map(i => ({ x: xPct(i), y: yPctD(durMins[i] as number) }));
+              if (pts.length === 1) {
+                return <circle key={`dur${ri}`} cx={pts[0].x} cy={pts[0].y} r={1.2} fill={durColor} />;
+              }
+              const d = smoothPath(pts);
+              return d ? (
+                <path key={`dur${ri}`} d={d} fill="none" stroke={durColor}
+                  strokeWidth="1.5" strokeDasharray="5 3"
+                  strokeLinejoin="round" strokeLinecap="round"
+                  vectorEffect="non-scaling-stroke" opacity={0.8} />
+              ) : null;
+            })}
+
+            {runsOf(fromVals).map((run, ri) => {
+              const pts = run.map(i => ({ x: xPct(i), y: yPct(fromVals[i] as number) }));
+              const d = smoothPath(pts);
+              return d ? (
+                <path key={`from${ri}`} d={d} fill="none" stroke={fromColor}
+                  strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"
+                  vectorEffect="non-scaling-stroke" opacity={0.9} />
+              ) : null;
+            })}
+
+            {runsOf(toVals).map((run, ri) => {
+              const pts = run.map(i => ({ x: xPct(i), y: yPct(toVals[i] as number) }));
+              const d = smoothPath(pts);
+              return d ? (
+                <path key={`to${ri}`} d={d} fill="none" stroke={toColor}
+                  strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"
+                  vectorEffect="non-scaling-stroke" opacity={0.9} />
+              ) : null;
             })}
           </svg>
 
-          {/* Hover zones + dots */}
+          {/* Hover zones + dots — one bucket wide, so zones tile instead of
+              overlapping at high bucket counts. */}
           {buckets.map((b, i) => (
-            <div key={b.label} className="absolute top-0 bottom-0"
-              style={{ left: `${xPct(i)}%`, width: 28, transform: 'translateX(-50%)',
-                cursor: 'pointer', zIndex: 2 }}
+            <div key={i} className="absolute top-0 bottom-0"
+              style={{ left: `${xPct(i)}%`,
+                width: `${100 / Math.max(1, n - 1)}%`, minWidth: 10,
+                transform: 'translateX(-50%)',
+                cursor: 'pointer', zIndex: activeIdx === i ? 10 : 2 }}
               onMouseEnter={() => setActiveIdx(i)}
               onMouseLeave={() => setActiveIdx(null)}
               onClick={() => setActiveIdx(activeIdx === i ? null : i)}>
@@ -722,14 +847,16 @@ export function CssDualLineChart({ buckets, isDark }: CssDualLineChartProps) {
                   <>
                     <div className="absolute rounded-full"
                       style={{ left: '50%', top, transform: 'translate(-50%, -50%)',
-                        width: isActive ? 9 : 7, height: isActive ? 9 : 7,
+                        width: isActive ? dotD + 2 : dotD, height: isActive ? dotD + 2 : dotD,
                         background: fromColor, opacity: isActive ? 1 : 0.9, zIndex: 3 }} />
-										<div className="absolute text-[10px] font-semibold leading-none whitespace-nowrap"
-                      style={{ left: '50%', top,
-                        transform: below ? 'translate(-50%, 8px)' : 'translate(-50%, -18px)',
-                        color: fromColor, zIndex: 4, pointerEvents: 'none' }}>
-                      {minsToClockStr(b.avgStartMins)}
-                    </div>
+										{showValues && (
+                      <div className="absolute text-[10px] font-semibold leading-none whitespace-nowrap"
+                        style={{ left: '50%', top,
+                          transform: below ? 'translate(-50%, 8px)' : 'translate(-50%, -18px)',
+                          color: fromColor, zIndex: 4, pointerEvents: 'none' }}>
+                        {minsToClockStr(b.avgStartMins)}
+                      </div>
+                    )}
                   </>
                 );
               })()}
@@ -743,60 +870,136 @@ export function CssDualLineChart({ buckets, isDark }: CssDualLineChartProps) {
                   <>
                     <div className="absolute rounded-full"
                       style={{ left: '50%', top, transform: 'translate(-50%, -50%)',
-                        width: isActive ? 9 : 7, height: isActive ? 9 : 7,
+                        width: isActive ? dotD + 2 : dotD, height: isActive ? dotD + 2 : dotD,
                         background: toColor, opacity: isActive ? 1 : 0.9, zIndex: 3 }} />
-										<div className="absolute text-[10px] font-semibold leading-none whitespace-nowrap"
-                      style={{ left: '50%', top,
-                        transform: below ? 'translate(-50%, 8px)' : 'translate(-50%, -18px)',
-                        color: toColor, zIndex: 4, pointerEvents: 'none' }}>
-                      {minsToClockStr(b.avgEndMins, b.avgEndMins >= 1440)}
-                    </div>
+										{showValues && (
+                      <div className="absolute text-[10px] font-semibold leading-none whitespace-nowrap"
+                        style={{ left: '50%', top,
+                          transform: below ? 'translate(-50%, 8px)' : 'translate(-50%, -18px)',
+                          color: toColor, zIndex: 4, pointerEvents: 'none' }}>
+                        {minsToClockStr(b.avgEndMins, b.avgEndMins >= 1440)}
+                      </div>
+                    )}
                   </>
                 );
               })()}
-							{/* Duration (always shown) — two lines (Xh / YYm); left of the line on the last bucket */}
-              {b.avgStartMins !== null && b.avgEndMins !== null && b.avgDurationSeconds !== null && (() => {
-                const totalMin = Math.round(b.avgDurationSeconds / 60);
-                const h = Math.floor(totalMin / 60);
-                const m = totalMin % 60;
-                const isLast = i === n - 1;
+
+              {/* Duration dot — hollow, the same shape language as the dashes */}
+              {durMins[i] !== null && (() => {
+                const isActive = activeIdx === i;
                 return (
-                  <div className="absolute text-[10px] font-semibold leading-tight whitespace-nowrap text-center"
-                    style={{ left: '50%', top: `${(yPct(b.avgStartMins) + yPct(b.avgEndMins)) / 2}%`,
-                      transform: isLast ? 'translate(calc(-100% - 4px), -50%)' : 'translate(4px, -50%)',
-                      color: durColor, zIndex: 4, pointerEvents: 'none' }}>
-                    <div>{h}h</div>
-                    <div>{String(m).padStart(2, '0')}m</div>
-                  </div>
+                  <div className="absolute rounded-full"
+                    style={{ left: '50%', top: `${yPctD(durMins[i] as number)}%`,
+                      transform: 'translate(-50%, -50%)',
+                      width: isActive ? dotD + 2 : dotD, height: isActive ? dotD + 2 : dotD,
+                      background: isDark ? '#18181b' : '#ffffff',
+                      border: `1.5px solid ${durColor}`,
+                      opacity: isActive ? 1 : 0.9, zIndex: 3 }} />
                 );
               })()}
+
+              {/* Hover card — the same shape as every other chart here */}
+              {activeIdx === i && (
+                <>
+                  <div className="absolute inset-y-0 pointer-events-none"
+                    style={{ left: '50%', width: 2, marginLeft: -1,
+                      background: lc, opacity: 0.75 }} />
+                  <div className="absolute rounded px-2 py-1 leading-tight whitespace-nowrap pointer-events-none"
+                    style={{ left: '50%', top: 4,
+                      transform: i > n * 0.6
+                        ? 'translateX(calc(-100% - 16px))'
+                        : 'translateX(16px)',
+                      background: isDark ? '#27272a' : '#ffffff',
+                      border: `1px solid ${isDark ? '#3f3f46' : '#e7e5e4'}`,
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.12)', zIndex: 6 }}>
+                    <div style={{ fontSize: 10, color: lc }}>{b.label}</div>
+
+                    <div className="flex items-center gap-1" style={{ fontSize: 10, color: lc, marginTop: 2 }}>
+                      <span className="inline-block rounded-full"
+                        style={{ width: 7, height: 7, background: fromColor }} />
+                      <span style={{ minWidth: 52 }}>From</span>
+                      <span style={{ color: vc, fontWeight: 600 }}>
+                        {b.avgStartMins === null ? '—' : minsToClockStr(b.avgStartMins)}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1" style={{ fontSize: 10, color: lc, marginTop: 2 }}>
+                      <span className="inline-block rounded-full"
+                        style={{ width: 7, height: 7, background: toColor }} />
+                      <span style={{ minWidth: 52 }}>To</span>
+                      <span style={{ color: vc, fontWeight: 600 }}>
+                        {b.avgEndMins === null ? '—' : minsToClockStr(b.avgEndMins, b.avgEndMins >= 1440)}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1" style={{ fontSize: 10, color: lc, marginTop: 2 }}>
+                      <span className="inline-block rounded-full"
+                        style={{ width: 7, height: 7,
+                          background: isDark ? '#18181b' : '#ffffff',
+                          border: `1.5px solid ${durColor}` }} />
+                      <span style={{ minWidth: 52 }}>Duration</span>
+                      <span style={{ color: vc, fontWeight: 600 }}>
+                        {durMins[i] === null ? '—' : durStr(durMins[i] as number)}
+                      </span>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           ))}
         </div>
+
+        {/* Right axis — duration */}
+        {hasDur && (
+          <div className="relative shrink-0 overflow-hidden" style={{ width: Y_LABEL_W, height: DUAL_H }}>
+            {durTicks.map(tk => {
+              const t = yPctD(tk);
+              if (t < 3 || t > 97) return null;
+              return (
+                <span key={tk} className="absolute text-[10px] leading-none"
+                  style={{ left: 4, top: `${t}%`, transform: 'translateY(-50%)',
+                    color: durColor, opacity: 0.9 }}>
+                  {durStr(tk)}
+                </span>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* X labels */}
-      <div className="flex w-full" style={{ paddingLeft: Y_LABEL_W }}>
+      <div className="flex w-full"
+        style={{ paddingLeft: Y_LABEL_W, paddingRight: hasDur ? Y_LABEL_W : 0 }}>
         <div className="relative flex-1" style={{ height: 16 }}>
-          {compressedLabels.map((lbl, i) => (
-            <span key={i} className="absolute text-[10px] leading-none"
+          {keep.map(i => (
+            <span key={i} className="absolute text-[10px] leading-none whitespace-nowrap"
               style={{ left: `${xPct(i)}%`, transform: 'translateX(-50%)',
-                color: i === n - 1 ? (isDark ? '#f4f4f5' : '#292524') : lc,
+                color: i === n - 1 ? vc : lc,
                 fontWeight: i === n - 1 ? 600 : 400 }}>
-              {lbl}
+              {shortAt.get(i)}
             </span>
           ))}
         </div>
       </div>
 
       {/* Legend */}
-      <div className="flex gap-3" style={{ paddingLeft: Y_LABEL_W }}>
-        {[{ label: 'From', color: fromColor }, { label: 'To', color: toColor }].map(({ label, color }) => (
+      <div className="flex gap-3 flex-wrap"
+        style={{ paddingLeft: Y_LABEL_W, paddingRight: hasDur ? Y_LABEL_W : 0 }}>
+        {[['From', fromColor], ['To', toColor]].map(([label, color]) => (
           <span key={label} className="flex items-center gap-1 text-[10px]" style={{ color: lc }}>
             <span className="inline-block rounded-full" style={{ width: 8, height: 8, background: color }} />
             {label}
           </span>
         ))}
+        {hasDur && (
+          <span className="flex items-center gap-1 text-[10px]" style={{ color: lc }}>
+            <span className="inline-block rounded-full"
+              style={{ width: 8, height: 8,
+                background: isDark ? '#18181b' : '#ffffff',
+                border: `1.5px solid ${durColor}` }} />
+            Duration
+          </span>
+        )}
       </div>
     </div>
   );
@@ -837,9 +1040,9 @@ export function formatBucketLabels(labels: string[]): string[] {
 // All positions computed in pixels relative to REST_H so there is no
 // coordinate-space mismatch between CSS bars and the SVG line.
 
-const REST_BUCKET_ORDER = ['0d', '1d', '2–3d', '4–6d', '1–2w', '2–4w', '1m+'];
+export const REST_BUCKET_ORDER = ['0d', '1d', '2–3d', '4–6d', '1–2w', '2–4w', '1m+'];
 
-const REST_BUCKET_COLORS_LIGHT: Record<string, string> = {
+export const REST_BUCKET_COLORS_LIGHT: Record<string, string> = {
   '0d':   '#9f1239',
   '1d':   '#c2410c',
   '2–3d': '#d97706',
@@ -848,7 +1051,7 @@ const REST_BUCKET_COLORS_LIGHT: Record<string, string> = {
   '2–4w': '#1d4ed8',
   '1m+':  '#1e3a8a',
 };
-const REST_BUCKET_COLORS_DARK: Record<string, string> = {
+export const REST_BUCKET_COLORS_DARK: Record<string, string> = {
   '0d':   '#fb7185',
   '1d':   '#fb923c',
   '2–3d': '#fbbf24',
@@ -861,7 +1064,9 @@ const REST_BUCKET_COLORS_DARK: Record<string, string> = {
 export interface RestBucket {
   label:       string;
   histogram:   Record<string, number>;
-  avgRestDays: number;
+  // null where no dry run ended in the bucket — the line breaks there
+  // rather than dropping to zero, which would read as "drank every day".
+  avgRestDays: number | null;
 }
 
 interface CssRestChartProps {
@@ -901,7 +1106,7 @@ export function CssRestChart({ buckets, isDark }: CssRestChartProps) {
   }
 
   // ── Right axis: avg line ──────────────────────────────────────────────────
-  const avgVals   = buckets.map(b => b.avgRestDays);
+  const avgVals   = buckets.map(b => b.avgRestDays).filter((v): v is number => v !== null);
   const rawAvgMax = Math.max(...avgVals, 0);
   const rawAvgMin = Math.min(...avgVals, 0);
   const avgPad    = Math.max(0.2, (rawAvgMax - rawAvgMin) * 0.12);
@@ -923,11 +1128,24 @@ export function CssRestChart({ buckets, isDark }: CssRestChartProps) {
   function slotCenter(i: number) { return i * slotW + slotW / 2; }
 
   // Avg spline points in SVG pixel space
-  const avgPts = buckets.map((b, i) => ({
-    x: slotCenter(i),
-    y: avgPx(b.avgRestDays),
-  }));
-  const avgPath = smoothPath(avgPts);
+  // Avg spline points in SVG pixel space. A null bucket ends the current run
+  // rather than being joined across, so a gap stays visible as a gap.
+  const avgSegments: { x: number; y: number }[][] = [];
+  {
+    let run: { x: number; y: number }[] = [];
+    buckets.forEach((b, i) => {
+      if (b.avgRestDays === null) {
+        if (run.length) avgSegments.push(run);
+        run = [];
+      } else {
+        run.push({ x: slotCenter(i), y: avgPx(b.avgRestDays) });
+      }
+    });
+    if (run.length) avgSegments.push(run);
+  }
+  const avgPaths = avgSegments
+    .map(seg => smoothPath(seg))
+    .filter((d): d is string => d !== null);
 
   const compressedLabels = formatBucketLabels(buckets.map(b => b.label));
 
@@ -1002,14 +1220,15 @@ export function CssRestChart({ buckets, isDark }: CssRestChartProps) {
             })}
 
             {/* Avg spline */}
-            {avgPath && (
-              <path d={avgPath} fill="none" stroke={avgColor}
+            {avgPaths.map((d, si) => (
+              <path key={si} d={d} fill="none" stroke={avgColor}
                 strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round"
                 vectorEffect="non-scaling-stroke" opacity={0.9} />
-            )}
+            ))}
 
 						{/* Avg dots */}
             {buckets.map((b, i) => {
+              if (b.avgRestDays === null) return null;
               const cx       = slotCenter(i);
               const cy       = avgPx(b.avgRestDays);
               const isActive = activeIdx === i;
@@ -1027,6 +1246,7 @@ export function CssRestChart({ buckets, isDark }: CssRestChartProps) {
 
 					{/* Avg value labels — HTML pills (readable over any bar, crisp + symmetric) */}
           {buckets.map((b, i) => {
+            if (b.avgRestDays === null) return null;
             const cy    = avgPx(b.avgRestDays);
             const below = cy < 18;
             return (
@@ -1311,6 +1531,16 @@ interface CssStackedAreaChartProps {
   yPadPct?:     number;
   /** cap on how many x labels are drawn; the last is always kept */
   maxXLabels?:  number;
+  /** dim every band but the one under the cursor, or under the legend entry.
+   *  Off by default so existing callers are untouched. */
+  highlightable?: boolean;
+  /** Optional line on its OWN right-hand axis, in different units from the
+   *  bands — the Drinking rest line is days while the bands are counts.
+   *  `values` draws solid. `bridge` fills the gaps left by nulls in `values`
+   *  with a dashed path that joins the neighbouring solid points, so a stretch
+   *  where nothing ended still reads as continuous. Off by default. */
+  rightLine?:     { values: (number | null)[]; bridge?: (number | null)[]; color: string; label?: string };
+  formatYRight?:  (v: number) => string;
 }
 
 const AREA_H = 150;
@@ -1331,8 +1561,15 @@ function areaBandPath(
 export function CssStackedAreaChart({
   points, segmentDefs, isDark, mode = 'absolute', formatY = String,
   height = AREA_H, baselineZero = false, yPadPct = 8, maxXLabels = 8,
+  highlightable = false, rightLine, formatYRight,
 }: CssStackedAreaChartProps) {
 	const [activeIdx, setActiveIdx] = useState<number | null>(null);
+  // One highlight state driven from two places — the legend and the plot —
+  // so the two can never disagree about what is focused.
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+  const hotKey = highlightable ? activeKey : null;
+  const bandOpacity = (key: string) =>
+    hotKey === null ? 0.85 : hotKey === key ? 0.95 : 0.15;
   const clipId = useId().replace(/:/g, '');   // ':' is illegal in a url(#…) ref
 
   const n = points.length;
@@ -1384,6 +1621,65 @@ export function CssStackedAreaChart({
   const yRange = yMax - yMin || 1;
   const xPct = (i: number) => (n <= 1 ? 50 : (i / (n - 1)) * 100);
   const yPct = (v: number) => (1 - (v - yMin) / yRange) * 100;
+
+  // ── Right-hand axis — its own range, never mixed into the left one ─────────
+  const rlValues = rightLine?.values ?? [];
+  const rlBridge = rightLine?.bridge ?? [];
+  const rlPool   = [...rlValues, ...rlBridge].filter((v): v is number => v !== null && v !== undefined);
+  const hasRight = !!rightLine && rlPool.length > 0;
+  const fmtR     = formatYRight ?? formatY;
+  const loR      = hasRight ? Math.min(...rlPool) : 0;
+  const hiR      = hasRight ? Math.max(...rlPool) : 1;
+  const padR     = Math.max(0.5, (hiR - loR) * (yPadPct / 100));
+  const yMinR    = Math.max(0, loR - padR);
+  const yMaxR    = hiR + padR;
+  const yRangeR  = (yMaxR - yMinR) || 1;
+  const yPctR    = (v: number) => (1 - (v - yMinR) / yRangeR) * 100;
+  const rightTicks = hasRight ? buildYTicks(yMinR, hiR) : [];
+
+  // Solid runs: consecutive points that carry a real value.
+  const rlSolidRuns: number[][] = [];
+  if (hasRight) {
+    let cur: number[] = [];
+    for (let i = 0; i < n; i++) {
+      if (rlValues[i] !== null && rlValues[i] !== undefined) cur.push(i);
+      else { if (cur.length) rlSolidRuns.push(cur); cur = []; }
+    }
+    if (cur.length) rlSolidRuns.push(cur);
+  }
+
+  // Dashed runs: each gap in `values` that `bridge` can fill, extended by one
+  // point on each side so the dashes meet the solid line instead of floating.
+  const rlDashRuns: number[][] = [];
+  if (hasRight && rlBridge.length) {
+    let i = 0;
+    while (i < n) {
+      const isGap = rlValues[i] === null || rlValues[i] === undefined;
+      if (!isGap) { i++; continue; }
+      let j = i;
+      while (j < n && (rlValues[j] === null || rlValues[j] === undefined)) j++;
+      const inner: number[] = [];
+      for (let k = i; k < j; k++) {
+        if (rlBridge[k] !== null && rlBridge[k] !== undefined) inner.push(k);
+      }
+      if (inner.length) {
+        const run: number[] = [];
+        if (i - 1 >= 0 && rlValues[i - 1] !== null && rlValues[i - 1] !== undefined) run.push(i - 1);
+        run.push(...inner);
+        if (j < n && rlValues[j] !== null && rlValues[j] !== undefined) run.push(j);
+        rlDashRuns.push(run);
+      }
+      i = j;
+    }
+  }
+
+  // A point's y on the right axis, whichever series carries it.
+  const rlAt = (i: number): number | null => {
+    const v = rlValues[i];
+    if (v !== null && v !== undefined) return v;
+    const bv = rlBridge[i];
+    return bv !== null && bv !== undefined ? bv : null;
+  };
 
   const gc = gridLineColor(isDark);
   const lc = labelColor(isDark);
@@ -1486,14 +1782,16 @@ export function CssStackedAreaChart({
                     <rect key={`${ri}-${k}`}
                       x={xPct(i) - soloW / 2} width={soloW}
                       y={Math.min(yTop, yBot)} height={Math.abs(yBot - yTop)}
-                      fill={def.color} opacity={0.85} />
+                      fill={def.color} opacity={bandOpacity(def.key)} />
                   );
                 }
                 const top = run.map(i => ({ x: xPct(i), y: yPct(allBoundaries[i]![k + 1]) }));
                 const bot = run.map(i => ({ x: xPct(i), y: yPct(allBoundaries[i]![k]) }));
                 const d = areaBandPath(top, bot);
                 if (!d) return null;
-                return <path key={`${ri}-${k}`} d={d} fill={def.color} opacity={0.85} />;
+								return <path key={`${ri}-${k}`} d={d} fill={def.color}
+                  opacity={bandOpacity(def.key)}
+                  style={{ transition: 'opacity 120ms' }} />;
               }),
             )}
             </g>
@@ -1512,6 +1810,35 @@ export function CssStackedAreaChart({
                   vectorEffect="non-scaling-stroke" opacity={0.95} />
               );
             })}
+
+            {/* Right-axis line. Solid where a real value exists; dashed across
+                a stretch the bridge covers, so the dash reads as "nothing
+                ended here" rather than as "different scale". */}
+            {hasRight && rlDashRuns.map((run, ri) => {
+              const pts = run.map(i => ({ x: xPct(i), y: yPctR(rlAt(i) as number) }));
+              const d = smoothPath(pts);
+              if (!d) return null;
+              return (
+                <path key={`rd${ri}`} d={d} fill="none" stroke={rightLine!.color}
+                  strokeWidth="1.5" strokeDasharray="5 3"
+                  strokeLinejoin="round" strokeLinecap="round"
+                  vectorEffect="non-scaling-stroke" opacity={0.75} />
+              );
+            })}
+            {hasRight && rlSolidRuns.map((run, ri) => {
+              const pts = run.map(i => ({ x: xPct(i), y: yPctR(rlValues[i] as number) }));
+              if (pts.length === 1) {
+                return <circle key={`rs${ri}`} cx={pts[0].x} cy={pts[0].y} r={1.2}
+                  fill={rightLine!.color} />;
+              }
+              const d = smoothPath(pts);
+              if (!d) return null;
+              return (
+                <path key={`rs${ri}`} d={d} fill="none" stroke={rightLine!.color}
+                  strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"
+                  vectorEffect="non-scaling-stroke" opacity={0.95} />
+              );
+            })}
           </svg>
 
           {/* Hover columns */}
@@ -1522,20 +1849,34 @@ export function CssStackedAreaChart({
             return (
               <div key={p.label + i} className="absolute top-0 bottom-0"
                 style={{ left: `${xPct(i)}%`, width: `${Math.max(100 / n, 2)}%`,
-                  transform: 'translateX(-50%)', cursor: 'pointer', zIndex: 2 }}
+								  transform: 'translateX(-50%)', cursor: 'pointer', zIndex: 2 }}
                 onMouseEnter={() => setActiveIdx(i)}
-                onMouseLeave={() => setActiveIdx(null)}
+                onMouseMove={e => {
+                  if (!highlightable) return;
+                  if (!b) { setActiveKey(null); return; }
+                  const box = e.currentTarget.getBoundingClientRect();
+                  if (box.height <= 0) return;
+                  const frac = (e.clientY - box.top) / box.height;
+                  const v = yMin + (1 - frac) * yRange;
+                  let hit: string | null = null;
+                  for (let k = 0; k < segmentDefs.length; k++) {
+                    if (v >= b[k] && v < b[k + 1]) { hit = segmentDefs[k].key; break; }
+                  }
+                  setActiveKey(hit);
+                }}
+                onMouseLeave={() => { setActiveIdx(null); setActiveKey(null); }}
                 onClick={() => setActiveIdx(isActive ? null : i)}>
 
                 {isActive && (
                   <>
-                    <div className="absolute inset-y-0 pointer-events-none"
-                      style={{ left: '50%', width: 1, background: lc, opacity: 0.5 }} />
+										<div className="absolute inset-y-0 pointer-events-none"
+                      style={{ left: '50%', width: 2, marginLeft: -1,
+                        background: lc, opacity: 0.75 }} />
                     <div className="absolute rounded px-2 py-1 leading-tight whitespace-nowrap pointer-events-none"
                       style={{ left: '50%', top: 4,
-                        transform: i > n * 0.6
-                          ? 'translateX(calc(-100% - 6px))'
-                          : 'translateX(6px)',
+												transform: i > n * 0.6
+                          ? 'translateX(calc(-100% - 16px))'
+                          : 'translateX(16px)',
                         background: isDark ? '#27272a' : '#ffffff',
                         border: `1px solid ${isDark ? '#3f3f46' : '#e7e5e4'}`,
                         boxShadow: '0 2px 8px rgba(0,0,0,0.12)', zIndex: 6 }}>
@@ -1554,13 +1895,17 @@ export function CssStackedAreaChart({
                       {b && segmentDefs.map((def, k) => {
                         const raw = p.segments?.[def.key] ?? 0;
                         const span = b[k + 1] - b[k];
+												const hot = hotKey === def.key;
                         return (
                           <div key={def.key} className="flex items-center gap-1"
-                            style={{ fontSize: 10, color: lc, marginTop: 1 }}>
+                            style={{ fontSize: 10, color: hot ? vc : lc, marginTop: 1,
+                              fontWeight: hot ? 600 : 400,
+                              opacity: hotKey === null || hot ? 1 : 0.45,
+                              transition: 'opacity 120ms' }}>
                             <span className="inline-block rounded-full"
                               style={{ width: 7, height: 7, background: def.color }} />
                             <span style={{ minWidth: 52 }}>{def.label}</span>
-                            <span style={{ color: vc }}>
+                            <span style={{ color: vc, fontWeight: hot ? 700 : 400 }}>
                               {percent ? `${span.toFixed(1)}%` : formatY(raw)}
                             </span>
                           </div>
@@ -1570,6 +1915,24 @@ export function CssStackedAreaChart({
                       {!b && p.total !== null && (
                         <div style={{ fontSize: 10, color: lc, marginTop: 2 }}>
                           Weight only
+                        </div>
+                      )}
+
+                      {hasRight && rlAt(i) !== null && (
+                        <div className="flex items-center gap-1"
+                          style={{ fontSize: 10, color: lc, marginTop: 2 }}>
+                          {/* hollow dot where the value came from the bridge —
+                              the same shape language the dashed path uses */}
+                          <span className="inline-block rounded-full"
+                            style={{ width: 7, height: 7,
+                              background: rlValues[i] !== null && rlValues[i] !== undefined
+                                ? rightLine!.color
+                                : (isDark ? '#18181b' : '#ffffff'),
+                              border: `1.5px solid ${rightLine!.color}` }} />
+                          {rightLine!.label && <span style={{ minWidth: 52 }}>{rightLine!.label}</span>}
+                          <span style={{ color: vc, fontWeight: 600 }}>
+                            {fmtR(rlAt(i) as number)}
+                          </span>
                         </div>
                       )}
 
@@ -1583,10 +1946,29 @@ export function CssStackedAreaChart({
             );
           })}
         </div>
+
+        {/* Right axis — only drawn when a right-hand line is present, so every
+            existing caller keeps its exact width. */}
+        {hasRight && (
+          <div className="relative shrink-0 overflow-hidden" style={{ width: Y_LABEL_W, height }}>
+            {rightTicks.map(tk => {
+              const t = yPctR(tk);
+              if (t < 3 || t > 97) return null;
+              return (
+                <span key={tk} className="absolute text-[10px] leading-none"
+                  style={{ left: 4, top: `${t}%`, transform: 'translateY(-50%)',
+                    color: rightLine!.color, opacity: 0.8 }}>
+                  {fmtR(tk)}
+                </span>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* X labels */}
-      <div className="flex w-full" style={{ paddingLeft: Y_LABEL_W }}>
+      <div className="flex w-full"
+        style={{ paddingLeft: Y_LABEL_W, paddingRight: hasRight ? Y_LABEL_W : 0 }}>
         <div className="relative flex-1" style={{ height: 16 }}>
 					{keep.map(i => (
             <span key={i} className="absolute text-[10px] leading-none whitespace-nowrap"
@@ -1600,9 +1982,17 @@ export function CssStackedAreaChart({
       </div>
 
       {/* Legend */}
-      <div className="flex gap-3 flex-wrap" style={{ paddingLeft: Y_LABEL_W }}>
-        {segmentDefs.map(def => (
-          <span key={def.key} className="flex items-center gap-1 text-[10px]" style={{ color: lc }}>
+      <div className="flex gap-3 flex-wrap"
+        style={{ paddingLeft: Y_LABEL_W, paddingRight: hasRight ? Y_LABEL_W : 0 }}>
+				{segmentDefs.map(def => (
+          <span key={def.key} className="flex items-center gap-1 text-[10px]"
+            style={{ color: hotKey === def.key ? vc : lc,
+              fontWeight: hotKey === def.key ? 600 : 400,
+              opacity: hotKey === null || hotKey === def.key ? 1 : 0.4,
+              cursor: highlightable ? 'pointer' : 'default',
+              transition: 'opacity 120ms' }}
+            onMouseEnter={() => { if (highlightable) setActiveKey(def.key); }}
+            onMouseLeave={() => { if (highlightable) setActiveKey(null); }}>
             <span className="inline-block rounded-full"
               style={{ width: 8, height: 8, background: def.color }} />
             {def.label}
@@ -1612,6 +2002,12 @@ export function CssStackedAreaChart({
           <span className="flex items-center gap-1 text-[10px]" style={{ color: lc }}>
             <span className="inline-block" style={{ width: 10, height: 2, background: tc }} />
             Total
+          </span>
+        )}
+        {hasRight && rightLine!.label && (
+          <span className="flex items-center gap-1 text-[10px]" style={{ color: lc }}>
+            <span className="inline-block" style={{ width: 10, height: 2, background: rightLine!.color }} />
+            {rightLine!.label}
           </span>
         )}
       </div>

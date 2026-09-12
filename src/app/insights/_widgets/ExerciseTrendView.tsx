@@ -298,7 +298,7 @@ export function ExerciseTrendView({ globalFilter, isDark }: Props) {
                   then centres each point over its cell. */}
               <div style={{ paddingLeft: LABEL_W + 8 - 36 }}>
                 <CssTrendChart
-                  series={[{ values: data!.frequency, color: accent }]}
+                  series={[{ values: data!.frequency, color: accent, label: 'Days' }]}
                   labels={labels}
                   formatY={v => String(Math.round(v))}
                   isDark={isDark}
@@ -382,7 +382,7 @@ export function ExerciseTrendView({ globalFilter, isDark }: Props) {
                     : `Day total — avg per active day (${itemData.unit})`}
                 </span>
                 <CssTrendChart
-                  series={[{ values: itemData.dayTotal.value, color: accent }]}
+                  series={[{ values: itemData.dayTotal.value, color: accent, label: 'Day total' }]}
                   labels={itemLabels}
                   formatY={fmt}
                   isDark={isDark}
@@ -401,7 +401,7 @@ export function ExerciseTrendView({ globalFilter, isDark }: Props) {
                     Biggest set — avg per active day ({itemData.unit})
                   </span>
                   <CssTrendChart
-                    series={[{ values: itemData.biggestSet.value, color: accent }]}
+                    series={[{ values: itemData.biggestSet.value, color: accent, label: 'Biggest set' }]}
                     labels={itemLabels}
                     formatY={fmt}
                     isDark={isDark}

@@ -3,6 +3,14 @@ import Log from '@/models/Log';
 import AlcoholConversion from '@/models/AlcoholConversion';
 import { SLEEP_THRESHOLD_HOUR, hourStringToMinutes, assignDrinkingDate, diffDays, yesterdayStr } from './dates';
 import { percentile } from './util';
+import {
+  TrendGrain,
+  buildBucketStarts,
+  bucketStartFor,
+  bucketDayCount,
+  bucketLabel,
+  ymd,
+} from './trend-window';
 
 
 function hourStrToDecimal(hourStr: string | null | undefined): number | null {
@@ -27,32 +35,50 @@ function classifyOccasion(
   return 'After/No dinner';
 }
 
-// Returns yesterday as YYYY-MM-DD (UTC)
+// ── Rest scoring ─────────────────────────────────────────────────────────────
+//
+// A rest score belongs to a DRINKING DAY only, and equals the number of dry
+// days directly before it. Non-drinking days carry no score. Sunday to the
+// next Sunday scores 6.
+//
+// The old model scored every calendar day in the period, which spread one dry
+// run across many histogram cases and diluted the average. It also needed the
+// full drinking history to score any day. The new model needs only the drinking
+// days inside the window plus the single most recent drinking day before it —
+// everything older cannot affect any score in the window.
+//
+// The very first drinking day in the whole log gets no score: we do not know
+// how long the dry run before it was, so any number would be invented.
 
-// Score(D) = diffDays(D, lastDrinkBeforeD) - 1 + (D is rest ? 1 : 0)
-// If no prior drinking day exists, anchor to datasetFirstDate.
-function computeDailyScores(
-  allDrinkingDates: Set<string>,
-  periodDates: string[],
-  datasetFirstDate: string,
-): { dateStr: string; score: number; isDrinking: boolean }[] {
-  const sortedDrinkDates = [...allDrinkingDates].sort();
+export type RestEvent = { date: string; score: number };
 
-  return periodDates.map(dateStr => {
-    const isDrinking = allDrinkingDates.has(dateStr);
-
-    let lastDrink: string | null = null;
-    for (let i = sortedDrinkDates.length - 1; i >= 0; i--) {
-      if (sortedDrinkDates[i] < dateStr) {
-        lastDrink = sortedDrinkDates[i];
-        break;
-      }
+function buildRestEvents(
+  drinkingDaysAsc: string[],
+  priorDrinkDate: string | null,
+): RestEvent[] {
+  const events: RestEvent[] = [];
+  let prev = priorDrinkDate;
+  for (const day of drinkingDaysAsc) {
+    if (prev !== null) {
+      events.push({ date: day, score: Math.max(0, diffDays(day, prev) - 1) });
     }
+    prev = day;
+  }
+  return events;
+}
 
-    const anchor = lastDrink ?? datasetFirstDate;
-    const score  = diffDays(dateStr, anchor) - 1 + (isDrinking ? 0 : 1);
-    return { dateStr, score: Math.max(0, score), isDrinking };
-  });
+// Dry days reached by a given day, counting back to the last drinking day at
+// or before it. Used only where no dry run ends — a stretch with no drinking
+// day at all would otherwise report nothing.
+function dryDaysAt(measureDay: string, lastDrinkDay: string | null): number | null {
+  if (!lastDrinkDay || measureDay < lastDrinkDay) return null;
+  return Math.max(0, diffDays(measureDay, lastDrinkDay));
+}
+
+function averageScore(events: RestEvent[]): number | null {
+  if (!events.length) return null;
+  const sum = events.reduce((s, e) => s + e.score, 0);
+  return Math.round((sum / events.length) * 10) / 10;
 }
 
 // Bucket a rest score into a histogram label
@@ -67,6 +93,80 @@ function bucketScore(score: number): string {
 }
 
 const SCORE_BUCKET_ORDER = ['0d', '1d', '2–3d', '4–6d', '1–2w', '2–4w', '1m+'];
+
+function emptyHistogram(): Record<string, number> {
+  return Object.fromEntries(SCORE_BUCKET_ORDER.map(k => [k, 0]));
+}
+
+/**
+ * The single most recent drinking day strictly before `startStr`.
+ *
+ * This replaces the unbounded scan of every drinking record ever logged. Only
+ * a handful of the newest records can hold the answer, so the query is sorted,
+ * limited and served by the datetime index. The window is widened by the 6am
+ * boundary so a post-midnight session is assigned to the day it belongs to
+ * before the comparison is made.
+ */
+async function findPriorDrinkDate(userId: string, startStr: string): Promise<string | null> {
+  const cutoff = new Date(`${startStr}T00:00:00.000Z`);
+  cutoff.setUTCHours(cutoff.getUTCHours() + SLEEP_THRESHOLD_HOUR);
+
+  const raw = await Log.find(
+    {
+      userId,
+      'food.alcohols': { $exists: true, $not: { $size: 0 } },
+      'start.datetime': { $lt: cutoff },
+    },
+    { 'start.datetime': 1, 'start.hour': 1 },
+  )
+    .sort({ 'start.datetime': -1 })
+    .limit(10)
+    .lean();
+
+  const dates = raw
+    .map((d: any) =>
+      d.start?.datetime ? assignDrinkingDate(new Date(d.start.datetime), d.start?.hour) : null,
+    )
+    .filter((s): s is string => s !== null && s < startStr)
+    .sort();
+
+  return dates.length ? dates[dates.length - 1] : null;
+}
+
+/**
+ * Every drinking day inside [startStr, endStr], ignoring the cross-activity
+ * filter — a dry day means a day with no drinking at all, whatever the record
+ * was tagged with. When no cross-activity filter is set the caller's own docs
+ * already carry the same information, so this extra query is skipped.
+ */
+async function fetchWindowDrinkingDays(
+  userId: string,
+  startStr: string,
+  endStr: string,
+): Promise<Set<string>> {
+  const fetchStart = new Date(`${startStr}T00:00:00.000Z`);
+  fetchStart.setUTCHours(fetchStart.getUTCHours() - SLEEP_THRESHOLD_HOUR);
+  const fetchEnd = new Date(`${endStr}T00:00:00.000Z`);
+  fetchEnd.setUTCDate(fetchEnd.getUTCDate() + 1);
+  fetchEnd.setUTCHours(SLEEP_THRESHOLD_HOUR);
+
+  const raw = await Log.find(
+    {
+      userId,
+      'food.alcohols': { $exists: true, $not: { $size: 0 } },
+      'start.datetime': { $gte: fetchStart, $lt: fetchEnd },
+    },
+    { 'start.datetime': 1, 'start.hour': 1 },
+  ).lean();
+
+  const set = new Set<string>();
+  for (const d of raw as any[]) {
+    if (!d.start?.datetime) continue;
+    const day = assignDrinkingDate(new Date(d.start.datetime), d.start?.hour);
+    if (day >= startStr && day <= endStr) set.add(day);
+  }
+  return set;
+}
 
  
 
@@ -86,26 +186,7 @@ export async function computeDrinkingSummary(
     convMap.set(`${(c as any).item}||${(c as any).unit}`, (c as any).drinks);
   }
  
-  // ── Step 2: all distinct drinking days (full dataset, unbounded) ─────────────
-  // Fetch raw to apply 6am date assignment in JS (can't do it in aggregation easily)
-  const allDrinkingRaw = await Log.find(
-    { userId, 'food.alcohols': { $exists: true, $not: { $size: 0 } } },
-    { 'start.datetime': 1, 'start.hour': 1 },
-  ).lean();
- 
-  const allDrinkingDates = new Set<string>(
-    allDrinkingRaw
-      .map((d: any) =>
-        d.start?.datetime
-          ? assignDrinkingDate(new Date(d.start.datetime), d.start?.hour)
-          : null,
-      )
-      .filter(Boolean) as string[],
-  );
-  const sortedAll = [...allDrinkingDates].sort();
-  const datasetFirstDate = sortedAll[0] ?? periodStart.toISOString().slice(0, 10);
- 
-  // ── Step 3: cap effective period end at yesterday ────────────────────────────
+  // ── Step 2: cap effective period end at yesterday ────────────────────────────
   const yesterday     = yesterdayStr();
   const rawEnd        = periodEnd.toISOString().slice(0, 10);
   const rawStart      = periodStart.toISOString().slice(0, 10);
@@ -122,18 +203,19 @@ export async function computeDrinkingSummary(
   }
   const daysInPeriod = periodDates.length;
  
-  // ── Step 4: fetch alcohol entries in the effective period ────────────────────
-  // Expand window by 6h on the early side to capture pre-6am records
-  // that belong to the first day of the period
+  // ── Step 3: fetch alcohol entries in the effective period ────────────────────
+  // Expand by the 6am boundary on both sides: the early side catches pre-6am
+  // records belonging to the first day, the late side catches a post-midnight
+  // session belonging to the last day.
   const fetchStart = new Date(`${effectiveStart}T00:00:00.000Z`);
   fetchStart.setUTCHours(fetchStart.getUTCHours() - SLEEP_THRESHOLD_HOUR);
+  const fetchEnd = new Date(`${effectiveEnd}T00:00:00.000Z`);
+  fetchEnd.setUTCDate(fetchEnd.getUTCDate() + 1);
+  fetchEnd.setUTCHours(SLEEP_THRESHOLD_HOUR);
  
   const filter: Record<string, any> = {
     userId,
-    'start.datetime': {
-      $gte: fetchStart,
-      $lte: new Date(`${effectiveEnd}T23:59:59.999Z`),
-    },
+    'start.datetime': { $gte: fetchStart, $lt: fetchEnd },
     'food.alcohols': { $exists: true, $not: { $size: 0 } },
   };
   if (crossActivities.length) {
@@ -141,8 +223,7 @@ export async function computeDrinkingSummary(
   }
   const docs = await Log.find(filter).lean();
  
-  // ── Step 5: daily scores and histogram ──────────────────────────────────────
-  const dailyScores = computeDailyScores(allDrinkingDates, periodDates, datasetFirstDate);
+  const periodDateSet = new Set(periodDates);
  
   // Build drinkingDaySet using assignDrinkingDate
   const drinkingDaySet = new Set<string>(
@@ -152,22 +233,34 @@ export async function computeDrinkingSummary(
           ? assignDrinkingDate(new Date(d.start.datetime), d.start?.hour)
           : null,
       )
-      .filter((s): s is string => s !== null && periodDates.includes(s)),
+      .filter((s): s is string => s !== null && periodDateSet.has(s)),
   );
  
-  const scoreSum    = dailyScores.reduce((s, d) => s + d.score, 0);
-  const avgRestDays = daysInPeriod > 0
-    ? Math.round((scoreSum / daysInPeriod) * 10) / 10
-    : 0;
+  // ── Step 4: rest scores and histogram ───────────────────────────────────────
+  // Same scoring as the trend view, so the two screens cannot disagree. One
+  // bounded lookup for the drinking day before the period replaces the old
+  // scan of every drinking record ever logged.
+  const priorDrinkDate = await findPriorDrinkDate(userId, effectiveStart);
+  const restDayPool = crossActivities.length
+    ? await fetchWindowDrinkingDays(userId, effectiveStart, effectiveEnd)
+    : drinkingDaySet;
  
-  const histogram: Record<string, number> = Object.fromEntries(
-    SCORE_BUCKET_ORDER.map(k => [k, 0]),
-  );
-  for (const { score } of dailyScores) {
+  const restEvents  = buildRestEvents([...restDayPool].sort(), priorDrinkDate);
+  const avgRestDays = averageScore(restEvents);
+ 
+  // No dry run ended inside the period — report how far the run had reached by
+  // the period's last day instead, so a fully dry period is not silent.
+  const lastDrinkInPeriod = [...restDayPool].sort().pop() ?? null;
+  const dryDaysAtEnd = restEvents.length === 0
+    ? dryDaysAt(effectiveEnd, lastDrinkInPeriod ?? priorDrinkDate)
+    : null;
+ 
+  const histogram: Record<string, number> = emptyHistogram();
+  for (const { score } of restEvents) {
     histogram[bucketScore(score)]++;
   }
  
-  // ── Step 6: drinks quantity ──────────────────────────────────────────────────
+  // ── Step 5: drinks quantity ──────────────────────────────────────────────────
  
   // Accumulate drinks per assigned date
   const drinksByDate = new Map<string, number>();
@@ -179,7 +272,7 @@ export async function computeDrinkingSummary(
       (doc as any).start?.hour,
     );
     // Only count dates within the effective period
-    if (!periodDates.includes(dateStr)) continue;
+    if (!periodDateSet.has(dateStr)) continue;
  
     const alcohols: any[] = (doc as any).food?.alcohols ?? [];
     let sessionDrinks = 0;
@@ -228,7 +321,7 @@ export async function computeDrinkingSummary(
     const dateStr = (doc as any).start?.datetime
       ? assignDrinkingDate(new Date((doc as any).start.datetime), (doc as any).start?.hour)
       : null;
-    if (!dateStr || !periodDates.includes(dateStr)) continue;
+    if (!dateStr || !periodDateSet.has(dateStr)) continue;
 
     const alcohols: any[] = (doc as any).food?.alcohols ?? [];
 
@@ -260,7 +353,7 @@ export async function computeDrinkingSummary(
     if (rounded > 0) drinkType[item] = rounded;
   }
 
-  // ── Step 7: remaining metrics ────────────────────────────────────────────────
+  // ── Step 6: remaining metrics ────────────────────────────────────────────────
  
   // Occasions
   const occasions: Record<string, number> = {
@@ -344,6 +437,7 @@ export async function computeDrinkingSummary(
     drinkingDays:      drinkingDaySet.size,
     restDays:          daysInPeriod - drinkingDaySet.size,
     avgRestDays,
+    dryDaysAtEnd,
     histogram,
     avgStartClock,
     avgEndClock,
@@ -362,6 +456,34 @@ export async function computeDrinkingSummary(
 
 
 
+
+// ── LEGACY ───────────────────────────────────────────────────────────────────
+// The old per-calendar-day scoring, kept alive ONLY for the old
+// `mode=trend` route path below, which stays untouched until the widget moves
+// to computeDrinkingTrend. Delete both together. Do not call from new code.
+function computeDailyScoresLegacy(
+  allDrinkingDates: Set<string>,
+  periodDates: string[],
+  datasetFirstDate: string,
+): { dateStr: string; score: number; isDrinking: boolean }[] {
+  const sortedDrinkDates = [...allDrinkingDates].sort();
+
+  return periodDates.map(dateStr => {
+    const isDrinking = allDrinkingDates.has(dateStr);
+
+    let lastDrink: string | null = null;
+    for (let i = sortedDrinkDates.length - 1; i >= 0; i--) {
+      if (sortedDrinkDates[i] < dateStr) {
+        lastDrink = sortedDrinkDates[i];
+        break;
+      }
+    }
+
+    const anchor = lastDrink ?? datasetFirstDate;
+    const score  = diffDays(dateStr, anchor) - 1 + (isDrinking ? 0 : 1);
+    return { dateStr, score: Math.max(0, score), isDrinking };
+  });
+}
 
 export async function computeDrinkingTrendBucket(
   userId: string,
@@ -554,7 +676,7 @@ export async function computeDrinkingTrendBucket(
   );
   const sortedAll = [...allDrinkingDates].sort();
   const datasetFirstDate = sortedAll[0] ?? effectiveStart;
-  const dailyScores = computeDailyScores(allDrinkingDates, periodDates, datasetFirstDate);
+  const dailyScores = computeDailyScoresLegacy(allDrinkingDates, periodDates, datasetFirstDate);
   const histogram: Record<string, number> = Object.fromEntries(
     SCORE_BUCKET_ORDER.map(k => [k, 0]),
   );
@@ -620,3 +742,307 @@ export async function computeDrinkingTrendBucket(
   };
 }
 
+
+
+// ── Grain × count trend (the Weight-style window) ────────────────────────────
+//
+// One fetch covers the whole window; bucketing happens in memory, so 120
+// buckets never means 120 database round trips. The old per-bucket path above
+// ran three queries per bucket, one of them an unbounded scan of every
+// drinking record ever logged — 360 queries and 120 full scans at 120 buckets.
+// This path runs three bounded queries in total (four when a cross-activity
+// filter is set), none of them growing with the log.
+//
+// Rest scoring follows the rule in buildRestEvents: a score belongs to a
+// drinking day and equals the dry days directly before it. A bucket with no
+// drinking day has no average — the chart draws a gap there — and instead
+// reports how far the dry run had reached by the bucket's last day.
+
+export type DrinkingTrendBucket = {
+  label: string;
+  start: string;
+  daysInBucket: number;
+  drinkingDays: number;
+  totalDrinks: number;
+  avgDrinksPerDay: number | null;
+  drinksBox: { min: number; max: number; avg: number } | null;
+  avgRestDays: number | null;
+  dryDaysAtEnd: number | null;
+  histogram: Record<string, number>;
+  drinkType: Record<string, number>;
+  occasions: Record<string, number>;
+  companions: Record<string, number>;
+  people: Record<string, Record<string, number>>;
+  avgStartMins: number | null;
+  avgEndMins: number | null;
+  avgDurationSeconds: number | null;
+};
+
+/** The last calendar day of a bucket, as YYYY-MM-DD. */
+function bucketEndStr(grain: TrendGrain, bucketStart: Date): string {
+  const e = new Date(bucketStart);
+  if (grain === 'week') {
+    e.setUTCDate(e.getUTCDate() + 6);
+  } else if (grain === 'month') {
+    e.setUTCMonth(e.getUTCMonth() + 1);
+    e.setUTCDate(e.getUTCDate() - 1);
+  }
+  return ymd(e);
+}
+
+/** Everything a bucket needs from its own records. Dates are pre-assigned. */
+function summariseBucketDocs(
+  entries: { doc: any; date: string }[],
+  drinkingDays: Set<string>,
+  convMap: Map<string, number>,
+) {
+  const drinksByDate  = new Map<string, number>();
+  const drinkTypeAccum: Record<string, number> = {};
+  const occasions: Record<string, number> = {
+    '아침술': 0, '점심술': 0, '저녁술': 0, '낮술': 0, 'After/No dinner': 0,
+  };
+  const companions: Record<string, number> = {};
+  const people: Record<string, Record<string, number>> = {};
+
+  for (const { doc, date } of entries) {
+    const alcohols: any[] = doc.food?.alcohols ?? [];
+    let sessionDrinks = 0;
+    const itemDrinks: { item: string; drinks: number }[] = [];
+    for (const a of alcohols) {
+      const dpu = convMap.get(`${a.item}||${a.unit}`) ?? null;
+      if (dpu === null) continue;                 // unknown item × unit — skip
+      const amt = parseFloat(a.amount);
+      if (isNaN(amt)) continue;
+      const d = amt * dpu;
+      sessionDrinks += d;
+      itemDrinks.push({ item: a.item, drinks: d });
+    }
+    drinksByDate.set(date, (drinksByDate.get(date) ?? 0) + sessionDrinks);
+
+    const recTotal = itemDrinks.reduce((s, x) => s + x.drinks, 0);
+    if (recTotal > 0) {
+      for (const { item, drinks } of itemDrinks) {
+        drinkTypeAccum[item] = (drinkTypeAccum[item] ?? 0) + drinks / recTotal;
+      }
+    }
+
+    const occ = classifyOccasion(doc.food?.type, doc.start?.hour);
+    occasions[occ] = (occasions[occ] ?? 0) + 1;
+
+    for (const group of (doc.people ?? [])) {
+      const cat = group.category ?? '기타';
+      companions[cat] = (companions[cat] ?? 0) + 1;
+    }
+    if (!doc.people?.length) {
+      companions['혼자'] = (companions['혼자'] ?? 0) + 1;
+    }
+
+    const seenPeople = new Set<string>();
+    for (const group of (doc.people ?? [])) {
+      const cat = group.category ?? '기타';
+      const targets: string[] = Array.isArray(group.targets)
+        ? group.targets
+        : typeof group.target === 'string' ? [group.target] : [];
+      for (const name of targets) {
+        if (!name || name === '등' || seenPeople.has(name)) continue;
+        seenPeople.add(name);
+        if (!people[name]) people[name] = {};
+        people[name][cat] = (people[name][cat] ?? 0) + 1;
+      }
+    }
+  }
+
+  const totalDrinks = Math.round(
+    [...drinksByDate.values()].reduce((s, v) => s + v, 0) * 100,
+  ) / 100;
+
+  // Per-day figures over drinking days only.
+  const perDayValues = [...drinksByDate.entries()]
+    .filter(([d]) => drinkingDays.has(d))
+    .map(([, v]) => Math.round(v * 100) / 100)
+    .sort((a, b) => a - b);
+
+  const n = perDayValues.length;
+  const avg = n > 0
+    ? Math.round((perDayValues.reduce((s, v) => s + v, 0) / n) * 100) / 100
+    : null;
+
+  // Quartiles dropped: the trend view draws average, max and min as lines.
+  const drinksBox = n > 0
+    ? { min: perDayValues[0], max: perDayValues[n - 1], avg: avg as number }
+    : null;
+
+  const drinkType: Record<string, number> = {};
+  for (const [item, val] of Object.entries(drinkTypeAccum)) {
+    const r = Math.round(val);
+    if (r > 0) drinkType[item] = r;
+  }
+
+  const THRESHOLD = 6;
+  const startMins = entries
+    .map(({ doc }) => hourStringToMinutes(doc.start?.hour))
+    .filter((x): x is number => x !== null)
+    .map(m => (m < THRESHOLD * 60 ? m + 1440 : m));
+  const avgStartMins = startMins.length
+    ? Math.round((startMins.reduce((s, x) => s + x, 0) / startMins.length) % 1440)
+    : null;
+
+  const endMins = entries
+    .map(({ doc }) => {
+      const m = hourStringToMinutes(doc.end?.hour);
+      if (m === null) return null;
+      const sm = hourStringToMinutes(doc.start?.hour);
+      return (sm !== null && m < sm) ? m + 1440 : m;   // overnight session
+    })
+    .filter((x): x is number => x !== null);
+  const avgEndMins = endMins.length
+    ? Math.round(endMins.reduce((s, v) => s + v, 0) / endMins.length)
+    : null;
+
+  const durations = entries
+    .map(({ doc }) => doc.duration?.totalSeconds)
+    .filter((v): v is number => v != null && v > 0);
+  const avgDurationSeconds = durations.length
+    ? Math.round(durations.reduce((s, v) => s + v, 0) / durations.length)
+    : null;
+
+  return {
+    totalDrinks,
+    avgDrinksPerDay: avg,
+    drinksBox,
+    drinkType,
+    occasions,
+    companions,
+    people,
+    avgStartMins,
+    avgEndMins,
+    avgDurationSeconds,
+  };
+}
+
+export async function computeDrinkingTrend(
+  userId: string,
+  grain: TrendGrain,
+  windowStart: Date,
+  windowEnd: Date,
+  crossActivities: string[],
+): Promise<{ grain: TrendGrain; data: DrinkingTrendBucket[] }> {
+  // Today is a partial day and would drag every per-day figure down, so the
+  // window stops at yesterday — the same cap the summary path uses.
+  const yesterday    = yesterdayStr();
+  const startStr     = ymd(windowStart);
+  const rawEnd       = ymd(windowEnd);
+  const effectiveEnd = rawEnd < yesterday ? rawEnd : yesterday;
+
+  if (effectiveEnd < startStr) return { grain, data: [] };
+
+  const effectiveEndDate = new Date(`${effectiveEnd}T00:00:00.000Z`);
+
+  // ── Query 1: conversion table ───────────────────────────────────────────────
+  const conversionDocs = await AlcoholConversion.find({ userId }).lean();
+  const convMap = new Map<string, number>();
+  for (const c of conversionDocs) {
+    convMap.set(`${(c as any).item}||${(c as any).unit}`, (c as any).drinks);
+  }
+
+  // ── Query 2: the one drinking day before the window ─────────────────────────
+  const priorDrinkDate = await findPriorDrinkDate(userId, startStr);
+
+  // ── Query 3: every record in the window, once ───────────────────────────────
+  const fetchStart = new Date(`${startStr}T00:00:00.000Z`);
+  fetchStart.setUTCHours(fetchStart.getUTCHours() - SLEEP_THRESHOLD_HOUR);
+  const fetchEnd = new Date(`${effectiveEnd}T00:00:00.000Z`);
+  fetchEnd.setUTCDate(fetchEnd.getUTCDate() + 1);
+  fetchEnd.setUTCHours(SLEEP_THRESHOLD_HOUR);
+
+  const filter: Record<string, any> = {
+    userId,
+    'start.datetime': { $gte: fetchStart, $lt: fetchEnd },
+    'food.alcohols': { $exists: true, $not: { $size: 0 } },
+  };
+  if (crossActivities.length) filter['activity.crossActivity'] = { $in: crossActivities };
+  const docs = await Log.find(filter).lean();
+
+  // Assign every record to its drinking day once, and drop anything the 6am
+  // padding pulled in from outside the window.
+  const entries: { doc: any; date: string }[] = [];
+  for (const doc of docs as any[]) {
+    if (!doc.start?.datetime) continue;
+    const date = assignDrinkingDate(new Date(doc.start.datetime), doc.start?.hour);
+    if (date < startStr || date > effectiveEnd) continue;
+    entries.push({ doc, date });
+  }
+
+  // ── Query 4 (only with a cross-activity filter) ─────────────────────────────
+  // A dry day means a day with no drinking at all, whatever the record was
+  // tagged with, so rest scoring ignores the cross-activity filter. Without a
+  // filter the records above already carry the same days.
+  const restDayPool = crossActivities.length
+    ? await fetchWindowDrinkingDays(userId, startStr, effectiveEnd)
+    : new Set(entries.map(e => e.date));
+
+  // Rest scores for the whole window at once, then split per bucket. A score
+  // belongs to the drinking day that ended the dry run, so a long run shows up
+  // in the bucket where it finished.
+  const restEvents = buildRestEvents([...restDayPool].sort(), priorDrinkDate);
+
+  // ── Bucketing, all in memory ────────────────────────────────────────────────
+  const starts = buildBucketStarts(grain, windowStart, effectiveEndDate);
+
+  const keyOf = (dateStr: string): string => {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return ymd(bucketStartFor(grain, y, m, d));
+  };
+
+  const entriesByBucket = new Map<string, { doc: any; date: string }[]>();
+  const drinkDaysByBucket = new Map<string, Set<string>>();
+  const restByBucket = new Map<string, RestEvent[]>();
+  for (const s of starts) {
+    const k = ymd(s);
+    entriesByBucket.set(k, []);
+    drinkDaysByBucket.set(k, new Set());
+    restByBucket.set(k, []);
+  }
+
+  for (const e of entries) entriesByBucket.get(keyOf(e.date))?.push(e);
+  for (const day of restDayPool) drinkDaysByBucket.get(keyOf(day))?.add(day);
+  for (const ev of restEvents) restByBucket.get(keyOf(ev.date))?.push(ev);
+
+  // Walk oldest to newest, carrying the last drinking day forward so a dry
+  // bucket can report how far the run had reached by its last day.
+  let lastDrinkSeen: string | null = priorDrinkDate;
+
+  const data: DrinkingTrendBucket[] = starts.map(s => {
+    const key          = ymd(s);
+    const bucketDays   = drinkDaysByBucket.get(key) ?? new Set<string>();
+    const bucketRest   = restByBucket.get(key) ?? [];
+    const bucketEntries = entriesByBucket.get(key) ?? [];
+
+    const histogram = emptyHistogram();
+    for (const { score } of bucketRest) histogram[bucketScore(score)]++;
+
+    let dryDaysAtEnd: number | null = null;
+    if (bucketDays.size === 0) {
+      const bEnd       = bucketEndStr(grain, s);
+      const measureDay = bEnd < effectiveEnd ? bEnd : effectiveEnd;
+      dryDaysAtEnd     = dryDaysAt(measureDay, lastDrinkSeen);
+    } else {
+      lastDrinkSeen = [...bucketDays].sort().pop() ?? lastDrinkSeen;
+    }
+
+    const summary = summariseBucketDocs(bucketEntries, bucketDays, convMap);
+
+    return {
+      label:        bucketLabel(grain, s),
+      start:        key,
+      daysInBucket: bucketDayCount(grain, s, windowStart, effectiveEndDate),
+      drinkingDays: bucketDays.size,
+      avgRestDays:  averageScore(bucketRest),
+      dryDaysAtEnd,
+      histogram,
+      ...summary,
+    };
+  });
+
+  return { grain, data };
+}

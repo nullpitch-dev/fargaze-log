@@ -2,13 +2,16 @@
 // src/app/insights/_widgets/InteractionsWidget.tsx
 
 import { useEffect, useState, useRef } from 'react';
-import { WidgetCard, ViewToggle, BucketSelector } from '../_components/WidgetCard';
+import { WidgetCard, ViewToggle } from '../_components/WidgetCard';
+import { Segmented } from '../_components/Segmented';
+import { BUCKET_OPTIONS, DEFAULT_BUCKETS } from './WeightTrendView';
+import type { TrendGrain } from '@/lib/insights/trend-window';
 import { MultiSelectDropdown } from '../_components/MultiSelectDropdown';
 import { useIsDark } from '../_lib/hooks';
 import { chartColors, PERSON_COLORS_LIGHT, PERSON_COLORS_DARK, autoColorMap } from '../_lib/chart-colors';
 import { BarSection, BarRow, Title } from '../_components/charts/bars';
-import { StackedBars } from '../_components/charts/StackedBars';
-import { CssTrendChart } from '../_components/charts/css-chart-components';
+import { CssTrendChart, CssStackedAreaChart } from '../_components/charts/css-chart-components';
+import type { StackedAreaPoint, StackedAreaSegmentDef } from '../_components/charts/css-chart-components';
 import { CssRankFlowChart } from '../_components/charts/CssRankFlowChart';
 import { buildParams } from '../_lib/date-helpers';
 import type { WidgetProps, WidgetViewMode } from '../_lib/types';
@@ -22,6 +25,7 @@ const METHOD_FILTER_TABS: TrendMetric[] = ['interactions', 'people', 'relationTy
 
 interface TrendBucket {
   label: string;
+  start: string;
   totalCount: number;
   uniquePeopleCount: number;
   byRelationType: Record<string, number>;
@@ -57,34 +61,38 @@ function buildCategoryColorMap(
 
 // ── Data adapters: TrendBucket → shared chart prop types ─────────────────────
 
-// {label, data} bucket shape for StackedBars (formerly exported by _lib/chart-components).
-interface StackedBarBucket {
-  label: string;
-  data: Record<string, number>;
-}
-
-function toStackedBuckets(
+// TrendBucket → stacked-area props. Band order is fixed across the whole
+// window by total size, largest at the bottom — the same order the bars used.
+// A band set that changed per bucket would make the stack jump; these two
+// tabs have small stable vocabularies, so one pass over the window settles it.
+function toArea(
   buckets: TrendBucket[],
   key: 'byRelationType' | 'byMethod',
-): StackedBarBucket[] {
-  return buckets.map(b => ({ label: b.label, data: b[key] }));
-}
-
-// {label,data} buckets + colour map → StackedBars props.
-// Largest-total category stacked at the bottom (matches the old StackedBarChart order).
-function toStacked(
-  raw: StackedBarBucket[],
   colorMap: Record<string, string>,
   isDark: boolean,
-) {
+): { points: StackedAreaPoint[]; defs: StackedAreaSegmentDef[] } {
   const ng = isDark ? '#71717a' : '#a8a29e';
   const totals: Record<string, number> = {};
-  for (const b of raw) for (const [k, v] of Object.entries(b.data)) if (k.trim()) totals[k] = (totals[k] ?? 0) + v;
-  const cats = Object.keys(totals).filter(c => c.trim()).sort((a, b) => totals[b] - totals[a]);
-  return {
-    buckets: raw.map(b => ({ label: b.label, values: b.data })),
-    series:  cats.map(c => ({ key: c, label: c, color: colorMap[c] ?? ng })),
-  };
+  for (const b of buckets) {
+    for (const [k, v] of Object.entries(b[key])) if (k.trim()) totals[k] = (totals[k] ?? 0) + v;
+  }
+  const cats = Object.keys(totals).sort((a, b) => totals[b] - totals[a]);
+  const defs = cats.map(c => ({ key: c, label: c, color: colorMap[c] ?? ng }));
+
+  const points = buckets.map(b => {
+    const segments: Record<string, number> = {};
+    let sum = 0;
+    for (const c of cats) {
+      const v = b[key][c] ?? 0;
+      segments[c] = v;
+      sum += v;
+    }
+    // sum 0 → no bar to normalise; the chart reads a null as a gap, which is
+    // the honest picture for a bucket with nothing in it.
+    return { label: b.label, total: sum > 0 ? sum : null, segments: sum > 0 ? segments : null };
+  });
+
+  return { points, defs };
 }
 
 // ── Summary sub-components ────────────────────────────────────────────────────
@@ -142,7 +150,12 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
   const isDark = useIsDark();
   const [viewMode, setViewMode]       = useState<WidgetViewMode>('summary');
   const [trendMetric, setTrendMetric] = useState<TrendMetric>('interactions');
-  const [bucketsBack, setBucketsBack] = useState(12);
+	// Weight-style window: grain × count, count resetting to the grain's
+  // default on a grain switch. The People tab keeps its own short count
+  // (3/6/12) so flipping there and back never destroys a longer window.
+  const [grain, setGrain] = useState<TrendGrain>('month');
+  const [count, setCount] = useState<number>(DEFAULT_BUCKETS.month);
+  const [peopleCount, setPeopleCount] = useState<number>(12);
 
   // People-tab filters (unchanged): Relation + Method, draft → commit on close
   const [top7RelType, setTop7RelType]           = useState<string[]>([]);
@@ -164,7 +177,8 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
   const summaryMethodRef = useRef<string[]>([]);
 
   const [summaryData, setSummaryData] = useState<any>(null);
-  const [trendData, setTrendData]     = useState<TrendBucket[]>([]);
+	const [trendData, setTrendData]     = useState<TrendBucket[]>([]);
+  const [dataGrain, setDataGrain]     = useState<TrendGrain>('month');
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState<string | null>(null);
 
@@ -184,8 +198,8 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
   const pUnique       = subsetParam(tabMethodCommitted['people'],       trendAllMethods);
   const pRelation     = subsetParam(tabMethodCommitted['relationType'], trendAllMethods);
 
-  const isPeriodMode = globalFilter.timeMode === 'period';
-  useEffect(() => { if (isPeriodMode) setViewMode('summary'); }, [isPeriodMode]);
+	// The People tab fetches its own shorter window; the other tabs share one.
+  const effectiveBuckets = trendMetric === 'top7' ? peopleCount : count;
 
   useEffect(() => {
     setLoading(true); setError(null);
@@ -196,9 +210,9 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
           ...(summaryMethodParam && { method: summaryMethodParam }),
         }, globalFilter)}`
       : `/api/insights/stats?${buildParams({
-          metric: 'interactions.summary',
-          mode: 'trend',
-          bucketsBack: String(bucketsBack),
+          metric: 'interactions.trend',
+          grain,
+          buckets: String(effectiveBuckets),
           ...(committedRelType.length && { top7RelType: committedRelType.join(',') }),
           ...(committedMethod.length  && { top7Method:  committedMethod.join(',')  }),
           ...(pInteractions && { mInteractions: pInteractions }),
@@ -207,13 +221,16 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
         }, globalFilter)}`;
     fetch(url)
       .then(r => r.json())
-      .then(d => {
-        if (viewMode === 'summary') setSummaryData(d.summary ?? null);
-        else setTrendData(d.data ?? []);
-        setLoading(false);
-      })
-      .catch(() => { setError('Failed to load data.'); setLoading(false); });
-  }, [globalFilter, viewMode, bucketsBack, committedRelType, committedMethod, pInteractions, pUnique, pRelation, summaryMethodParam]);
+			.then(d => {
+				if (viewMode === 'summary') setSummaryData(d.summary ?? null);
+				else {
+					setTrendData(d.data ?? []);
+					if (d.grain) setDataGrain(d.grain);   // range line formats from the payload's grain
+				}
+				setLoading(false);
+			})
+			.catch(() => { setError('Failed to load data.'); setLoading(false); });
+	}, [globalFilter, viewMode, grain, effectiveBuckets, committedRelType, committedMethod, pInteractions, pUnique, pRelation, summaryMethodParam]);
 
   // Keep refs in sync with draft state
   useEffect(() => { top7RelTypeRef.current = top7RelType; }, [top7RelType]);
@@ -249,11 +266,27 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
     setSummaryMethodCommitted(prev => prev.length === 0 ? all : prev);
   }, [summaryData]);
 
+	// Resolved range — the control states a count, this line states the span.
+  const pad2 = (n: number) => String(n).padStart(2, '0');
+  const toISO = (dt: Date) => `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
+  const bucketEndISO = (startISO: string, g: TrendGrain): string => {
+    const [y, m, d] = startISO.split('-').map(Number);
+    const dt = new Date(y, (m ?? 1) - 1, d ?? 1);
+    if (g === 'week') dt.setDate(dt.getDate() + 6);
+    else if (g === 'month') { dt.setMonth(dt.getMonth() + 1); dt.setDate(dt.getDate() - 1); }
+    return toISO(dt);
+  };
+  const todayISO = toISO(new Date());
+  const lastEnd = trendData.length ? bucketEndISO(trendData[trendData.length - 1].start, dataGrain) : '';
+  const rangeText = trendData.length
+    ? `${trendData[0].start} → ${lastEnd > todayISO ? todayISO : lastEnd}`
+    : '';
+
   // Derived values
   const relTypeColorMap = buildCategoryColorMap(trendData, 'byRelationType', isDark);
   const methodColorMap  = buildCategoryColorMap(trendData, 'byMethod', isDark);
-  const relTypeStacked  = toStacked(toStackedBuckets(trendData, 'byRelationType'), relTypeColorMap, isDark);
-  const methodStacked   = toStacked(toStackedBuckets(trendData, 'byMethod'),       methodColorMap,  isDark);
+	const relTypeArea     = toArea(trendData, 'byRelationType', relTypeColorMap, isDark);
+  const methodArea      = toArea(trendData, 'byMethod',       methodColorMap,  isDark);
 
   const lineValues      = trendData.map(b =>
     trendMetric === 'interactions' ? b.totalCount : b.uniquePeopleCount,
@@ -317,7 +350,7 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
       floor={1}
       loading={loading}
       error={error}
-      action={<ViewToggle value={viewMode} onChange={setViewMode} disabled={isPeriodMode} />}
+			action={<ViewToggle value={viewMode} onChange={setViewMode} />}
     >
       {viewMode === 'summary' ? (
         <>
@@ -366,12 +399,31 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
                 </button>
               ))}
             </div>
-            <BucketSelector value={bucketsBack} onChange={setBucketsBack} />
+						<div className="flex items-center gap-2">
+              <Segmented<TrendGrain>
+                value={grain}
+                onChange={g => { setGrain(g); setCount(DEFAULT_BUCKETS[g]); }}
+                options={[['day', 'Day'], ['week', 'Week'], ['month', 'Month']]} />
+              {trendMetric === 'top7' ? (
+                <Segmented<number>
+                  value={peopleCount} onChange={setPeopleCount}
+                  options={[[3, '3'], [6, '6'], [12, '12']]} />
+              ) : (
+                <Segmented<number>
+                  value={count} onChange={setCount}
+                  options={BUCKET_OPTIONS[grain].map(n => [n, String(n)]) as [number, string][]} />
+              )}
+            </div>
           </div>
 
           {/* Row 2: description of active metric */}
           {activeDesc && (
             <p className="text-[11px] text-stone-400 dark:text-zinc-500 -mt-1">{activeDesc}</p>
+          )}
+
+					{/* Resolved range — what you picked is a count, what you see is a span */}
+          {rangeText && (
+            <span className="text-[10px] text-stone-400 dark:text-zinc-500 -mt-1">{rangeText}</span>
           )}
 
           {/* Row 3: per-tab Method control (Interactions / Unique / Relation) */}
@@ -382,19 +434,32 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
             <p className="text-xs text-stone-400 dark:text-zinc-500">No data</p>
           ) : (trendMetric === 'interactions' || trendMetric === 'people') ? (
             validLineValues.length > 0 ? (
-              <CssTrendChart
-                series={[{ values: lineValues, color: isDark ? '#2dd4bf' : '#1d4ed8' }]}
+							<CssTrendChart
+                series={[{
+                  values: lineValues,
+                  color: isDark ? '#2dd4bf' : '#1d4ed8',
+                  label: trendMetric === 'interactions' ? 'Interactions' : 'People',
+                }]}
                 labels={trendData.map(b => b.label)}
                 formatY={v => String(v)}
                 isDark={isDark}
+                maxXLabels={12}
+                showValues={trendData.length <= 16}
+                compressXLabels={false}
               />
             ) : (
               <p className="text-xs text-stone-400 dark:text-zinc-500">No data</p>
             )
-          ) : trendMetric === 'relationType' ? (
-            <StackedBars buckets={relTypeStacked.buckets} series={relTypeStacked.series} isDark={isDark} mode="percent" />
+					) : trendMetric === 'relationType' ? (
+            <CssStackedAreaChart
+              points={relTypeArea.points} segmentDefs={relTypeArea.defs}
+              isDark={isDark} mode="percent" highlightable
+              maxXLabels={12} formatY={v => String(v)} height={190} />
           ) : trendMetric === 'method' ? (
-            <StackedBars buckets={methodStacked.buckets} series={methodStacked.series} isDark={isDark} mode="percent" />
+            <CssStackedAreaChart
+              points={methodArea.points} segmentDefs={methodArea.defs}
+              isDark={isDark} mode="percent" highlightable
+              maxXLabels={12} formatY={v => String(v)} height={190} />
           ) : (
             <CssRankFlowChart
               buckets={trendData.map(b => ({ label: b.label, ranked: b.top7 }))}

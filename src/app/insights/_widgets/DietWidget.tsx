@@ -1,7 +1,7 @@
 'use client';
 // src/app/insights/_widgets/DietWidget.tsx
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { WidgetCard, ViewToggle } from '../_components/WidgetCard';
 import { ModalShell } from '../_components/ModalShell';
 import { Segmented } from '../_components/Segmented';
@@ -15,7 +15,12 @@ import {
   CssDailyChart, CssVerticalBoxPlotChart, minsToClockStr,
   type CssDailyZone, type BoxPlotBucket,
 } from '../_components/charts/css-chart-components';
-import { DietTrendView, type DietTrendBucket } from './DietTrendView';
+import {
+  DietTrendView, DIET_SHORT_COUNT_TABS,
+  type DietTrendBucket, type DietTrendTab,
+} from './DietTrendView';
+import { DEFAULT_BUCKETS } from './WeightTrendView';
+import type { TrendGrain } from '@/lib/insights/trend-window';
 import { Title, BarSection } from '../_components/charts/bars';
 
 // ── Types (mirrors diet.summary API contract) ─────────────────────────────────
@@ -309,41 +314,53 @@ export function DietWidget({ globalFilter }: WidgetProps) {
   const isDark = useIsDark();
   const [viewMode,    setViewMode]    = useState<WidgetViewMode>('summary');
   const [summaryData, setSummaryData] = useState<DietSummary | null>(null);
-	const [trendData, setTrendData] = useState<DietTrendBucket[] | null>(null);
-	const [bucketsBack, setBucketsBack] = useState(12);
-  const [loading,     setLoading]     = useState(true);
-	const [error,       setError]       = useState<string | null>(null);
-  const trendLoadedRef = useRef(false);
+  const [trendData,   setTrendData]   = useState<DietTrendBucket[]>([]);
 
-  const isPeriodMode = globalFilter.timeMode === 'period';
+  // Weight-style window: grain × count, count resetting to the grain's default
+  // on a grain switch. Composition and People keep their own short count so
+  // flipping there and back never destroys a longer window.
+  const [trendTab,   setTrendTab]   = useState<DietTrendTab>('eating');
+  const [grain,      setGrain]      = useState<TrendGrain>('month');
+  const [count,      setCount]      = useState<number>(DEFAULT_BUCKETS.month);
+  const [shortCount, setShortCount] = useState<number>(12);
+  // The grain the data was actually built at, echoed by the server. Labels and
+  // the range line format from this, never from the control, so a grain switch
+  // cannot render one frame of new labels against old data.
+  const [dataGrain,  setDataGrain]  = useState<TrendGrain>('month');
+
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState<string | null>(null);
+
+  const effectiveBuckets = DIET_SHORT_COUNT_TABS.includes(trendTab) ? shortCount : count;
 
   useEffect(() => {
-    if (viewMode !== 'summary') return;
     setLoading(true);
     setError(null);
-    const url = `/api/insights/stats?${buildParams(
-      { metric: 'diet.summary', mode: 'summary' },
-      globalFilter,
-    )}`;
-    fetch(url)
-      .then(r => r.json())
-      .then(d => { setSummaryData(d.summary ?? null); setLoading(false); })
-      .catch(() => { setError('Failed to load data.'); setLoading(false); });
-  }, [globalFilter, viewMode]);
 
-	useEffect(() => {
-		if (viewMode !== 'trend') return;
-    if (!trendLoadedRef.current) setLoading(true);
-    setError(null);
-    const url = `/api/insights/stats?${buildParams(
-      { metric: 'diet.summary', mode: 'trend', bucketsBack: String(bucketsBack) },
-      globalFilter,
-    )}`;
-    fetch(url)
-      .then(r => r.json())
-			.then(d => { setTrendData(d.data ?? []); trendLoadedRef.current = true; setLoading(false); })
-      .catch(() => { setError('Failed to load data.'); setLoading(false); });
-  }, [globalFilter, viewMode, bucketsBack]);
+    if (viewMode === 'summary') {
+      const url = `/api/insights/stats?${buildParams(
+        { metric: 'diet.summary', mode: 'summary' },
+        globalFilter,
+      )}`;
+      fetch(url)
+        .then(r => r.json())
+        .then(d => { setSummaryData(d.summary ?? null); setLoading(false); })
+        .catch(() => { setError('Failed to load data.'); setLoading(false); });
+    } else {
+      const url = `/api/insights/stats?${buildParams(
+        { metric: 'diet.trend', grain, buckets: String(effectiveBuckets) },
+        globalFilter,
+      )}`;
+      fetch(url)
+        .then(r => r.json())
+        .then(d => {
+          setTrendData(d.data ?? []);
+          if (d.grain) setDataGrain(d.grain);
+          setLoading(false);
+        })
+        .catch(() => { setError('Failed to load data.'); setLoading(false); });
+    }
+  }, [globalFilter, viewMode, grain, effectiveBuckets]);
 
   return (
     <WidgetCard
@@ -351,22 +368,28 @@ export function DietWidget({ globalFilter }: WidgetProps) {
       floor={1}
       loading={loading}
       error={error}
-      action={<ViewToggle value={viewMode} onChange={setViewMode} disabled={isPeriodMode} />}
+      action={<ViewToggle value={viewMode} onChange={setViewMode} />}
     >
       {viewMode === 'summary' ? (
         !summaryData ? (
           <p className="text-xs text-stone-400 dark:text-zinc-500">No data</p>
         ) : (
           <SummaryView data={summaryData} isDark={isDark} />
-
         )
       ) : (
-				<DietTrendView
-					data={trendData ?? []}
-					isDark={isDark}
-					bucketsBack={bucketsBack}
-					onBucketsBackChange={setBucketsBack}
-				/>
+        <DietTrendView
+          data={trendData}
+          isDark={isDark}
+          tab={trendTab}
+          onTabChange={setTrendTab}
+          grain={grain}
+          onGrainChange={g => { setGrain(g); setCount(DEFAULT_BUCKETS[g]); }}
+          count={count}
+          onCountChange={setCount}
+          shortCount={shortCount}
+          onShortCountChange={setShortCount}
+          dataGrain={dataGrain}
+        />
       )}
     </WidgetCard>
   );

@@ -2,7 +2,10 @@
 // src/app/insights/_widgets/DrinkingWidget.tsx
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { WidgetCard, ViewToggle, BucketSelector } from '../_components/WidgetCard';
+import { WidgetCard, ViewToggle } from '../_components/WidgetCard';
+import { Segmented } from '../_components/Segmented';
+import { BUCKET_OPTIONS, DEFAULT_BUCKETS } from './WeightTrendView';
+import type { TrendGrain } from '@/lib/insights/trend-window';
 import { useIsDark } from '../_lib/hooks';
 import { buildParams } from '../_lib/date-helpers';
 import { formatDuration } from '../_lib/format';
@@ -11,11 +14,12 @@ import { BoxPlot } from '../_components/charts/BoxPlot';
 import { Histogram } from '../_components/charts/Histogram';
 import {
   CssTrendChart,
-  CssVerticalBoxPlotChart,
+  CssStackedAreaChart,
   CssDualLineChart,
-  CssRestChart,
+  REST_BUCKET_COLORS_LIGHT,
+  REST_BUCKET_COLORS_DARK,
 } from '../_components/charts/css-chart-components';
-import { StackedBars } from '../_components/charts/StackedBars';
+import type { StackedAreaPoint, StackedAreaSegmentDef } from '../_components/charts/css-chart-components';
 import { CssRankFlowChart } from '../_components/charts/CssRankFlowChart';
 import { MultiSelectDropdown } from '../_components/MultiSelectDropdown';
 import { useLiveFilter } from '../_lib/useLiveFilter';
@@ -58,12 +62,17 @@ interface DrinkingSummary {
 
 interface DrinkingTrendBucket {
   label:              string;
+  start:              string;
   drinkingDays:       number;
-  daysInPeriod:       number;
+  daysInBucket:       number;
   totalDrinks:        number;
   avgDrinksPerDay:    number | null;
-  drinksBox:          { min: number; max: number; avg: number; p25: number; p75: number } | null;
-  avgRestDays:        number;
+  // Quartiles dropped — the trend view draws average, max and min as lines.
+  drinksBox:          { min: number; max: number; avg: number } | null;
+  // null where no dry run ended in the bucket; dryDaysAtEnd carries the
+  // running total instead, so a fully dry stretch is not silent.
+  avgRestDays:        number | null;
+  dryDaysAtEnd:       number | null;
   histogram:          Record<string, number>;
   drinkType:          Record<string, number>;
   occasions:          Record<string, number>;
@@ -87,8 +96,8 @@ const TREND_METRICS: { key: TrendMetric; label: string; desc: string; tip?: stri
 	{ key: 'withWhom',    label: 'Relation',  desc: 'Mix of relation types over time (100%)'           },
   { key: 'topPeople',   label: 'People',    desc: 'How your top 7 drinking companions change over time' },
   { key: 'restDays',    label: 'Rest',      desc: 'Rest days distribution and average over time',
-    tip: 'Consecutive days without drinking before each day' },
-  { key: 'sessionTime', label: 'Session',   desc: 'Average session start and end time over time',
+    tip: 'Dry days immediately before each drinking day. A dashed line marks a stretch where no dry run ended.' },
+  { key: 'sessionTime', label: 'Session',   desc: 'Average session start, end and length over time',
     tip: '1 drink = 50 ml soju equivalent' },
 ];
 
@@ -323,33 +332,55 @@ function TrendTip({ tip }: { tip: string }) {
 
 // ── Trend chart dispatcher ────────────────────────────────────────────────────
 
-// Convert {label,data} buckets + a colour map into StackedBars props,
-// stacking the largest-total category at the bottom (as CssStackedBarChart did).
-function toStacked(
+// Convert {label,data} buckets + a colour map into stacked-area props. Band
+// order is fixed across the whole window by total size, largest at the bottom,
+// so a band does not swap places as you scroll through time. The same adapter
+// shape as the Interactions trend uses.
+function toArea(
   raw: { label: string; data: Record<string, number> }[],
   colorMap: Record<string, string>,
   isDark: boolean,
-) {
+): { points: StackedAreaPoint[]; defs: StackedAreaSegmentDef[] } {
   const ng = isDark ? '#71717a' : '#a8a29e';
   const totals: Record<string, number> = {};
-  for (const b of raw) for (const [k, v] of Object.entries(b.data)) if (k.trim()) totals[k] = (totals[k] ?? 0) + v;
-  const cats = Object.keys(totals).filter(c => c.trim()).sort((a, b) => totals[b] - totals[a]);
-  return {
-    buckets: raw.map(b => ({ label: b.label, values: b.data })),
-    series:  cats.map(c => ({ key: c, label: c, color: colorMap[c] ?? ng })),
-  };
+  for (const b of raw) {
+    for (const [k, v] of Object.entries(b.data)) if (k.trim()) totals[k] = (totals[k] ?? 0) + v;
+  }
+  const cats = Object.keys(totals).sort((a, b) => totals[b] - totals[a]);
+  const defs = cats.map(c => ({ key: c, label: c, color: colorMap[c] ?? ng }));
+
+  const points = raw.map(b => {
+    const segments: Record<string, number> = {};
+    let sum = 0;
+    for (const c of cats) {
+      const v = b.data[c] ?? 0;
+      segments[c] = v;
+      sum += v;
+    }
+    // sum 0 → nothing to normalise; a null reads as a gap, which is the
+    // honest picture for a bucket with no drinking at all.
+    return { label: b.label, total: sum > 0 ? sum : null, segments: sum > 0 ? segments : null };
+  });
+
+  return { points, defs };
 }
 
 function DrinkingTrendChart({
-  metric, buckets, isDark, bucketsBack,
+  metric, buckets, isDark, count,
 }: {
   metric: TrendMetric;
   buckets: DrinkingTrendBucket[];
   isDark: boolean;
-  bucketsBack: number;
+  count: number;
 }) {
 	const labels = buckets.map(b => b.label);
-  const alwaysShow = bucketsBack <= 6;
+  const alwaysShow = count <= 6;
+  // Shared line-tab settings, matching the Interactions trend.
+  const lineProps = {
+    maxXLabels: 12,
+    showValues: buckets.length <= 16,
+    compressXLabels: false,
+  } as const;
 
 	// Relation filter for the People (rank-flow) tab — live, but an empty selection
   // ("Deselect all") is held until the dropdown closes rather than emptying the chart.
@@ -365,11 +396,13 @@ function DrinkingTrendChart({
         series={[{
           values: buckets.map(b => b.drinkingDays),
           color: isDark ? '#2dd4bf' : '#1d4ed8',
+          label: 'Days',
         }]}
         labels={labels}
         formatY={v => String(Math.round(v))}
         isDark={isDark}
         alwaysShowLabels={alwaysShow}
+        {...lineProps}
       />
     );
   }
@@ -380,40 +413,79 @@ function DrinkingTrendChart({
         series={[{
           values: buckets.map(b => b.totalDrinks),
           color: isDark ? '#2dd4bf' : '#1d4ed8',
+          label: 'Drinks',
         }]}
         labels={labels}
         formatY={v => String(Math.round(v))}
         isDark={isDark}
         alwaysShowLabels={alwaysShow}
+        {...lineProps}
       />
     );
   }
 
+  // Amt(day): three lines instead of a box plot. Quartiles were dropped, and a
+  // box per bucket is unreadable at 120 buckets. Average is the headline; max
+  // and min are lighter. A bucket with no drinking day is a gap, not a zero.
   if (metric === 'drinksPerDay') {
-    const boxBuckets = buckets
-      .filter(b => b.drinksBox !== null)
-      .map(b => ({ label: b.label, ...b.drinksBox! }));
-    if (!boxBuckets.length) return <p className="text-xs text-stone-400 dark:text-zinc-500">No data</p>;
-    return <CssVerticalBoxPlotChart buckets={boxBuckets} isDark={isDark} />;
+    if (!buckets.some(b => b.drinksBox !== null)) {
+      return <p className="text-xs text-stone-400 dark:text-zinc-500">No data</p>;
+    }
+    const avgC = isDark ? '#2dd4bf' : '#1d4ed8';
+    const maxC = isDark ? '#5eead4' : '#60a5fa';
+    const minC = isDark ? '#99f6e4' : '#93c5fd';
+    return (
+      <CssTrendChart
+        series={[
+          { values: buckets.map(b => b.drinksBox?.avg ?? null), color: avgC, label: 'Avg' },
+          { values: buckets.map(b => b.drinksBox?.max ?? null), color: maxC, label: 'Max' },
+          { values: buckets.map(b => b.drinksBox?.min ?? null), color: minC, label: 'Min' },
+        ]}
+        labels={labels}
+        formatY={v => String(Math.round(v * 10) / 10)}
+        isDark={isDark}
+        maxXLabels={12}
+        showValues={false}
+        compressXLabels={false}
+      />
+    );
   }
 
-	if (metric === 'drinkType') {
-    const { buckets: bk, series } = toStacked(
+	// Type / Occasion / Relation: stacked areas. Dense bars are unreadable at
+  // 120 buckets, and all three have small stable vocabularies, so bands stay
+  // recognisable across the whole window.
+  if (metric === 'drinkType') {
+    const { points, defs } = toArea(
       buckets.map(b => ({ label: b.label, data: b.drinkType })), DRINK_TYPE_COLORS, isDark);
-    return <StackedBars buckets={bk} series={series} isDark={isDark} mode="percent" />;
+    return (
+      <CssStackedAreaChart
+        points={points} segmentDefs={defs}
+        isDark={isDark} mode="percent" highlightable
+        maxXLabels={12} formatY={v => String(v)} height={190} />
+    );
   }
 
   if (metric === 'occasion') {
-    const { buckets: bk, series } = toStacked(
+    const { points, defs } = toArea(
       buckets.map(b => ({ label: b.label, data: b.occasions })), OCCASION_COLORS, isDark);
-    return <StackedBars buckets={bk} series={series} isDark={isDark} mode="percent" />;
+    return (
+      <CssStackedAreaChart
+        points={points} segmentDefs={defs}
+        isDark={isDark} mode="percent" highlightable
+        maxXLabels={12} formatY={v => String(v)} height={190} />
+    );
   }
 
   if (metric === 'withWhom') {
     const companionColors: Record<string, string> = { '혼자': '#a8a29e', ...RELATION_COLORS };
-    const { buckets: bk, series } = toStacked(
+    const { points, defs } = toArea(
       buckets.map(b => ({ label: b.label, data: b.companions })), companionColors, isDark);
-    return <StackedBars buckets={bk} series={series} isDark={isDark} mode="percent" />;
+    return (
+      <CssStackedAreaChart
+        points={points} segmentDefs={defs}
+        isDark={isDark} mode="percent" highlightable
+        maxXLabels={12} formatY={v => String(v)} height={190} />
+    );
   }
 
   if (metric === 'topPeople') {
@@ -444,15 +516,35 @@ function DrinkingTrendChart({
       );
   }
 
+  // Rest: seven fixed bands as a stacked area (counts of dry runs that ended
+  // in the bucket), with the rest line on its own right-hand axis in days.
+  // Solid where a run actually ended; dashed across a dry stretch, passing
+  // through how far the run had reached at each bucket's last day.
   if (metric === 'restDays') {
+    const restColors = isDark ? REST_BUCKET_COLORS_DARK : REST_BUCKET_COLORS_LIGHT;
+    const defs = BUCKET_ORDER.map(k => ({ key: k, label: k, color: restColors[k] }));
+    const points = buckets.map(b => {
+      const segments: Record<string, number> = {};
+      let sum = 0;
+      for (const k of BUCKET_ORDER) {
+        const v = b.histogram[k] ?? 0;
+        segments[k] = v;
+        sum += v;
+      }
+      return { label: b.label, total: sum > 0 ? sum : null, segments: sum > 0 ? segments : null };
+    });
     return (
-      <CssRestChart
-        buckets={buckets.map(b => ({
-          label:       b.label,
-          histogram:   b.histogram,
-          avgRestDays: b.avgRestDays,
-        }))}
-        isDark={isDark}
+      <CssStackedAreaChart
+        points={points} segmentDefs={defs}
+        isDark={isDark} mode="absolute" baselineZero highlightable
+        maxXLabels={12} formatY={v => String(Math.round(v))} height={190}
+        rightLine={{
+          values: buckets.map(b => b.avgRestDays),
+          bridge: buckets.map(b => b.dryDaysAtEnd),
+          color:  isDark ? '#c084fc' : '#7c3aed',
+          label:  'Rest',
+        }}
+        formatYRight={v => `${Math.round(v * 10) / 10}d`}
       />
     );
   }
@@ -467,6 +559,8 @@ function DrinkingTrendChart({
           avgDurationSeconds: b.avgDurationSeconds,
         }))}
         isDark={isDark}
+        maxXLabels={12}
+        showValues={buckets.length <= 16}
       />
     );
   }
@@ -480,13 +574,20 @@ export function DrinkingWidget({ globalFilter }: WidgetProps) {
   const isDark = useIsDark();
   const [viewMode,    setViewMode]    = useState<WidgetViewMode>('summary');
   const [trendMetric, setTrendMetric] = useState<TrendMetric>('days');
-  const [bucketsBack, setBucketsBack] = useState(12);
+  // Weight-style window: grain × count, count resetting to the grain's default
+  // on a grain switch. The People tab keeps its own short count (3/6/12) so
+  // flipping there and back never destroys a longer window.
+  const [grain, setGrain] = useState<TrendGrain>('month');
+  const [count, setCount] = useState<number>(DEFAULT_BUCKETS.month);
+  const [peopleCount, setPeopleCount] = useState<number>(12);
   const [summaryData, setSummaryData] = useState<DrinkingSummary | null>(null);
   const [trendData,   setTrendData]   = useState<DrinkingTrendBucket[]>([]);
+  const [dataGrain,   setDataGrain]   = useState<TrendGrain>('month');
   const [loading,     setLoading]     = useState(true);
   const [error,       setError]       = useState<string | null>(null);
 
-  const isPeriodMode = globalFilter.timeMode === 'period';
+  // The People tab fetches its own shorter window; the other tabs share one.
+  const effectiveBuckets = trendMetric === 'topPeople' ? peopleCount : count;
 
   useEffect(() => {
     setLoading(true);
@@ -503,15 +604,35 @@ export function DrinkingWidget({ globalFilter }: WidgetProps) {
         .catch(() => { setError('Failed to load data.'); setLoading(false); });
     } else {
       const url = `/api/insights/stats?${buildParams(
-        { metric: 'drinking.summary', mode: 'trend', bucketsBack: String(bucketsBack) },
+        { metric: 'drinking.trend', grain, buckets: String(effectiveBuckets) },
         globalFilter,
       )}`;
       fetch(url)
         .then(r => r.json())
-        .then(d => { setTrendData(d.data ?? []); setLoading(false); })
+        .then(d => {
+          setTrendData(d.data ?? []);
+          if (d.grain) setDataGrain(d.grain);   // range line formats from the payload's grain
+          setLoading(false);
+        })
         .catch(() => { setError('Failed to load data.'); setLoading(false); });
     }
-  }, [globalFilter, viewMode, bucketsBack]);
+  }, [globalFilter, viewMode, grain, effectiveBuckets]);
+
+  // Resolved range — the control states a count, this line states the span.
+  const pad2 = (n: number) => String(n).padStart(2, '0');
+  const toISO = (dt: Date) => `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
+  const bucketEndISO = (startISO: string, g: TrendGrain): string => {
+    const [y, m, d] = startISO.split('-').map(Number);
+    const dt = new Date(y, (m ?? 1) - 1, d ?? 1);
+    if (g === 'week') dt.setDate(dt.getDate() + 6);
+    else if (g === 'month') { dt.setMonth(dt.getMonth() + 1); dt.setDate(dt.getDate() - 1); }
+    return toISO(dt);
+  };
+  const todayISO = toISO(new Date());
+  const lastEnd  = trendData.length ? bucketEndISO(trendData[trendData.length - 1].start, dataGrain) : '';
+  const rangeText = trendData.length
+    ? `${trendData[0].start} → ${lastEnd > todayISO ? todayISO : lastEnd}`
+    : '';
 
   return (
     <WidgetCard
@@ -519,7 +640,7 @@ export function DrinkingWidget({ globalFilter }: WidgetProps) {
       floor={1}
       loading={loading}
       error={error}
-      action={<ViewToggle value={viewMode} onChange={setViewMode} disabled={isPeriodMode} />}
+      action={<ViewToggle value={viewMode} onChange={setViewMode} />}
     >
 			{viewMode === 'summary' ? (
         !summaryData ? (
@@ -531,7 +652,7 @@ export function DrinkingWidget({ globalFilter }: WidgetProps) {
         // ── Trend view ──────────────────────────────────────────────────────────
         <div className="flex flex-col gap-3">
 
-          {/* Row 1: metric pills + BucketSelector */}
+          {/* Row 1: metric pills + grain × count */}
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex flex-wrap gap-1">
               {TREND_METRICS.map(({ key, label }) => (
@@ -548,7 +669,21 @@ export function DrinkingWidget({ globalFilter }: WidgetProps) {
                 </button>
               ))}
             </div>
-            <BucketSelector value={bucketsBack} onChange={setBucketsBack} />
+            <div className="flex items-center gap-2">
+              <Segmented<TrendGrain>
+                value={grain}
+                onChange={g => { setGrain(g); setCount(DEFAULT_BUCKETS[g]); }}
+                options={[['day', 'Day'], ['week', 'Week'], ['month', 'Month']]} />
+              {trendMetric === 'topPeople' ? (
+                <Segmented<number>
+                  value={peopleCount} onChange={setPeopleCount}
+                  options={[[3, '3'], [6, '6'], [12, '12']]} />
+              ) : (
+                <Segmented<number>
+                  value={count} onChange={setCount}
+                  options={BUCKET_OPTIONS[grain].map(n => [n, String(n)]) as [number, string][]} />
+              )}
+            </div>
           </div>
 
           {/* Row 2: description + optional ⓘ */}
@@ -561,6 +696,11 @@ export function DrinkingWidget({ globalFilter }: WidgetProps) {
             </p>
           )}
 
+					{/* Resolved range — what you picked is a count, what you see is a span */}
+          {rangeText && (
+            <span className="text-[10px] text-stone-400 dark:text-zinc-500 -mt-1">{rangeText}</span>
+          )}
+
           {/* Row 3: chart */}
           {trendData.length === 0 ? (
             <p className="text-xs text-stone-400 dark:text-zinc-500">No data</p>
@@ -569,7 +709,7 @@ export function DrinkingWidget({ globalFilter }: WidgetProps) {
               metric={trendMetric}
               buckets={trendData}
               isDark={isDark}
-              bucketsBack={bucketsBack}
+              count={effectiveBuckets}
             />
           )}
         </div>
