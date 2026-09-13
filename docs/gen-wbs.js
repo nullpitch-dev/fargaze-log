@@ -11,7 +11,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Service Concept & Work Breakdown Structure", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 3.6  |  11 September 2026", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 3.7  |  12 September 2026", size: 24 })], spacing: { after: 240 } }),
 );
 
 C(h1("Version History"));
@@ -41,6 +41,7 @@ C(table(["Version","Date","Headline"],[
   ["3.4","29 Jul 2026","#58 Exercise widget COMPLETE \u2014 exercise.ts, stats/route.ts branch, ExerciseWidget.tsx, registered in page.tsx. ModalShell extracted from DietWidget; emphasizeLast added to CssVerticalBoxPlotChart. \uacc4\ub2e8 \uc624\ub974\uae30 \ucda9 records converted to \ubd84, so every item now carries one unit; the per-item table below is re-surveyed and the earlier counts were stale. \ucd1d CORRECTED \u2014 it marks a day total with an unknown set split, not a rest-pause set. Trend view and the load line deferred. Mirrors Design Doc v4.4"],
   ["3.5","7 Aug 2026","#58 Exercise Trend view COMPLETE \u2014 exercise-trend.ts (exercise.trend / exercise.itemTrend), ExerciseTrendView.tsx, ViewToggle wired into ExerciseWidget. Weight-style grain \u00d7 buckets window; frequency chart aligned over a five-zone Gantt-style item timeline grouped by activity.name; per-item modal averages per active day with the load line on a new CssTrendChart right axis \u2014 the v3.4 load-line deferral is resolved. CssTrendChart gained xBand, maxXLabels, showValues, compressXLabels, a two-line hover tooltip, tiled hover zones and index keys, all default-off or behaviour-preserving. Mirrors Design Doc v4.5"],
   ["3.6","11 Sep 2026","Drinking rest scoring REDESIGNED \u2014 a score belongs to a drinking day and equals the dry days directly before it; the first drinking day in the log has none; a fully dry bucket has no average and reports dryDaysAtEnd instead. Summary shares the scoring. Interactions and Drinking Trend converted to the Weight-style grain \u00d7 count window on the new shared trend-window.ts; metric=drinking.trend runs three bounded queries per request in place of three per bucket including an all-time scan \u2014 the summary's all-time scan went with it, clearing that deferral. Drinking charts converted (three lines, stacked areas, right-axis rest and duration lines). Shared hover card on CssTrendChart and CssDualLineChart; right-hand axis on CssStackedAreaChart; dotSize ladder. Mirrors Design Doc v4.6"],
+  ["3.7","12 Sep 2026","#61 Diet Trend converted to the Weight-style grain × count window — metric=diet.trend (computeDietTrend) runs ONE bounded query for the whole window and buckets in memory, replacing the per-bucket path that re-queried records AND ingredient_master for every bucket; the four daily metrics become three-line charts, Spicy and Relation become stacked areas, Composition and People stay on the short 3/6/12 count; the trend view moved into its own DietTrendView.tsx with the tab state lifted into DietWidget so the fetch can pick the right count list. THREE data corrections: companions double-counted on every food-bearing record, post-midnight records dropped on the last day of any range, and absent spiciness read as not-spicy. The v3.6 label-grain deferral is cleared for Diet. Mirrors Design Doc v4.7"],
 ],[1100,1300,6960]));
 C(spacer());
 
@@ -94,11 +95,11 @@ C(table(["Phase","Status","Detail"],[
   ["1 — Base Infrastructure & Auth","\u2705 Complete","Subscription-architecture placeholder still pending"],
   ["2 — Data Structure Design","\u2705 Complete","Schema, supporting collections, Mongoose models"],
   ["3 — Migration Tool","\u2705 Complete","Delete-all + re-insert; incremental sync deferred to post-MVP"],
-  ["4 — Analytics & Search","\u2B1C In progress","Done: search, cost dashboard, Sleep / Interactions / Drinking / Diet / Weight widgets (all with Summary and Trend), food + drink ingredient taxonomies. Done: #58 Exercise (Summary and Trend, complete 7 Aug). Done: Drinking rest-scoring redesign + Interactions and Drinking trend windows (11 Sep). Remaining: Diet trend window, then #59 Calendar"],
+  ["4 — Analytics & Search","\u2B1C In progress","Done: search, cost dashboard, Sleep / Interactions / Drinking / Diet / Weight widgets (all with Summary and Trend), food + drink ingredient taxonomies. Done: #58 Exercise (Summary and Trend, complete 7 Aug). Done: Drinking rest-scoring redesign + Interactions and Drinking trend windows (11 Sep). Done: Diet trend window (12 Sep) — every widget is now on the shared window. Remaining: #59 Calendar"],
   ["5 — Data Entry","\u2B1C Not started","Post-MVP"],
 ],[2900,1700,4760]));
 C(spacer());
-C(p([new TextRun({ text: "Current focus: ", bold: true }), new TextRun("Trend-view conversion to the Weight-style window. Interactions and Drinking are done (11 Sep); Diet is next, then #59 Calendar view, then Phase 5 (data entry). #58 Exercise is complete — Summary shipped 29 July, Trend shipped 7 August.")]));
+C(p([new TextRun({ text: "Current focus: ", bold: true }), new TextRun("#59 Calendar view — design not started. The trend-view conversion to the Weight-style window is COMPLETE across every widget: Interactions and Drinking on 11 Sep, Diet on 12 Sep. After #59 comes Phase 5 (data entry). #58 Exercise is complete — Summary shipped 29 July, Trend shipped 7 August.")]));
 
 C(h1("5. Work Breakdown Structure"));
 C(p("\u2705 = Complete   \u2B1C = Pending   DESCOPED = out of MVP scope. Each line states current state, not how it evolved (see the changelog for history)."));
@@ -242,7 +243,7 @@ C(bold("Deferred \u2014 not built"));
 C(
   bullet("\u2B1C Rename REST_PAUSE / restPauseCount / bestSetRestPause \u2014 misnomers left over from the earlier reading of \ucda9; the new exercise-trend.ts already uses DAY_TOTAL_MARK instead. bestSetRestPause is still computed and returned, but deliberately not rendered"),
   bullet("\u2B1C Set-box exclusion caption \u2014 present in the widget but near-unreachable, since it needs both a \ucda9 record and 3+ days for the item in the same period. Left as-is deliberately"),
-  bullet("\u2705 RESOLVED v3.6 \u2014 Trend view labels derived from the CONTROL's grain, not the data's, so for one frame after a grain switch old buckets rendered under the new format. Interactions and Drinking now store the grain the SERVER echoed and format from that; apply the same pattern to Diet and, when next touched, to Exercise"),
+  bullet("\u2705 RESOLVED v3.6 \u2014 Trend view labels derived from the CONTROL's grain, not the data's, so for one frame after a grain switch old buckets rendered under the new format. Interactions, Drinking and (v3.7) Diet all store the grain the SERVER echoed and format from that. Exercise still derives its labels from the control and should adopt the pattern when next touched"),
   bullet("\u2B1C Load line on the SUMMARY's daily modal \u2014 the Trend resolved the load line at bucket level; a daily load line remains unbuilt and its natural home is an optional second series on CssDailyChart"),
 );
 C(h3("Sub-items for #54 (Weight Widget):"));
@@ -340,7 +341,15 @@ C(
   bullet("\u2705 css-chart-components.tsx: CssDailyChart added (avg line + zone bands + above-marker tooltip); CssVerticalBoxPlotChart gained formatY + height props"),
   bullet("\u2705 DietWidget.tsx Summary view: distribution box plots (Finish/인분/Carbs) with daily-line modals; spiciness strip + calendar modal; Food/Drink × Ingredients/Items treemap toggles; with-whom toggle (relation / companions); uppercase titles"),
   bullet("\u2705 Registered in page.tsx WIDGETS array (floor 1)"),
-  bullet("\u2705 Trend view — 8 tabs: four box-plot metrics (Eating/Caffeine/Servings/Carbs), three StackedBars tabs (Composition with Food/Drink × Ingredients/Items toggles, Spicy, Relation), and People (CssRankFlowChart of top-7 companions with a client-side Relation filter); per-person people:{name:{category:count}} trend field; drink-only companions counted; 아침 6am-rollback exception; trendLoadedRef keeps the active tab across bucket-size changes"),
+  bullet("\u2705 Trend view — 8 tabs: four daily metrics (Eating/Caffeine/Servings/Carbs), Composition (Food/Drink × Ingredients/Items toggles), Spicy, Relation, and People (CssRankFlowChart of top-7 companions with a client-side Relation filter); per-person people:{name:{category:count}} trend field; drink-only companions counted; \uc544\uce68 6am-rollback exception"),
+  bullet("\u2705 (v3.7) API: metric=diet.trend — computeDietTrend takes the window resolved by trend-window.ts and runs ONE bounded query for it, assigning each record its diet day once and bucketing in memory. No ingredient_master lookup is needed, so the whole request is a single query at any bucket count. The legacy diet.summary&mode=trend path and computeDietTrendBucket survive until the old UI path goes"),
+  bullet("\u2705 (v3.7) One shared per-record accumulator now serves the summary AND every trend bucket, so the two screens cannot drift apart on the 6am boundary, the \uc544\uce68 exception, the companion scope or the spiciness rule"),
+  bullet("\u2705 (v3.7) CORRECTED — companions were counted TWICE for every food-bearing record: the block appeared once under the food-or-drink rule and again after the food-only cut, so meals outweighed drink-only events two to one in the relation split and the people ranking. Counted once now, and the Summary card numbers changed with it"),
+  bullet("\u2705 (v3.7) CORRECTED — the fetch ended at the last day 23:59, so a post-midnight record on the FINAL day of a range was dropped. Interior days were always safe, because the next day records were already inside the range. Padded on both sides now, in the summary as well as the trend — the same fix drinking took at v3.6"),
+  bullet("\u2705 (v3.7) CORRECTED — an absent food.spiciness value was read as L, so the whole stretch predating the field rendered as a full band of not-spicy. Only explicitly recorded days count now, and a bucket with none totals zero and draws as a gap"),
+  bullet("\u2705 (v3.7) Widget controls — grain × count Segmented pairs importing the WeightTrendView option lists, a separate short count (3/6/12) for Composition and People, the resolved-range line formatted from the SERVER-echoed grain, and the Period-mode disable removed"),
+  bullet("\u2705 (v3.7) Chart conversions — the four box plots → three lines each (Avg/Max/Min); Spicy → zero-based stacked area in the scale own band order; Relation → stacked area keeping the 100% mix; Composition and People unchanged on the short count"),
+  bullet("\u2705 (v3.7) DietTrendView.tsx rewritten; the trend tab, grain, count, short count and server-echoed grain now live in DietWidget, because the widget is what fetches and has to know which count list the active tab wants"),
 );
 
 C(h2("Phase 5 — Data Entry \u2B1C"));
@@ -370,11 +379,10 @@ C(h2("6.2 Backlog (deferred / nice-to-have)"));
 C(
   bullet("\u2B1C foodsItemSchema.amount String → Number — housekeeping; the API uses parseFloat, so non-blocking"),
   bullet("\u2B1C Drinking / Interactions Summary-vs-Trend colour sources differ (Summary uses barColors; Trend keeps its own) — intentional for now, may revisit"),
-  bullet("\u2B1C Companions rank-flow bump chart for the Diet Trend tab — placeholder idea"),
   bullet("\u2B1C Insights page: widgets render in fixed WIDGETS-array order. The CSS-columns layout repacks by height but there is no drag-to-reorder — the Cost dashboard has @dnd-kit + localStorage persistence that could be ported"),
   bullet("\u2B1C WidgetCard header divider — briefly removed on a wrong diagnosis, then restored. The stray line was a chart gridline escaping upward, not the divider; no change is outstanding"),
   bullet("\u2B1C Search UI — no numeric filter for exercise[].loadKg. The field is listed in Design Doc §7.4 as available to aggregate, but the search page offers no control for it"),
-  bullet("\u2B1C Retire the old mode=trend route paths and their parameters \u2014 interactions.summary&mode=trend and drinking.summary&mode=trend, with computeDrinkingTrendBucket and computeDailyScoresLegacy \u2014 once the UIs no longer call them. Delete them together"),
+  bullet("\u2B1C Retire the old mode=trend route paths and their parameters \u2014 interactions.summary&mode=trend, drinking.summary&mode=trend and diet.summary&mode=trend, with computeDrinkingTrendBucket, computeDailyScoresLegacy and computeDietTrendBucket \u2014 once the UIs no longer call them. Delete them together"),
   bullet("\u2B1C CssRestChart is now UNUSED: the Drinking Rest tab moved to CssStackedAreaChart at v3.6. Left in place rather than deleted mid-patch; its REST_BUCKET_ORDER and colour-map exports are still imported and must survive any removal"),
   bullet("\u2B1C Weight and Exercise still carry private copies of the grain/window/bucket helpers; they can adopt trend-window.ts when next touched"),
   bullet("\u2B1C Per-series stroke width / opacity on CssTrendChart \u2014 the Amt(day) design called for max and min to be thinner as well as lighter, but a series carries only a colour. Lighter colours alone were used instead"),
@@ -395,7 +403,7 @@ C(h2("A.2 Shared File Change Protocol"));
 C(table(["File","Used by","Rule"],[
   ["src/app/api/insights/stats/route.ts","All widgets","Targeted patches only. Always read current version first. Verify session?.user?.userId is used."],
   ["src/app/insights/_components/charts/bars.tsx","Diet, Drinking, Interactions summaries","Targeted patches only. Shared summary-bar primitives (Title / BarRow / BarSection). Changing the geometry or the {pct}% ({count}) value format affects all three summaries."],
-  ["src/app/insights/_components/charts/css-chart-components.tsx","DrinkingWidget, DietWidget, WeightWidget","Full replacement acceptable when Hyoje uploads latest version. compressWeekLabels() is shared — preserve it. CssVerticalBoxPlotChart has THREE call sites (Diet Summary compact, Diet Trend, Drinking Amt(day)) plus Weight Summary and, from v3.4, Exercise (one chart per box) — check all six before changing its label layout. CssTrendChart is consumed by Sleep, Drinking AND (v3.5) ExerciseTrendView \u2014 its v3.5 props (rightSeries, xBand, maxXLabels, showValues, compressXLabels) are default-off and must stay that way, and the whole-section replacement between the CssTrendChart and CssVerticalBoxPlotChart header comments is the proven safe patch shape for it. WARNING: the bold-last-label style block is duplicated across FIVE chart components in this file; anchor any patch on a uniquely-named identifier such as hasXLabels, never on the style line alone. (v3.6) CssStackedAreaChart is the LAST section in the file and has no trailing header comment — use fine-grained anchors there. CssDualLineChart was replaced whole-section at v3.6, between its own header and the formatBucketLabels comment. Its v3.6 additions (rightLine/formatYRight on the area chart, maxXLabels/showValues on the dual chart, series label) are all default-off or behaviour-preserving and must stay that way. Verify every multi-line anchor with Python str.count() before applying — grep -c counts LINES and silently miscounts multi-line patterns."],
+  ["src/app/insights/_components/charts/css-chart-components.tsx","DrinkingWidget, DietWidget, WeightWidget","Full replacement acceptable when Hyoje uploads latest version. compressWeekLabels() is shared — preserve it. CssVerticalBoxPlotChart has THREE call sites (Diet Summary compact, Diet Trend, Drinking Amt(day)) plus Weight Summary and, from v3.4, Exercise (one chart per box) — check all six before changing its label layout. CssTrendChart is consumed by Sleep, Drinking AND (v3.5) ExerciseTrendView \u2014 its v3.5 props (rightSeries, xBand, maxXLabels, showValues, compressXLabels) are default-off and must stay that way, and the whole-section replacement between the CssTrendChart and CssVerticalBoxPlotChart header comments is the proven safe patch shape for it. WARNING: the bold-last-label style block is duplicated across FIVE chart components in this file; anchor any patch on a uniquely-named identifier such as hasXLabels, never on the style line alone. (v3.6) CssStackedAreaChart is the LAST section in the file and has no trailing header comment — use fine-grained anchors there. CssDualLineChart was replaced whole-section at v3.6, between its own header and the formatBucketLabels comment. (v3.7) CssVerticalBoxPlotChart lost its Diet Trend call site when those four tabs became three-line charts, so it now has FIVE, not six. highlightable on CssStackedAreaChart is OFF by default and every area call site must pass it explicitly \u2014 forgetting it is what silently disabled hover on the new Diet Relation tab. Its v3.6 additions (rightLine/formatYRight on the area chart, maxXLabels/showValues on the dual chart, series label) are all default-off or behaviour-preserving and must stay that way. Verify every multi-line anchor with Python str.count() before applying — grep -c counts LINES and silently miscounts multi-line patterns."],
   ["src/app/insights/_lib/format.ts","All widgets via chart-components","Targeted patches only. formatBucketLabel handles month, week (raw + compressed), and day formats."],
   ["src/app/insights/_components/GlobalFilterBar.tsx","Insights page","Targeted patches only. Activity Type filter commits on Apply."],
   ["src/app/insights/_components/WidgetCard.tsx","All widgets","Targeted patches only. Changes affect every widget simultaneously."],
@@ -447,7 +455,7 @@ C(
 );
 C(spacer());
 
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze — Service Concept & WBS v3.6 — 11 September 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze — Service Concept & WBS v3.7 — 12 September 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 const doc = new Document({
   styles: {
@@ -473,6 +481,6 @@ const doc = new Document({
   sections: [{ properties: { page: PAGE }, children }],
 });
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-WBS-v3.6.docx", buffer);
-  console.log("Wrote FarGaze-WBS-v3.6.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-WBS-v3.7.docx", buffer);
+  console.log("Wrote FarGaze-WBS-v3.7.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });

@@ -16,7 +16,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze Log", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Data Design & Requirements Document", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 4.6  |  11 September 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 4.7  |  12 September 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
 );
 C(p([new TextRun({ text: "Structure: ", bold: true }), new TextRun("Part I Foundations · Part II Data · Part III Features · Part IV Operations · Appendices. The body is the complete, always-current source of truth; the changelog below carries one line per version. Work status, open questions and the backlog live in the separate WBS, not here.")]));
 
@@ -52,6 +52,7 @@ C(table(
   ["4.4","29 Jul 2026","Exercise widget (WBS #58) shipped \u2014 new \u00a79.3.6, src/lib/insights/exercise.ts and ExerciseWidget.tsx; ModalShell extracted from DietWidget to \u00a7_components; emphasizeLast prop added to CssVerticalBoxPlotChart; \u00a75.2 setStyle CORRECTED \u2014 \ucd1d marks a day total with an unknown set split, not a rest-pause set; \uacc4\ub2e8 \uc624\ub974\uae30 \ucda9 records converted to \ubd84 so every item now carries exactly one unit"],
   ["4.5","7 Aug 2026","Exercise Trend view completes the widget \u2014 \u00a79.3.6 Trend written; new metric=exercise.trend and exercise.itemTrend (Weight-style grain \u00d7 buckets window) in src/lib/insights/exercise-trend.ts; new ExerciseTrendView.tsx and the Summary/Trend toggle in ExerciseWidget; CssTrendChart extended \u2014 optional right-axis series (the load line, resolving the v4.4 deferral), band-centred x positions, label thinning, hideable point values, uncompressed labels, a two-line hover tooltip, tiled hover zones and index keys"],
   ["4.6","11 Sep 2026","Drinking rest scoring REDESIGNED \u2014 a rest score now belongs to a drinking day and equals the dry days directly before it (\u00a79.3.3), replacing the per-calendar-day score; Drinking Trend converted to the Weight-style grain \u00d7 count window via the new shared src/lib/insights/trend-window.ts (also behind the Interactions conversion shipped alongside it); new metric=drinking.trend runs three bounded queries per REQUEST in place of three per bucket including an all-time scan; Drinking charts converted \u2014 Amt(day) box plot \u2192 three lines, Type/Occasion/Relation \u2192 stacked areas, Rest \u2192 stacked area with a right-axis rest line, Session \u2192 right-axis duration line with the arrows and captions dropped; CssTrendChart and CssDualLineChart gain the shared hover card; CssStackedAreaChart gains an optional right-hand axis; per-bucket dot size scales with bucket count"],
+  ["4.7","12 Sep 2026","Diet Trend converted to the Weight-style grain × count window — new metric=diet.trend backed by computeDietTrend in diet.ts, ONE bounded query for the whole window with in-memory bucketing, replacing the per-bucket path that re-queried and re-read ingredient_master for every bucket; the four daily metrics now arrive as average/max/min per bucket and render as three lines; Spicy and Relation become stacked areas, Composition and People stay on the short count with their existing charts. THREE data corrections in §9.3.4: companions were counted TWICE for every food-bearing record and are now counted once on the food-or-drink rule; the fetch window lost post-midnight records on the LAST day of any range and is now padded on both sides; spiciness treated an absent value as not spicy and now counts only explicitly recorded days, so the stretch predating the field reads as a gap rather than a full band. The Diet Trend view moved into its own DietTrendView.tsx with the tab state lifted into DietWidget"],
   ],
   [1100, 1300, 6960]
 ));
@@ -974,10 +975,10 @@ C(table(["Field","Description"],[
   ["finishCaffeine","[{date, endMins}] — latest end time among records with a caffeinated drink (ingredient 커피/카페인) per day; computed in the drinks pass, so coffee taken without food still counts (v3.4)"],
   ["servings","[{date, total}] — Σ food.foods[].amount (인분); parseFloat so it works on String or Number"],
   ["carbsIndex","[{date, value}] — Σ (carbs H=2/M=1/L=0 × that meal's 인분); drinks excluded"],
-  ["spiciness","[{date, level}] — per eating day, max of H/M/L (L = ate but not spicy); a day absent from the array had no meal logged"],
+  ["spiciness","[{date, level}] — per eating day, max of the levels EXPLICITLY recorded on that day's records. CORRECTED v4.7: an absent food.spiciness value used to be read as L, so every day with a meal appeared in the array and the whole stretch of the dataset predating the field read as ate-but-not-spicy. A record with no value now contributes nothing, and a day where nothing was recorded is absent from the array — the same meaning a day with no meal already carried"],
   ["ateIngredients / drankIngredients","[{level2, level1, count}] — frequency; level1 joined from ingredient_master"],
   ["ateItems / drankItems","[{item, count}] — frequency by item name"],
-  ["companions","{alone, total, byRelationType, topPeople[]} — scoped to food- OR drink-bearing records; drink-only meetups (e.g. coffee) now count (v3.5)"],
+  ["companions","{alone, total, byRelationType, topPeople[]} — scoped to food- OR drink-bearing records; drink-only meetups (e.g. coffee) count (v3.5). CORRECTED v4.7: the counting block appeared TWICE in the record loop, once under the food-or-drink rule and again after the food-only cut, so every meal added 2 to the relation counts and to each companion's total while a drink-only event added 1. Meals therefore outweighed drink-only events two to one, distorting the relation split and the people ranking rather than merely scaling them. Counted once now, on the food-or-drink rule"],
   ["averages","{finishEatingMins, finishCaffeineMins, servings, carbsIndex} — mean over days present (drives the average line/marker)"],
   ["rangeStart / rangeEnd","full filter range (uncapped) — for the spiciness calendar grid"],
 ],[2700,6660]));
@@ -990,9 +991,28 @@ C(
   bullet("The 6am day-boundary rule from the Drinking widget applies uniformly to every per-day Diet metric — with one exception (v3.5): records tagged food.type === '아침' (breakfast) are exempted from the previous-day rollback and the +1440 late-night shift, so an early-morning breakfast stays on its own calendar day."),
 );
 C(bold("Summary view = distribution, not trend"));
-C(p("The summary deliberately shows the distribution of daily values (box plots, with the full daily line one tap away in a modal) rather than a period trend — the average is the headline statistic. The Trend view (complete as of v3.5) rolls these same metrics into weekly/monthly buckets per the global filter; its eight tabs appear under this widget's Trend view below."));
-C(bold("Trend Mode API — diet.summary (NEW v3.5)"));
-C(p("mode=trend returns one object per bucket: label, daysInPeriod, the four box-plot arrays (eatingCutoff, caffeineCutoff, servings, carbs), the composition maps (ateIng, ateItems, drankIng, drankItems), spicy {H,M,L}, relation (Record<string,number>, behind the Relation tab), and people (Record<string, Record<string,number>>). people is the per-person, per-relation-type companion breakdown that the People rank-flow tab filters and re-ranks client-side; it is built from the same personMap category counts the summary uses for topPeople, so the 아침 exception and the food-or-drink scope apply identically."));
+C(p("The summary deliberately shows the distribution of daily values (box plots, with the full daily line one tap away in a modal) rather than a period trend — the average is the headline statistic. The Trend view rolls these same metrics into buckets over a grain × count window; its eight tabs appear under this widget's Trend view below."));
+C(bold("Shared per-record accumulation (v4.7)"));
+C(p("The summary and every trend bucket fold each record through ONE shared function. An accumulator holds the per-day maps (finish, caffeine, servings, carbs, spiciness) together with the composition and companion counters; the caller supplies the already-assigned diet day. The summary shapes its arrays from one accumulator over the whole period, the trend from one accumulator per bucket. Neither screen carries its own copy of the rules, so the 6am boundary, the \uc544\uce68 exception, the food-or-drink companion scope and the spiciness rule cannot drift apart between them \u2014 the same principle the Drinking rest scoring follows."));
+C(bold("Day assignment and the fetch window"));
+C(p("A record's diet day is its own calendar day when food.type is \uc544\uce68, and otherwise assignDrinkingDate's 6am rollback. The fetch is therefore padded on BOTH sides by the 6am threshold. The late side is the one that is easy to miss: a 1am record rolls back to the previous day, so the final day of a range can only be complete if the fetch reaches into the morning after it. Interior days are safe either way, because the next day's records are already inside the range. CORRECTED v4.7 \u2014 the range previously ended at the last day 23:59 and silently dropped every post-midnight record on that one day, in the summary as well as the trend. This is the same bug the drinking path carried before its late-side padding was added at v4.6."));
+C(bold("Legacy trend path \u2014 diet.summary&mode=trend"));
+C(p("The original trend stepped the period one bucket at a time and called the whole summary collector for each, so an N-bucket window meant N record queries AND N ingredient_master queries. computeDietTrendBucket survives to serve that branch while the old path exists, and retires with it."));
+C(bold("Trend API \u2014 metric=diet.trend (v4.7)"));
+C(p("computeDietTrend(userId, grain, windowStart, windowEnd, crossActivities) resolves nothing itself: the route resolves the window through trend-window.ts and passes it down, exactly as drinking.trend does. The module runs ONE bounded query for the whole window, assigns every record its diet day once, drops anything the padding pulled in from outside, and buckets in memory. The window still stops at yesterday, because today is a partial day and would drag every per-day figure down. It needs no ingredient_master lookup \u2014 the trend reports composition by level2 count and leaves the level1 grouping to the summary \u2014 so the whole request is a single query whatever the bucket count."));
+C(table(["Field","Description"],[
+  ["grain","echoed at the TOP level, not per bucket. The view formats labels and the resolved-range line from this, never from the control, so a grain switch cannot render one frame of new labels against old data"],
+  ["label / start","bucket label in the shared raw forms (yy.mm \u00b7 yyWww \u00b7 mm-dd) and the bucket's first day"],
+  ["daysInBucket","real days of the bucket falling inside the window, so an edge bucket is not read as a short month"],
+  ["eatingCutoff / caffeineCutoff","{min, max, avg} in minutes past midnight, or null when the bucket has no such day. A value above 1440 is after midnight and renders as +HH:MM"],
+  ["servings / carbs","{min, max, avg} over the bucket's days, or null"],
+  ["ateIng / ateItems / drankIng / drankItems","{name: count} \u2014 raw composition maps, unchanged from the legacy shape"],
+  ["spicy","{H, M, L} day counts over EXPLICITLY recorded days only; all three zero across the stretch where the field was never used"],
+  ["relation","{category | \ud63c\uc790: count} of eating-or-drinking events"],
+  ["people","{name: {category: count}} \u2014 the per-person, per-relation-type breakdown the People tab filters and re-ranks client-side"],
+],[2700,6660]));
+C(spacer());
+C(note("The four daily metrics arrive as average/max/min per bucket rather than as raw daily arrays. The charts are three lines now, so the client no longer computes box statistics, and a 120-bucket day window would otherwise ship several thousand numbers the client discards. Composition and People keep their raw count maps: they are drawn from the members themselves and stay on the short bucket counts."));
 C(bold("Summary"));
 C(
   bullet("Summary view is distribution-oriented (not a trend): four compact vertical box plots in one row — EATING CUTOFF, CAFFEINE CUTOFF, SERVINGS (인분), CARBS — each tappable to open a modal with the full daily line (CssDailyChart); the 인분 line carries green/light-blue/red zone bands (<3 소식 / 3–6 적당 / >6 과식)"),
@@ -1003,12 +1023,16 @@ C(
   bullet("With whom I eat: toggle between relationship bars (혼자 + categories) and a top-companions list", 1),
   bullet("Uppercase, centred section titles; compact layout (four-box row, single-treemap toggles) tuned to keep the widget near a single widget's height"),
 );
-C(bold("Trend"));
+C(bold("Trend (converted v4.7)"));
 C(
-  bullet("Eating · Caffeine · Servings · Carbs — four box-plot-per-bucket tabs, each rendering CssVerticalBoxPlotChart (non-compact) across the weekly/monthly buckets"),
-  bullet("Composition · Spicy · Relation — three tabs built on the reusable StackedBars: Composition (Food/Drink × Ingredients/Items toggles; dynamic 30%-threshold 'others' rollup, capped at palette size), Spicy (absolute H/M/L day counts), Relation (relation-type mix, 100%; 혼자 neutral)"),
-  bullet("People — a CssRankFlowChart of the top-7 companions over time, with a Relation multi-select that re-ranks client-side (each person summed over the selected relation types, zeros dropped, top-7 re-taken)"),
-  bullet("Tab persistence: a trendLoadedRef in DietWidget keeps the view mounted across bucket-size changes so the active tab is not reset"),
+  bullet("Window: grain \u00d7 bucket count, counted back from min(end of the selected filter period, today), the start snapped to a bucket boundary. The period ANCHORS the window rather than setting its span, so the Summary/Trend toggle is no longer disabled in Period mode."),
+  bullet("Counts and defaults are Weight's exactly, the option lists IMPORTED from WeightTrendView rather than copied: 14/30/60/90 \u00b7 12/26/52/104 \u00b7 12/24/60/120, defaults 30/26/24, the count resetting to the grain's default on a grain switch. Month \u00d7 24 is the default view."),
+  bullet("Eating \u00b7 Caffeine \u00b7 Servings \u00b7 Carbs \u2014 four tabs, each three CssTrendChart lines (Average / Max / Min, the average in the strong colour, max and min lighter). The per-bucket box plot is gone: quartiles were dropped by choice and a box per bucket is unreadable at 120 buckets. A bucket with no qualifying day breaks the line rather than dropping to zero, so a stretch without coffee reads as absent rather than as caffeine at midnight."),
+  bullet("Spicy \u2014 a stacked area of absolute day counts, zero-based, band order following the SCALE's own order (not spicy at the bottom, spicy on top) rather than total size, because the level is ordinal and reordering it by frequency would misread. With only explicitly recorded days counted, the years before the field existed total zero and render as a gap."),
+  bullet("Relation \u2014 a stacked area of the same 100% mix the bars showed, band order fixed across the window by total size, \ud63c\uc790 neutral. Only the chart type changed."),
+  bullet("Composition \u2014 unchanged: StackedBars with the Food/Drink \u00d7 Ingredients/Items toggles and the dynamic 30%-threshold 'others' rollup. Fixing band membership across a long window would change what the tab means, so it stays on the short 3/6/12 count instead."),
+  bullet("People \u2014 unchanged: a CssRankFlowChart of the top-7 companions with a client-side Relation multi-select, also on the short count. A rank flow cannot render at 120 buckets."),
+  bullet("The short-count tabs share the one grain control and differ only in their count list; each remembers its own count, so moving to Composition and back does not destroy a longer window. The tab state lives in DietWidget rather than in the trend view, because the widget is what fetches and has to know which count list the active tab wants."),
 );
 C(note("Naming convention (unified v3.5) across the Diet, Drinking, and Interactions trend views: the relation-type 100% stacked tab is Relation; the top-7 individual rank-flow tab is People; the relation multi-select is the Relation filter. Diet and Drinking filter the rank-flow client-side from the per-bucket people map; Interactions filters server-side (committed on close, then re-fetch)."));
 C(bold("Filters"));
@@ -1094,7 +1118,7 @@ C(
 
 C(bold("Filters"));
 C(p("Global filter bar only — no widget-local filter. crossActivities applies to BOTH the period query and the latest-ever lookup, so the two bars never differ in scope along that axis."));
-C(p("The Trend view takes crossActivities from the same global filter, but ignores the selected period as a range: granularity \u00d7 buckets IS its span. The period still sets where the window ENDS \u2014 see the anchor rule below \u2014 so selecting a past month moves the whole window back rather than filtering inside it. The Summary/Trend toggle is therefore never disabled on this widget, unlike Diet, whose trend buckets are built from timeMode and timePeriod directly."));
+C(p("The Trend view takes crossActivities from the same global filter, but ignores the selected period as a range: granularity \u00d7 buckets IS its span. The period still sets where the window ENDS \u2014 see the anchor rule below \u2014 so selecting a past month moves the whole window back rather than filtering inside it. The Summary/Trend toggle is therefore never disabled on this widget — and since v4.7, not on Diet either, which now anchors its window the same way."));
 
 C(bold("Notes"));
 C(bold("Latest is deliberately outside the global filter"));
@@ -1646,7 +1670,8 @@ C(table(["Path","Purpose"],[
   ["src/app/insights/_widgets/SleepWidget.tsx","Sleep widget"],
   ["src/app/insights/_widgets/InteractionsWidget.tsx","Interactions widget — Summary restructured v3.6 (two-column stats grid + full-width PeopleBars, no tabs); StackedBarBucket type now local here after the SVG-module retirement"],
   ["src/app/insights/_widgets/DrinkingWidget.tsx","Drinking widget — Summary (restructured v3.6: two-column bar block + People bars, no tabs) + Trend (9 metric tabs), TrendTip component"],
-  ["src/app/insights/_widgets/DietWidget.tsx","Diet widget (WBS #61) — Summary view: four compact box plots, spicy HeatStrip + calendar modal, treemap toggles, companions toggle (v3.3–v3.4); its local ModalShell was extracted to _components/ModalShell.tsx at v4.4"],
+  ["src/app/insights/_widgets/DietWidget.tsx","Diet widget (WBS #61) — Summary view: four compact box plots, spicy HeatStrip + calendar modal, treemap toggles, companions toggle (v3.3–v3.4); its local ModalShell was extracted to _components/ModalShell.tsx at v4.4. From v4.7 it also owns the trend tab, grain, count, short count and the server-echoed data grain, and fetches metric=diet.trend"],
+  ["src/app/insights/_widgets/DietTrendView.tsx","(v3.5, rewritten v4.7) Diet Trend view — the eight tabs, the grain × count controls and the resolved-range line. Takes its tab and window state from DietWidget as props"],
   ["src/app/insights/_components/charts/BoxPlot.tsx","CSS horizontal box plot — props: min, max, avg, p25, p75, isDark"],
   ["src/app/insights/_components/charts/Histogram.tsx","CSS histogram — props: buckets[] ({label, count}), isDark"],
   ["src/app/insights/_components/charts/css-chart-components.tsx","CSS+SVG chart components: CssTrendChart (right-axis series, xBand, maxXLabels, showValues, compressXLabels, two-line hover tooltip, tiled hover zones, index keys — all v4.5), CssVerticalBoxPlotChart (compact prop v3.4; last-bucket values v4.1), CssDualLineChart, CssRestChart, CssDailyChart (v3.3), CssStackedAreaChart (v4.2), formatBucketLabels, inPlot gridline guard (v4.2) (CssStackedBarChart removed v3.6)"],
@@ -1674,7 +1699,7 @@ C(table(["Path","Purpose"],[
   ["src/lib/insights/sleep.ts","computeSleepSummary + QUALITY_SCORE (v3.4)"],
   ["src/lib/insights/interactions.ts","computeInteractionsSummary, computeInteractionsTrendBucket, addTransitioning (v3.4) — no external deps"],
   ["src/lib/insights/drinking.ts","computeDrinkingSummary, computeDrinkingTrendBucket + drinking helpers (computeDailyScores, bucketScore, classifyOccasion, hourStrToDecimal, SCORE_BUCKET_ORDER) (v3.4)"],
-  ["src/lib/insights/diet.ts","computeDietSummary (v3.4; computeDietTrend to follow with the Trend view)"],
+  ["src/lib/insights/diet.ts","computeDietSummary, computeDietTrend (v4.7 — grain × count window, one bounded query, in-memory bucketing) and the legacy computeDietTrendBucket; all three fold records through one shared accumulator"],
   ["src/lib/insights/exercise.ts","(v4.4) computeExerciseSummary \u2014 one UNBOUNDED fetch of every \uc6b4\ub3d9 record, period cut in memory on YYYY-MM-DD strings so no MongoDB date filter is needed; boxOf / bestOf / groupByItem / sumByDate helpers; REST_PAUSE and MIN_BOX_DAYS constants"],
   ["src/lib/insights/exercise-trend.ts","(v4.5) computeExerciseTrend and computeExerciseItemTrend \u2014 same unbounded-fetch, cut-in-memory approach; bucketKey/buildBuckets (day / ISO-Monday week / month) with per-bucket period-day counts; grouping read from activity.name; names the \ucd1d marker DAY_TOTAL_MARK rather than repeating the REST_PAUSE misnomer; private date-helper mirrors of exercise.ts — a third copy is the signal to extract them to dates.ts"],
   ["src/models/AlcoholConversion.ts","Mongoose model for alcohol_conversion collection"],
@@ -1699,7 +1724,7 @@ C(table(["Path","Purpose"],[
 C(spacer());
 
 // ===== FOOTER =====
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.6 — 11 September 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.7 — 12 September 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 
 // ===== DOCUMENT ASSEMBLY =====
@@ -1736,6 +1761,6 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-Log-Data-Design-v4.6.docx", buffer);
-  console.log("Wrote FarGaze-Log-Data-Design-v4.6.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-Log-Data-Design-v4.7.docx", buffer);
+  console.log("Wrote FarGaze-Log-Data-Design-v4.7.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });

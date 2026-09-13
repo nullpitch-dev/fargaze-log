@@ -32,6 +32,23 @@ export function parseBoolean(val: string): boolean {
 
 // ── DATE/TIME ─────────────────────────────────────────────────────────────────
 
+/**
+ * Build the NAIVE LOCAL WALL CLOCK, encoded as if it were UTC.
+ *
+ * This is deliberately NOT a true instant. Every consumer of `start.datetime`
+ * reads a local calendar date or clock time back out of it (drinking/diet day
+ * assignment, range filters, display), and the rule is that 23:00 KST stays
+ * 23:00 forever, wherever it is read.
+ *
+ * `Date.UTC` is what keeps that true. The previous `new Date(y, m, d, ...)`
+ * interpreted the wall clock in the MIGRATION MACHINE's zone (Europe/London),
+ * displacing every record by the UK's current offset — zero in winter, one hour
+ * in BST. That cancelled out of durations on ordinary nights, but not on nights
+ * spanning a UK clock change, which corrupted them by an hour even for Korean
+ * records. It also shifted near-midnight summer records onto the wrong day.
+ *
+ * The record's own offset is applied later, in computeTotalSeconds.
+ */
 export function parseDateTime(
   year: string,
   month: string,
@@ -45,7 +62,7 @@ export function parseDateTime(
     const d = parseInt(day);
     const [h, min] = hour.split(':').map(Number);
     if (isNaN(y) || isNaN(m) || isNaN(d) || isNaN(h)) return null;
-    return new Date(y, m, d, h, min || 0, 0);
+    return new Date(Date.UTC(y, m, d, h, min || 0, 0));
   } catch {
     return null;
   }
@@ -179,7 +196,12 @@ export function parsePeople(
 /**
  * Compute duration in total seconds from start/end datetimes and their UTC offsets.
  *
- * UTC conversion: localDatetime - (timezoneOffset * 3600 * 1000) = UTC ms
+ * parseDateTime stores the NAIVE LOCAL wall clock, so the offsets must be
+ * applied here to recover true instants before subtracting. This is the ONLY
+ * place the offsets are applied — applying them in parseDateTime as well would
+ * double-count them.
+ *
+ * UTC conversion: naiveLocal - (timezoneOffset * 3600 * 1000) = true UTC ms
  *
  * Cases:
  *   - Normal event:        (endUTC - startUTC) in seconds
@@ -219,7 +241,7 @@ export function computeTotalSeconds(
   const startOffset = startTimezoneOffset ?? 0;
   const endOffset = endTimezoneOffset ?? 0;
 
-  // Convert local datetime to UTC milliseconds
+  // Convert naive local datetime to true UTC milliseconds
   const startUTC = startDatetime.getTime() - startOffset * 3600 * 1000;
   const endUTC = endDatetime.getTime() - endOffset * 3600 * 1000;
 

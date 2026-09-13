@@ -8,7 +8,7 @@ import connectDB from '@/lib/mongodb';
 import Log from '@/models/Log';
 
 import { buildDateRange, stepBack, labelForPeriod, currentPeriod } from '@/lib/insights/dates';
-import { computeSleepSummary } from '@/lib/insights/sleep';
+import { computeSleepSummary, computeSleepTrend, computeSleepSummaryLegacy } from '@/lib/insights/sleep';
 import { computeInteractionsSummary, computeInteractionsTrendBucket, addTransitioning, computeInteractionsTrend } from '@/lib/insights/interactions';
 import { parseGrain, anchorFrom, resolveWindow } from '@/lib/insights/trend-window';
 import { computeDrinkingSummary, computeDrinkingTrendBucket, computeDrinkingTrend } from '@/lib/insights/drinking';
@@ -151,7 +151,7 @@ export async function GET(req: NextRequest) {
           };
           if (crossActivities.length) filter['activity.crossActivity'] = { $in: crossActivities };
           const docs = await Log.find(filter).lean();
-          return { label: labelForPeriod(timeMode, period), summary: computeSleepSummary(docs) };
+					return { label: labelForPeriod(timeMode, period), summary: computeSleepSummaryLegacy(docs) };
         }),
       );
       return NextResponse.json({ data: results });
@@ -165,8 +165,36 @@ export async function GET(req: NextRequest) {
       'activity.name': '수면',
     };
     if (crossActivities.length) filter['activity.crossActivity'] = { $in: crossActivities };
-    const docs = await Log.find(filter).lean();
-    return NextResponse.json({ summary: computeSleepSummary(docs) });
+		const docs = await Log.find(filter).lean();
+    return NextResponse.json({ summary: computeSleepSummaryLegacy(docs) });
+  }
+
+  // ── sleep.summary ─────────────────────────────────────────────────────────
+  // The night-assignment rules version: one entry per sleep day, four metrics
+  // each with an average, a three-way band count for the pie, and a per-day
+  // series for the strip. The compute module runs its own query because the
+  // 8am boundary needs padding past the window end.
+  if (metric === 'sleep.summary') {
+    const { start, end } = buildDateRange(timeMode, timePeriod, dateFrom, dateTo);
+    const summary = await computeSleepSummary(userId, start, end, crossActivities);
+    return NextResponse.json({ summary });
+  }
+
+  // ── sleep.trend ───────────────────────────────────────────────────────────
+  // Weight-style window: grain × bucket count, anchored at min(end of the
+  // selected period, today), start snapped to a bucket boundary. ONE bounded
+  // query whatever the bucket count. The old sleep.all path above stays until
+  // the UI switches over.
+  if (metric === 'sleep.trend') {
+    const grain = parseGrain(sp.get('grain'));
+    const bucketCount = parseInt(sp.get('buckets') ?? '12');
+    const safeCount = Math.min(Number.isFinite(bucketCount) ? Math.max(1, bucketCount) : 12, 400);
+
+    const { end: periodEnd } = buildDateRange(timeMode, timePeriod, dateFrom, dateTo);
+    const { start, end } = resolveWindow(grain, safeCount, anchorFrom(periodEnd));
+
+    const trend = await computeSleepTrend(userId, grain, start, end, crossActivities);
+    return NextResponse.json(trend);
   }
 
   // ── drinking.summary ────────────────────────────────────────────────────────

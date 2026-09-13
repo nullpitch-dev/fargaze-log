@@ -105,6 +105,14 @@ export function rowToDocument(row: any[], userId: string): any {
   const endHour = get(row, C.END_HOUR);
   const allDay = !startHour && !endHour;
 
+  // Fractional offsets are real — IST 5.5, Nepal 5.75. parseInteger truncated
+  // them, which is why IST reached the database as 5. parseNumber keeps the
+  // fraction, and Mongo then stores it as a double rather than int32.
+  const startTzOffset = parseNumber(get(row, C.START_TZ_OFFSET));
+  const endTzOffset = parseNumber(get(row, C.END_TZ_OFFSET));
+
+  // parseDateTime stores the naive local wall clock; the offsets below are
+  // applied by computeTotalSeconds, and there only.
   const startDatetime = parseDateTime(
     get(row, C.START_YEAR),
     get(row, C.START_MONTH),
@@ -123,8 +131,8 @@ export function rowToDocument(row: any[], userId: string): any {
     allDay,
     startDatetime,
     endDatetime,
-    parseInteger(get(row, C.START_TZ_OFFSET)),
-    parseInteger(get(row, C.END_TZ_OFFSET)),
+    startTzOffset,
+    endTzOffset,
     parseInteger(get(row, C.START_YEAR)),
     parseInteger(get(row, C.START_MONTH)),
     parseInteger(get(row, C.START_DAY)),
@@ -171,7 +179,7 @@ export function rowToDocument(row: any[], userId: string): any {
     get(row, C.ALCOHOL_NOTE)
   );
 
-	// 부하(kg) and 방식 are per-item, like amount and unit.
+  // 부하(kg) and 방식 are per-item, like amount and unit.
   // zipMultiValueWithPlusSplit can turn "A+B" into two entries, so repeat
   // each load/style across its own split items. Amount is divided by the
   // splitter; load and style are NOT — a 10kg bag is 10kg for both halves.
@@ -233,7 +241,7 @@ export function rowToDocument(row: any[], userId: string): any {
       day: parseInteger(get(row, C.START_DAY)),
       weekday: parseString(get(row, C.START_WEEKDAY)),
       hour: parseString(startHour),
-      timezoneOffset: parseInteger(get(row, C.START_TZ_OFFSET)),
+      timezoneOffset: startTzOffset,
     },
     end: {
       timezone: parseString(get(row, C.END_TZ)),
@@ -243,7 +251,7 @@ export function rowToDocument(row: any[], userId: string): any {
       day: parseInteger(get(row, C.END_DAY)),
       weekday: parseString(get(row, C.END_WEEKDAY)),
       hour: parseString(endHour),
-      timezoneOffset: parseInteger(get(row, C.END_TZ_OFFSET)),
+      timezoneOffset: endTzOffset,
     },
     duration: {
       totalSeconds,
