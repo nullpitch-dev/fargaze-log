@@ -16,7 +16,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze Log", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Data Design & Requirements Document", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 4.7  |  12 September 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 4.8  |  13 September 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
 );
 C(p([new TextRun({ text: "Structure: ", bold: true }), new TextRun("Part I Foundations · Part II Data · Part III Features · Part IV Operations · Appendices. The body is the complete, always-current source of truth; the changelog below carries one line per version. Work status, open questions and the backlog live in the separate WBS, not here.")]));
 
@@ -53,6 +53,7 @@ C(table(
   ["4.5","7 Aug 2026","Exercise Trend view completes the widget \u2014 \u00a79.3.6 Trend written; new metric=exercise.trend and exercise.itemTrend (Weight-style grain \u00d7 buckets window) in src/lib/insights/exercise-trend.ts; new ExerciseTrendView.tsx and the Summary/Trend toggle in ExerciseWidget; CssTrendChart extended \u2014 optional right-axis series (the load line, resolving the v4.4 deferral), band-centred x positions, label thinning, hideable point values, uncompressed labels, a two-line hover tooltip, tiled hover zones and index keys"],
   ["4.6","11 Sep 2026","Drinking rest scoring REDESIGNED \u2014 a rest score now belongs to a drinking day and equals the dry days directly before it (\u00a79.3.3), replacing the per-calendar-day score; Drinking Trend converted to the Weight-style grain \u00d7 count window via the new shared src/lib/insights/trend-window.ts (also behind the Interactions conversion shipped alongside it); new metric=drinking.trend runs three bounded queries per REQUEST in place of three per bucket including an all-time scan; Drinking charts converted \u2014 Amt(day) box plot \u2192 three lines, Type/Occasion/Relation \u2192 stacked areas, Rest \u2192 stacked area with a right-axis rest line, Session \u2192 right-axis duration line with the arrows and captions dropped; CssTrendChart and CssDualLineChart gain the shared hover card; CssStackedAreaChart gains an optional right-hand axis; per-bucket dot size scales with bucket count"],
   ["4.7","12 Sep 2026","Diet Trend converted to the Weight-style grain × count window — new metric=diet.trend backed by computeDietTrend in diet.ts, ONE bounded query for the whole window with in-memory bucketing, replacing the per-bucket path that re-queried and re-read ingredient_master for every bucket; the four daily metrics now arrive as average/max/min per bucket and render as three lines; Spicy and Relation become stacked areas, Composition and People stay on the short count with their existing charts. THREE data corrections in §9.3.4: companions were counted TWICE for every food-bearing record and are now counted once on the food-or-drink rule; the fetch window lost post-midnight records on the LAST day of any range and is now padded on both sides; spiciness treated an absent value as not spicy and now counts only explicitly recorded days, so the stretch predating the field reads as a gap rather than a full band. The Diet Trend view moved into its own DietTrendView.tsx with the tab state lifted into DietWidget"],
+  ["4.8","13 Sep 2026","MIGRATION TIMEZONE BUG FIXED \u2014 parseDateTime built every instant with new Date(y,m,d,...), which reads the wall clock in the MIGRATION MACHINE\u2019s zone (Europe/London), displacing every record by the UK\u2019s current offset: zero in GMT, one hour in BST. computeTotalSeconds then applied the record\u2019s real offsets on top, so the displacement cancelled on ordinary records and did NOT cancel on any record spanning a UK clock change \u2014 corrupting durations by an hour even for Korean records \u2014 while the one genuine GMT\u2192BST record was corrected twice. Near-midnight summer records were also assigned to the WRONG DAY, affecting Drinking and Diet. parseDateTime now uses Date.UTC and stores the naive local wall clock; offsets are applied in computeTotalSeconds and nowhere else (\u00a75.3). timezoneOffset switched from parseInteger to parseNumber \u2014 IST 5.5 had been truncated to 5. Full re-migration of all years (\u00a710.3.5). SLEEP WIDGET REBUILT \u2014 \u00a79.3.1 rewritten: seven night-assignment rules (8am day boundary, 8pm nap cutoff, timezone-crossing and 15-hour ceiling), new metric=sleep.summary and metric=sleep.trend backed by a shared buildSleepDays pass in sleep.ts; Summary becomes four metrics each with an average, a band pie and a per-day HeatStrip; Trend collapses Duration/Bedtime/Wake into one Session band on CssDualLineChart with Quality as a percent stacked area, on the Weight-style grain \u00d7 count window with leading empty buckets trimmed"],
   ],
   [1100, 1300, 6960]
 ));
@@ -281,7 +282,7 @@ C(
   bullet("userId is present on every document for multi-user isolation"),
   bullet("Entry state (future/ongoing/completed) is computed dynamically, not stored"),
   bullet("No unique index on the log collection — re-migration uses delete-all + re-insert strategy"),
-  bullet("duration.totalSeconds is computed from start and end UTC timestamps using timezoneOffset; d/h/m/s sub-fields are not stored"),
+  bullet("duration.totalSeconds is computed from start and end wall-clock values using timezoneOffset; d/h/m/s sub-fields are not stored. The offsets are applied in \u00a75.3 and NOWHERE else."),
   bullet("food.foods[] and food.drinks[] each carry an optional ingredients: string[] field populated from level2 taxonomy values (foods added v3.1, drinks added v3.2). food.alcohols[] does NOT have this field."),
   bullet("Collection name: log (singular)"),
 );
@@ -320,26 +321,26 @@ C(spacer());
 C(bold("start"));
 C(table(["Field Path","Type","Source Column","Notes"],[
   ["start.timezone","String","start TimeZone","\"BST\", \"GMT\", \"KST\""],
-  ["start.datetime","Date","start year/month/day/hour","Computed from components; stored as MongoDB Date"],
+  ["start.datetime","Date","start year/month/day/hour","The NAIVE LOCAL wall clock, encoded as if it were UTC \u2014 deliberately NOT a true instant. 23:00 KST is stored as 23:00Z. Every consumer reads a local calendar date or clock time back out of it, so a range query on this field IS a local-date range. Built with Date.UTC (v4.8); see \u00a75.3."],
   ["start.year","Number","start 년",""],
   ["start.month","Number","start 월",""],
   ["start.day","Number","start 일",""],
   ["start.weekday","String","start 요일","Korean weekday string"],
   ["start.hour","String","start 시","\"9:00\", \"14:30\""],
-  ["start.timezoneOffset","Number","start 시차","UTC offset in hours (e.g. 9 for KST)"],
+  ["start.timezoneOffset","Number","start 시차","UTC offset in hours, FRACTIONAL where the zone is (9 KST, 1 BST, 5.5 IST, 5.75 Nepal). Read with parseNumber \u2014 parseInteger truncated IST to 5 until v4.8."],
 ],[2400,1400,2400,3160]));
 C(spacer());
 
 C(bold("end"));
 C(table(["Field Path","Type","Source Column","Notes"],[
   ["end.timezone","String","end TimeZone",""],
-  ["end.datetime","Date","end year/month/day/hour","Computed from components; stored as MongoDB Date"],
+  ["end.datetime","Date","end year/month/day/hour","The NAIVE LOCAL wall clock, encoded as if it were UTC \u2014 see start.datetime. A timezone-crossing record can therefore carry an end clock EARLIER than its start clock (the 2024-08-14 Seoul\u2192LA flight ends 13:30 on the date it began 23:30); that is correct, and only duration.totalSeconds knows the true elapsed time."],
   ["end.year","Number","end 년",""],
   ["end.month","Number","end 월",""],
   ["end.day","Number","end 일",""],
   ["end.weekday","String","end 요일",""],
   ["end.hour","String","end 시",""],
-  ["end.timezoneOffset","Number","end 시차","UTC offset in hours"],
+  ["end.timezoneOffset","Number","end 시차","UTC offset in hours, fractional where the zone is. Differs from start.timezoneOffset only on a record that crossed zones while it ran."],
 ],[2400,1400,2400,3160]));
 C(spacer());
 
@@ -486,6 +487,17 @@ C(
   bullet("totalSeconds = endUTC − startUTC"),
 );
 C(note("timezoneOffset is stored per entry (read from the 시차 source column during migration); no separate timezone-master lookup is required."));
+C(spacer());
+C(bold("THE WALL-CLOCK INVARIANT (v4.8) — do not violate"));
+C(p("start.datetime and end.datetime hold the NAIVE LOCAL WALL CLOCK, encoded as if it were UTC. They are deliberately NOT true instants. A bedtime of 23:00 KST is stored as 23:00Z and reads back as 23:00 wherever and whenever it is read. Hyoje\u2019s rule: the clock on the wall at the time is the truth, and start.timezone records WHERE that wall was."));
+C(p("It follows that the offsets must be applied in computeTotalSeconds and NOWHERE ELSE. Applying them in parseDateTime as well double-counts them; applying them in neither leaves duration wrong across a zone change."));
+C(bold("Why this is written down"));
+C(p("Until v4.8 parseDateTime ended with new Date(y, m, d, h, min, 0). That constructor interprets the wall clock in the MIGRATION MACHINE\u2019s timezone \u2014 Europe/London \u2014 so every datetime in the database was displaced by the UK\u2019s current offset: zero in winter, minus one hour in BST. Writing London\u2019s offset as L and the record\u2019s as O, computeTotalSeconds produced (end clock \u2212 start clock) \u2212 (L_end \u2212 L_start) \u2212 (O_end \u2212 O_start). The middle term does not belong. On an ordinary record L is identical at both ends, the term is zero, and the answer came out right BY CANCELLATION \u2014 which is why the defect survived years of correct-looking output."));
+C(p("It stopped cancelling in two places. Any record spanning a UK clock change had one end read as GMT and the other as BST, leaking 60 minutes \u2014 including Korean records, because London switched even though Seoul did not. And the single genuine UK clock-change record was handled correctly by the constructor and then corrected a second time by the offset subtraction. Separately, near-midnight summer records were displaced onto the wrong calendar day, which silently moved Drinking and Diet day assignment for any record within an hour of midnight between late March and late October."));
+C(p("The fix is one call: Date.UTC(y, m, d, h, min, 0). Eleven sleep records changed duration, plus any other activity spanning 02:00 on a switch night. Verified against fourteen cases before release; see \u00a710.3.5."));
+C(spacer());
+C(bold("Fractional timezone offsets"));
+C(p("Offsets are NOT integers. IST is 5.5, Nepal 5.75, Iran 3.5, Newfoundland \u22123.5, parts of Australia 9.5, the Chatham Islands 12.75. rowToDocument.ts reads both offsets with parseNumber; using parseInteger truncated IST to 5 and put a 30-minute error into every Indian record until v4.8. The Mongoose schema type was already Number \u2014 the truncation was upstream of the database, and Mongo stores a fractional offset as a double automatically."));
 
 C(h1("6. Supporting Collections"));
 C(h2("6.1 cost_master"));
@@ -513,10 +525,12 @@ C(h2("6.4 timezone_master"));
 C(table(["Field","Type","Notes"],[
   ["userId","String","Owner"],
   ["code","String","Timezone abbreviation (e.g. KST, BST, GMT)"],
-  ["offsetUTC","Number","UTC offset in hours (e.g. 9 for KST, 1 for BST)"],
+  ["offsetUTC","Number","UTC offset in hours (e.g. 9 for KST, 1 for BST). Fractional where the zone is \u2014 IST 5.5. parseFloat in migrate.ts, so the fraction survives here."],
   ["ianaTimezone","String","IANA timezone name (e.g. Asia/Seoul)"],
   ["city","String","Representative city"],
 ],[2400,2000,4960]));
+C(spacer());
+C(note("This collection does NOT feed migration. Each log record\u2019s timezoneOffset comes from column N of the log sheet directly; the migration never looks anything up. timezone_master is a reference copy of the TimeDiff tab, refreshed only when migrateTimezoneMaster is uncommented in migrate.ts \u2014 so it can lag the sheet. It did exactly that after the v4.8 IST correction. The collection name is timezone_master, singular."));
 C(spacer());
 C(h2("6.5 exchange_rate"));
 C(table(["Field","Type","Notes"],[
@@ -850,15 +864,72 @@ C(p("One sub-section per widget, each on the same template: Purpose · API / dat
 
 // ── 9.3.1 Sleep ──────────────────────────────────────────────────────────────
 C(h3("9.3.1 Sleep (WBS #53)"));
-C(bold("Purpose")); C(p("Sleep duration and quality analytics."));
+C(bold("Purpose"));
+C(p("How long, when and how well he sleeps \u2014 and whether the whole night is drifting later, stretching, or both. Rebuilt in v4.8 on an explicit night-assignment model; the v1.8 version averaged raw records and is gone."));
+
+C(bold("Night assignment \u2014 the seven rules (settled v4.8, do not relitigate)"));
+C(p("A sleep record is not the same thing as a night. Records are ~one per day but can be split, napped around, mistyped, or flown through. buildSleepDays in src/lib/insights/sleep.ts is the ONE place these rules live; the Summary and every Trend bucket are folded from its output, so the two screens cannot drift apart. Same principle as the Diet accumulator and the Drinking rest scoring."));
+C(table(["#","Rule","Why"],[
+  ["1","Bedtime before 08:00 \u2192 the sleep belongs to the PREVIOUS day. Otherwise the day it started.","A 01:00 bedtime is last night, not this morning. 08:00 is the empty gap in the bedtime histogram \u2014 no sleep in seven years starts between 06:00 and 09:00."],
+  ["2","A sleep that began before 08:00 is ALWAYS a night sleep, whenever he woke. For one that began at or after 08:00: nap if it woke the SAME CALENDAR DAY before 20:00, night otherwise.","The same-calendar-day wording carries the rule. Read loosely, a 23:00\u219205:00 night \u201cwoke before 8pm\u201d and would be misread as a nap."],
+  ["3","Timezone crossing (start.timezone \u2260 end.timezone): classify by TRUE DURATION instead \u2014 night if \u2265 5 hours.","Rule 2 misfires when the local clock moves underneath the sleeper. The 2024-08-14 Seoul\u2192LA flight woke on the calendar date it began, so the nap test called a six-hour sleep a nap."],
+  ["4","Over 15 hours: still counts toward the day\u2019s DURATION total, contributes NO bedtime and NO wake time.","A safeguard against am/pm typos that no rule can distinguish from real data. It also protects the one genuine 20-hour sleep (2019-11-16) from dragging a month\u2019s average bedtime three hours earlier."],
+  ["5","A nap-only day gets a duration and no band.","2024-04-25 was a short sleep on a plane and nothing else. The duration line has a point; the Session band has a gap."],
+  ["6","Several sleeps in one day: bedtime from the EARLIEST, wake time from the LATEST, duration = SUM of all.","13 of 2,637 days. This is why the band width and the duration line are different numbers \u2014 see Trend below."],
+  ["7","Records excluded from the band still count toward Quality.","A bad nap is still a bad sleep. Only the clock position is unusable, not the rating."],
+],[600,4560,4200]));
+
+C(bold("Worked examples \u2014 the canonical test fixture"));
+C(p("Hyoje\u2019s own six cases. Any change to the rules must still reproduce this table exactly; it is implemented as a test fixture alongside sleep.ts."));
+C(table(["Input records","Resolves to"],[
+  ["Bed 12 Jun 22:00 \u2192 Wake 13 Jun 06:00","12 Jun: bed 22:00, wake 06:00 (+1), duration 8h"],
+  ["Bed 13 Jun 19:00 \u2192 Wake 13 Jun 23:00, AND Bed 14 Jun 05:00 \u2192 Wake 14 Jun 10:00","13 Jun: bed 19:00, wake 10:00 (+1), duration 9h \u2014 a split night. The second record rolls back under rule 1; bed from the earlier, wake from the later."],
+  ["Bed 14 Jun 21:00 \u2192 Wake 15 Jun 08:00","14 Jun: bed 21:00, wake 08:00 (+1), duration 11h"],
+  ["Bed 15 Jun 14:00 \u2192 Wake 15 Jun 17:00, AND Bed 15 Jun 23:00 \u2192 Wake 16 Jun 05:00","15 Jun: bed 23:00, wake 05:00 (+1), duration 9h \u2014 the nap is excluded from the band and included in the duration."],
+  ["Bed 28 Mar 22:00 GMT \u2192 Wake 29 Mar 08:00 BST","bedtime 22:00, wake time 08:00, duration 9h. Local clock is the truth at each end; duration comes from the stored value."],
+],[4680,4680]));
+C(note("Hyoje\u2019s framing for the timezone case: \u201cIt\u2019s like 80\uc77c\uac04\uc758 \uc138\uacc4 \uc77c\uc8fc. Sometimes time is gained, sometimes lost. Whatever the local time is, the event time belongs to the local timezone.\u201d"));
+
+C(bold("Minutes-from-sleep-day, not clock minutes"));
+C(p("buildSleepDays returns bedMin and wakeMin as minutes from midnight of the SLEEP DAY, not as clock values. A 01:00 bedtime is 1500; a 06:00 wake the next morning is 1800. This keeps min/max chronological across midnight \u2014 raw clock minutes would rank 03:00 (next day) below 21:15 (same evening), which is exactly the bug that first showed on 2025-01-09 \u2014 and lets the Session band plot on a continuous clock axis without re-deriving which side of midnight each end falls on. A timezone crossing can still push the wake end backwards, so it is wrapped forward until the band is positive."));
+
+C(bold("API / data shape"));
+C(p("computeSleepSummary, computeSleepTrend and the shared buildSleepDays in src/lib/insights/sleep.ts. Both entry points run their own query because rule 1 needs the fetch padded a day past the window end \u2014 a 01:00 sleep on the day after the window rolls back INTO it. Two metrics on the stats route:"));
+C(
+  bullet("metric=sleep.summary \u2014 the selected filter period. Returns count, rangeStart/rangeEnd, four metric blocks (average + three-way band counts), and days[]: one entry per sleep day carrying durationSec, bedMin, wakeMin, qualityScore and the four band codes."),
+  bullet("metric=sleep.trend \u2014 Weight-style grain \u00d7 bucket count. ONE bounded query for the whole window, night-assigned once, bucketed in memory. grain echoed at the TOP level. Leading empty buckets are trimmed (see below)."),
+  bullet("metric=sleep.all \u2014 LEGACY, the pre-rules path, served by computeSleepSummaryLegacy. No UI calls it. Retires with the other legacy trend paths."),
+);
+C(note("Everything is DAY-based, not record-based: the card answers \u201cwhat does a typical day look like\u201d. 2,625 of 2,637 days hold exactly one sleep, so the distinction is a rounding difference everywhere except the 13 multi-sleep days."));
+
+C(bold("Band thresholds"));
+C(p("An exact boundary value falls in the MIDDLE band. These live as constants in sleep.ts and are repeated in the widget\u2019s tooltips \u2014 change one and the other must follow."));
+C(table(["Metric","Good / early","OK / mid","Bad / late"],[
+  ["Duration","longer than 7h","5h to 7h","shorter than 5h"],
+  ["Bedtime","before 22:30","22:30 to 23:30","after 23:30"],
+  ["Wake","before 05:00 (\u201c<5\u201d)","05:00 to 07:00 (\u201c5~7\u201d)","after 07:00 (\u201c>7\u201d)"],
+  ["Quality","\uc88b\uc74c (+1)","\ubcf4\ud1b5 (0)","\ub098\uc068 (\u22121)"],
+],[1800,2520,2520,2520]));
+C(note("Wake is deliberately NOT a judgement \u2014 waking early is neither good nor bad. It is the only metric of the four that is pure information, and it carries its own violet colour ramp for that reason; reusing the blue/light-blue/red judgement scale would make early waking read as \u201cgood\u201d however the labels are worded."));
+
 C(bold("Summary"));
+C(p("Two parts. The upper part is four columns \u2014 Duration, Bedtime, Wake, Quality \u2014 each with four rows: heading, headline figure, pie, legend. Tooltips on the heading, each legend row and each strip label carry the thresholds above. The lower part is four HeatStrips, one per metric, day-aligned vertically so a bad stretch is visible across all four at once."));
 C(
-  bullet("Summary view: avg duration, bedtime, wake time, sleep quality counts and score"),
+  bullet("Quality is shown as a PERCENTAGE, not a score: (mean + 1) / 2, so all-poor is 0% and all-good 100%. A raw \u22120.08 next to three clock times was unreadable."),
+  bullet("A day with no fill in a strip is a day with no band \u2014 the nap-only day and the 15-hour-ceiling day \u2014 drawn the same as a day with no record at all."),
+  bullet("Band colours: Good #3b82f6, OK #93c5fd, Bad #f87171. Wake: early #c4b5fd, mid #8b5cf6, late #5b21b6. The same colours are used in the Trend Quality area so a colour means one thing in both views."),
 );
+
 C(bold("Trend"));
+C(p("Two tabs, not four. Duration, Bedtime and Wake used to be three separate charts that between them answered one question \u2014 did the whole night move, or stretch? Session puts all three in one picture on CssDualLineChart (the component built for Drinking, reused unchanged): the shaded band runs from average bedtime up to average wake time on a continuous clock axis, and the dashed line on the right-hand axis is average duration. Quality cannot join a clock axis \u2014 it is ordinal \u2014 so it keeps its own tab."));
 C(
-  bullet("Trend view: 4 metric tabs — Duration, Bedtime, Wake Time, Quality Score"),
+  bullet("The band\u2019s width and the duration line are NOT the same number, which is why both are drawn. The band spans first-bed to last-wake; the duration is the SUM of every sleep in the day. 2025-01-09 spans 17:50\u219203:00, over nine hours, and totals 6.9. A day with a nap can span six hours and total nine."),
+  bullet("Quality is a percent stacked area, highlightable, bands in the SCALE\u2019s own order \u2014 Poor at the bottom, Good on top \u2014 never sorted by size, because the rating is ordinal. Same rule as the Diet spiciness chart. An average would hide whether a 50% month was all \u201c\ubcf4\ud1b5\u201d or half good and half bad."),
+  bullet("Every tab is a single band or a single area, so none has the density problem that pinned Diet\u2019s Composition and People to the short count. All tabs use the LONG counts: 14/30/60/90 \u00b7 12/26/52/104 \u00b7 12/24/60/120, defaults 30/26/24."),
+  bullet("LEADING empty buckets are trimmed server-side. At Month \u00d7 120 the window reaches back to 2016 and the log begins 2019-06; three years of blank columns carry nothing. Interior gaps STAY \u2014 a month with nothing recorded is a fact about that month \u2014 and so do trailing gaps, which is the whole point of anchoring to today rather than to the last record. The requested count is therefore a ceiling, not a promise."),
+  bullet("Clock captions beside every dot are printed only at 16 buckets or fewer; above that the hover card carries the figures. Axis labels show a wake time the morning after as \u201c+06:00\u201d."),
 );
+C(note("No reference lines. The old chart drew baselines at 23:00 and 06:00; those numbers predate the band thresholds above and now mark nothing \u2014 bedtime turns OK at 22:30 and bad at 23:30. Drawing all four band edges would mean four lines on a chart that already carries three. Revisit only if the band alone proves hard to read."));
 
 // ── 9.3.2 Interactions ───────────────────────────────────────────────────────
 C(h3("9.3.2 Interactions (WBS #56)"));
@@ -1274,6 +1345,8 @@ C(
   bullet("allDay flag: true when both start and end hour fields are empty"),
   bullet("H/M/L values (carbs, fat, spiciness): stored as-is as strings"),
   bullet("Null/empty strings: parseString() returns null for empty, #N/A, or #-prefixed values"),
+  bullet("timezoneOffset: parseNumber, NEVER parseInteger \u2014 half-hour and quarter-hour zones are real (IST 5.5, Nepal 5.75). Corrected v4.8."),
+  bullet("datetime: built with Date.UTC so the value is the naive local wall clock, independent of where the migration runs. new Date(y,m,d,...) reads the machine\u2019s zone and was the v4.8 bug \u2014 see \u00a75.3."),
 );
 C(h3("10.1.5 Google Sheets Column Layout"));
 C(p("Two insertions shape the current layout. In v3.0 a new column AO (spiciness) was inserted between AN (fat) and the previous AO (drink item), shifting every column after it by one. In v4.3 two new columns BU (부하) and BV (방식) were inserted after BT (운동단위), shifting every column after them by two. The total is now 86 columns. The migration script fetch range is A:CI — A:CH would be exact, and A:CI keeps one spare column."));
@@ -1459,6 +1532,38 @@ C(table(["Sheet","Total rows","Skipped","Inserted","Errors"],[
 C(spacer());
 
 
+
+C(h3("10.3.5 v4.8 Timezone Re-migration (13 September 2026)"));
+C(p("Triggered by the wall-clock defect described in \u00a75.3. Both migration files changed (transform.ts: parseDateTime back to four parameters using Date.UTC, computeTotalSeconds keeping its offset parameters; rowToDocument.ts: parseNumber for both offsets). All years re-migrated \u2014 the ~2025 archive block and its deleteMany uncommented in migrate.ts, then re-commented."));
+C(table(["Record","Before","After","Why"],[
+  ["2019-10-26","510m","450m","UK clocks went back; Korean record, wrongly credited an extra hour"],
+  ["2020-03-28","510m","570m","UK clocks went forward; an hour wrongly removed"],
+  ["2021-03-27","669m","729m","as above"],
+  ["2021-10-30","1425m","1365m","as above, reversed"],
+  ["2022-03-26","240m","300m","as above"],
+  ["2022-10-29","557m","497m","as above, reversed"],
+  ["2023-03-25","420m","480m","as above"],
+  ["2024-03-30","445m","505m","as above"],
+  ["2024-10-27","469m","409m","as above, reversed"],
+  ["2025-03-29","360m","420m","as above"],
+  ["2025-10-25","543m","483m","as above, reversed"],
+  ["2026-03-28","477m","537m","the one GENUINE UK clock-change record \u2014 handled correctly by the constructor, then corrected a second time"],
+  ["2024-08-14 (flight)","360m","360m","unchanged and always correct \u2014 the displacement cancelled between the two ends"],
+],[2200,1400,1400,4360]));
+C(spacer());
+C(bold("Source-sheet corrections made in the same pass"));
+C(
+  bullet("2025-08-31 and 2026-06-01 \u2014 86400s placeholders with no start or end; fixed."),
+  bullet("2021-03-25 \u2014 was really 2021-03-26 00:24; fixed."),
+  bullet("2021-01-07 \u2014 end day 7 should have been 8, so end preceded start and the duration clamped to zero; fixed."),
+  bullet("19 records over 15 hours \u2014 am/pm slips (a 10:00 bedtime that should read 22:00); fixed."),
+  bullet("IST offset in the TimeDiff tab \u2014 6 corrected to 5.5."),
+);
+C(note("2019-11-16 (15:00 \u2192 11:20, 20h20m) is REAL DATA \u2014 Hyoje slept more than twenty hours with a brief wake-up to take a call from his parents. It is the only record still over the 15-hour ceiling. No automatic rule can tell it from a typo, which is exactly why \u00a79.3.1 rule 4 exists rather than a sheet cleanup. Do not \u201ccorrect\u201d it."));
+C(spacer());
+C(bold("Open"));
+C(p("timezone_master and exchange_rate were NOT resynced \u2014 migrateTimezoneMaster and migrateExchangeRate remain commented out in migrate.ts, so timezone_master still holds IST 6. Harmless today because migration reads the offset from the log sheet directly, but it is a trap for anything that later reads the collection."));
+C(spacer());
 
 C(h1("11. Daily Data Routine"));
 C(h2("11.1 Overview"));
@@ -1667,7 +1772,9 @@ C(
 C(h1("Appendix B — Directory Map"));
 C(table(["Path","Purpose"],[
   ["src/app/insights/page.tsx","Insights master page — CSS columns layout; widget registry (WIDGETS array); ExerciseWidget registered v4.4"],
-  ["src/app/insights/_widgets/SleepWidget.tsx","Sleep widget"],
+  ["src/app/insights/_widgets/SleepWidget.tsx","(rebuilt v4.8) Sleep widget (WBS #53) \u2014 shell owning both views and their fetches, and the trend tab / grain / count / dataGrain state. Summary: four metric columns (heading, figure, pie, legend) over four day-aligned HeatStrips."],
+  ["src/app/insights/_widgets/SleepTrendView.tsx","(v4.8) Sleep Trend view \u2014 Session (CssDualLineChart band + right-axis duration line) and Quality (percent stacked area, ordinal band order). Grain \u00d7 count controls on Weight\u2019s options and defaults, resolved-range line formatted from the SERVER-echoed grain."],
+  ["src/lib/insights/sleep.ts","(rewritten v4.8) buildSleepDays \u2014 the single home of the seven night-assignment rules \u2014 plus computeSleepSummary and computeSleepTrend folded from it, and computeSleepSummaryLegacy for the retiring sleep.all path."],
   ["src/app/insights/_widgets/InteractionsWidget.tsx","Interactions widget — Summary restructured v3.6 (two-column stats grid + full-width PeopleBars, no tabs); StackedBarBucket type now local here after the SVG-module retirement"],
   ["src/app/insights/_widgets/DrinkingWidget.tsx","Drinking widget — Summary (restructured v3.6: two-column bar block + People bars, no tabs) + Trend (9 metric tabs), TrendTip component"],
   ["src/app/insights/_widgets/DietWidget.tsx","Diet widget (WBS #61) — Summary view: four compact box plots, spicy HeatStrip + calendar modal, treemap toggles, companions toggle (v3.3–v3.4); its local ModalShell was extracted to _components/ModalShell.tsx at v4.4. From v4.7 it also owns the trend tab, grain, count, short count and the server-echoed data grain, and fetches metric=diet.trend"],
@@ -1684,7 +1791,7 @@ C(table(["Path","Purpose"],[
   ["src/app/insights/_widgets/weight-colors.ts","(v4.2) SEG / SEG_ORDER / segColor / soloColor — the pinned muscle-fat-other palette, extracted from WeightWidget so the Trend view can import it without a circular dependency"],
   ["src/lib/insights/weight.ts","computeWeightSummary (v4.1) and computeWeightTrend (v4.2) — collapseToDays and buildComposition shared by both; the trend path issues ONE query for the whole span and buckets in memory rather than one query per bucket, because a 400-bucket day request would otherwise be 400 round trips"],
   ["src/app/insights/_components/charts/Treemap.tsx","Squarified treemap (v3.3); ResizeObserver-measured cells; top-N + 기타 rollup; label font capped at 11px (v3.4)"],
-  ["src/app/insights/_components/charts/CalendarHeatmap.tsx","CalendarHeatmap (Mon–Sun grid, modal) + HeatStrip (single-row inline) (v3.3)"],
+  ["src/app/insights/_components/charts/CalendarHeatmap.tsx","CalendarHeatmap (Mon–Sun grid, modal) + HeatStrip (single-row inline) (v3.3). HeatStrip takes fillFor(date) returning a colour or null; null draws the empty-day background. Four of them stacked make the Sleep Summary strip block (v4.8)."],
   ["src/app/insights/_components/charts/bars.tsx","(v3.6) Shared summary-bar primitives Title / BarRow / BarSection; desc-sorted, max-normalised bars with {pct}% ({count}) values; used by the Diet, Drinking and Interactions summaries (replaces the retired SVG _lib/chart-components.tsx)"],
   ["src/app/insights/_lib/chart-colors.ts","chartColors(isDark), PERSON_COLORS_LIGHT/DARK, categoryColors (v3.3), rankFlowColors (v3.5), BAR_COLORS_LIGHT/DARK + barColors(isDark) + autoColorMap (v3.6)"],
   ["src/app/insights/_lib/format.ts","formatDuration, formatBucketLabel (handles month, week raw/compressed, day)"],
@@ -1761,6 +1868,6 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-Log-Data-Design-v4.7.docx", buffer);
-  console.log("Wrote FarGaze-Log-Data-Design-v4.7.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-Log-Data-Design-v4.8.docx", buffer);
+  console.log("Wrote FarGaze-Log-Data-Design-v4.8.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });

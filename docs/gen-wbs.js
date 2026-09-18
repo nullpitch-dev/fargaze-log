@@ -11,7 +11,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Service Concept & Work Breakdown Structure", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 3.7  |  12 September 2026", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 3.8  |  13 September 2026", size: 24 })], spacing: { after: 240 } }),
 );
 
 C(h1("Version History"));
@@ -42,6 +42,7 @@ C(table(["Version","Date","Headline"],[
   ["3.5","7 Aug 2026","#58 Exercise Trend view COMPLETE \u2014 exercise-trend.ts (exercise.trend / exercise.itemTrend), ExerciseTrendView.tsx, ViewToggle wired into ExerciseWidget. Weight-style grain \u00d7 buckets window; frequency chart aligned over a five-zone Gantt-style item timeline grouped by activity.name; per-item modal averages per active day with the load line on a new CssTrendChart right axis \u2014 the v3.4 load-line deferral is resolved. CssTrendChart gained xBand, maxXLabels, showValues, compressXLabels, a two-line hover tooltip, tiled hover zones and index keys, all default-off or behaviour-preserving. Mirrors Design Doc v4.5"],
   ["3.6","11 Sep 2026","Drinking rest scoring REDESIGNED \u2014 a score belongs to a drinking day and equals the dry days directly before it; the first drinking day in the log has none; a fully dry bucket has no average and reports dryDaysAtEnd instead. Summary shares the scoring. Interactions and Drinking Trend converted to the Weight-style grain \u00d7 count window on the new shared trend-window.ts; metric=drinking.trend runs three bounded queries per request in place of three per bucket including an all-time scan \u2014 the summary's all-time scan went with it, clearing that deferral. Drinking charts converted (three lines, stacked areas, right-axis rest and duration lines). Shared hover card on CssTrendChart and CssDualLineChart; right-hand axis on CssStackedAreaChart; dotSize ladder. Mirrors Design Doc v4.6"],
   ["3.7","12 Sep 2026","#61 Diet Trend converted to the Weight-style grain × count window — metric=diet.trend (computeDietTrend) runs ONE bounded query for the whole window and buckets in memory, replacing the per-bucket path that re-queried records AND ingredient_master for every bucket; the four daily metrics become three-line charts, Spicy and Relation become stacked areas, Composition and People stay on the short 3/6/12 count; the trend view moved into its own DietTrendView.tsx with the tab state lifted into DietWidget so the fetch can pick the right count list. THREE data corrections: companions double-counted on every food-bearing record, post-midnight records dropped on the last day of any range, and absent spiciness read as not-spicy. The v3.6 label-grain deferral is cleared for Diet. Mirrors Design Doc v4.7"],
+  ["3.8","13 Sep 2026","MIGRATION TIMEZONE BUG FOUND AND FIXED \u2014 parseDateTime read the wall clock in the migration machine\u2019s zone (Europe/London), displacing every datetime by the UK offset; the error cancelled on ordinary records and did NOT cancel across a UK clock change, corrupting eleven sleep durations by an hour INCLUDING Korean ones, and moving near-midnight summer records onto the wrong day (which silently affected Drinking and Diet day assignment). Fixed with Date.UTC; offsets now applied in computeTotalSeconds only. timezoneOffset parseInteger \u2192 parseNumber (IST 5.5 was truncated to 5). Full re-migration of all years, plus 23 source-sheet corrections. #53 SLEEP WIDGET REBUILT on seven explicit night-assignment rules \u2014 metric=sleep.summary and metric=sleep.trend on a shared buildSleepDays pass; Summary is four metrics with pies and day-aligned strips; Trend collapses three charts into one Session band with a right-axis duration line, plus Quality as a percent stacked area; Sleep joins the shared grain \u00d7 count window, the last widget to do so"],
 ],[1100,1300,6960]));
 C(spacer());
 
@@ -95,11 +96,11 @@ C(table(["Phase","Status","Detail"],[
   ["1 — Base Infrastructure & Auth","\u2705 Complete","Subscription-architecture placeholder still pending"],
   ["2 — Data Structure Design","\u2705 Complete","Schema, supporting collections, Mongoose models"],
   ["3 — Migration Tool","\u2705 Complete","Delete-all + re-insert; incremental sync deferred to post-MVP"],
-  ["4 — Analytics & Search","\u2B1C In progress","Done: search, cost dashboard, Sleep / Interactions / Drinking / Diet / Weight widgets (all with Summary and Trend), food + drink ingredient taxonomies. Done: #58 Exercise (Summary and Trend, complete 7 Aug). Done: Drinking rest-scoring redesign + Interactions and Drinking trend windows (11 Sep). Done: Diet trend window (12 Sep) — every widget is now on the shared window. Remaining: #59 Calendar"],
+  ["4 — Analytics & Search","\u2B1C In progress","Done: search, cost dashboard, Interactions / Drinking / Diet / Weight / Exercise widgets (all with Summary and Trend), food + drink ingredient taxonomies. Done: Drinking rest-scoring redesign + Interactions and Drinking trend windows (11 Sep), Diet (12 Sep). Done: migration timezone fix + #53 Sleep rebuilt on night-assignment rules (13 Sep) — Sleep was the last widget still on the old 3/6/12 selector, so every widget is now on the shared window. Remaining: #59 Calendar, 배변 widget"],
   ["5 — Data Entry","\u2B1C Not started","Post-MVP"],
 ],[2900,1700,4760]));
 C(spacer());
-C(p([new TextRun({ text: "Current focus: ", bold: true }), new TextRun("#59 Calendar view — design not started. The trend-view conversion to the Weight-style window is COMPLETE across every widget: Interactions and Drinking on 11 Sep, Diet on 12 Sep. After #59 comes Phase 5 (data entry). #58 Exercise is complete — Summary shipped 29 July, Trend shipped 7 August.")]));
+C(p([new TextRun({ text: "Current focus: ", bold: true }), new TextRun("배변 widget — design not started; the closest shape is Diet (a daily count plus ordinal scales), and the source columns BR/BS/BT already exist. Check per-field coverage by year BEFORE designing: urgency and stomach pain may have started partway through, which is the spiciness trap that cost a rewrite in v4.7. Then #59 Calendar view, then Phase 5 (data entry). The trend-view conversion is now COMPLETE across every widget: Interactions and Drinking 11 Sep, Diet 12 Sep, Sleep 13 Sep.")]));
 
 C(h1("5. Work Breakdown Structure"));
 C(p("\u2705 = Complete   \u2B1C = Pending   DESCOPED = out of MVP scope. Each line states current state, not how it evolved (see the changelog for history)."));
@@ -165,9 +166,10 @@ C(
   bullet("\u2705 61. Diet widget — Summary + Trend (8 tabs) — see sub-items"),
   bullet("\u2705 62. Drink ingredient taxonomy — see sub-items"),
   bullet("\u2705 54. Weight widget — Summary (box plot + body composition) and Trend (stacked area) both complete — see sub-items"),
-  bullet("\u2705 55. Average bed-time widget — CLOSED as covered by the Sleep widget (Summary bedtime + Trend › Bedtime); no separate widget will be built"),
+  bullet("\u2705 55. Average bed-time widget — CLOSED as covered by the Sleep widget (Summary bedtime + Trend › Session); no separate widget will be built"),
   bullet("\u2705 58. Exercise widget — Summary complete (per-item box plots, all-time bests, daily charts in a modal); Trend view deferred — see sub-items"),
-  bullet("\u2B1C 59. Native calendar view — reuses the CalendarHeatmap built for #61"),
+  bullet("\u2B1C 59. Native calendar view — reuses the CalendarHeatmap built for #61 (the full Mon–Sun grid, not the inline HeatStrip). Design not started; begins with a design conversation in plain English, not code"),
+  bullet("\u2B1C 62. 배변 widget — frequency, count per day, quality, amount, urgency, stomach pain. Source columns BR (배변량) / BS (배변질) / BT (배변특징) already populate bowel.amount / .quality / .characteristics. Closest in shape to Diet. FIRST STEP: per-field coverage by year"),
 );
 C(h3("Sub-items for #58 (Exercise Widget):"));
 C(p("Data preparation, the compute module, the API branch and the Summary view are all complete and in use. The Trend view is deferred and has no agreed design. Design Doc \u00a79.3.6 carries the full widget specification and the reasoning behind each decision."));
@@ -282,6 +284,19 @@ C(
   bullet("\u2705 GET /api/insights/stats dispatcher — sleep, interactions, drinking, diet"),
   bullet("\u2705 Shared chart library — CssTrendChart, StackedBars, CssRankFlowChart, bars.tsx (Title/BarRow/BarSection), BoxPlot, Histogram, Treemap, CalendarHeatmap/HeatStrip, CssDailyChart, CssVerticalBoxPlotChart, CssDualLineChart, CssRestChart"),
   bullet("\u2705 MultiSelectDropdown — portal-rendered panel, edge/scroll/resize-aware"),
+);
+C(h3("Sub-items for #53 (Sleep Widget) — rebuilt v3.8:"));
+C(
+  bullet("\u2705 Migration timezone fix — parseDateTime rebuilt on Date.UTC; offsets applied in computeTotalSeconds only; parseNumber for fractional offsets; full re-migration of all years"),
+  bullet("\u2705 Seven night-assignment rules agreed and verified against all 2,658 records before any API code was written — 2,642 nights, 8 naps, 2 timezone crossings, 1 at the 15-hour ceiling"),
+  bullet("\u2705 buildSleepDays in sleep.ts — the single home of the rules; Summary and Trend both folded from it so they cannot drift"),
+  bullet("\u2705 API: metric=sleep.summary — four metric blocks (average + three-way band counts) plus days[] for the strips"),
+  bullet("\u2705 API: metric=sleep.trend — Weight-style grain \u00d7 count, ONE bounded query, grain echoed at top level, leading empty buckets trimmed"),
+  bullet("\u2705 Summary rebuilt — four centred columns (heading, figure, pie, legend) over four day-aligned HeatStrips; threshold tooltips; quality as a percentage"),
+  bullet("\u2705 Trend rebuilt — Session band on the existing CssDualLineChart (no new chart component needed) with the right-axis duration line; Quality as a percent stacked area in ordinal band order"),
+  bullet("\u2705 Canonical worked examples implemented as a test fixture — any rule change must still reproduce them"),
+  bullet("\u2B1C Retire metric=sleep.all and computeSleepSummaryLegacy with the other legacy trend paths"),
+  bullet("\u2B1C Reference lines on the Session band — dropped for now; the old 23:00 / 06:00 baselines contradict the new band thresholds. Revisit only if the band proves hard to read"),
 );
 C(h3("Sub-items for #56 (Interactions Widget):"));
 C(
@@ -481,6 +496,6 @@ const doc = new Document({
   sections: [{ properties: { page: PAGE }, children }],
 });
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-WBS-v3.7.docx", buffer);
-  console.log("Wrote FarGaze-WBS-v3.7.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-WBS-v3.8.docx", buffer);
+  console.log("Wrote FarGaze-WBS-v3.8.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });

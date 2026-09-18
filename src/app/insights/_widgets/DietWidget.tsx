@@ -13,7 +13,7 @@ import { Treemap, type TreemapDatum } from '../_components/charts/Treemap';
 import { CalendarHeatmap, HeatStrip } from '../_components/charts/CalendarHeatmap';
 import {
   CssDailyChart, CssVerticalBoxPlotChart, minsToClockStr,
-  type CssDailyZone, type BoxPlotBucket,
+  type CssDailyZone, type BoxPlotBucket, type HoverRow,
 } from '../_components/charts/css-chart-components';
 import {
   DietTrendView, DIET_SHORT_COUNT_TABS,
@@ -213,6 +213,19 @@ function SummaryView({ data, isDark }: { data: DietSummary; isDark: boolean }) {
     L: isDark ? '#60a5fa' : '#3b82f6',  // blue
   };
   const spicyFill = (date: string) => { const lvl = spMap.get(date); return lvl ? SPICE_FILL[lvl] : null; };
+
+  // An absent level means the day was never RATED, not that it was mild — the
+  // v4.7 correction. The card says so rather than leaving the cell silent.
+  const SPICE_LABEL: Record<'H' | 'M' | 'L', string> = {
+    H: 'Spicy (H)', M: 'Mild (M)', L: 'Not spicy',
+  };
+  const spicyTip = (date: string) => {
+    const lvl = spMap.get(date);
+    const rows: HoverRow[] = lvl
+      ? [{ label: 'Spiciness', value: SPICE_LABEL[lvl], color: SPICE_FILL[lvl] }]
+      : [{ value: 'not recorded', dim: true }];
+    return { title: date, rows };
+  };
   const spStats = useMemo(() => {
     let h = 0, m = 0;
     data.spiciness.forEach(s => { if (s.level === 'H') h++; else if (s.level === 'M') m++; });
@@ -282,7 +295,8 @@ function SummaryView({ data, isDark }: { data: DietSummary; isDark: boolean }) {
             ({spStats.h} H and {spStats.m} M out of {spStats.total} days)
           </span>
         </div>
-        <HeatStrip rangeStart={data.rangeStart} rangeEnd={data.rangeEnd} isDark={isDark} fillFor={spicyFill} />
+        <HeatStrip rangeStart={data.rangeStart} rangeEnd={data.rangeEnd} isDark={isDark}
+          fillFor={spicyFill} tooltipFor={spicyTip} />
       </div>
 
       {/* ── With whom I eat (toggleable) ── */}
@@ -295,7 +309,7 @@ function SummaryView({ data, isDark }: { data: DietSummary; isDark: boolean }) {
         <ModalShell title={modal === 'spicy' ? 'Spicy days' : metrics[modal].title} onClose={() => setModal(null)}>
           {modal === 'spicy' ? (
             <CalendarHeatmap rangeStart={data.rangeStart} rangeEnd={data.rangeEnd} isDark={isDark}
-              fillFor={spicyFill} legend={spicyLegend} />
+              fillFor={spicyFill} tooltipFor={spicyTip} legend={spicyLegend} />
           ) : (
             <CssDailyChart
               values={metrics[modal].values} labels={metrics[modal].labels}

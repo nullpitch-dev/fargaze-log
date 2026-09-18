@@ -5,7 +5,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { WidgetProps, WidgetViewMode } from '../_lib/types';
 import { useIsDark } from '../_lib/hooks';
 import { buildParams } from '../_lib/date-helpers';
-import { CssVerticalBoxPlotChart } from '../_components/charts/css-chart-components';
+import {
+  CssVerticalBoxPlotChart, ChartHoverCard, type HoverRow,
+} from '../_components/charts/css-chart-components';
 import { WidgetCard, ViewToggle } from '../_components/WidgetCard';
 import { SEG, SEG_ORDER, segColor, soloColor } from './weight-colors';
 import {
@@ -38,7 +40,7 @@ const MIN_KG_PX  = 30;   // room for "14.7"
 const MIN_PCT_PX = 40;   // room for "(21.2%)" underneath it
 
 function CompositionRow({
-  label, sublabel, sublabel2, comp, max, isDark,
+  label, sublabel, sublabel2, comp, max, isDark, tooltipPlacement = 'below',
 }: {
   label: string;
   sublabel?: string;
@@ -46,9 +48,12 @@ function CompositionRow({
   comp: Composition;
   max: number;
   isDark: boolean;
+  /** 'above' for the lower row — WidgetCard is overflow-hidden. */
+  tooltipPlacement?: 'below' | 'above';
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [trackPx, setTrackPx] = useState(0);
+  const [hoverKey, setHoverKey] = useState<string | null>(null);
 
   useEffect(() => {
     const el = trackRef.current;
@@ -72,6 +77,23 @@ function CompositionRow({
       }))
     : [];
 
+  // Each segment's centre as a percentage of the TRACK rather than of the bar,
+  // so the card points at the segment even though the bar is only widthPct of
+  // the track.
+  let cum = 0;
+  const centres: Record<string, number> = {};
+  for (const part of parts) {
+    centres[part.key] = (widthPct * (cum + part.pct / 2)) / 100;
+    cum += part.pct;
+  }
+
+  const rows: HoverRow[] = parts.map(part => ({
+    label: SEG[part.key].name,
+    color: segColor(part.key, isDark),
+    value: `${part.kg.toFixed(1)} kg · ${part.pct.toFixed(1)}%`,
+    dim: hoverKey !== null && hoverKey !== part.key,
+  }));
+
   return (
     <div className="flex items-center gap-2">
       <div className="w-11 shrink-0 flex flex-col">
@@ -90,7 +112,8 @@ function CompositionRow({
         )}
       </div>
 
-      <div ref={trackRef} className="flex-1 min-w-0">
+      <div ref={trackRef} className="flex-1 min-w-0 relative"
+        onMouseLeave={() => setHoverKey(null)}>
         <div className="flex rounded overflow-hidden" style={{ height: BAR_H, width: `${widthPct}%` }}>
           {comp.hasComposition ? (
             parts.map(p => {
@@ -98,8 +121,13 @@ function CompositionRow({
               return (
                 <div key={p.key}
                   className="flex flex-col items-center justify-center gap-0.5 overflow-hidden"
-                  style={{ width: `${p.pct}%`, background: segColor(p.key, isDark) }}
-                  title={`${SEG[p.key].name} ${p.kg.toFixed(1)} kg (${p.pct.toFixed(1)}%)`}>
+                  style={{
+                    width: `${p.pct}%`, background: segColor(p.key, isDark),
+                    cursor: 'pointer',
+                    opacity: hoverKey === null || hoverKey === p.key ? 1 : 0.55,
+                    transition: 'opacity 120ms',
+                  }}
+                  onMouseEnter={() => setHoverKey(p.key)}>
                   {segPx >= MIN_KG_PX && (
                     <span className="text-[11px] font-mono font-medium text-white leading-none">
                       {p.kg.toFixed(1)}
@@ -121,6 +149,20 @@ function CompositionRow({
             </div>
           )}
         </div>
+
+        {hoverKey !== null && (
+          <div className="absolute pointer-events-none"
+            style={{ left: `${centres[hoverKey]}%`, top: 0, width: 0, height: BAR_H, zIndex: 20 }}>
+            <ChartHoverCard
+              title={`${label}${sublabel ? ` \u00b7 ${sublabel}` : ''}`}
+              rows={rows}
+              note={`total ${comp.weight.toFixed(1)} kg`}
+              isDark={isDark}
+              flip={centres[hoverKey] > 55}
+              placement={tooltipPlacement}
+            />
+          </div>
+        )}
       </div>
 
       <span className="w-12 shrink-0 text-right text-[11px] font-mono font-medium text-stone-800 dark:text-zinc-100">
@@ -221,11 +263,12 @@ function SummaryView({ data, isDark }: { data: any; isDark: boolean }) {
             {latest && (
               <CompositionRow
                 label="Latest"
-								sublabel={shortDate(latest.date)}
+                sublabel={shortDate(latest.date)}
                 sublabel2={latest.date.slice(0, 4)}
                 comp={latest}
                 max={max}
                 isDark={isDark}
+                tooltipPlacement="above"
               />
             )}
 

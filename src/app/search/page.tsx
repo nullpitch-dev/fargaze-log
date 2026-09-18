@@ -122,6 +122,38 @@ function formatKRW(amount: number): string {
   return amount.toLocaleString('ko-KR') + '원';
 }
 
+/**
+ * Amounts arrive as strings straight from the sheet, and the plus-split rule
+ * DIVIDES them: "10" shared across three items is stored as
+ * "3.3333333333333335". Two decimals covers every unit in use (0.25 cup stays
+ * 0.25) and trailing zeros go, so "2.00" prints as "2".
+ *
+ * A value that is not a number at all is passed through untouched — some
+ * amount fields carry text.
+ */
+function formatAmount(v?: string | number | null): string | undefined {
+  if (v === null || v === undefined || v === '') return undefined;
+  const n = typeof v === 'number' ? v : Number(String(v).replace(/,/g, '').trim());
+  if (!Number.isFinite(n)) return String(v);
+  return String(Math.round(n * 100) / 100);
+}
+
+/** Body measurements follow the Weight widget: one decimal. */
+function formatKg(v?: number | null): string | undefined {
+  return v === null || v === undefined ? undefined : `${v.toFixed(1)} kg`;
+}
+
+/**
+ * bodyFatPercent is stored as a PERCENT — 21.265 means 21.3% — corrected in
+ * design doc v4.1. This panel multiplied by 100 and printed 2126.5%. The
+ * documented consumer rule is the guard below: a value under 1 is the old
+ * decimal form and still needs scaling.
+ */
+function formatBodyFatPercent(v?: number | null): string | undefined {
+  if (v === null || v === undefined) return undefined;
+  return `${(v < 1 ? v * 100 : v).toFixed(1)}%`;
+}
+
 function formatAggValue(field: string, value: number): string {
   if (field === 'duration.totalSeconds') return formatDuration(value);
   if (field.includes('KRW') || field.includes('gross') || field.includes('net')) return formatKRW(value);
@@ -207,7 +239,7 @@ function DetailPanel({ entry, onClose }: { entry: LogEntry; onClose: () => void 
           {entry.cost && (entry.cost.amountKRW || entry.cost.amountForeign) && (
             <DetailSection title="비용">
               <DetailRow label="금액(원)" value={entry.cost.amountKRW ? formatKRW(entry.cost.amountKRW) : undefined} />
-              <DetailRow label="금액(외화)" value={entry.cost.amountForeign ? `${entry.cost.amountForeign.toLocaleString()} ${entry.cost.currency ?? ''}` : undefined} />
+              <DetailRow label="금액(외화)" value={entry.cost.amountForeign ? `${(Math.round(entry.cost.amountForeign * 100) / 100).toLocaleString()} ${entry.cost.currency ?? ''}` : undefined} />
               <DetailRow label="비용구분" value={entry.cost.categoryDetail} />
               <DetailRow label="비용카테고리" value={entry.cost.category} />
             </DetailSection>
@@ -216,7 +248,7 @@ function DetailPanel({ entry, onClose }: { entry: LogEntry; onClose: () => void 
           {(entry.purchase ?? []).length > 0 && (
             <DetailSection title="구매">
               {entry.purchase!.map((p, i) => (
-                <DetailRow key={i} label={`항목 ${i + 1}`} value={[p.item, p.amount && p.unit ? `${p.amount} ${p.unit}` : ''].filter(Boolean).join(' · ')} />
+                <DetailRow key={i} label={`항목 ${i + 1}`} value={[p.item, p.amount && p.unit ? `${formatAmount(p.amount)} ${p.unit}` : ''].filter(Boolean).join(' · ')} />
               ))}
             </DetailSection>
           )}
@@ -244,25 +276,25 @@ function DetailPanel({ entry, onClose }: { entry: LogEntry; onClose: () => void 
               <DetailRow label="탄수" value={entry.food.carbs} />
               <DetailRow label="지방" value={entry.food.fat} />
               <DetailRow label="맵기" value={entry.food.spiciness} />
-							{(entry.food.drinks ?? []).map((d, i) => <DetailRow key={`d${i}`} label="음료" value={[d.item, d.ingredients?.length ? `(${d.ingredients.join(', ')})` : '', d.amount, d.unit, d.note].filter(Boolean).join(' ')} />)}
-              {(entry.food.foods ?? []).map((f, i) => <DetailRow key={`f${i}`} label="음식" value={[f.item, f.ingredients?.length ? `(${f.ingredients.join(', ')})` : '', f.amount, f.unit, f.note].filter(Boolean).join(' ')} />)}
-              {(entry.food.alcohols ?? []).map((a, i) => <DetailRow key={`a${i}`} label="술" value={[a.item, a.amount, a.unit, a.note].filter(Boolean).join(' ')} />)}
+              {(entry.food.drinks ?? []).map((d, i) => <DetailRow key={`d${i}`} label="음료" value={[d.item, d.ingredients?.length ? `(${d.ingredients.join(', ')})` : '', formatAmount(d.amount), d.unit, d.note].filter(Boolean).join(' ')} />)}
+              {(entry.food.foods ?? []).map((f, i) => <DetailRow key={`f${i}`} label="음식" value={[f.item, f.ingredients?.length ? `(${f.ingredients.join(', ')})` : '', formatAmount(f.amount), f.unit, f.note].filter(Boolean).join(' ')} />)}
+              {(entry.food.alcohols ?? []).map((a, i) => <DetailRow key={`a${i}`} label="술" value={[a.item, formatAmount(a.amount), a.unit, a.note].filter(Boolean).join(' ')} />)}
             </DetailSection>
           )}
 
           {entry.body && (entry.body.weight || entry.body.muscleMass || entry.body.bodyFat) && (
             <DetailSection title="신체">
-              <DetailRow label="체중" value={entry.body.weight ? `${entry.body.weight} kg` : undefined} />
-              <DetailRow label="골격근량" value={entry.body.muscleMass ? `${entry.body.muscleMass} kg` : undefined} />
-              <DetailRow label="체지방량" value={entry.body.bodyFat ? `${entry.body.bodyFat} kg` : undefined} />
-              <DetailRow label="체지방률" value={entry.body.bodyFatPercent ? `${(entry.body.bodyFatPercent * 100).toFixed(1)}%` : undefined} />
+              <DetailRow label="체중" value={formatKg(entry.body.weight)} />
+              <DetailRow label="골격근량" value={formatKg(entry.body.muscleMass)} />
+              <DetailRow label="체지방량" value={formatKg(entry.body.bodyFat)} />
+              <DetailRow label="체지방률" value={formatBodyFatPercent(entry.body.bodyFatPercent)} />
             </DetailSection>
           )}
 
           {(entry.exercise ?? []).length > 0 && (
             <DetailSection title="운동">
               {entry.exercise!.map((ex, i) => (
-                <DetailRow key={i} label={ex.item ?? `운동 ${i + 1}`} value={ex.amount ? `${ex.amount} ${ex.unit ?? ''}` : undefined} />
+                <DetailRow key={i} label={ex.item ?? `운동 ${i + 1}`} value={ex.amount ? `${formatAmount(ex.amount)} ${ex.unit ?? ''}` : undefined} />
               ))}
             </DetailSection>
           )}

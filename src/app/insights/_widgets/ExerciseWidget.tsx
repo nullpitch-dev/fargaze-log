@@ -22,7 +22,7 @@ import type { WidgetProps, WidgetViewMode } from '../_lib/types';
 import { CalendarHeatmap, HeatStrip } from '../_components/charts/CalendarHeatmap';
 import {
   CssDailyChart, CssVerticalBoxPlotChart,
-  type BoxPlotBucket,
+  type BoxPlotBucket, type HoverRow,
 } from '../_components/charts/css-chart-components';
 
 // ── Types (mirror src/lib/insights/exercise.ts) ───────────────────────────────
@@ -121,6 +121,31 @@ function mean(values: (number | null)[]): number | undefined {
   return v.length ? v.reduce((t, n) => t + n, 0) / v.length : undefined;
 }
 
+// ── Day tooltip, shared by the strip and the calendar modal ───────────────────
+//
+// The cell already says whether he exercised; the card says WHAT. items[].daily
+// is index-aligned with data.dates, so one lookup gives every item recorded on
+// that day with its amount. A day inside the period with nothing is a rest day,
+// which is a fact worth stating rather than an empty hover.
+
+function makeDayTooltip(data: ExerciseSummary, accent: string) {
+  const idxOf = new Map(data.dates.map((d, i) => [d, i]));
+  return (date: string) => {
+    const i = idxOf.get(date);
+    const rows: HoverRow[] = [];
+    if (i !== undefined) {
+      for (const it of data.items) {
+        const v = it.daily[i];
+        if (v !== null && v !== undefined) {
+          rows.push({ label: it.item, value: `${fmt(v)}${it.unit}`, color: accent });
+        }
+      }
+    }
+    if (!rows.length) rows.push({ value: 'rest day', dim: true });
+    return { title: date, rows };
+  };
+}
+
 // ── Row 1 — whole period ──────────────────────────────────────────────────────
 
 function PeriodRow({ data, isDark, onOpen }: {
@@ -130,6 +155,7 @@ function PeriodRow({ data, isDark, onOpen }: {
 }) {
   const accent = isDark ? ACCENT_DARK : ACCENT_LIGHT;
   const fill = (date: string) => (data.dayCounts[date] ? accent : null);
+  const tip = makeDayTooltip(data, accent);
 
   return (
     <div role="button" tabIndex={0} onClick={onOpen}
@@ -149,6 +175,7 @@ function PeriodRow({ data, isDark, onOpen }: {
           rangeEnd={data.dates[data.dates.length - 1]}
           isDark={isDark}
           fillFor={fill}
+          tooltipFor={tip}
         />
       </div>
     </div>
@@ -289,6 +316,7 @@ export function ExerciseWidget({ globalFilter }: WidgetProps) {
             rangeEnd={data!.dates[data!.dates.length - 1]}
             isDark={isDark}
             fillFor={(d: string) => (data!.dayCounts[d] ? accent : null)}
+            tooltipFor={makeDayTooltip(data!, accent)}
             legend={[{ color: accent, label: 'Exercised' }]}
           />
         </ModalShell>

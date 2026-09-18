@@ -21,6 +21,95 @@ function labelColor(isDark: boolean)    { return isDark ? '#a1a1aa' : '#a8a29e';
 function valueColor(isDark: boolean)    { return isDark ? '#f4f4f5' : '#292524'; }
 function lineColor(isDark: boolean)     { return isDark ? '#2dd4bf' : '#1d4ed8'; }
 
+// ── Shared hover card ─────────────────────────────────────────────────────────
+//
+// The canonical tooltip shape, lifted out of CssTrendChart so the charts that
+// only ever had a native `title` attribute — HeatStrip, CalendarHeatmap, the
+// summary pies, the composition bar — can show the same card: a dim label
+// line, then one row per value with a colour dot, then an optional dim note.
+//
+// The CALLER positions it. Render it inside a `position: relative` box (a
+// bucket column, a heat-strip cell, a pie) and it hangs from the horizontal
+// centre of that box, `top` px down. Pass flip=true once the anchor is past
+// roughly 60% across its container so the card never runs off the right edge —
+// the same rule CssTrendChart and the area charts already follow.
+//
+// Nothing here knows about axes, buckets or dates: rows are already-formatted
+// strings, so every caller keeps its own units.
+
+export interface HoverRow {
+  /** series or band name; omitted for a single-value card */
+  label?: string;
+  /** already formatted — this component never rounds or converts */
+  value: string;
+  color?: string;
+  /** hollow dot, the shape language the dashed right-axis series uses */
+  hollow?: boolean;
+  /** de-emphasise the value (context rather than the headline figure) */
+  dim?: boolean;
+}
+
+export function ChartHoverCard({
+  title, rows, isDark, flip = false, offset = 4, placement = 'below', note,
+}: {
+  title?: string;
+  rows: HoverRow[];
+  isDark: boolean;
+  flip?: boolean;
+  /** px clear of the anchor box's top or bottom edge */
+  offset?: number;
+  /**
+   * 'below' hangs from the anchor's bottom edge, 'above' from its top. Use
+   * 'above' for anything sitting near the bottom of a widget — WidgetCard is
+   * overflow-hidden, so a card that hangs below the last row gets clipped.
+   */
+  placement?: 'below' | 'above';
+  /** small dim line under the rows, e.g. the threshold a band stands for */
+  note?: string;
+}) {
+  const lc = labelColor(isDark);
+  const vc = valueColor(isDark);
+
+  return (
+    <div className="absolute rounded px-2 py-1 leading-tight whitespace-nowrap pointer-events-none"
+      style={{
+        left: '50%',
+        ...(placement === 'above' ? { bottom: `calc(100% + ${offset}px)` } : { top: `calc(100% + ${offset}px)` }),
+        transform: flip ? 'translateX(calc(-100% - 8px))' : 'translateX(8px)',
+        background: isDark ? '#27272a' : '#ffffff',
+        border: `1px solid ${isDark ? '#3f3f46' : '#e7e5e4'}`,
+        boxShadow: '0 2px 8px rgba(0,0,0,0.12)', zIndex: 30,
+      }}>
+      {title && <div style={{ fontSize: 10, color: lc }}>{title}</div>}
+
+      {rows.map((r, i) => (
+        <div key={i} className="flex items-center gap-1"
+          style={{ fontSize: 10, color: lc, marginTop: title || i ? 2 : 0 }}>
+          {r.color && (
+            <span className="inline-block rounded-full shrink-0"
+              style={{
+                width: 7, height: 7,
+                background: r.hollow ? (isDark ? '#18181b' : '#ffffff') : r.color,
+                border: r.hollow ? `1.5px solid ${r.color}` : undefined,
+              }} />
+          )}
+          {r.label && <span style={{ minWidth: 52 }}>{r.label}</span>}
+          <span style={{ color: r.dim ? lc : vc, fontWeight: r.dim ? 400 : 600 }}>
+            {r.value}
+          </span>
+        </div>
+      ))}
+
+      {note && (
+        <div style={{
+          fontSize: 9, color: lc, marginTop: 3,
+          whiteSpace: 'normal', maxWidth: 200,
+        }}>{note}</div>
+      )}
+    </div>
+  );
+}
+
 // ── Catmull-Rom spline (tension=0.2) ─────────────────────────────────────────
 // Generates an SVG path string from percentage-space points {x, y} in 0-100 viewBox.
 
