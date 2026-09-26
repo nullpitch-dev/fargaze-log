@@ -285,8 +285,14 @@ function BowelSummaryView({ data, isDark }: { data: Summary | null; isDark: bool
       <div className="grid grid-cols-1 @lg:grid-cols-3 gap-x-4 gap-y-3">
         <HistBlock
           title="Per day"
-          hint={[{ value: 'Movements on each day of the period' }]}
+					hint={[
+            { value: 'Movements per day, counting every day of the period' },
+            { value: 'Second figure: on days with at least one movement', dim: true },
+          ]}
           figure={`${data.perDay.average}`}
+          sub={data.movementDays ? `· ${(data.movements / data.movementDays).toFixed(2)} on movement days` : undefined}
+          // hint={[{ value: 'Movements on each day of the period' }]}
+          // figure={`${data.perDay.average}`}
           buckets={withHover(data.perDay.histogram, data.periodDays, 'day', perDayNames)}
           isDark={isDark}
         />

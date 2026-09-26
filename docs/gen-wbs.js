@@ -11,7 +11,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Service Concept & Work Breakdown Structure", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 3.8  |  13 September 2026", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 3.9  |  26 September 2026", size: 24 })], spacing: { after: 240 } }),
 );
 
 C(h1("Version History"));
@@ -43,6 +43,7 @@ C(table(["Version","Date","Headline"],[
   ["3.6","11 Sep 2026","Drinking rest scoring REDESIGNED \u2014 a score belongs to a drinking day and equals the dry days directly before it; the first drinking day in the log has none; a fully dry bucket has no average and reports dryDaysAtEnd instead. Summary shares the scoring. Interactions and Drinking Trend converted to the Weight-style grain \u00d7 count window on the new shared trend-window.ts; metric=drinking.trend runs three bounded queries per request in place of three per bucket including an all-time scan \u2014 the summary's all-time scan went with it, clearing that deferral. Drinking charts converted (three lines, stacked areas, right-axis rest and duration lines). Shared hover card on CssTrendChart and CssDualLineChart; right-hand axis on CssStackedAreaChart; dotSize ladder. Mirrors Design Doc v4.6"],
   ["3.7","12 Sep 2026","#61 Diet Trend converted to the Weight-style grain × count window — metric=diet.trend (computeDietTrend) runs ONE bounded query for the whole window and buckets in memory, replacing the per-bucket path that re-queried records AND ingredient_master for every bucket; the four daily metrics become three-line charts, Spicy and Relation become stacked areas, Composition and People stay on the short 3/6/12 count; the trend view moved into its own DietTrendView.tsx with the tab state lifted into DietWidget so the fetch can pick the right count list. THREE data corrections: companions double-counted on every food-bearing record, post-midnight records dropped on the last day of any range, and absent spiciness read as not-spicy. The v3.6 label-grain deferral is cleared for Diet. Mirrors Design Doc v4.7"],
   ["3.8","13 Sep 2026","MIGRATION TIMEZONE BUG FOUND AND FIXED \u2014 parseDateTime read the wall clock in the migration machine\u2019s zone (Europe/London), displacing every datetime by the UK offset; the error cancelled on ordinary records and did NOT cancel across a UK clock change, corrupting eleven sleep durations by an hour INCLUDING Korean ones, and moving near-midnight summer records onto the wrong day (which silently affected Drinking and Diet day assignment). Fixed with Date.UTC; offsets now applied in computeTotalSeconds only. timezoneOffset parseInteger \u2192 parseNumber (IST 5.5 was truncated to 5). Full re-migration of all years, plus 23 source-sheet corrections. #53 SLEEP WIDGET REBUILT on seven explicit night-assignment rules \u2014 metric=sleep.summary and metric=sleep.trend on a shared buildSleepDays pass; Summary is four metrics with pies and day-aligned strips; Trend collapses three charts into one Session band with a right-axis duration line, plus Quality as a percent stacked area; Sleep joins the shared grain \u00d7 count window, the last widget to do so"],
+  ["3.9","26 Sep 2026","#62 BOWEL MOVEMENT WIDGET — Summary COMPLETE, Trend not started. bowel.quality and bowel.characteristics now String[]; new Bowel sheet + bowel_score collection (allowed values AND scores; npm run migrate-bowel) and the daily migration rejects any bowel value not in it. Day-score index defined and verified on all years (mean movement score + frequency penalty −2 / −3, gap scale −1…−10, bad day below −3, scored from 2019-09-19). metric=bowel.summary, BowelWidget.tsx with a width-responsive layout; CssDailyChart hoverFor, Histogram hover + height, MetricPieBlock / HintLabel exported with unit and legendCols. Stale v3.7 footer corrected. Mirrors Design Doc v4.9"],
 ],[1100,1300,6960]));
 C(spacer());
 
@@ -96,11 +97,11 @@ C(table(["Phase","Status","Detail"],[
   ["1 — Base Infrastructure & Auth","\u2705 Complete","Subscription-architecture placeholder still pending"],
   ["2 — Data Structure Design","\u2705 Complete","Schema, supporting collections, Mongoose models"],
   ["3 — Migration Tool","\u2705 Complete","Delete-all + re-insert; incremental sync deferred to post-MVP"],
-  ["4 — Analytics & Search","\u2B1C In progress","Done: search, cost dashboard, Interactions / Drinking / Diet / Weight / Exercise widgets (all with Summary and Trend), food + drink ingredient taxonomies. Done: Drinking rest-scoring redesign + Interactions and Drinking trend windows (11 Sep), Diet (12 Sep). Done: migration timezone fix + #53 Sleep rebuilt on night-assignment rules (13 Sep) — Sleep was the last widget still on the old 3/6/12 selector, so every widget is now on the shared window. Remaining: #59 Calendar, 배변 widget"],
+  ["4 — Analytics & Search","\u2B1C In progress","Done: search, cost dashboard, Interactions / Drinking / Diet / Weight / Exercise widgets (all with Summary and Trend), food + drink ingredient taxonomies. Done: Drinking rest-scoring redesign + Interactions and Drinking trend windows (11 Sep), Diet (12 Sep). Done: migration timezone fix + #53 Sleep rebuilt on night-assignment rules (13 Sep) — Sleep was the last widget still on the old 3/6/12 selector, so every widget is now on the shared window. Done: #62 Bowel Movement Summary (26 Sep). Remaining: #62 Bowel Trend, #59 Calendar"],
   ["5 — Data Entry","\u2B1C Not started","Post-MVP"],
 ],[2900,1700,4760]));
 C(spacer());
-C(p([new TextRun({ text: "Current focus: ", bold: true }), new TextRun("배변 widget — design not started; the closest shape is Diet (a daily count plus ordinal scales), and the source columns BR/BS/BT already exist. Check per-field coverage by year BEFORE designing: urgency and stomach pain may have started partway through, which is the spiciness trap that cost a rewrite in v4.7. Then #59 Calendar view, then Phase 5 (data entry). The trend-view conversion is now COMPLETE across every widget: Interactions and Drinking 11 Sep, Diet 12 Sep, Sleep 13 Sep.")]));
+C(p([new TextRun({ text: "Current focus: ", bold: true }), new TextRun("#62 Bowel Movement — the Summary shipped on 26 Sep and is in use; the Trend view is not designed yet. Next: decide between the Bowel Trend view and #59 Calendar view, then Phase 5 (data entry). Every other widget already has Summary and Trend on the shared window.")]));
 
 C(h1("5. Work Breakdown Structure"));
 C(p("\u2705 = Complete   \u2B1C = Pending   DESCOPED = out of MVP scope. Each line states current state, not how it evolved (see the changelog for history)."));
@@ -169,7 +170,7 @@ C(
   bullet("\u2705 55. Average bed-time widget — CLOSED as covered by the Sleep widget (Summary bedtime + Trend › Session); no separate widget will be built"),
   bullet("\u2705 58. Exercise widget — Summary complete (per-item box plots, all-time bests, daily charts in a modal); Trend view deferred — see sub-items"),
   bullet("\u2B1C 59. Native calendar view — reuses the CalendarHeatmap built for #61 (the full Mon–Sun grid, not the inline HeatStrip). Design not started; begins with a design conversation in plain English, not code"),
-  bullet("\u2B1C 62. 배변 widget — frequency, count per day, quality, amount, urgency, stomach pain. Source columns BR (배변량) / BS (배변질) / BT (배변특징) already populate bowel.amount / .quality / .characteristics. Closest in shape to Diet. FIRST STEP: per-field coverage by year"),
+  bullet("\u2B1C 62. Bowel Movement (배변) widget — Summary \u2705 complete (26 Sep); Trend view not started — see sub-items. Source columns BJ (량) / BK (질) / BL (특징) → bowel.amount / .quality / .characteristics. NOTE: #62 is also the number of the drink ingredient taxonomy item — the two are unrelated"),
 );
 C(h3("Sub-items for #58 (Exercise Widget):"));
 C(p("Data preparation, the compute module, the API branch and the Summary view are all complete and in use. The Trend view is deferred and has no agreed design. Design Doc \u00a79.3.6 carries the full widget specification and the reasoning behind each decision."));
@@ -248,6 +249,37 @@ C(
   bullet("\u2705 RESOLVED v3.6 \u2014 Trend view labels derived from the CONTROL's grain, not the data's, so for one frame after a grain switch old buckets rendered under the new format. Interactions, Drinking and (v3.7) Diet all store the grain the SERVER echoed and format from that. Exercise still derives its labels from the control and should adopt the pattern when next touched"),
   bullet("\u2B1C Load line on the SUMMARY's daily modal \u2014 the Trend resolved the load line at bucket level; a daily load line remains unbuilt and its natural home is an optional second series on CssDailyChart"),
 );
+C(h3("Sub-items for #62 (Bowel Movement Widget):"));
+C(p("Design Doc \u00a79.3.7 carries the full specification: the day-score index, the counting rules for each block and the reasons behind each decision."));
+C(bold("Done — data"));
+C(
+  bullet("\u2705 Per-field coverage checked by year BEFORE designing (scripts/check-bowel-coverage.js): amount and quality 100%; characteristics complete only from 2019-09-19, so earlier empties are treated as unknown — the spiciness trap avoided"),
+  bullet("\u2705 Source data cleansed and fully re-migrated by Hyoje; one stray 이동 record carrying bowel values corrected"),
+  bullet("\u2705 bowel.quality and bowel.characteristics → String[] (Log.ts, parsePlusList in transform.ts, rowToDocument.ts); Search detail panel shows them comma-separated"),
+  bullet("\u2705 Bowel sheet created (value | score pairs) and loaded into the new bowel_score collection by scripts/migrate-bowel-score.ts (npm run migrate-bowel)"),
+  bullet("\u2705 Migration validates every bowel value against bowel_score — loadBowelVocabulary at start, BowelValidationError per row, same pattern as ingredients"),
+);
+C(bold("Done — index"));
+C(
+  bullet("\u2705 Movement score = amount + quality + characteristics; 편하게 raised to +5 so a perfect movement scores 10"),
+  bullet("\u2705 Day score = mean movement score + frequency penalty (3rd −2, each after −3); days without −1/−3/−5/−7/−10; bad day below −3; calendar day; scored from 2019-09-19"),
+  bullet("\u2705 Assessed quantitatively on all years with scripts/export-bowel.js before any API code: the first draft’s cliff at three movements removed; worst day moves a month’s average by 0.35 typically, 1.3 at most"),
+);
+C(bold("Done — widget"));
+C(
+  bullet("\u2705 src/lib/insights/bowel.ts — computeBowelSummary + pure buildBowelSummary; period to min(end, yesterday); crossActivities ignored on purpose"),
+  bullet("\u2705 stats/route.ts — metric=bowel.summary; verified in the browser against predicted values (Sep 2026, 2025, all years)"),
+  bullet("\u2705 BowelWidget.tsx registered after Sleep — header; Day score line with rich hover and bad-day zone; Per day / Gap / Duration histograms; Quality (½ / ⅓ split) and How it went pies with an Other signs list; seven fixed time-of-day groups"),
+  bullet("\u2705 Layout tightened after first review — @container rows follow the widget’s width, 48px histograms, pie row always three columns, two-column legends; about 1,150px → 640px at two-column page width"),
+  bullet("\u2705 Shared components extended, all default-off: CssDailyChart hoverFor; Histogram hover + height; MetricPieBlock / HintLabel exported from SleepWidget with unit and legendCols"),
+);
+C(bold("Not built"));
+C(
+  bullet("\u2B1C Trend view — not designed. A long period on the Summary draws 2,500+ daily points as a dense band"),
+  bullet("\u2B1C Sheet checks raised during the survey: four 0-minute durations (2020-08-05, 2021-11-17, 2022-04-21, 2024-02-18); three over 60 minutes (2020-01-20, 2023-03-06, 2023-09-17); two fully empty records (2021-10-25, 2026-03-09); one 2023 record without characteristics"),
+  bullet("\u2B1C Cause-and-effect links (diet timing, servings, caffeine cut-off, spiciness, ingredients, alcohol, exercise → Sleep, Bowel, Weight) — later, once the Trend and Calendar views exist"),
+);
+
 C(h3("Sub-items for #54 (Weight Widget):"));
 C(
   bullet("\u2705 src/lib/insights/weight.ts — computeWeightSummary; collapseToDays() shared by the period query and the latest-ever lookup; buildComposition normalises bodyFatPercent and degrades to a weight-only bar"),
@@ -402,6 +434,8 @@ C(
   bullet("\u2B1C Weight and Exercise still carry private copies of the grain/window/bucket helpers; they can adopt trend-window.ts when next touched"),
   bullet("\u2B1C Per-series stroke width / opacity on CssTrendChart \u2014 the Amt(day) design called for max and min to be thinner as well as lighter, but a series carries only a colour. Lighter colours alone were used instead"),
   bullet("\u2B1C Summary card does not read dryDaysAtEnd \u2014 a fully dry period therefore shows a blank average with nothing in its place. Rare in the data; wire it in when the widget is next open"),
+  bullet("\u2B1C CssDailyChart x-axis labels are M/D with no year, so a multi-year period is hard to read (visible on the Bowel Day score). Also affects Diet and Exercise modals"),
+  bullet("\u2B1C MetricPieBlock and HintLabel live in SleepWidget.tsx and are imported by BowelWidget. Extract both to _components if a third widget needs them"),
 );
 C(spacer());
 
@@ -423,7 +457,9 @@ C(table(["File","Used by","Rule"],[
   ["src/app/insights/_components/GlobalFilterBar.tsx","Insights page","Targeted patches only. Activity Type filter commits on Apply."],
   ["src/app/insights/_components/WidgetCard.tsx","All widgets","Targeted patches only. Changes affect every widget simultaneously."],
   ["src/app/insights/_components/ModalShell.tsx","Diet, Exercise","(v3.4) Targeted patches only. Portal modal on document.body; it exists specifically to escape widget-card overflow:hidden, so do not reparent it into the card."],
-  ["src/lib/migration/transform.ts","migrate, fill, reconcile, scan scripts","Targeted patches only. parseFoodIngredients / loadValidLevel2 are shared. Keep IngredientMaster import at top of file."],
+  ["src/lib/migration/transform.ts","migrate, fill, reconcile, scan scripts","Targeted patches only. parseFoodIngredients / loadValidLevel2 are shared. Keep IngredientMaster import at top of file. (v3.9) The bowel vocabulary block is appended at the END of the file and needs BowelScore imported at the top."],
+  ["src/app/insights/_widgets/SleepWidget.tsx","Sleep, Bowel","(v3.9) MetricPieBlock, HintLabel and Seg are exported and imported by BowelWidget — changing their props or layout changes both widgets. unit and legendCols default to Sleep’s behaviour."],
+  ["src/app/insights/_components/charts/Histogram.tsx","Drinking, Bowel","(v3.9) hover, hoverPlacement and height are default-off / 64px; Drinking passes none of them."],
 ],[3000,2600,3760]));
 C(spacer());
 C(h2("A.3 Regression Prevention Checklist"));
@@ -435,6 +471,7 @@ C(
   bullet("Global filter: All 4 time modes work including Week mode (ISO week numbers). Activity Type multi-select commits on Apply."),
   bullet("Auth: All widgets return data (not 403). Confirm session?.user?.userId is read correctly."),
   bullet("Weight widget: Summary shows the box plot with printed values, both composition bars, the delta strip and one legend. Filtering to a pre-InBody month gives un-segmented bars; LATEST still shows the most recent date overall."),
+  bullet("Bowel widget: September 2026 shows 21/25 days, Avg 6.7, 1 bad day; 2025 shows Avg 2.0 and 48 bad days. Day-score hover lists every movement. Three histograms side by side at two-column width, stacked at three-column width."),
   bullet("Dark mode: All charts render correctly in both light and dark mode."),
 );
 C(h2("A.4 API Route Safety"));
@@ -452,6 +489,7 @@ C(
   bullet("Before re-migrating old rows, run scan-bad-parens.ts and clean any legacy descriptive parentheses ((국만)/(국물)/(밥만)/content lists)."),
   bullet("Ingredient parsing applies to food.foods[] and food.drinks[] — never to food.alcohols[]."),
   bullet("To update alcohol_conversion: edit AlcoholConv sheet → npm run migrate-alcohol (no log re-migration needed)."),
+  bullet("(v3.9) To update bowel scores or add a bowel value: edit the Bowel sheet → npm run migrate-bowel. A score change needs nothing else; a NEW value must be loaded before the next npm run migrate, or its rows are rejected. Check the Errors count after every migrate."),
 );
 
 C(h2("A.6 Google Sheets Column Insertion Rules"));
@@ -470,7 +508,7 @@ C(
 );
 C(spacer());
 
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze — Service Concept & WBS v3.7 — 12 September 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze — Service Concept & WBS v3.9 — 26 September 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 const doc = new Document({
   styles: {
@@ -496,6 +534,6 @@ const doc = new Document({
   sections: [{ properties: { page: PAGE }, children }],
 });
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-WBS-v3.8.docx", buffer);
-  console.log("Wrote FarGaze-WBS-v3.8.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-WBS-v3.9.docx", buffer);
+  console.log("Wrote FarGaze-WBS-v3.9.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });
