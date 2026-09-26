@@ -1,4 +1,5 @@
 import IngredientMaster from '../../models/IngredientMaster';
+import BowelScore from '../../models/BowelScore';
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
 
@@ -23,6 +24,15 @@ export function parseString(val: string): string | null {
   if (val.trim() === '#N/A') return null;
   if (val.trim().startsWith('#')) return null;
   return val.trim();
+}
+
+// Parse a "+"-joined multi-value cell into a list ("무름+설사" → ["무름", "설사"]).
+// Empty or error cells return undefined so no field is stored at all.
+export function parsePlusList(val: string): string[] | undefined {
+  const s = parseString(val);
+  if (s === null) return undefined;
+  const items = s.split('+').map(t => t.trim()).filter(t => t !== '');
+  return items.length > 0 ? items : undefined;
 }
 
 // Parse boolean
@@ -392,3 +402,77 @@ export function parseFoodIngredients(raw: string): { item: string; ingredients: 
   return { item, ingredients };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Bowel vocabulary — allowed values come from the bowel_score collection
+// (Active file > Bowel sheet, loaded by `npm run migrate-bowel`).
+// Same pattern as ingredients: a value not in the sheet throws, the row is
+// reported as an error in the migration summary and is not inserted.
+// ─────────────────────────────────────────────────────────────────────────────
+
+type BowelField = 'amount' | 'quality' | 'characteristics';
+
+let _bowelVocab: Record<BowelField, Set<string>> | null = null;
+
+export async function loadBowelVocabulary(userId: string, force = false) {
+  if (_bowelVocab && !force) return _bowelVocab;
+
+  const docs = await BowelScore.find({ userId }).select('field value -_id').lean();
+  const vocab: Record<BowelField, Set<string>> = {
+    amount: new Set(),
+    quality: new Set(),
+    characteristics: new Set(),
+  };
+  for (const d of docs as any[]) vocab[d.field as BowelField]?.add(d.value);
+
+  if (!vocab.amount.size || !vocab.quality.size || !vocab.characteristics.size) {
+    throw new Error(
+      'loadBowelVocabulary: bowel_score is empty or incomplete for userId "' +
+        userId +
+        '". Run `npm run migrate-bowel` first.'
+    );
+  }
+
+  _bowelVocab = vocab;
+  return vocab;
+}
+
+export class BowelValidationError extends Error {
+  constructor(
+    public readonly field: string,
+    public readonly badValue: string,
+    public readonly rawCell: string
+  ) {
+    super(`Unknown bowel ${field} "${badValue}" in "${rawCell}" (not in the Bowel sheet)`);
+    this.name = 'BowelValidationError';
+  }
+}
+
+function requireBowelVocab(): Record<BowelField, Set<string>> {
+  if (!_bowelVocab) {
+    throw new Error(
+      'Bowel value parsed before loadBowelVocabulary(). ' +
+        'Await loadBowelVocabulary(userId) once at migration start.'
+    );
+  }
+  return _bowelVocab;
+}
+
+// Single value (amount). Empty → null; unknown value → throws.
+export function parseBowelValue(val: string, field: BowelField): string | null {
+  const vocab = requireBowelVocab();
+  const s = parseString(val);
+  if (s === null) return null;
+  if (!vocab[field].has(s)) throw new BowelValidationError(field, s, s);
+  return s;
+}
+
+// "+"-joined list (quality, characteristics). Empty → undefined; any unknown item → throws.
+export function parseBowelList(val: string, field: BowelField): string[] | undefined {
+  const vocab = requireBowelVocab();
+  const items = parsePlusList(val);
+  if (!items) return undefined;
+  for (const item of items) {
+    if (!vocab[field].has(item)) throw new BowelValidationError(field, item, val.trim());
+  }
+  return items;
+}

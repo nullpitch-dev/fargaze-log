@@ -14,6 +14,7 @@ import { DrinkingWidget } from './_widgets/DrinkingWidget';
 import { DietWidget } from './_widgets/DietWidget';
 import { WeightWidget } from './_widgets/WeightWidget';
 import { ExerciseWidget } from './_widgets/ExerciseWidget';
+import { BowelWidget } from './_widgets/BowelWidget';
 
 // ── Widget registry ───────────────────────────────────────────────────────────
 // Add new widgets here — one line per widget.
@@ -28,7 +29,8 @@ const WIDGETS: WidgetConfig[] = [
   { id: 'interactions', size: 'md', component: InteractionsWidget },
   { id: 'drinking',     size: 'md', component: DrinkingWidget },
 	{ id: 'diet',         size: 'md', component: DietWidget },
-  { id: 'sleep',        size: 'md', component: SleepWidget },
+	{ id: 'sleep',        size: 'md', component: SleepWidget },
+  { id: 'bowel',        size: 'md', component: BowelWidget },
 	{ id: 'weight',       size: 'md', component: WeightWidget },
   { id: 'exercise',     size: 'md', component: ExerciseWidget },
 ];

@@ -23,7 +23,7 @@ interface LogEntry {
   };
   people?: Array<{ method?: string; category?: string; target?: string }>;
   transport?: { from?: string; to?: string; purpose?: string; method?: string; returnType?: string };
-  bowel?: { amount?: string; quality?: string; characteristics?: string };
+	bowel?: { amount?: string; quality?: string[]; characteristics?: string[] };
   body?: { weight?: number; muscleMass?: number; bodyFat?: number; bodyFatPercent?: number };
   sleep?: { quality?: string };
   exercise?: Array<{ item?: string; amount?: number; unit?: string }>;
@@ -342,8 +342,8 @@ function DetailPanel({ entry, onClose }: { entry: LogEntry; onClose: () => void 
           {entry.bowel && (entry.bowel.amount || entry.bowel.quality) && (
             <DetailSection title="대변">
               <DetailRow label="량" value={entry.bowel.amount} />
-              <DetailRow label="질" value={entry.bowel.quality} />
-              <DetailRow label="특징" value={entry.bowel.characteristics} />
+							<DetailRow label="질" value={entry.bowel.quality?.join(', ')} />
+              <DetailRow label="특징" value={entry.bowel.characteristics?.join(', ')} />
             </DetailSection>
           )}
 

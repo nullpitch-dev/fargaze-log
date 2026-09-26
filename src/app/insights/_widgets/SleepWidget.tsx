@@ -41,7 +41,7 @@ const CRITERIA = {
 
 // ── Pie ───────────────────────────────────────────────────────────────────────
 
-interface Seg { key: string; label: string; value: number; color: string; hint?: string }
+export interface Seg { key: string; label: string; value: number; color: string; hint?: string }
 
 /**
  * Pie and legend are one component because they share one hover state: pointing
@@ -53,8 +53,12 @@ interface Seg { key: string; label: string; value: number; color: string; hint?:
  * The card hangs below the block rather than below the pie, so it never lands
  * on top of the legend it is explaining.
  */
-function MetricPieBlock({ segments, title, size = 56, isDark, flip = false }: {
+export function MetricPieBlock({ segments, title, size = 56, isDark, flip = false, unit = 'day', legendCols = 1 }: {
   segments: Seg[]; title: string; size?: number; isDark: boolean; flip?: boolean;
+  /** what one unit of value counts, for the hover card: "3 days", "3 movements" */
+  unit?: string;
+  /** 2 = legend in two columns, for pies with many bands */
+  legendCols?: 1 | 2;
 }) {
   const [hoverKey, setHoverKey] = useState<string | null>(null);
 
@@ -81,7 +85,7 @@ function MetricPieBlock({ segments, title, size = 56, isDark, flip = false }: {
   const rows: HoverRow[] = segments.map(s => ({
     label: s.label,
     color: s.color,
-    value: `${s.value} day${s.value === 1 ? '' : 's'} · ${total ? Math.round((s.value / total) * 100) : 0}%`,
+		value: `${s.value} ${unit}${s.value === 1 ? '' : 's'} · ${total ? Math.round((s.value / total) * 100) : 0}%`,
     dim: hoverKey !== null && hoverKey !== s.key,
   }));
   const hovered = segments.find(s => s.key === hoverKey);
@@ -103,7 +107,11 @@ function MetricPieBlock({ segments, title, size = 56, isDark, flip = false }: {
         </svg>
       )}
 
-      <div className="flex flex-col gap-0.5 items-start">
+			{/* Two columns only when the nearest @container is wide enough (@lg);
+          below that one column, so a label never wraps inside a narrow cell. */}
+      <div className={legendCols === 2
+        ? 'grid grid-cols-1 @lg:grid-cols-2 gap-x-2 gap-y-0.5 whitespace-nowrap'
+        : 'flex flex-col gap-0.5 items-start'}>
         {segments.map(s => (
           <div key={s.key} className="flex items-center gap-1"
             style={{
@@ -139,7 +147,7 @@ function MetricPieBlock({ segments, title, size = 56, isDark, flip = false }: {
  * browser's own tooltip — so the thresholds read the same wherever they appear,
  * and appear at once rather than after the browser's delay.
  */
-function HintLabel({ text, rows, isDark, className, flip = false, placement = 'below' }: {
+export function HintLabel({ text, rows, isDark, className, flip = false, placement = 'below' }: {
   text: string;
   rows: HoverRow[];
   isDark: boolean;

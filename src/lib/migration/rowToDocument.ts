@@ -1,7 +1,9 @@
 import {
   parseNumber,
   parseInteger,
-  parseString,
+	parseString,
+	parseBowelValue,
+  parseBowelList,
   parseDateTime,
   zipMultiValue,
   zipMultiValueWithPlusSplit,
@@ -287,9 +289,9 @@ export function rowToDocument(row: any[], userId: string): any {
       returnType: parseString(get(row, C.TRANSPORT_RETURN_TYPE)),
     },
     bowel: {
-      amount: parseString(get(row, C.BOWEL_AMOUNT)),
-      quality: parseString(get(row, C.BOWEL_QUALITY)),
-      characteristics: parseString(get(row, C.BOWEL_CHARACTERISTICS)),
+			amount: parseBowelValue(get(row, C.BOWEL_AMOUNT), 'amount'),
+      quality: parseBowelList(get(row, C.BOWEL_QUALITY), 'quality'),
+      characteristics: parseBowelList(get(row, C.BOWEL_CHARACTERISTICS), 'characteristics'),
     },
     body: {
       weight: parseNumber(get(row, C.BODY_WEIGHT)),

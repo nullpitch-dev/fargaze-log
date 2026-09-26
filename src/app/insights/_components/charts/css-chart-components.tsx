@@ -1416,10 +1416,14 @@ interface CssDailyChartProps {
   zones?:        CssDailyZone[];           // background bands, in data units
   baselineZero?: boolean;                  // pin y-min to 0 (for sums / 인분)
   yPadPct?:      number;
+  // Optional rich hover. When given, the shared ChartHoverCard replaces the
+  // value + date bubble and hangs BELOW the plot, so a long card never covers
+  // the line. Return null to show nothing for that day.
+  hoverFor?:     (i: number) => { title?: string; rows: HoverRow[]; note?: string } | null;
 }
 
 export function CssDailyChart({
-  values, labels, formatY, isDark, avg = null, zones, baselineZero = false, yPadPct = 12,
+  values, labels, formatY, isDark, avg = null, zones, baselineZero = false, yPadPct = 12, hoverFor,
 }: CssDailyChartProps) {
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
 
@@ -1525,8 +1529,15 @@ export function CssDailyChart({
               <div key={lbl + i} className="absolute top-0 bottom-0"
                 style={{ left: `${xPct(i)}%`, width: `${100 / Math.max(1, n)}%`,
                   transform: 'translateX(-50%)', cursor: 'pointer', zIndex: 2 }}
-                onMouseEnter={() => setActiveIdx(i)}
+								onMouseEnter={() => setActiveIdx(i)}
                 onMouseLeave={() => setActiveIdx(null)}>
+                {hoverFor && activeIdx === i && (() => {
+                  const h = hoverFor(i);
+                  return h ? (
+                    <ChartHoverCard title={h.title} rows={h.rows} note={h.note} isDark={isDark}
+                      flip={xPct(i) > 60} placement="below" />
+                  ) : null;
+                })()}
                 {v !== null && (() => {
                   const top = `${yPct(v)}%`;
                   const isActive = activeIdx === i;
@@ -1536,7 +1547,7 @@ export function CssDailyChart({
                         style={{ left: '50%', top, transform: 'translate(-50%,-50%)',
                           width: isActive ? 9 : 5, height: isActive ? 9 : 5,
                           background: dc, opacity: isActive ? 1 : 0.85, zIndex: 3 }} />
-                      {isActive && (
+											{isActive && !hoverFor && (
                         <div className="absolute rounded px-1.5 py-1 leading-tight whitespace-nowrap text-center pointer-events-none"
                           style={{ left: '50%', top,
                             transform: 'translate(-50%, calc(-100% - 11px))',

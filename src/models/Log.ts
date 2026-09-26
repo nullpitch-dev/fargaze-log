@@ -79,8 +79,8 @@ export interface ILog extends Document {
   };
   bowel?: {
     amount?: string;
-    quality?: string;
-    characteristics?: string;
+		quality?: string[];
+    characteristics?: string[];
   };
   body?: {
     weight?: number;
@@ -228,8 +228,8 @@ const LogSchema = new Schema<ILog>({
   },
   bowel: {
     amount: String,
-    quality: String,
-    characteristics: String,
+		quality: { type: [String], default: undefined },
+    characteristics: { type: [String], default: undefined },
   },
   body: {
     weight: Number,

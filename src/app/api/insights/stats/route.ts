@@ -18,6 +18,7 @@ import type { WeightGranularity } from '@/lib/insights/weight';
 import { computeExerciseSummary } from '@/lib/insights/exercise';
 import { computeExerciseTrend, computeExerciseItemTrend } from '@/lib/insights/exercise-trend';
 import type { ExerciseTrendGrain } from '@/lib/insights/exercise-trend';
+import { computeBowelSummary } from '@/lib/insights/bowel';
 
 // ── Main route ────────────────────────────────────────────────────────────────
 
@@ -347,7 +348,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ trend });
   }
 
-  // ── exercise.summary ──────────────────────────────────────────────────────
+	// ── bowel.summary ───────────────────────────────────────────────────────────
+  // Period runs to min(period end, yesterday). The compute module fetches all
+  // movements unbounded — gaps and the first movement day look back past the
+  // period start. crossActivities is ignored on purpose (see bowel.ts).
+  if (metric === 'bowel.summary') {
+    const { start, end } = buildDateRange(timeMode, timePeriod, dateFrom, dateTo);
+    const summary = await computeBowelSummary(userId, start, end);
+    return NextResponse.json({ summary });
+  }
+
+  // ── exercise.summary ──
   // Summary mode only — no Trend view in #58. The compute module fetches all
   // 운동 records unbounded and cuts the period itself, because the personal
   // bests are all-time, so no date filter is applied here.

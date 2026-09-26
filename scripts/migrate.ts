@@ -6,7 +6,7 @@ dotenv.config({ path: path.join(process.cwd(), '.env.local') });
 
 import mongoose from 'mongoose';
 import { google } from 'googleapis';
-import { createRowFilter, loadValidLevel2 } from '../src/lib/migration/transform';
+import { createRowFilter, loadValidLevel2, loadBowelVocabulary } from '../src/lib/migration/transform';
 import { rowToDocument } from '../src/lib/migration/rowToDocument';
 import Log from '../src/models/Log';
 import CostMaster from '../src/models/CostMaster';
@@ -216,7 +216,12 @@ async function main() {
   // Load level2 ingredient vocabulary from ingredient_master (single source of truth).
   // Run `npm run migrate-ingredient` first if this throws.
   await loadValidLevel2(userId);
-  console.log('✅ Level2 vocabulary loaded from ingredient_master');
+	console.log('✅ Level2 vocabulary loaded from ingredient_master');
+
+  // Bowel values allowed by the Bowel sheet (bowel_score collection).
+  // Run `npm run migrate-bowel` first if this throws.
+  await loadBowelVocabulary(userId);
+  console.log('✅ Bowel vocabulary loaded from bowel_score');
   const results = [];
 
   // ── RARELY NEEDED — uncomment when supporting collections change ──────────
