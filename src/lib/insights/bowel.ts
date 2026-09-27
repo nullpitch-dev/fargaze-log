@@ -29,6 +29,9 @@
 
 import Log from '@/models/Log';
 import BowelScore from '@/models/BowelScore';
+import {
+  type TrendGrain, ymd, fromYMD, buildBucketStarts, bucketDayCount, bucketLabel,
+} from './trend-window';
 
 export const DAY_SCORE_START = '2019-09-19';
 export const BAD_DAY_BELOW = -3;
@@ -383,5 +386,167 @@ export function buildBowelSummary(
     howItWent,
     otherSigns,
     timeOfDay: { groups, peak: top ? top.key : null },
+  };
+}
+
+// ── Trend ─────────────────────────────────────────────────────────────────────
+//
+// Every bucket IS a Summary: buildBowelSummary runs once per bucket over the
+// bucket's own dates (clamped to the window). No rule is restated here, so a
+// Month bucket always agrees with the Summary for that month — gaps and the
+// first movement day look back past the bucket start exactly as they look back
+// past a period start. One extra run over the whole window picks the Other
+// signs bands, so the bands are the same in every bucket.
+//
+// ~3.5k records × at most a few hundred buckets — cheap, and it keeps the
+// rules in one place.
+
+export const TREND_SIGN_TOP = 6;
+export const TREND_SIGN_OTHER = 'Other';
+
+// Quality bands, bottom → top: hard → normal → loose. An ordinal scale, so the
+// view keeps this order rather than sorting by size. A value not listed here
+// (new in the Bowel sheet) is appended after 설사 rather than dropped.
+export const QUALITY_ORDER = ['토끼똥', '딱딱함', '푸석함', '가늠', '좋음', '보통', '무름', '묽음', '설사'] as const;
+
+export interface BowelTrendBucket {
+  label:        string;
+  start:        string;             // bucket start, YYYY-MM-DD
+  end:          string;             // last day counted (clamped to the window)
+  daysInBucket: number;
+  movementDays: number;
+  movements:    number;
+  score: {
+    average:    number | null;
+    scoredDays: number;
+    badDays:    number;
+    badShare:   number | null;      // % of scored days below BAD_DAY_BELOW
+    worst:      { date: string; score: number } | null;
+  };
+  perDay:   { average: number;        counts: number[] };   // aligned to perDayLabels
+  gap:      { average: number | null; counts: number[] };   // aligned to gapLabels
+  duration: { average: number | null; counts: number[]; counted: number };  // aligned to durationLabels
+  quality:  Record<string, number>;   // value → share % (½ / ⅓ split), as the Summary pie
+  qualityCount: number;               // movements with a quality recorded
+  howItWent: Record<string, number>;  // value → movements, incl. HOW_NOT_RECORDED
+  otherSigns: { movements: number; pct: Record<string, number> };  // signKeys + TREND_SIGN_OTHER → % of movements
+  timeOfDay: Record<string, number>;  // group key → movements
+}
+
+export interface BowelTrend {
+  grain:          TrendGrain;
+  windowStart:    string;
+  windowEnd:      string;
+  perDayLabels:   string[];
+  gapLabels:      string[];
+  durationLabels: string[];
+  qualityOrder:   string[];
+  signKeys:       string[];           // top signs over the window, largest first; Other last when used
+  timeGroups:     { key: string; label: string; range: string }[];
+  buckets:        BowelTrendBucket[];
+}
+
+export async function computeBowelTrend(
+  userId: string,
+  grain: TrendGrain,
+  windowStart: Date,
+  windowEnd: Date,
+): Promise<BowelTrend> {
+  const [scoreRows, docs] = await Promise.all([
+    BowelScore.find({ userId }).lean(),
+    Log.find(
+      { userId, 'activity.category': '생리', 'activity.name': '대변' },
+      { start: 1, bowel: 1, 'duration.totalSeconds': 1 },
+    ).lean(),
+  ]);
+  const scores = scoreTableFrom(scoreRows as any[]);
+  if (!scores.quality.size) {
+    throw new Error('bowel_score is empty. Run `npm run migrate-bowel` first.');
+  }
+  return buildBowelTrend(docs as any[], scores, grain, ymd(windowStart), ymd(windowEnd), localToday());
+}
+
+// Pure, like buildBowelSummary: runs against an export without a database.
+export function buildBowelTrend(
+  docs: any[],
+  scores: ScoreTable,
+  grain: TrendGrain,
+  startStr: string,
+  endStr: string,
+  today: string,
+): BowelTrend {
+  const toDate = (s: string) => { const [y, m, d] = s.split('-').map(Number); return fromYMD(y, m, d); };
+  const ws = toDate(startStr);
+  const we = toDate(endStr);
+
+  // Other signs bands: fixed over the whole window
+  const whole = buildBowelSummary(docs, scores, startStr, endStr, today);
+  const topSigns = whole.otherSigns.rows.slice(0, TREND_SIGN_TOP).map(r => r.value);
+  const hasOther = whole.otherSigns.rows.length > TREND_SIGN_TOP;
+  const signKeys = hasOther ? [...topSigns, TREND_SIGN_OTHER] : topSigns;
+
+  const qualityOrder: string[] = [...QUALITY_ORDER];
+  for (const q of whole.quality) if (!qualityOrder.includes(q.value)) qualityOrder.push(q.value);
+
+  const buckets: BowelTrendBucket[] = buildBucketStarts(grain, ws, we).map(bs => {
+    const be = new Date(bs);
+    if (grain === 'week') be.setUTCDate(be.getUTCDate() + 6);
+    else if (grain === 'month') { be.setUTCMonth(be.getUTCMonth() + 1); be.setUTCDate(be.getUTCDate() - 1); }
+    const bEnd = be > we ? we : be;
+
+    const s = buildBowelSummary(docs, scores, ymd(bs), ymd(bEnd), today);
+
+    let worst: { date: string; score: number } | null = null;
+    for (const d of s.days) {
+      if (d.score !== null && (worst === null || d.score < worst.score)) worst = { date: d.date, score: d.score };
+    }
+
+    const pct: Record<string, number> = {};
+    for (const k of topSigns) pct[k] = 0;
+    if (hasOther) pct[TREND_SIGN_OTHER] = 0;
+    for (const r of s.otherSigns.rows) {
+      const k = topSigns.includes(r.value) ? r.value : TREND_SIGN_OTHER;
+      if (k in pct) pct[k] = r1(pct[k] + r.pctOfMovements);
+    }
+
+    return {
+      label:        bucketLabel(grain, bs),
+      start:        ymd(bs),
+      end:          s.dates.length ? s.dates[s.dates.length - 1] : ymd(bEnd),
+      daysInBucket: bucketDayCount(grain, bs, ws, we),
+      movementDays: s.movementDays,
+      movements:    s.movements,
+      score: {
+        ...s.dayScore,
+        badShare: s.dayScore.scoredDays ? r1((s.dayScore.badDays / s.dayScore.scoredDays) * 100) : null,
+        worst,
+      },
+      perDay:   { average: s.perDay.average, counts: s.perDay.histogram.map(h => h.count) },
+      gap:      { average: s.gap.average, counts: s.gap.histogram.map(h => h.count) },
+      duration: { average: s.duration.average, counts: s.duration.histogram.map(h => h.count), counted: s.duration.counted },
+      quality:  Object.fromEntries(s.quality.map(q => [q.value, q.share])),
+      qualityCount: s.days.reduce((n, d) => n + d.movements.filter(m => m.quality.length).length, 0),
+      howItWent: Object.fromEntries(s.howItWent.map(h => [h.value, h.count])),
+      otherSigns: { movements: s.otherSigns.movements, pct },
+      timeOfDay: Object.fromEntries(s.timeOfDay.groups.map(g => [g.key, g.count])),
+    };
+  });
+
+  // Drop leading buckets before the log begins (the Sleep rule). Interior and
+  // trailing empty buckets stay: they are facts about those buckets.
+  const first = buckets.findIndex(b => b.movements > 0);
+  const trimmed = first <= 0 ? buckets : buckets.slice(first);
+
+  return {
+    grain,
+    windowStart:    trimmed.length ? trimmed[0].start : startStr,
+    windowEnd:      endStr,
+    perDayLabels:   [...PER_DAY_LABELS],
+    gapLabels:      [...GAP_LABELS],
+    durationLabels: DURATION_BUCKETS.map(b => b.label),
+    qualityOrder,
+    signKeys,
+    timeGroups:     TIME_GROUPS.map(g => ({ key: g.key, label: g.label, range: g.range })),
+    buckets:        trimmed,
   };
 }

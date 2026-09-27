@@ -10,7 +10,7 @@ import Log from '@/models/Log';
 import { buildDateRange, stepBack, labelForPeriod, currentPeriod } from '@/lib/insights/dates';
 import { computeSleepSummary, computeSleepTrend, computeSleepSummaryLegacy } from '@/lib/insights/sleep';
 import { computeInteractionsSummary, computeInteractionsTrendBucket, addTransitioning, computeInteractionsTrend } from '@/lib/insights/interactions';
-import { parseGrain, anchorFrom, resolveWindow } from '@/lib/insights/trend-window';
+import { parseGrain, anchorFrom, resolveWindow, todayUTC } from '@/lib/insights/trend-window';
 import { computeDrinkingSummary, computeDrinkingTrendBucket, computeDrinkingTrend } from '@/lib/insights/drinking';
 import { computeDietSummary, computeDietTrendBucket, computeDietTrend } from '@/lib/insights/diet';
 import { computeWeightSummary, computeWeightTrend } from '@/lib/insights/weight';
@@ -18,7 +18,7 @@ import type { WeightGranularity } from '@/lib/insights/weight';
 import { computeExerciseSummary } from '@/lib/insights/exercise';
 import { computeExerciseTrend, computeExerciseItemTrend } from '@/lib/insights/exercise-trend';
 import type { ExerciseTrendGrain } from '@/lib/insights/exercise-trend';
-import { computeBowelSummary } from '@/lib/insights/bowel';
+import { computeBowelSummary, computeBowelTrend } from '@/lib/insights/bowel';
 
 // ── Main route ────────────────────────────────────────────────────────────────
 
@@ -354,8 +354,27 @@ export async function GET(req: NextRequest) {
   // period start. crossActivities is ignored on purpose (see bowel.ts).
   if (metric === 'bowel.summary') {
     const { start, end } = buildDateRange(timeMode, timePeriod, dateFrom, dateTo);
-    const summary = await computeBowelSummary(userId, start, end);
+	  const summary = await computeBowelSummary(userId, start, end);
     return NextResponse.json({ summary });
+  }
+
+  // ── bowel.trend ─────────────────────────────────────────────────────────────
+  // The shared grain × count window, anchored at min(end of the selected
+  // period, YESTERDAY) — not today: an unfinished today would read as a gap
+  // day, the same rule as the Summary. crossActivities ignored, as above.
+  if (metric === 'bowel.trend') {
+    const grain = parseGrain(sp.get('grain'), 'month');
+    const bucketCount = parseInt(sp.get('buckets') ?? '24');
+    const safeCount = Math.min(Number.isFinite(bucketCount) ? Math.max(1, bucketCount) : 24, 400);
+
+    const { end: periodEnd } = buildDateRange(timeMode, timePeriod, dateFrom, dateTo);
+    const anchor = anchorFrom(periodEnd);
+    const yesterday = todayUTC();
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    const { start, end } = resolveWindow(grain, safeCount, anchor < yesterday ? anchor : yesterday);
+
+    const trend = await computeBowelTrend(userId, grain, start, end);
+    return NextResponse.json(trend);
   }
 
   // ── exercise.summary ──

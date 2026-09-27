@@ -1,7 +1,8 @@
 'use client';
 // src/app/insights/_widgets/BowelWidget.tsx
 //
-// Bowel Movement widget (WBS #62) — Summary view.
+// Bowel Movement widget (WBS #62) — Summary view, and the shell for the
+// Trend view (BowelTrendView.tsx).
 //
 // Header      movement days / period days, per week, last movement
 // Day Score   daily line, dashed average, bad-day zone; hover lists every movement
@@ -13,10 +14,13 @@
 // All rules live in src/lib/insights/bowel.ts; this file only draws.
 
 import { useEffect, useState } from 'react';
-import { WidgetCard } from '../_components/WidgetCard';
+import { WidgetCard, ViewToggle } from '../_components/WidgetCard';
 import { useIsDark } from '../_lib/hooks';
 import { buildParams } from '../_lib/date-helpers';
-import type { WidgetProps } from '../_lib/types';
+import type { WidgetProps, WidgetViewMode } from '../_lib/types';
+import type { TrendGrain } from '@/lib/insights/trend-window';
+import { DEFAULT_BUCKETS } from './WeightTrendView';
+import { BowelTrendView, type BowelTrend, type BowelTrendTab } from './BowelTrendView';
 import { CssDailyChart, type HoverRow } from '../_components/charts/css-chart-components';
 import { Histogram, type HistogramBucket } from '../_components/charts/Histogram';
 import { MetricPieBlock, HintLabel, type Seg } from './SleepWidget';
@@ -216,7 +220,7 @@ function BowelSummaryView({ data, isDark }: { data: Summary | null; isDark: bool
   const peak = data.timeOfDay.groups.find(g => g.key === data.timeOfDay.peak);
   const todTotal = data.timeOfDay.groups.reduce((s, g) => s + g.count, 0);
   const todBuckets: HistogramBucket[] = data.timeOfDay.groups.map(g => ({
-    label: g.range.slice(0, 5).replace(/^0/, ''),
+    label: `${g.range.slice(0, 5).replace(/^0/, '')}~`,
     count: g.count,
     hover: {
       title: `${g.label} · ${g.range}`,
@@ -256,6 +260,7 @@ function BowelSummaryView({ data, isDark }: { data: Summary | null; isDark: bool
               { value: 'No movement: −1, −3, −5, −7, then −10 a day', dim: true },
               { value: `Bad day: below ${BAD_DAY_BELOW}`, dim: true },
               { value: 'Until yesterday — today is not finished', dim: true },
+              { value: '× marks a day with no movement', dim: true },
             ]}
           />
           <span className="text-[11px] text-stone-500 dark:text-zinc-400">
@@ -274,6 +279,7 @@ function BowelSummaryView({ data, isDark }: { data: Summary | null; isDark: bool
             avg={data.dayScore.average}
             zones={[{ from: -1000, to: BAD_DAY_BELOW, color: isDark ? 'rgba(239,68,68,0.10)' : 'rgba(239,68,68,0.07)' }]}
             hoverFor={i => dayHover(byIndex[i])}
+            markerFor={i => (byIndex[i].movements.length ? 'dot' : 'cross')}
             isDark={isDark}
           />
         ) : (
@@ -373,25 +379,59 @@ function BowelSummaryView({ data, isDark }: { data: Summary | null; isDark: bool
 
 export function BowelWidget({ globalFilter }: WidgetProps) {
   const isDark = useIsDark();
+  const [viewMode, setViewMode] = useState<WidgetViewMode>('summary');
   const [data, setData] = useState<Summary | null>(null);
+  const [trend, setTrend] = useState<BowelTrend | null>(null);
+  const [trendTab, setTrendTab] = useState<BowelTrendTab>('score');
+  const [grain, setGrain] = useState<TrendGrain>('month');
+  const [count, setCount] = useState(DEFAULT_BUCKETS.month);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  function changeGrain(g: TrendGrain) {
+    setGrain(g);
+    setCount(DEFAULT_BUCKETS[g]);   // count resets to the new grain's default
+  }
+
   useEffect(() => {
     setLoading(true); setError(null);
-    fetch(`/api/insights/stats?${buildParams({ metric: 'bowel.summary' }, globalFilter)}`)
+    // Trend stays available in Period mode — the period only anchors the window.
+    const url = viewMode === 'summary'
+      ? `/api/insights/stats?${buildParams({ metric: 'bowel.summary' }, globalFilter)}`
+      : `/api/insights/stats?${buildParams(
+          { metric: 'bowel.trend', grain, buckets: String(count) },
+          globalFilter,
+        )}`;
+    fetch(url)
       .then(r => r.json())
       .then(d => {
         if (d.error) setError(String(d.error));
-        setData(d.summary ?? null);
+        // The trend payload carries its own grain; the view labels from it,
+        // so a grain switch never shows new labels against old data.
+        if (viewMode === 'summary') setData(d.summary ?? null);
+        else setTrend(d.buckets ? (d as BowelTrend) : null);
         setLoading(false);
       })
       .catch(() => { setError('Failed to load data.'); setLoading(false); });
-  }, [globalFilter]);
+  }, [globalFilter, viewMode, grain, count]);
 
   return (
-    <WidgetCard title="Bowel Movement" floor={1} loading={loading} error={error}>
-      <BowelSummaryView data={data} isDark={isDark} />
+    <WidgetCard title="Bowel Movement" floor={1} loading={loading} error={error}
+      action={<ViewToggle value={viewMode} onChange={setViewMode} />}>
+      {viewMode === 'summary' ? (
+        <BowelSummaryView data={data} isDark={isDark} />
+      ) : (
+        <BowelTrendView
+          data={trend}
+          isDark={isDark}
+          tab={trendTab}
+          onTabChange={setTrendTab}
+          grain={grain}
+          onGrainChange={changeGrain}
+          count={count}
+          onCountChange={setCount}
+        />
+      )}
     </WidgetCard>
   );
 }

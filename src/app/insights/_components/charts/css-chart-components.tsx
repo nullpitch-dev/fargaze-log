@@ -163,6 +163,10 @@ export interface CssTrendSeries {
   values: (number | null)[];
   color:  string;
   label?: string;
+  /** Right-hand series only (v4.10): draw it faint — a thin, low-opacity line,
+   *  faint hollow dots and no printed values — so it stays context behind the
+   *  main line. The hover card still shows its value. Off by default. */
+  dim?:   boolean;
 }
 
 interface CssTrendChartProps {
@@ -194,11 +198,17 @@ interface CssTrendChartProps {
   // carrying the year can be one of the thinned ones. Pass false to print
   // every label whole.
   compressXLabels?:  boolean;
+  // Background bands in left-axis units (v4.10 — the Bowel bad-day zone).
+  // Clipped to the plotted range. Off by default.
+  zones?:            CssDailyZone[];
+  // One extra dim line per bucket at the foot of the hover card (v4.10 — the
+  // Bowel worst day). null or absent for a bucket shows nothing. Off by default.
+  notes?:            (string | null)[];
 }
 
 export function CssTrendChart({
   series, labels, formatY, isDark, yPadPct = 10, yAxis, rightSeries, formatYRight,
-  xBand = false, maxXLabels, showValues = true, compressXLabels = true,
+  xBand = false, maxXLabels, showValues = true, compressXLabels = true, zones, notes,
 }: CssTrendChartProps) {
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
 
@@ -231,13 +241,22 @@ export function CssTrendChart({
 
   const n = labels.length;
   const dotD = dotSize(n);
-  const displayLabels = compressXLabels ? formatBucketLabels(labels) : labels;
   function xPct(i: number)  {
     if (xBand) return n <= 0 ? 50 : ((i + 0.5) / n) * 100;
     return n <= 1 ? 50 : (i / (n - 1)) * 100;
   }
   const labelStride = maxXLabels ? Math.max(1, Math.ceil(n / maxXLabels)) : 1;
   const showXLabel  = (i: number) => (n - 1 - i) % labelStride === 0;
+  // Thin FIRST, then shorten (v4.10) — the CssStackedAreaChart rule. Shortening
+  // all labels and then thinning dropped the one label carrying the year, so a
+  // new year could pass unmarked. Compressing only the labels actually drawn
+  // prints the year on the first kept label of every year. Without
+  // maxXLabels every label is kept, so the axis is exactly as before.
+  const keptIdx   = labels.map((_, i) => i).filter(showXLabel);
+  const keptShort = compressXLabels
+    ? formatBucketLabels(keptIdx.map(i => labels[i]))
+    : keptIdx.map(i => labels[i]);
+  const shortAt   = new Map<number, string>(keptIdx.map((i, k) => [i, keptShort[k]]));
   function yPct(v: number)  { return (1 - (v - yMin) / yRange) * 100; }
   function yPctR(v: number) { return (1 - (v - yMinR) / yRangeR) * 100; }
 
@@ -268,6 +287,18 @@ export function CssTrendChart({
 
         {/* Plot area */}
         <div className="relative flex-1" style={{ height: CHART_H }}>
+          {/* Zone bands (optional) — clipped to the plotted range */}
+          {zones?.map((z, zi) => {
+            const top    = Math.max(0, yPct(Math.min(z.to, yMax)));
+            const bottom = Math.min(100, yPct(Math.max(z.from, yMin)));
+            const h      = bottom - top;
+            if (h <= 0) return null;
+            return (
+              <div key={zi} className="absolute inset-x-0 pointer-events-none"
+                style={{ top: `${top}%`, height: `${h}%`, background: z.color }} />
+            );
+          })}
+
           {/* Grid lines — left ticks only; a second grid would be noise */}
           {ticks.map(tk => (
             inPlot(yPct(tk.value)) ? (
@@ -305,9 +336,9 @@ export function CssTrendChart({
               if (!d) return null;
               return (
                 <path d={d} fill="none" stroke={rightSeries.color}
-                  strokeWidth="1.5" strokeDasharray="5 3"
+                  strokeWidth={rightSeries.dim ? 1 : 1.5} strokeDasharray="5 3"
                   strokeLinejoin="round" strokeLinecap="round"
-                  vectorEffect="non-scaling-stroke" opacity={0.85} />
+                  vectorEffect="non-scaling-stroke" opacity={rightSeries.dim ? 0.35 : 0.85} />
               );
             })()}
           </svg>
@@ -365,8 +396,8 @@ export function CssTrendChart({
                         width: isActive ? dotD + 2 : dotD, height: isActive ? dotD + 2 : dotD,
                         background: isDark ? '#18181b' : '#ffffff',
                         border: `1.5px solid ${rightSeries.color}`,
-                        opacity: isActive ? 1 : 0.9, zIndex: 3 }} />
-                    {showValues && (
+                        opacity: isActive ? 1 : rightSeries.dim ? 0.3 : 0.9, zIndex: 3 }} />
+                    {showValues && !rightSeries.dim && (
                       <div className="absolute text-[10px] font-semibold leading-none whitespace-nowrap"
                         style={{ left: '50%', top,
                           transform: labelBelow ? 'translate(-50%, 8px)' : 'translate(-50%, -18px)',
@@ -396,7 +427,8 @@ export function CssTrendChart({
                       background: isDark ? '#27272a' : '#ffffff',
                       border: `1px solid ${isDark ? '#3f3f46' : '#e7e5e4'}`,
                       boxShadow: '0 2px 8px rgba(0,0,0,0.12)', zIndex: 6 }}>
-                    <div style={{ fontSize: 10, color: lc }}>{displayLabels[i]}</div>
+                    {/* Full label, year included — the axis may have shortened it */}
+                    <div style={{ fontSize: 10, color: lc }}>{labels[i]}</div>
 
                     {series.map((s, si) => {
                       const v = s.values[i];
@@ -428,6 +460,10 @@ export function CssTrendChart({
                         </span>
                       </div>
                     )}
+
+                    {notes?.[i] && (
+                      <div style={{ fontSize: 10, color: lc, marginTop: 3 }}>{notes[i]}</div>
+                    )}
                   </div>
                 </>
               )}
@@ -457,14 +493,14 @@ export function CssTrendChart({
       <div className="flex w-full"
         style={{ paddingLeft: Y_LABEL_W, paddingRight: hasRight ? Y_LABEL_WR : 0 }}>
         <div className="relative flex-1" style={{ height: 16 }}>
-          {displayLabels.map((lbl, i) => showXLabel(i) ? (
+          {keptIdx.map(i => (
             <span key={i} className="absolute text-[10px] leading-none whitespace-nowrap"
               style={{ left: `${xPct(i)}%`, transform: 'translateX(-50%)',
                 color: i === n - 1 ? (isDark ? '#f4f4f5' : '#292524') : lc,
                 fontWeight: i === n - 1 ? 600 : 400 }}>
-              {lbl}
+              {shortAt.get(i)}
             </span>
-          ) : null)}
+          ))}
         </div>
       </div>
 
@@ -1420,10 +1456,15 @@ interface CssDailyChartProps {
   // value + date bubble and hangs BELOW the plot, so a long card never covers
   // the line. Return null to show nothing for that day.
   hoverFor?:     (i: number) => { title?: string; rows: HoverRow[]; note?: string } | null;
+  // Optional per-point marker shape. 'cross' draws an × instead of a dot, so a
+  // class of day (Bowel: no movement) reads at a glance. Default: every point
+  // is a dot, so existing call sites render as before.
+  markerFor?:    (i: number) => 'dot' | 'cross';
 }
 
 export function CssDailyChart({
   values, labels, formatY, isDark, avg = null, zones, baselineZero = false, yPadPct = 12, hoverFor,
+  markerFor,
 }: CssDailyChartProps) {
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
 
@@ -1541,12 +1582,24 @@ export function CssDailyChart({
                 {v !== null && (() => {
                   const top = `${yPct(v)}%`;
                   const isActive = activeIdx === i;
+                  const cross = markerFor?.(i) === 'cross';
+                  const xs = isActive ? 11 : 8;   // a cross needs a little more room than a dot to read
                   return (
                     <>
-                      <div className="absolute rounded-full"
-                        style={{ left: '50%', top, transform: 'translate(-50%,-50%)',
-                          width: isActive ? 9 : 5, height: isActive ? 9 : 5,
-                          background: dc, opacity: isActive ? 1 : 0.85, zIndex: 3 }} />
+                      {cross ? (
+                        <svg className="absolute pointer-events-none" width={xs} height={xs}
+                          viewBox="0 0 10 10"
+                          style={{ left: '50%', top, transform: 'translate(-50%,-50%)',
+                            opacity: isActive ? 1 : 0.85, zIndex: 3, overflow: 'visible' }}>
+                          <path d="M1.5 1.5 L8.5 8.5 M8.5 1.5 L1.5 8.5" stroke={dc}
+                            strokeWidth={isActive ? 3 : 2.4} strokeLinecap="round" />
+                        </svg>
+                      ) : (
+                        <div className="absolute rounded-full"
+                          style={{ left: '50%', top, transform: 'translate(-50%,-50%)',
+                            width: isActive ? 9 : 5, height: isActive ? 9 : 5,
+                            background: dc, opacity: isActive ? 1 : 0.85, zIndex: 3 }} />
+                      )}
 											{isActive && !hoverFor && (
                         <div className="absolute rounded px-1.5 py-1 leading-tight whitespace-nowrap text-center pointer-events-none"
                           style={{ left: '50%', top,
@@ -1641,6 +1694,11 @@ interface CssStackedAreaChartProps {
    *  where nothing ended still reads as continuous. Off by default. */
   rightLine?:     { values: (number | null)[]; bridge?: (number | null)[]; color: string; label?: string };
   formatYRight?:  (v: number) => string;
+  /** Absolute mode only: a point whose segments are all zero draws as a real
+   *  zero (flat on the floor) instead of a gap. For measures where zero is a
+   *  fact, not a missing record — Bowel Other signs. Off by default, so the
+   *  settled "zero-total bucket is a gap" rule holds everywhere else. */
+  zeroIsValue?:   boolean;
 }
 
 const AREA_H = 150;
@@ -1661,7 +1719,7 @@ function areaBandPath(
 export function CssStackedAreaChart({
   points, segmentDefs, isDark, mode = 'absolute', formatY = String,
   height = AREA_H, baselineZero = false, yPadPct = 8, maxXLabels = 8,
-  highlightable = false, rightLine, formatYRight,
+  highlightable = false, rightLine, formatYRight, zeroIsValue = false,
 }: CssStackedAreaChartProps) {
 	const [activeIdx, setActiveIdx] = useState<number | null>(null);
   // One highlight state driven from two places — the legend and the plot —
@@ -1685,7 +1743,7 @@ export function CssStackedAreaChart({
     if (!seg) return null;
     const vals = segmentDefs.map(d => seg[d.key] ?? 0);
     const sum  = vals.reduce((a, b) => a + b, 0);
-    if (sum <= 0) return null;
+    if (sum <= 0) return zeroIsValue && !percent ? vals.map(() => 0).concat(0) : null;
     const scale = percent ? 100 / sum : 1;
     const out: number[] = [0];
     for (const v of vals) out.push(out[out.length - 1] + v * scale);
