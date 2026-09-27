@@ -3,6 +3,7 @@
 // GET /api/calendar/options — what the Calendar filters offer:
 //   categories      every activity.category with its all-time record count
 //   crossActivities every distinct activity.crossActivity
+//   firstYear       the year of the earliest record (month picker range)
 //   longestTimed    the longest timed (not all-day) record
 //   longTimedCount  timed records longer than MAX_TIMED_SPAN_DAYS; the events
 //                   query fetches these by duration, not by the look-back
@@ -20,7 +21,7 @@ export async function GET() {
 
   await connectDB();
 
-  const [cats, cross, longest, longTimedCount] = await Promise.all([
+  const [cats, cross, longest, longTimedCount, first] = await Promise.all([
     Log.aggregate([
       { $match: { userId } },
       { $group: { _id: '$activity.category', count: { $sum: 1 } } },
@@ -35,6 +36,7 @@ export async function GET() {
     Log.countDocuments({
       userId, allDay: { $ne: true }, 'duration.totalSeconds': { $gt: MAX_TIMED_SPAN_DAYS * 86_400 },
     }),
+    Log.findOne({ userId, 'start.year': { $gt: 0 } }, { 'start.year': 1 }).sort({ 'start.year': 1 }).lean(),
   ]);
 
   const categories = cats
@@ -53,6 +55,7 @@ export async function GET() {
   return NextResponse.json({
     categories,
     crossActivities: (cross as string[]).filter(Boolean).sort((a, b) => a.localeCompare(b, 'ko')),
+    firstYear: (first as any)?.start?.year ?? null,
     longestTimed,
     longTimedCount,
     longTimedLimitDays: MAX_TIMED_SPAN_DAYS,

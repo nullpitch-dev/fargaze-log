@@ -8,21 +8,26 @@
 //
 // Step 1: Month view. Week, Day, Year and Schedule follow; their buttons are
 // shown disabled so the toolbar does not move when they arrive.
+// Step 1b: month picker on the title, collapsible filter panel (remembered per
+// device), and the shared record detail pane.
 
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { CalendarEvent } from '@/lib/calendar/calendar';
-import { zonedDate } from '@/lib/calendar/calendar';
+import { zonedDate, addDays } from '@/lib/calendar/calendar';
 import { useIsDark } from '@/app/insights/_lib/hooks';
 import { ModalShell } from '@/app/insights/_components/ModalShell';
 import {
-  monthGrid, layoutWeek, applyFilters, isReading, touches, readingProgress,
+  monthGrid, applyFilters, isReading, touches, readingProgress,
 } from './_lib/month-layout';
-import { MonthView, DayList, METRICS_COMPACT, METRICS_WIDE } from './_components/MonthView';
+import { MonthView, DayList } from './_components/MonthView';
 import { CalendarFilters, type FilterState } from './_components/CalendarFilters';
+import { MonthPicker } from './_components/MonthPicker';
+import { DetailPanel, type LogEntry } from '@/app/_components/LogDetailPanel';
 
 const COMPACT_BELOW = 640;   // px of page width
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const SIDEBAR_KEY = 'fargaze.calendar.sidebarOpen';   // per device, like the panel width itself
 
 const DEFAULT_FILTERS: FilterState = {
   hiddenCategories: [], hiddenCrossActivities: [], colors: {}, showReading: true,
@@ -68,9 +73,21 @@ function CalendarInner() {
   }, []);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
+  // ── Wide screens: the filter column folds away; remembered on this device ──
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  useEffect(() => {
+    try { if (localStorage.getItem(SIDEBAR_KEY) === '0') setSidebarOpen(false); } catch {}
+  }, []);
+  const toggleSidebar = () => setSidebarOpen(o => {
+    try { localStorage.setItem(SIDEBAR_KEY, o ? '0' : '1'); } catch {}
+    return !o;
+  });
+  const [pickerOpen, setPickerOpen] = useState(false);
+
   // ── Options and saved settings ──
   const [categories, setCategories] = useState<{ name: string; count: number }[]>([]);
   const [crossActivities, setCrossActivities] = useState<string[]>([]);
+  const [firstYear, setFirstYear] = useState(2019);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   // Nothing is saved until the saved settings have arrived, so an early click
   // can never overwrite them with the defaults.
@@ -79,6 +96,7 @@ function CalendarInner() {
     fetch('/api/calendar/options').then(r => r.json()).then(o => {
       setCategories(o.categories ?? []);
       setCrossActivities(o.crossActivities ?? []);
+      if (o.firstYear) setFirstYear(o.firstYear);
     }).catch(() => {});
     fetch('/api/calendar/settings').then(r => r.json()).then(s => {
       if (s && !s.error) setFilters({ ...DEFAULT_FILTERS, ...s });
@@ -127,10 +145,15 @@ function CalendarInner() {
     [events, filters.hiddenCategories, filters.hiddenCrossActivities]);
   const reading = useMemo(() => shown.filter(isReading), [shown]);
   const others  = useMemo(() => shown.filter(e => !isReading(e)), [shown]);
-  const metrics = compact ? METRICS_COMPACT : METRICS_WIDE;
-  const weeks = useMemo(
-    () => grid.weeks.map(w => layoutWeek(w, others, reading, metrics.maxLanes, filters.showReading)),
-    [grid.weeks, others, reading, metrics.maxLanes, filters.showReading]);
+
+  // ── Record detail (the Search pane) ──
+  const [record, setRecord] = useState<LogEntry | null>(null);
+  const openEvent = useCallback((e: CalendarEvent) => {
+    fetch(`/api/calendar/record?id=${encodeURIComponent(e.id)}`)
+      .then(r => r.json())
+      .then(d => { if (!d.error) setRecord(d); })
+      .catch(() => {});
+  }, []);
 
   // ── Day pop-up ──
   const [openDay, setOpenDay] = useState<string | null>(null);
@@ -138,6 +161,24 @@ function CalendarInner() {
   const dayReading = openDay && filters.showReading
     ? reading.filter(e => touches(e, openDay)).map(e => ({ e, ...readingProgress(e, openDay) }))
     : [];
+
+  // ‹ › in the pop-up. A day outside the loaded grid moves the month with it.
+  const stepDay = useCallback((n: number) => {
+    if (!openDay) return;
+    const next = addDays(openDay, n);
+    setOpenDay(next);
+    if (next < grid.from || next > grid.to) setCursor(next);
+  }, [openDay, grid.from, grid.to, setCursor]);
+  useEffect(() => {
+    if (!openDay || record) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') stepDay(-1);
+      else if (e.key === 'ArrowRight') stepDay(1);
+      else if (e.key === 'Escape') setOpenDay(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [openDay, record, stepDay]);
 
   // ── Navigation ──
   const shiftMonth = (n: number) => {
@@ -159,6 +200,15 @@ function CalendarInner() {
     <div ref={rootRef} className="flex flex-col flex-1 px-4 py-4 gap-3">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
+        {!compact && (
+          <button onClick={toggleSidebar} aria-label={sidebarOpen ? 'Hide filters' : 'Show filters'}
+            title={sidebarOpen ? 'Hide filters' : 'Show filters'}
+            className="w-7 h-7 rounded-full flex items-center justify-center text-stone-500 dark:text-zinc-400 hover:bg-stone-100 dark:hover:bg-zinc-800">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6">
+              <path d="M2.5 4h11M2.5 8h11M2.5 12h11" />
+            </svg>
+          </button>
+        )}
         <button onClick={() => setCursor(today)}
           className="border border-stone-200 dark:border-zinc-700 rounded px-2.5 py-1 text-[11px] bg-white dark:bg-zinc-900 text-stone-700 dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800">
           Today
@@ -171,7 +221,18 @@ function CalendarInner() {
             </button>
           ))}
         </div>
-        <h1 className="text-base font-semibold text-stone-900 dark:text-zinc-50">{title}</h1>
+        <div className="relative">
+          <button onClick={() => setPickerOpen(o => !o)}
+            className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-stone-100 dark:hover:bg-zinc-800">
+            <h1 className="text-base font-semibold text-stone-900 dark:text-zinc-50">{title}</h1>
+            <span className="text-[9px] text-stone-400 dark:text-zinc-500">▼</span>
+          </button>
+          {pickerOpen && (
+            <MonthPicker cursor={cursor} today={today} firstYear={firstYear}
+              onPick={d => { setCursor(d); setPickerOpen(false); }}
+              onClose={() => setPickerOpen(false)} />
+          )}
+        </div>
         {loading && <span className="text-[10px] text-stone-400 dark:text-zinc-500">Loading…</span>}
         {tz !== deviceTz && (
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300">
@@ -210,25 +271,42 @@ function CalendarInner() {
               {filterPanel}
             </div>
           )}
-          <MonthView weeks={weeks} month={grid.month} today={today} tz={tz}
-            colors={filters.colors} isDark={isDark} compact onOpenDay={setOpenDay} />
+          <MonthView weekDates={grid.weeks} events={others} reading={reading} showReading={filters.showReading}
+            month={grid.month} today={today} tz={tz}
+            colors={filters.colors} isDark={isDark} compact onOpenDay={setOpenDay} onOpenEvent={openEvent} />
         </>
       ) : (
-        <div className="grid gap-4" style={{ gridTemplateColumns: '220px minmax(0, 1fr)' }}>
-          <aside>{filterPanel}</aside>
-          <MonthView weeks={weeks} month={grid.month} today={today} tz={tz}
-            colors={filters.colors} isDark={isDark} compact={false} onOpenDay={setOpenDay} />
+        <div className="grid gap-4" style={{ gridTemplateColumns: sidebarOpen ? '220px minmax(0, 1fr)' : 'minmax(0, 1fr)' }}>
+          {sidebarOpen && (
+            <aside className="overflow-y-auto pr-1" style={{ maxHeight: 'calc(100dvh - 110px)' }}>{filterPanel}</aside>
+          )}
+          <MonthView weekDates={grid.weeks} events={others} reading={reading} showReading={filters.showReading}
+            month={grid.month} today={today} tz={tz}
+            colors={filters.colors} isDark={isDark} compact={false} onOpenDay={setOpenDay} onOpenEvent={openEvent} />
         </div>
       )}
 
       {openDay && (
         <ModalShell onClose={() => setOpenDay(null)}
+          actions={
+            <>
+              {loading && <span className="text-[10px] text-stone-400 dark:text-zinc-500 mr-1">Loading…</span>}
+              {([[-1, '‹', 'Previous day'], [1, '›', 'Next day']] as const).map(([n, s, label]) => (
+                <button key={s} onClick={() => stepDay(n)} aria-label={label} title={`${label} (${n < 0 ? '←' : '→'})`}
+                  className="w-7 h-7 rounded-full text-lg leading-none text-stone-500 dark:text-zinc-400 hover:bg-stone-100 dark:hover:bg-zinc-800">
+                  {s}
+                </button>
+              ))}
+            </>
+          }
           title={new Date(`${openDay}T00:00:00Z`).toLocaleDateString('en-GB',
             { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}>
           <DayList date={openDay} events={dayEvents} reading={dayReading}
-            tz={tz} colors={filters.colors} isDark={isDark} />
+            tz={tz} colors={filters.colors} isDark={isDark} onOpenEvent={openEvent} />
         </ModalShell>
       )}
+
+      {record && <DetailPanel entry={record} onClose={() => setRecord(null)} />}
     </div>
   );
 }

@@ -12,10 +12,12 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 
-export function ModalShell({ title, onClose, children }: {
+export function ModalShell({ title, onClose, children, actions }: {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
+  /** Optional controls placed before the ×, e.g. the Calendar's ‹ › day arrows (#59). */
+  actions?: React.ReactNode;
 }) {
   if (typeof document === 'undefined') return null;
   return createPortal(
@@ -24,8 +26,11 @@ export function ModalShell({ title, onClose, children }: {
         onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium text-stone-900 dark:text-zinc-50 uppercase tracking-wide">{title}</p>
-          <button onClick={onClose}
-            className="text-stone-400 dark:text-zinc-500 hover:text-stone-700 dark:hover:text-zinc-200 text-lg leading-none">×</button>
+          <div className="flex items-center gap-1">
+            {actions}
+            <button onClick={onClose}
+              className="text-stone-400 dark:text-zinc-500 hover:text-stone-700 dark:hover:text-zinc-200 text-lg leading-none ml-1">×</button>
+          </div>
         </div>
         {children}
       </div>

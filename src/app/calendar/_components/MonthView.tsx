@@ -1,14 +1,23 @@
 'use client';
 // src/app/calendar/_components/MonthView.tsx
 //
-// Month view (WBS #59). Layout comes from month-layout.ts; this file only
-// draws it. Each week row is a 7-column grid of day cells with absolutely
-// positioned lanes on top: bars (all-day / 24 h+), chips (timed), "+N more",
-// and the optional Reading & study row directly under the date numbers.
+// Month view (WBS #59). Lane placement comes from month-layout.ts; this file
+// sizes and draws it. Each week row is a 7-column grid of day cells with
+// absolutely positioned lanes on top: bars (all-day / 24 h+), chips (timed),
+// "+N more", and the optional Reading & study row under the date numbers.
+//
+// FULL HEIGHT: the view fills the window below its own top edge. The week
+// rows share that height equally, and each row gets as many lanes as fit
+// (at least MIN_LANES; the page scrolls rather than go below that).
+//
+// Clicking a bar or chip opens that record; clicking a day's empty space, its
+// date, the reading row or "+N more" opens the day's list. A chip shows its
+// time only when a day cell is at least TIME_MIN_CELL wide (Google hides it
+// on a phone for the same reason).
 
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { CalendarEvent } from '@/lib/calendar/calendar';
-import { type WeekLayout, type Placed, type ReadingCell, labelOf } from '../_lib/month-layout';
+import { type Placed, type ReadingCell, labelOf, layoutWeek } from '../_lib/month-layout';
 import {
   colorFor, textOn,
   READING_TINT_LIGHT, READING_TINT_DARK, READING_INK_LIGHT, READING_INK_DARK,
@@ -19,11 +28,19 @@ const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 export interface MonthMetrics { headerH: number; readingH: number; laneH: number; maxLanes: number }
 export const METRICS_WIDE:    MonthMetrics = { headerH: 24, readingH: 18, laneH: 18, maxLanes: 6 };
 export const METRICS_COMPACT: MonthMetrics = { headerH: 20, readingH: 15, laneH: 15, maxLanes: 4 };
+const TIME_MIN_CELL = 110;   // px
+const MIN_LANES = 2;
+const DOW_H = 23;            // the Mon…Sun header strip, border included
+const FRAME = 3;             // outer border (2 px) + rounding slack, so no stray scrollbar
+const BOTTOM_GAP = 16;       // px left free under the grid
 
 export function MonthView({
-  weeks, month, today, tz, colors, isDark, compact, onOpenDay,
+  weekDates, events, reading, showReading, month, today, tz, colors, isDark, compact, onOpenDay, onOpenEvent,
 }: {
-  weeks: WeekLayout[];
+  weekDates: string[][];       // the grid, Monday-first
+  events: CalendarEvent[];     // filtered, reading records excluded
+  reading: CalendarEvent[];    // filtered reading & study records
+  showReading: boolean;
   month: string;               // YYYY-MM being shown
   today: string;               // YYYY-MM-DD in the display zone
   tz: string;
@@ -31,12 +48,44 @@ export function MonthView({
   isDark: boolean;
   compact: boolean;
   onOpenDay: (date: string) => void;
+  onOpenEvent: (e: CalendarEvent) => void;
 }) {
   const m = compact ? METRICS_COMPACT : METRICS_WIDE;
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [cellW, setCellW] = useState(0);
+  const [avail, setAvail] = useState(0);   // px from the grid's top to the window's foot
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const measure = () => {
+      const r = el.getBoundingClientRect();
+      setCellW(r.width / 7);
+      setAvail(Math.floor(window.innerHeight - (r.top + window.scrollY) - BOTTOM_GAP));
+    };
+    measure();
+    // The body observer catches the toolbar wrapping or the phone filter panel opening.
+    const ro = new ResizeObserver(measure);
+    ro.observe(el); ro.observe(document.body);
+    window.addEventListener('resize', measure);
+    return () => { ro.disconnect(); window.removeEventListener('resize', measure); };
+  }, []);
+  const showTime = !compact && cellW >= TIME_MIN_CELL;
+
+  // Equal rows; each week's lanes are whatever fits under its date and reading row.
+  const hasReading = weekDates.map(w => showReading
+    && reading.some(e => e.startDate <= w[6] && e.endDate >= w[0]));
+  const minRow = m.headerH + m.readingH + MIN_LANES * m.laneH + 4;
+  const rowH = avail > 0
+    ? Math.max(minRow, Math.floor((avail - DOW_H - FRAME) / weekDates.length))
+    : m.headerH + m.readingH + m.maxLanes * m.laneH + 4;          // before the first measure
+  const weeks = weekDates.map((w, i) => {
+    const lanes = Math.max(MIN_LANES, Math.floor((rowH - m.headerH - (hasReading[i] ? m.readingH : 0) - 4) / m.laneH));
+    return layoutWeek(w, events, reading, lanes, showReading);
+  });
   const time = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 
   return (
-    <div className="select-none border border-stone-200 dark:border-zinc-800 rounded-lg overflow-hidden bg-white dark:bg-zinc-900">
+    <div ref={boxRef} className="select-none border border-stone-200 dark:border-zinc-800 rounded-lg overflow-hidden bg-white dark:bg-zinc-900">
       <div className="grid grid-cols-7 border-b border-stone-200 dark:border-zinc-800">
         {DOW.map(d => (
           <div key={d} className="text-[10px] uppercase tracking-wide text-center py-1 text-stone-400 dark:text-zinc-500">{d}</div>
@@ -45,7 +94,7 @@ export function MonthView({
 
       {weeks.map((w, wi) => {
         const readingH = w.reading ? m.readingH : 0;
-        const height = m.headerH + readingH + m.maxLanes * m.laneH + 4;
+        const height = rowH;
         const laneTop = (lane: number) => m.headerH + readingH + lane * m.laneH;
         return (
           <div key={w.dates[0]} className={`relative ${wi < weeks.length - 1 ? 'border-b border-stone-200 dark:border-zinc-800' : ''}`}
@@ -80,14 +129,14 @@ export function MonthView({
             {w.bars.map(p => (
               <Bar key={`b-${p.event.id}`} p={p} top={laneTop(p.lane)} height={m.laneH}
                 color={colorFor(p.event.category, colors)} compact={compact}
-                onClick={() => onOpenDay(w.dates[p.startCol])} />
+                onClick={() => onOpenEvent(p.event)} />
             ))}
 
             {w.chips.map(p => (
               <Chip key={`c-${p.event.id}`} p={p} top={laneTop(p.lane)} height={m.laneH}
                 color={colorFor(p.event.category, colors)} compact={compact}
-                time={p.event.start ? time.format(new Date(p.event.start)) : ''}
-                onClick={() => onOpenDay(w.dates[p.startCol])} />
+                time={p.event.start ? time.format(new Date(p.event.start)) : ''} showTime={showTime}
+                onClick={() => onOpenEvent(p.event)} />
             ))}
 
             {w.more.map((n, c) => n > 0 && (
@@ -127,8 +176,9 @@ function Bar({ p, top, height, color, compact, onClick }: {
   );
 }
 
-function Chip({ p, top, height, color, compact, time, onClick }: {
-  p: Placed; top: number; height: number; color: string; compact: boolean; time: string; onClick: () => void;
+function Chip({ p, top, height, color, compact, time, showTime, onClick }: {
+  p: Placed; top: number; height: number; color: string; compact: boolean; time: string; showTime: boolean;
+  onClick: () => void;
 }) {
   return (
     <div onClick={e => { e.stopPropagation(); onClick(); }}
@@ -142,7 +192,7 @@ function Chip({ p, top, height, color, compact, time, onClick }: {
       {compact
         ? <span className="shrink-0 self-stretch my-[3px] rounded-full" style={{ width: 2, background: color }} />
         : <span className="shrink-0 rounded-full" style={{ width: 7, height: 7, background: color }} />}
-      {!compact && <span className="shrink-0 tabular-nums text-stone-400 dark:text-zinc-500">{time}</span>}
+      {showTime && <span className="shrink-0 tabular-nums text-stone-400 dark:text-zinc-500">{time}</span>}
       <span className="truncate">{labelOf(p.event)}</span>
     </div>
   );
@@ -194,9 +244,10 @@ function BookIcon() {
 
 // ── Day list (the pop-up for a date) ────────────────────────────────────────
 
-export function DayList({ date, events, reading, tz, colors, isDark }: {
+export function DayList({ date, events, reading, tz, colors, isDark, onOpenEvent }: {
   date: string; events: CalendarEvent[]; reading: { e: CalendarEvent; day: number; of: number }[];
   tz: string; colors: Record<string, string>; isDark: boolean;
+  onOpenEvent: (e: CalendarEvent) => void;
 }) {
   const time = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
   const short = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
@@ -219,30 +270,33 @@ export function DayList({ date, events, reading, tz, colors, isDark }: {
   return (
     <div className="flex flex-col gap-3 max-h-[70vh] overflow-y-auto -mx-1 px-1">
       {reading.length > 0 && (
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-0.5">
           <p className="text-[10px] uppercase tracking-wide text-stone-400 dark:text-zinc-500">Reading &amp; study</p>
           {reading.map(({ e, day, of }) => (
-            <div key={e.id} className="flex items-baseline gap-2 text-xs">
+            <button key={e.id} onClick={() => onOpenEvent(e)}
+              className="flex items-baseline gap-2 text-xs text-left rounded px-1 -mx-1 py-0.5 hover:bg-stone-100 dark:hover:bg-zinc-800">
               <span className="shrink-0 w-4 text-center" style={{ color: ink }}>
                 {e.startDate === date ? '▶' : e.endDate === date ? '✓' : '·'}
               </span>
               <span className="truncate text-stone-800 dark:text-zinc-100">{labelOf(e)}</span>
               <span className="ml-auto shrink-0 tabular-nums text-[11px] text-stone-400 dark:text-zinc-500">day {day} of {of}</span>
-            </div>
+            </button>
           ))}
         </div>
       )}
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-0.5">
         {barsFirst.length === 0 && <p className="text-xs text-stone-400 dark:text-zinc-500">Nothing recorded.</p>}
         {barsFirst.map(e => (
-          <div key={e.id} className="flex items-baseline gap-2 text-xs" style={{ opacity: e.future ? 0.55 : 1 }}>
+          <button key={e.id} onClick={() => onOpenEvent(e)}
+            className="flex items-baseline gap-2 text-xs text-left rounded px-1 -mx-1 py-0.5 hover:bg-stone-100 dark:hover:bg-zinc-800"
+            style={{ opacity: e.future ? 0.55 : 1 }}>
             <span className="shrink-0 rounded-full translate-y-[-1px]" style={{ width: 8, height: 8, background: colorFor(e.category, colors) }} />
             <span className="shrink-0 w-[136px] tabular-nums text-[11px] text-stone-500 dark:text-zinc-400">{whenOf(e)}</span>
             <span className="truncate text-stone-800 dark:text-zinc-100">{labelOf(e)}</span>
             {e.title && e.name && (
               <span className="ml-auto shrink-0 text-[10px] text-stone-400 dark:text-zinc-500">{e.name}</span>
             )}
-          </div>
+          </button>
         ))}
       </div>
     </div>
