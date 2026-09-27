@@ -19,8 +19,9 @@ export default function NavBar() {
       <span className="text-sm font-semibold tracking-widest text-stone-400 dark:text-zinc-500 uppercase">
         FarGaze
       </span>
-      <Link href="/search" className={navClass('/search')}>Search</Link>
+			<Link href="/calendar" className={navClass('/calendar')}>Calendar</Link>
       <Link href="/insights" className={navClass('/insights')}>Insights</Link>
+      <Link href="/search" className={navClass('/search')}>Search</Link>
       <Link href="/spending" className={navClass('/spending')}>Spending</Link>
     </nav>
   );

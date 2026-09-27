@@ -271,4 +271,7 @@ const LogSchema = new Schema<ILog>({
 // Index for time-based queries
 LogSchema.index({ userId: 1, 'start.datetime': -1 });
 
+// Calendar (#59): finds long "(기간)" records that started before the viewed range.
+LogSchema.index({ userId: 1, 'duration.totalSeconds': -1 });
+
 export default mongoose.models.Log || mongoose.model<ILog>('Log', LogSchema);

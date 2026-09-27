@@ -11,7 +11,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Service Concept & Work Breakdown Structure", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 3.9  |  26 September 2026", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 3.10  |  27 September 2026", size: 24 })], spacing: { after: 240 } }),
 );
 
 C(h1("Version History"));
@@ -44,6 +44,7 @@ C(table(["Version","Date","Headline"],[
   ["3.7","12 Sep 2026","#61 Diet Trend converted to the Weight-style grain × count window — metric=diet.trend (computeDietTrend) runs ONE bounded query for the whole window and buckets in memory, replacing the per-bucket path that re-queried records AND ingredient_master for every bucket; the four daily metrics become three-line charts, Spicy and Relation become stacked areas, Composition and People stay on the short 3/6/12 count; the trend view moved into its own DietTrendView.tsx with the tab state lifted into DietWidget so the fetch can pick the right count list. THREE data corrections: companions double-counted on every food-bearing record, post-midnight records dropped on the last day of any range, and absent spiciness read as not-spicy. The v3.6 label-grain deferral is cleared for Diet. Mirrors Design Doc v4.7"],
   ["3.8","13 Sep 2026","MIGRATION TIMEZONE BUG FOUND AND FIXED \u2014 parseDateTime read the wall clock in the migration machine\u2019s zone (Europe/London), displacing every datetime by the UK offset; the error cancelled on ordinary records and did NOT cancel across a UK clock change, corrupting eleven sleep durations by an hour INCLUDING Korean ones, and moving near-midnight summer records onto the wrong day (which silently affected Drinking and Diet day assignment). Fixed with Date.UTC; offsets now applied in computeTotalSeconds only. timezoneOffset parseInteger \u2192 parseNumber (IST 5.5 was truncated to 5). Full re-migration of all years, plus 23 source-sheet corrections. #53 SLEEP WIDGET REBUILT on seven explicit night-assignment rules \u2014 metric=sleep.summary and metric=sleep.trend on a shared buildSleepDays pass; Summary is four metrics with pies and day-aligned strips; Trend collapses three charts into one Session band with a right-axis duration line, plus Quality as a percent stacked area; Sleep joins the shared grain \u00d7 count window, the last widget to do so"],
   ["3.9","26 Sep 2026","#62 BOWEL MOVEMENT WIDGET — Summary COMPLETE, Trend not started. bowel.quality and bowel.characteristics now String[]; new Bowel sheet + bowel_score collection (allowed values AND scores; npm run migrate-bowel) and the daily migration rejects any bowel value not in it. Day-score index defined and verified on all years (mean movement score + frequency penalty −2 / −3, gap scale −1…−10, bad day below −3, scored from 2019-09-19). metric=bowel.summary, BowelWidget.tsx with a width-responsive layout; CssDailyChart hoverFor, Histogram hover + height, MetricPieBlock / HintLabel exported with unit and legendCols. Stale v3.7 footer corrected. Mirrors Design Doc v4.9"],
+  ["3.10","27 Sep 2026","#62 BOWEL MOVEMENT WIDGET COMPLETE — Trend view shipped. metric=bowel.trend on the shared grain × count window, anchored at min(period end, yesterday); buildBowelTrend runs the Summary builder once per bucket, so Month buckets equal the Summary (verified on July 2021 and January 2026). BowelTrendView.tsx: Score, Per day, Gap, Duration, Quality (all nine values), How it went, Other signs (% of movements, not normalised) and Time of day. Summary: × marks days with no movement; Time of day labels read 5:00~. Shared charts, all additions default-off: CssDailyChart markerFor; CssTrendChart zones, notes, rightSeries.dim; CssStackedAreaChart zeroIsValue. CssTrendChart now thins labels before shortening them (year shown on each new year) and its hover card shows the full label. npm run build passed. Mirrors Design Doc v4.10"],
 ],[1100,1300,6960]));
 C(spacer());
 
@@ -97,11 +98,11 @@ C(table(["Phase","Status","Detail"],[
   ["1 — Base Infrastructure & Auth","\u2705 Complete","Subscription-architecture placeholder still pending"],
   ["2 — Data Structure Design","\u2705 Complete","Schema, supporting collections, Mongoose models"],
   ["3 — Migration Tool","\u2705 Complete","Delete-all + re-insert; incremental sync deferred to post-MVP"],
-  ["4 — Analytics & Search","\u2B1C In progress","Done: search, cost dashboard, Interactions / Drinking / Diet / Weight / Exercise widgets (all with Summary and Trend), food + drink ingredient taxonomies. Done: Drinking rest-scoring redesign + Interactions and Drinking trend windows (11 Sep), Diet (12 Sep). Done: migration timezone fix + #53 Sleep rebuilt on night-assignment rules (13 Sep) — Sleep was the last widget still on the old 3/6/12 selector, so every widget is now on the shared window. Done: #62 Bowel Movement Summary (26 Sep). Remaining: #62 Bowel Trend, #59 Calendar"],
+  ["4 — Analytics & Search","\u2B1C In progress","Done: search, cost dashboard, Interactions / Drinking / Diet / Weight / Exercise widgets (all with Summary and Trend), food + drink ingredient taxonomies. Done: Drinking rest-scoring redesign + Interactions and Drinking trend windows (11 Sep), Diet (12 Sep). Done: migration timezone fix + #53 Sleep rebuilt on night-assignment rules (13 Sep) — Sleep was the last widget still on the old 3/6/12 selector, so every widget is now on the shared window. Done: #62 Bowel Movement Summary (26 Sep) and Trend (27 Sep). Remaining: #59 Calendar"],
   ["5 — Data Entry","\u2B1C Not started","Post-MVP"],
 ],[2900,1700,4760]));
 C(spacer());
-C(p([new TextRun({ text: "Current focus: ", bold: true }), new TextRun("#62 Bowel Movement — the Summary shipped on 26 Sep and is in use; the Trend view is not designed yet. Next: decide between the Bowel Trend view and #59 Calendar view, then Phase 5 (data entry). Every other widget already has Summary and Trend on the shared window.")]));
+C(p([new TextRun({ text: "Current focus: ", bold: true }), new TextRun("#62 Bowel Movement is complete — Summary (26 Sep) and Trend (27 Sep); every widget now has Summary and Trend on the shared window. Next: #59 Calendar view, then Phase 5 (data entry).")]));
 
 C(h1("5. Work Breakdown Structure"));
 C(p("\u2705 = Complete   \u2B1C = Pending   DESCOPED = out of MVP scope. Each line states current state, not how it evolved (see the changelog for history)."));
@@ -170,7 +171,7 @@ C(
   bullet("\u2705 55. Average bed-time widget — CLOSED as covered by the Sleep widget (Summary bedtime + Trend › Session); no separate widget will be built"),
   bullet("\u2705 58. Exercise widget — Summary complete (per-item box plots, all-time bests, daily charts in a modal); Trend view deferred — see sub-items"),
   bullet("\u2B1C 59. Native calendar view — reuses the CalendarHeatmap built for #61 (the full Mon–Sun grid, not the inline HeatStrip). Design not started; begins with a design conversation in plain English, not code"),
-  bullet("\u2B1C 62. Bowel Movement (배변) widget — Summary \u2705 complete (26 Sep); Trend view not started — see sub-items. Source columns BJ (량) / BK (질) / BL (특징) → bowel.amount / .quality / .characteristics. NOTE: #62 is also the number of the drink ingredient taxonomy item — the two are unrelated"),
+  bullet("\u2705 62. Bowel Movement (배변) widget — Summary (26 Sep) and Trend (27 Sep) complete — see sub-items. Source columns BJ (량) / BK (질) / BL (특징) → bowel.amount / .quality / .characteristics. NOTE: #62 is also the number of the drink ingredient taxonomy item — the two are unrelated"),
 );
 C(h3("Sub-items for #58 (Exercise Widget):"));
 C(p("Data preparation, the compute module, the API branch and the Summary view are all complete and in use. The Trend view is deferred and has no agreed design. Design Doc \u00a79.3.6 carries the full widget specification and the reasoning behind each decision."));
@@ -273,11 +274,25 @@ C(
   bullet("\u2705 Layout tightened after first review — @container rows follow the widget’s width, 48px histograms, pie row always three columns, two-column legends; about 1,150px → 640px at two-column page width"),
   bullet("\u2705 Shared components extended, all default-off: CssDailyChart hoverFor; Histogram hover + height; MetricPieBlock / HintLabel exported from SleepWidget with unit and legendCols"),
 );
+C(bold("Done — Summary refinements (27 Sep)"));
+C(
+  bullet("\u2705 Day score: a day with no movement is drawn as a bold × (CssDailyChart markerFor), with a line in the heading hint"),
+  bullet("\u2705 Time of day histogram labels read 5:00~, 7:00~ …"),
+);
+C(bold("Done — Trend view (27 Sep)"));
+C(
+  bullet("\u2705 Designed in plain English first; Hyoje replaced the proposed Frequency tab with three stacked areas (Per day, Gap, Duration) carrying the Summary’s criteria plus an average line, asked for Other signs and Time of day to be tried, and chose all nine Quality values and the bad-day share as the Score tab’s second line"),
+  bullet("\u2705 bowel.ts — computeBowelTrend + pure buildBowelTrend: one buildBowelSummary per bucket, so no rule is restated; window to min(period end, yesterday); leading empty buckets dropped"),
+  bullet("\u2705 stats/route.ts — metric=bowel.trend; verified in the browser: July 2021 and January 2026 buckets match their Summaries (worst days −39.5 and −20.4), Month × 120 gives 88 buckets from 2019-06, Week × 12 ends on a 6-day 26W39"),
+  bullet("\u2705 BowelTrendView.tsx — Score, Per day, Gap, Duration, Quality, How it went, Other signs, Time of day; server-rendered with the real responses and eye-checked before delivery; Time of day legend shortened to start times after review"),
+  bullet("\u2705 Shared components extended, all default-off: CssTrendChart zones, notes, rightSeries.dim; CssStackedAreaChart zeroIsValue. CssTrendChart x labels now thinned before shortening, and its hover card shows the full label — Diet and Drinking tooltips gain the year"),
+  bullet("\u2705 npm run build passed"),
+);
 C(bold("Not built"));
 C(
-  bullet("\u2B1C Trend view — not designed. A long period on the Summary draws 2,500+ daily points as a dense band"),
+  bullet("\u2B1C Eye-check the Other signs and Time of day tabs over time and drop either if it does not earn its place (Other signs is mostly 복통 수반)"),
   bullet("\u2B1C Sheet checks raised during the survey: four 0-minute durations (2020-08-05, 2021-11-17, 2022-04-21, 2024-02-18); three over 60 minutes (2020-01-20, 2023-03-06, 2023-09-17); two fully empty records (2021-10-25, 2026-03-09); one 2023 record without characteristics"),
-  bullet("\u2B1C Cause-and-effect links (diet timing, servings, caffeine cut-off, spiciness, ingredients, alcohol, exercise → Sleep, Bowel, Weight) — later, once the Trend and Calendar views exist"),
+  bullet("\u2B1C Cause-and-effect links (diet timing, servings, caffeine cut-off, spiciness, ingredients, alcohol, exercise → Sleep, Bowel, Weight) — later, once the Calendar view exists. Keep daily figures easy to join by date"),
 );
 
 C(h3("Sub-items for #54 (Weight Widget):"));
@@ -432,7 +447,7 @@ C(
   bullet("\u2B1C Retire the old mode=trend route paths and their parameters \u2014 interactions.summary&mode=trend, drinking.summary&mode=trend and diet.summary&mode=trend, with computeDrinkingTrendBucket, computeDailyScoresLegacy and computeDietTrendBucket \u2014 once the UIs no longer call them. Delete them together"),
   bullet("\u2B1C CssRestChart is now UNUSED: the Drinking Rest tab moved to CssStackedAreaChart at v3.6. Left in place rather than deleted mid-patch; its REST_BUCKET_ORDER and colour-map exports are still imported and must survive any removal"),
   bullet("\u2B1C Weight and Exercise still carry private copies of the grain/window/bucket helpers; they can adopt trend-window.ts when next touched"),
-  bullet("\u2B1C Per-series stroke width / opacity on CssTrendChart \u2014 the Amt(day) design called for max and min to be thinner as well as lighter, but a series carries only a colour. Lighter colours alone were used instead"),
+  bullet("\u2B1C Per-series stroke width / opacity on CssTrendChart \u2014 the Amt(day) design called for max and min to be thinner as well as lighter, but a series carries only a colour. Lighter colours alone were used instead. (v3.10) The RIGHT-hand series can now be drawn faint with rightSeries.dim; left-hand series still carry only a colour"),
   bullet("\u2B1C Summary card does not read dryDaysAtEnd \u2014 a fully dry period therefore shows a blank average with nothing in its place. Rare in the data; wire it in when the widget is next open"),
   bullet("\u2B1C CssDailyChart x-axis labels are M/D with no year, so a multi-year period is hard to read (visible on the Bowel Day score). Also affects Diet and Exercise modals"),
   bullet("\u2B1C MetricPieBlock and HintLabel live in SleepWidget.tsx and are imported by BowelWidget. Extract both to _components if a third widget needs them"),
@@ -452,7 +467,7 @@ C(h2("A.2 Shared File Change Protocol"));
 C(table(["File","Used by","Rule"],[
   ["src/app/api/insights/stats/route.ts","All widgets","Targeted patches only. Always read current version first. Verify session?.user?.userId is used."],
   ["src/app/insights/_components/charts/bars.tsx","Diet, Drinking, Interactions summaries","Targeted patches only. Shared summary-bar primitives (Title / BarRow / BarSection). Changing the geometry or the {pct}% ({count}) value format affects all three summaries."],
-  ["src/app/insights/_components/charts/css-chart-components.tsx","DrinkingWidget, DietWidget, WeightWidget","Full replacement acceptable when Hyoje uploads latest version. compressWeekLabels() is shared — preserve it. CssVerticalBoxPlotChart has THREE call sites (Diet Summary compact, Diet Trend, Drinking Amt(day)) plus Weight Summary and, from v3.4, Exercise (one chart per box) — check all six before changing its label layout. CssTrendChart is consumed by Sleep, Drinking AND (v3.5) ExerciseTrendView \u2014 its v3.5 props (rightSeries, xBand, maxXLabels, showValues, compressXLabels) are default-off and must stay that way, and the whole-section replacement between the CssTrendChart and CssVerticalBoxPlotChart header comments is the proven safe patch shape for it. WARNING: the bold-last-label style block is duplicated across FIVE chart components in this file; anchor any patch on a uniquely-named identifier such as hasXLabels, never on the style line alone. (v3.6) CssStackedAreaChart is the LAST section in the file and has no trailing header comment — use fine-grained anchors there. CssDualLineChart was replaced whole-section at v3.6, between its own header and the formatBucketLabels comment. (v3.7) CssVerticalBoxPlotChart lost its Diet Trend call site when those four tabs became three-line charts, so it now has FIVE, not six. highlightable on CssStackedAreaChart is OFF by default and every area call site must pass it explicitly \u2014 forgetting it is what silently disabled hover on the new Diet Relation tab. Its v3.6 additions (rightLine/formatYRight on the area chart, maxXLabels/showValues on the dual chart, series label) are all default-off or behaviour-preserving and must stay that way. Verify every multi-line anchor with Python str.count() before applying — grep -c counts LINES and silently miscounts multi-line patterns."],
+  ["src/app/insights/_components/charts/css-chart-components.tsx","DrinkingWidget, DietWidget, WeightWidget","Full replacement acceptable when Hyoje uploads latest version. compressWeekLabels() is shared — preserve it. CssVerticalBoxPlotChart has THREE call sites (Diet Summary compact, Diet Trend, Drinking Amt(day)) plus Weight Summary and, from v3.4, Exercise (one chart per box) — check all six before changing its label layout. CssTrendChart is consumed by Sleep, Drinking, (v3.5) ExerciseTrendView AND (v3.10) BowelTrendView \u2014 its v3.5 props (rightSeries, xBand, maxXLabels, showValues, compressXLabels) are default-off and must stay that way, and the whole-section replacement between the CssTrendChart and CssVerticalBoxPlotChart header comments is the proven safe patch shape for it. WARNING: the bold-last-label style block is duplicated across FIVE chart components in this file; anchor any patch on a uniquely-named identifier such as hasXLabels, never on the style line alone. (v3.6) CssStackedAreaChart is the LAST section in the file and has no trailing header comment — use fine-grained anchors there. CssDualLineChart was replaced whole-section at v3.6, between its own header and the formatBucketLabels comment. (v3.7) CssVerticalBoxPlotChart lost its Diet Trend call site when those four tabs became three-line charts, so it now has FIVE, not six. highlightable on CssStackedAreaChart is OFF by default and every area call site must pass it explicitly \u2014 forgetting it is what silently disabled hover on the new Diet Relation tab. Its v3.6 additions (rightLine/formatYRight on the area chart, maxXLabels/showValues on the dual chart, series label) are all default-off or behaviour-preserving and must stay that way. Verify every multi-line anchor with Python str.count() before applying — grep -c counts LINES and silently miscounts multi-line patterns."],
   ["src/app/insights/_lib/format.ts","All widgets via chart-components","Targeted patches only. formatBucketLabel handles month, week (raw + compressed), and day formats."],
   ["src/app/insights/_components/GlobalFilterBar.tsx","Insights page","Targeted patches only. Activity Type filter commits on Apply."],
   ["src/app/insights/_components/WidgetCard.tsx","All widgets","Targeted patches only. Changes affect every widget simultaneously."],
@@ -460,6 +475,7 @@ C(table(["File","Used by","Rule"],[
   ["src/lib/migration/transform.ts","migrate, fill, reconcile, scan scripts","Targeted patches only. parseFoodIngredients / loadValidLevel2 are shared. Keep IngredientMaster import at top of file. (v3.9) The bowel vocabulary block is appended at the END of the file and needs BowelScore imported at the top."],
   ["src/app/insights/_widgets/SleepWidget.tsx","Sleep, Bowel","(v3.9) MetricPieBlock, HintLabel and Seg are exported and imported by BowelWidget — changing their props or layout changes both widgets. unit and legendCols default to Sleep’s behaviour."],
   ["src/app/insights/_components/charts/Histogram.tsx","Drinking, Bowel","(v3.9) hover, hoverPlacement and height are default-off / 64px; Drinking passes none of them."],
+  ["src/lib/insights/bowel.ts","Bowel Summary AND Trend","(v3.10) The Trend runs buildBowelSummary per bucket — a change to any Summary rule changes the Trend too, which is the intent. Check a Month bucket against the Summary for the same month after any rule change."],
 ],[3000,2600,3760]));
 C(spacer());
 C(h2("A.3 Regression Prevention Checklist"));
@@ -471,7 +487,7 @@ C(
   bullet("Global filter: All 4 time modes work including Week mode (ISO week numbers). Activity Type multi-select commits on Apply."),
   bullet("Auth: All widgets return data (not 403). Confirm session?.user?.userId is read correctly."),
   bullet("Weight widget: Summary shows the box plot with printed values, both composition bars, the delta strip and one legend. Filtering to a pre-InBody month gives un-segmented bars; LATEST still shows the most recent date overall."),
-  bullet("Bowel widget: September 2026 shows 21/25 days, Avg 6.7, 1 bad day; 2025 shows Avg 2.0 and 48 bad days. Day-score hover lists every movement. Three histograms side by side at two-column width, stacked at three-column width."),
+  bullet("Bowel widget: September 2026 shows 21/25 days, Avg 6.7, 1 bad day; 2025 shows Avg 2.0 and 48 bad days. Day-score hover lists every movement. Three histograms side by side at two-column width, stacked at three-column width. (v3.10) × on days with no movement. Trend: July 2021 Month bucket shows average −0.4 and 7 bad days, the same as the Summary for July 2021; Month × 120 starts at 19.06 and every x-axis year is marked."),
   bullet("Dark mode: All charts render correctly in both light and dark mode."),
 );
 C(h2("A.4 API Route Safety"));
@@ -508,7 +524,7 @@ C(
 );
 C(spacer());
 
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze — Service Concept & WBS v3.9 — 26 September 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze — Service Concept & WBS v3.10 — 27 September 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 const doc = new Document({
   styles: {
@@ -534,6 +550,6 @@ const doc = new Document({
   sections: [{ properties: { page: PAGE }, children }],
 });
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-WBS-v3.9.docx", buffer);
-  console.log("Wrote FarGaze-WBS-v3.9.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-WBS-v3.10.docx", buffer);
+  console.log("Wrote FarGaze-WBS-v3.10.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });
