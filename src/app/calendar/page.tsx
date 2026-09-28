@@ -10,6 +10,9 @@
 // shown disabled so the toolbar does not move when they arrive.
 // Step 1b: month picker on the title, collapsible filter panel (remembered per
 // device), and the shared record detail pane.
+// Step 2: Week and Day views. The view and date live in the address
+// (?view=week&date=2021-07-09) so the back button and bookmarks work; with no
+// view in the address the page opens on Month.
 
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -23,10 +26,25 @@ import {
 import { MonthView, DayList } from './_components/MonthView';
 import { CalendarFilters, type FilterState } from './_components/CalendarFilters';
 import { MonthPicker } from './_components/MonthPicker';
+import { TimeGridView } from './_components/TimeGridView';
+import { weekOf } from './_lib/time-layout';
 import { DetailPanel, type LogEntry } from '@/app/_components/LogDetailPanel';
 
 const COMPACT_BELOW = 640;   // px of page width
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+type View = 'day' | 'week' | 'month';
+const VIEWS: [View, string][] = [['day', 'Day'], ['week', 'Week'], ['month', 'Month']];
+const SOON = ['Year', 'Schedule'];
+
+const fmtDate = (d: string, o: Intl.DateTimeFormatOptions) =>
+  new Date(`${d}T00:00:00Z`).toLocaleDateString('en-GB', { ...o, timeZone: 'UTC' });
+
+/** "5 – 11 Jul 2021", "28 Jun – 4 Jul 2021", "29 Dec 2025 – 4 Jan 2026" */
+function weekTitle(a: string, b: string): string {
+  if (a.slice(0, 4) !== b.slice(0, 4)) return `${fmtDate(a, { day: 'numeric', month: 'short', year: 'numeric' })} – ${fmtDate(b, { day: 'numeric', month: 'short', year: 'numeric' })}`;
+  if (a.slice(0, 7) !== b.slice(0, 7)) return `${fmtDate(a, { day: 'numeric', month: 'short' })} – ${fmtDate(b, { day: 'numeric', month: 'short', year: 'numeric' })}`;
+  return `${Number(a.slice(8))} – ${fmtDate(b, { day: 'numeric', month: 'short', year: 'numeric' })}`;
+}
 const SIDEBAR_KEY = 'fargaze.calendar.sidebarOpen';   // per device, like the panel width itself
 
 const DEFAULT_FILTERS: FilterState = {
@@ -57,9 +75,12 @@ function CalendarInner() {
   const today = zonedDate(Date.now(), tz);
   const urlDate = params.get('date');
   const cursor = urlDate && DATE_RE.test(urlDate) ? urlDate : today;
-  const setCursor = useCallback((d: string) => {
-    router.replace(`/calendar?date=${d}`, { scroll: false });
+  const urlView = params.get('view');
+  const view: View = urlView === 'day' || urlView === 'week' ? urlView : 'month';
+  const go = useCallback((d: string, v: View) => {
+    router.replace(`/calendar?view=${v}&date=${d}`, { scroll: false });
   }, [router]);
+  const setCursor = useCallback((d: string) => go(d, view), [go, view]);
 
   // ── Width → compact layout ──
   const rootRef = useRef<HTMLDivElement>(null);
@@ -119,15 +140,19 @@ function CalendarInner() {
     });
   }, []);
 
-  // ── Events for the visible grid ──
+  // ── Events for the visible range ──
   const grid = useMemo(() => monthGrid(cursor), [cursor]);
+  const week = useMemo(() => weekOf(cursor), [cursor]);
+  const range = view === 'month' ? { from: grid.from, to: grid.to }
+    : view === 'week' ? { from: week[0], to: week[6] }
+    : { from: cursor, to: cursor };
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     const ctl = new AbortController();
     setLoading(true); setError(null);
-    const q = new URLSearchParams({ from: grid.from, to: grid.to, tz });
+    const q = new URLSearchParams({ from: range.from, to: range.to, tz });
     fetch(`/api/calendar?${q}`, { signal: ctl.signal })
       .then(r => r.json())
       .then(d => {
@@ -137,7 +162,7 @@ function CalendarInner() {
       .catch(e => { if (e.name !== 'AbortError') setError(String(e)); })
       .finally(() => { if (!ctl.signal.aborted) setLoading(false); });
     return () => ctl.abort();
-  }, [grid.from, grid.to, tz]);
+  }, [range.from, range.to, tz]);
 
   // ── Layout ──
   const shown = useMemo(
@@ -167,8 +192,8 @@ function CalendarInner() {
     if (!openDay) return;
     const next = addDays(openDay, n);
     setOpenDay(next);
-    if (next < grid.from || next > grid.to) setCursor(next);
-  }, [openDay, grid.from, grid.to, setCursor]);
+    if (next < range.from || next > range.to) setCursor(next);
+  }, [openDay, range.from, range.to, setCursor]);
   useEffect(() => {
     if (!openDay || record) return;
     const onKey = (e: KeyboardEvent) => {
@@ -181,14 +206,29 @@ function CalendarInner() {
   }, [openDay, record, stepDay]);
 
   // ── Navigation ──
-  const shiftMonth = (n: number) => {
+  const shift = (n: number) => {
+    if (view === 'day') return setCursor(addDays(cursor, n));
+    if (view === 'week') return setCursor(addDays(cursor, 7 * n));
     const [y, m] = cursor.split('-').map(Number);
-    const d = new Date(Date.UTC(y, m - 1 + n, 1)).toISOString().slice(0, 10);
-    setCursor(d);
+    setCursor(new Date(Date.UTC(y, m - 1 + n, 1)).toISOString().slice(0, 10));
   };
-  const title = new Date(`${grid.month}-01T00:00:00Z`)
-    .toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  const unit = view === 'day' ? 'day' : view === 'week' ? 'week' : 'month';
+  const title = view === 'month'
+    ? fmtDate(`${grid.month}-01`, { month: 'long', year: 'numeric' })
+    : view === 'week' ? weekTitle(week[0], week[6])
+    : fmtDate(cursor, compact
+      ? { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }
+      : { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const openDate = useCallback((d: string) => go(d, 'day'), [go]);
   const hiddenCount = filters.hiddenCategories.length + filters.hiddenCrossActivities.length;
+
+  const mainView = (isCompact: boolean) => view === 'month'
+    ? <MonthView weekDates={grid.weeks} events={others} reading={reading} showReading={filters.showReading}
+        month={grid.month} today={today} tz={tz} colors={filters.colors} isDark={isDark} compact={isCompact}
+        onOpenDay={setOpenDay} onOpenDate={openDate} onOpenEvent={openEvent} />
+    : <TimeGridView key={view} dates={view === 'week' ? week : [cursor]} events={others} reading={reading}
+        showReading={filters.showReading} today={today} tz={tz} colors={filters.colors} isDark={isDark}
+        compact={isCompact} onOpenDay={setOpenDay} onOpenDate={openDate} onOpenEvent={openEvent} />;
 
   const filterPanel = (
     <CalendarFilters tz={tz} deviceTz={deviceTz} onTz={setTz}
@@ -215,7 +255,7 @@ function CalendarInner() {
         </button>
         <div className="flex">
           {[['‹', -1], ['›', 1]].map(([s, n]) => (
-            <button key={s} onClick={() => shiftMonth(n as number)} aria-label={n === -1 ? 'Previous month' : 'Next month'}
+            <button key={s} onClick={() => shift(n as number)} aria-label={`${n === -1 ? 'Previous' : 'Next'} ${unit}`}
               className="w-7 h-7 rounded-full text-lg leading-none text-stone-500 dark:text-zinc-400 hover:bg-stone-100 dark:hover:bg-zinc-800">
               {s}
             </button>
@@ -249,13 +289,18 @@ function CalendarInner() {
             </button>
           )}
           <div className="flex rounded overflow-hidden border border-stone-200 dark:border-zinc-700 text-[11px]">
-            {(['Day', 'Week', 'Month', 'Year', 'Schedule'] as const).map(v => (
-              <button key={v} disabled={v !== 'Month'}
-                title={v !== 'Month' ? 'Coming next' : undefined}
-                className={`px-2.5 py-1 ${v === 'Month'
+            {VIEWS.map(([v, label]) => (
+              <button key={v} onClick={() => go(cursor, v)}
+                className={`px-2.5 py-1 ${v === view
                   ? 'bg-stone-800 dark:bg-zinc-200 text-white dark:text-zinc-900 font-medium'
-                  : 'bg-white dark:bg-zinc-900 text-stone-300 dark:text-zinc-600 cursor-not-allowed'}`}>
-                {compact ? v[0] : v}
+                  : 'bg-white dark:bg-zinc-900 text-stone-600 dark:text-zinc-300 hover:bg-stone-50 dark:hover:bg-zinc-800'}`}>
+                {compact ? label[0] : label}
+              </button>
+            ))}
+            {SOON.map(label => (
+              <button key={label} disabled title="Coming next"
+                className="px-2.5 py-1 bg-white dark:bg-zinc-900 text-stone-300 dark:text-zinc-600 cursor-not-allowed">
+                {compact ? label[0] : label}
               </button>
             ))}
           </div>
@@ -271,18 +316,14 @@ function CalendarInner() {
               {filterPanel}
             </div>
           )}
-          <MonthView weekDates={grid.weeks} events={others} reading={reading} showReading={filters.showReading}
-            month={grid.month} today={today} tz={tz}
-            colors={filters.colors} isDark={isDark} compact onOpenDay={setOpenDay} onOpenEvent={openEvent} />
+          {mainView(true)}
         </>
       ) : (
         <div className="grid gap-4" style={{ gridTemplateColumns: sidebarOpen ? '220px minmax(0, 1fr)' : 'minmax(0, 1fr)' }}>
           {sidebarOpen && (
             <aside className="overflow-y-auto pr-1" style={{ maxHeight: 'calc(100dvh - 110px)' }}>{filterPanel}</aside>
           )}
-          <MonthView weekDates={grid.weeks} events={others} reading={reading} showReading={filters.showReading}
-            month={grid.month} today={today} tz={tz}
-            colors={filters.colors} isDark={isDark} compact={false} onOpenDay={setOpenDay} onOpenEvent={openEvent} />
+          {mainView(false)}
         </div>
       )}
 

@@ -35,7 +35,7 @@ const FRAME = 3;             // outer border (2 px) + rounding slack, so no stra
 const BOTTOM_GAP = 16;       // px left free under the grid
 
 export function MonthView({
-  weekDates, events, reading, showReading, month, today, tz, colors, isDark, compact, onOpenDay, onOpenEvent,
+  weekDates, events, reading, showReading, month, today, tz, colors, isDark, compact, onOpenDay, onOpenEvent, onOpenDate,
 }: {
   weekDates: string[][];       // the grid, Monday-first
   events: CalendarEvent[];     // filtered, reading records excluded
@@ -49,6 +49,8 @@ export function MonthView({
   compact: boolean;
   onOpenDay: (date: string) => void;
   onOpenEvent: (e: CalendarEvent) => void;
+  /** Clicking a date number opens that Day view (Google's behaviour). */
+  onOpenDate?: (date: string) => void;
 }) {
   const m = compact ? METRICS_COMPACT : METRICS_WIDE;
   const boxRef = useRef<HTMLDivElement>(null);
@@ -109,7 +111,8 @@ export function MonthView({
                     className={`cursor-pointer ${i < 6 ? 'border-r border-stone-100 dark:border-zinc-800' : ''} ${
                       inMonth ? '' : 'bg-stone-50/70 dark:bg-zinc-950/40'} hover:bg-stone-50 dark:hover:bg-zinc-800/40`}>
                     <div className="flex justify-center" style={{ height: m.headerH, paddingTop: 3 }}>
-                      <span className={`inline-flex items-center justify-center rounded-full leading-none ${
+                      <span onClick={onOpenDate ? ev => { ev.stopPropagation(); onOpenDate(d); } : undefined}
+                        className={`inline-flex items-center justify-center rounded-full leading-none hover:ring-1 hover:ring-stone-300 dark:hover:ring-zinc-600 ${
                         compact ? 'text-[10px] w-4 h-4' : 'text-[11px] w-5 h-5'} ${
                         isToday ? 'bg-blue-600 text-white font-semibold'
                           : inMonth ? 'text-stone-700 dark:text-zinc-200' : 'text-stone-300 dark:text-zinc-600'}`}>
@@ -156,8 +159,9 @@ export function MonthView({
 
 // ── Pieces ──────────────────────────────────────────────────────────────────
 
-function Bar({ p, top, height, color, compact, onClick }: {
-  p: Placed; top: number; height: number; color: string; compact: boolean; onClick: () => void;
+/** A bar across `span` of `cols` columns. Shared with the Week / Day strip. */
+export function Bar({ p, top, height, color, compact, onClick, cols = 7 }: {
+  p: Placed; top: number; height: number; color: string; compact: boolean; onClick: () => void; cols?: number;
 }) {
   const span = p.endCol - p.startCol + 1;
   return (
@@ -165,8 +169,8 @@ function Bar({ p, top, height, color, compact, onClick }: {
       title={labelOf(p.event)}
       className={`absolute cursor-pointer truncate ${compact ? 'text-[9px] px-0.5' : 'text-[11px] px-1.5'}`}
       style={{
-        left: `calc(${(p.startCol / 7) * 100}% + ${p.continuesBefore ? 0 : 2}px)`,
-        width: `calc(${(span / 7) * 100}% - ${(p.continuesBefore ? 0 : 2) + (p.continuesAfter ? 0 : 3)}px)`,
+        left: `calc(${(p.startCol / cols) * 100}% + ${p.continuesBefore ? 0 : 2}px)`,
+        width: `calc(${(span / cols) * 100}% - ${(p.continuesBefore ? 0 : 2) + (p.continuesAfter ? 0 : 3)}px)`,
         top: top + 1, height: height - 2, lineHeight: `${height - 2}px`,
         background: color, color: textOn(color), opacity: p.event.future ? 0.55 : 1,
         borderRadius: `${p.continuesBefore ? 0 : 3}px ${p.continuesAfter ? 0 : 3}px ${p.continuesAfter ? 0 : 3}px ${p.continuesBefore ? 0 : 3}px`,
@@ -198,10 +202,12 @@ function Chip({ p, top, height, color, compact, time, showTime, onClick }: {
   );
 }
 
-function ReadingRow({ cells, dates, top, height, isDark, compact, onOpenDay }: {
+/** The Reading & study row. Shared with the Week / Day strip. */
+export function ReadingRow({ cells, dates, top, height, isDark, compact, onOpenDay }: {
   cells: ReadingCell[]; dates: string[]; top: number; height: number;
   isDark: boolean; compact: boolean; onOpenDay: (d: string) => void;
 }) {
+  const cols = dates.length;
   const tint = isDark ? READING_TINT_DARK : READING_TINT_LIGHT;
   const ink  = isDark ? READING_INK_DARK : READING_INK_LIGHT;
   return (
@@ -209,7 +215,7 @@ function ReadingRow({ cells, dates, top, height, isDark, compact, onOpenDay }: {
       {cells.map((c, i) => {
         if (!c.ongoing.length) return null;
         const prevOn = i > 0 && cells[i - 1].ongoing.length > 0;
-        const nextOn = i < 6 && cells[i + 1].ongoing.length > 0;
+        const nextOn = i < cols - 1 && cells[i + 1].ongoing.length > 0;
         const marks = [
           ...c.starts.map(e => `▶ ${labelOf(e)}`),
           ...c.finishes.map(e => `✓ ${labelOf(e)}`),
@@ -219,7 +225,7 @@ function ReadingRow({ cells, dates, top, height, isDark, compact, onOpenDay }: {
             title={c.ongoing.map(labelOf).join('\n')}
             className={`absolute cursor-pointer truncate flex items-center gap-1 ${compact ? 'text-[9px] px-0.5' : 'text-[10px] px-1.5'}`}
             style={{
-              left: `${(i / 7) * 100}%`, width: `${100 / 7}%`, top, height: height - 1,
+              left: `${(i / cols) * 100}%`, width: `${100 / cols}%`, top, height: height - 1,
               background: tint, color: ink,
               borderTopLeftRadius: prevOn ? 0 : 3, borderBottomLeftRadius: prevOn ? 0 : 3,
               borderTopRightRadius: nextOn ? 0 : 3, borderBottomRightRadius: nextOn ? 0 : 3,

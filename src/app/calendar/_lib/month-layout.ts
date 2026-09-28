@@ -52,6 +52,8 @@ export function monthGrid(cursor: string): { month: string; from: string; to: st
 }
 
 // ── One week row ────────────────────────────────────────────────────────────
+// Also the all-day strip of the Week (7 columns) and Day (1 column) views:
+// every "7" is dates.length.
 
 export interface Placed {
   event: CalendarEvent;
@@ -82,7 +84,8 @@ export function layoutWeek(
   dates: string[], events: CalendarEvent[], readingEvents: CalendarEvent[],
   maxLanes: number, showReading: boolean,
 ): WeekLayout {
-  const first = dates[0], last = dates[6];
+  const n = dates.length;
+  const first = dates[0], last = dates[n - 1];
   const col = (d: string) => dates.indexOf(d);
 
   const bars  = events.filter(e => isBar(e) && e.startDate <= last && e.endDate >= first);
@@ -95,7 +98,7 @@ export function layoutWeek(
     return true;
   };
   const take = (lane: number, a: number, b: number) => {
-    occ[lane] ??= Array(7).fill(false);
+    occ[lane] ??= Array(n).fill(false);
     for (let c = a; c <= b; c++) occ[lane][c] = true;
   };
   const place = (e: CalendarEvent, a: number, b: number) => {
@@ -107,7 +110,7 @@ export function layoutWeek(
   };
 
   bars
-    .map(e => ({ e, a: e.startDate < first ? 0 : col(e.startDate), b: e.endDate > last ? 6 : col(e.endDate) }))
+    .map(e => ({ e, a: e.startDate < first ? 0 : col(e.startDate), b: e.endDate > last ? n - 1 : col(e.endDate) }))
     .sort((x, y) => x.a - y.a || (y.b - y.a) - (x.b - x.a) || (x.e.start ?? '').localeCompare(y.e.start ?? ''))
     .forEach(({ e, a, b }) => place(e, a, b));
 
@@ -117,10 +120,10 @@ export function layoutWeek(
 
   // Overflow: a column overflows when any of its items sits at or past maxLanes.
   const L = maxLanes;
-  const overflow = Array(7).fill(false);
+  const overflow = Array(n).fill(false);
   for (const p of placed) if (p.lane >= L) for (let c = p.startCol; c <= p.endCol; c++) overflow[c] = true;
 
-  const more = Array(7).fill(0);
+  const more = Array(n).fill(0);
   const visible: Placed[] = [];
   for (const p of placed) {
     let show = p.lane < L;
