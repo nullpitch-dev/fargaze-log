@@ -224,7 +224,7 @@ export default function SearchPage() {
         {/* Active filters hint */}
         {query && hasActiveFilters && (
           <p className="text-xs text-stone-500 dark:text-zinc-300 mb-2 pl-1">
-            "{query}" + 아래 조건 적용 중ldquo;{query}"{query}" + 아래 조건 적용 중rdquo; + 아래 조건 적용 중
+            &ldquo;{query}&rdquo; + 아래 조건 적용 중
           </p>
         )}
 

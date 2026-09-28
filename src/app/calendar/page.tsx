@@ -18,6 +18,9 @@
 // 28 Sep: the Year view uses the Month view's day pop-up (fetching that one
 // day itself), every day pop-up has "Open day", and Today in Schedule
 // scrolls to today even when today has no records.
+// Search (28 Sep, Google's model with 상세 검색): the box sits in the toolbar;
+// a search is a view of its own in the address (?view=search&q=…&prev=month),
+// and ← returns to the view it came from.
 
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -36,14 +39,34 @@ import { YearView } from './_components/YearView';
 import { ScheduleView } from './_components/ScheduleView';
 import { weekOf } from './_lib/time-layout';
 import { DetailPanel, type LogEntry } from '@/app/_components/LogDetailPanel';
+import { SearchBox, type SearchSpec, EMPTY_SEARCH, isEmptySearch } from './_components/SearchBox';
+import { SearchResultsView } from './_components/SearchResultsView';
 
 const COMPACT_BELOW = 640;   // px of page width
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-type View = 'day' | 'week' | 'month' | 'year' | 'schedule';
-const VIEWS: [View, string][] = [
+type View = 'day' | 'week' | 'month' | 'year' | 'schedule' | 'search';
+const VIEWS: [Exclude<View, 'search'>, string][] = [
   ['day', 'Day'], ['week', 'Week'], ['month', 'Month'], ['year', 'Year'], ['schedule', 'Schedule'],
 ];
-const isView = (v: string | null): v is View => VIEWS.some(([k]) => k === v);
+const isView = (v: string | null): v is View => v === 'search' || VIEWS.some(([k]) => k === v);
+
+/** The search in the address: q, cond (field:value|…), not, sfrom, sto. */
+function searchFromParams(p: URLSearchParams): SearchSpec {
+  const conditions = (p.get('cond') ?? '').split('|').map(part => {
+    const i = part.indexOf(':');
+    return i > 0 ? { field: part.slice(0, i), value: part.slice(i + 1) } : null;
+  }).filter((c): c is { field: string; value: string } => !!c && !!c.value);
+  return { q: p.get('q') ?? '', conditions, not: p.get('not') ?? '', from: p.get('sfrom') ?? '', to: p.get('sto') ?? '' };
+}
+function searchToParams(s: SearchSpec): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (s.q.trim()) out.q = s.q.trim();
+  if (s.conditions.length) out.cond = s.conditions.map(c => `${c.field}:${c.value.trim()}`).join('|');
+  if (s.not.trim()) out.not = s.not.trim();
+  if (s.from) out.sfrom = s.from;
+  if (s.to) out.sto = s.to;
+  return out;
+}
 
 const fmtDate = (d: string, o: Intl.DateTimeFormatOptions) =>
   new Date(`${d}T00:00:00Z`).toLocaleDateString('en-GB', { ...o, timeZone: 'UTC' });
@@ -91,6 +114,33 @@ function CalendarInner() {
     router.replace(`/calendar?view=${v}&date=${d}`, { scroll: false });
   }, [router]);
   const setCursor = useCallback((d: string) => go(d, view), [go, view]);
+
+  // ── Search in the address ──
+  const paramsKey = params.toString();
+  const search = useMemo(() => (view === 'search' ? searchFromParams(new URLSearchParams(paramsKey)) : EMPTY_SEARCH),
+    [view, paramsKey]);
+  const prevParam = params.get('prev');
+  const prevView: View = isView(prevParam) && prevParam !== 'search' ? prevParam : 'month';
+  const runSearch = useCallback((s: SearchSpec) => {
+    const q = new URLSearchParams({ view: 'search', date: cursor, prev: view === 'search' ? prevView : view, ...searchToParams(s) });
+    // Entering search adds a history step (Back leaves it); refining a search replaces it.
+    if (view === 'search') router.replace(`/calendar?${q}`, { scroll: false });
+    else router.push(`/calendar?${q}`, { scroll: false });
+  }, [router, cursor, view, prevView]);
+  const [searchOpen, setSearchOpen] = useState(false);   // phone: the box folds under the toolbar
+
+  // Escape leaves the results (unless a pop-up or the detail pane is open — they close first).
+  const overlayOpen = useRef(false);
+  useEffect(() => {
+    if (view !== 'search') return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (e.key !== 'Escape' || overlayOpen.current || t?.closest('form')) return;
+      go(cursor, prevView);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [view, go, cursor, prevView]);
 
   // ── Width → compact layout ──
   const rootRef = useRef<HTMLDivElement>(null);
@@ -165,7 +215,7 @@ function CalendarInner() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    if (view === 'year') return;           // the Year view loads counts, below
+    if (view === 'year' || view === 'search') return;   // Year loads counts; Search its own results
     const ctl = new AbortController();
     setLoading(true); setError(null);
     const q = new URLSearchParams({ from: range.from, to: range.to, tz });
@@ -271,8 +321,41 @@ function CalendarInner() {
     const [y, m] = cursor.split('-').map(Number);
     setCursor(new Date(Date.UTC(y, m - 1 + n, 1)).toISOString().slice(0, 10));
   };
+  overlayOpen.current = !!openDay || !!record;
+
+  // ── Search results ──
+  const [results, setResults] = useState<{ events: CalendarEvent[]; total: number; totalIsMinimum: boolean }>(
+    { events: [], total: 0, totalIsMinimum: false });
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  useEffect(() => {
+    if (view !== 'search' || isEmptySearch(search)) return;
+    const ctl = new AbortController();
+    setSearching(true); setSearchError(null);
+    const q = new URLSearchParams({
+      tz,
+      ...(search.q.trim() ? { q: search.q.trim() } : {}),
+      ...(search.conditions.length ? { conditions: search.conditions.map(c => `${c.field}:${c.value}`).join('|') } : {}),
+      ...(search.not.trim() ? { not: search.not.trim() } : {}),
+      ...(search.from ? { dateFrom: search.from } : {}),
+      ...(search.to ? { dateTo: search.to } : {}),
+      excludeCategories: filters.hiddenCategories.join(','),
+      excludeCrossActivities: filters.hiddenCrossActivities.join(','),
+      excludeNames: filters.hiddenNames.join(','),
+    });
+    fetch(`/api/calendar/search?${q}`, { signal: ctl.signal })
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) { setSearchError(d.error); return; }
+        setResults({ events: d.events ?? [], total: d.total ?? 0, totalIsMinimum: !!d.totalIsMinimum });
+      })
+      .catch(e => { if (e.name !== 'AbortError') setSearchError(String(e)); })
+      .finally(() => { if (!ctl.signal.aborted) setSearching(false); });
+    return () => ctl.abort();
+  }, [view, search, tz, filters.hiddenCategories, filters.hiddenCrossActivities, filters.hiddenNames]);
+
   const unit = view === 'day' ? 'day' : view === 'week' ? 'week' : view === 'year' ? 'year' : 'month';
-  const title = view === 'year' ? String(year)
+  const title = view === 'search' ? 'Search' : view === 'year' ? String(year)
     : view === 'month' || view === 'schedule'
     ? fmtDate(`${grid.month}-01`, { month: 'long', year: 'numeric' })
     : view === 'week' ? weekTitle(week[0], week[6])
@@ -282,7 +365,11 @@ function CalendarInner() {
   const openDate = useCallback((d: string) => go(d, 'day'), [go]);
   const hiddenCount = filters.hiddenCategories.length + filters.hiddenCrossActivities.length;
 
-  const mainView = (isCompact: boolean) => view === 'year'
+  const mainView = (isCompact: boolean) => view === 'search'
+    ? <SearchResultsView events={results.events} total={results.total} totalIsMinimum={results.totalIsMinimum}
+        loading={searching} error={searchError} today={today} tz={tz} colors={filters.colors} isDark={isDark}
+        onOpenDate={openDate} onOpenEvent={openEvent} />
+    : view === 'year'
     ? <YearView year={year} counts={dayCounts} today={today} selected={openDay}
         onDay={setOpenDay} onOpenMonth={d => go(d, 'month')} />
     : view === 'schedule'
@@ -316,6 +403,13 @@ function CalendarInner() {
             </svg>
           </button>
         )}
+        {view === 'search' ? (
+          <>
+            <button onClick={() => go(cursor, prevView)} aria-label="Back to the calendar" title="Back (Esc)"
+              className="w-7 h-7 rounded-full text-lg leading-none text-stone-500 dark:text-zinc-400 hover:bg-stone-100 dark:hover:bg-zinc-800">←</button>
+            <h1 className="text-base font-semibold text-stone-900 dark:text-zinc-50 px-1">Search</h1>
+          </>
+        ) : (<>
         <button onClick={() => { setCursor(today); setJump(j => j + 1); }}
           className="border border-stone-200 dark:border-zinc-700 rounded px-2.5 py-1 text-[11px] bg-white dark:bg-zinc-900 text-stone-700 dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800">
           Today
@@ -340,7 +434,8 @@ function CalendarInner() {
               onClose={() => setPickerOpen(false)} />
           )}
         </div>
-        {loading && <span className="text-[10px] text-stone-400 dark:text-zinc-500">Loading…</span>}
+        </>)}
+        {loading && view !== 'search' && <span className="text-[10px] text-stone-400 dark:text-zinc-500">Loading…</span>}
         {tz !== deviceTz && (
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300">
             Shown in {tz}
@@ -348,6 +443,15 @@ function CalendarInner() {
         )}
 
         <div className="ml-auto flex items-center gap-2">
+          {!compact && <SearchBox value={search} onSubmit={runSearch} />}
+          {compact && view !== 'search' && (
+            <button onClick={() => setSearchOpen(o => !o)} aria-label="Search"
+              className="w-7 h-7 rounded-full flex items-center justify-center text-stone-500 dark:text-zinc-400 hover:bg-stone-100 dark:hover:bg-zinc-800">
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6">
+                <circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5L14 14" />
+              </svg>
+            </button>
+          )}
           {compact && (
             <button onClick={() => setFiltersOpen(o => !o)}
               className={`border rounded px-2.5 py-1 text-[11px] bg-white dark:bg-zinc-900 ${
@@ -368,7 +472,12 @@ function CalendarInner() {
         </div>
       </div>
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {compact && (searchOpen || view === 'search') && (
+        <SearchBox value={search} onSubmit={s => { setSearchOpen(false); runSearch(s); }}
+          autoFocus={view !== 'search'} wide={false} />
+      )}
+
+      {error && view !== 'search' && <p className="text-xs text-red-500">{error}</p>}
 
       {compact ? (
         <>
