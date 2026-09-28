@@ -180,6 +180,8 @@ export interface CalendarDiagnostics {
 export interface EventFilters {
   excludeCategories?: string[];
   crossActivities?: string[];   // include list; empty = all, with or without one
+  excludeCrossActivities?: string[];   // the page's own rule: hide these, keep records without one
+  excludeNames?: string[];             // activity.name, exact
 }
 
 function loggedLabel(e: any): string | null {
@@ -197,6 +199,8 @@ export function buildCalendarEvents(
   };
   const exclude = new Set(filters.excludeCategories ?? []);
   const cross   = new Set(filters.crossActivities ?? []);
+  const xCross  = new Set(filters.excludeCrossActivities ?? []);
+  const xNames  = new Set(filters.excludeNames ?? []);
   const today   = zonedDate(nowMs, r.tz);
   const events: CalendarEvent[] = [];
 
@@ -205,6 +209,8 @@ export function buildCalendarEvents(
     const category = a.category ?? '';
     if (exclude.has(category)) continue;
     if (cross.size && !cross.has(a.crossActivity ?? '')) continue;
+    if (a.crossActivity && xCross.has(a.crossActivity)) continue;
+    if (a.name && xNames.has(a.name)) continue;
 
     const base = {
       id: String(d._id), category,

@@ -17,7 +17,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import type { CalendarEvent } from '@/lib/calendar/calendar';
-import { type Placed, type ReadingCell, labelOf, layoutWeek } from '../_lib/month-layout';
+import { type Placed, type ReadingCell, labelOf, layoutWeek, isoWeek } from '../_lib/month-layout';
 import {
   colorFor, textOn,
   READING_TINT_LIGHT, READING_TINT_DARK, READING_INK_LIGHT, READING_INK_DARK,
@@ -33,6 +33,7 @@ const MIN_LANES = 2;
 const DOW_H = 23;            // the Mon…Sun header strip, border included
 const FRAME = 3;             // outer border (2 px) + rounding slack, so no stray scrollbar
 const BOTTOM_GAP = 16;       // px left free under the grid
+const WEEK_COL = { wide: 30, compact: 18 };   // the ISO week-number column
 
 export function MonthView({
   weekDates, events, reading, showReading, month, today, tz, colors, isDark, compact, onOpenDay, onOpenEvent, onOpenDate,
@@ -54,14 +55,14 @@ export function MonthView({
 }) {
   const m = compact ? METRICS_COMPACT : METRICS_WIDE;
   const boxRef = useRef<HTMLDivElement>(null);
-  const [cellW, setCellW] = useState(0);
+  const [boxW, setBoxW] = useState(0);
   const [avail, setAvail] = useState(0);   // px from the grid's top to the window's foot
   useEffect(() => {
     const el = boxRef.current;
     if (!el) return;
     const measure = () => {
       const r = el.getBoundingClientRect();
-      setCellW(r.width / 7);
+      setBoxW(r.width);
       setAvail(Math.floor(window.innerHeight - (r.top + window.scrollY) - BOTTOM_GAP));
     };
     measure();
@@ -71,6 +72,8 @@ export function MonthView({
     window.addEventListener('resize', measure);
     return () => { ro.disconnect(); window.removeEventListener('resize', measure); };
   }, []);
+  const weekCol = compact ? WEEK_COL.compact : WEEK_COL.wide;
+  const cellW = (boxW - weekCol) / 7;
   const showTime = !compact && cellW >= TIME_MIN_CELL;
 
   // Equal rows; each week's lanes are whatever fits under its date and reading row.
@@ -88,10 +91,14 @@ export function MonthView({
 
   return (
     <div ref={boxRef} className="select-none border border-stone-200 dark:border-zinc-800 rounded-lg overflow-hidden bg-white dark:bg-zinc-900">
-      <div className="grid grid-cols-7 border-b border-stone-200 dark:border-zinc-800">
-        {DOW.map(d => (
-          <div key={d} className="text-[10px] uppercase tracking-wide text-center py-1 text-stone-400 dark:text-zinc-500">{d}</div>
-        ))}
+      <div className="flex border-b border-stone-200 dark:border-zinc-800">
+        <div className="text-[9px] text-center py-1 text-stone-300 dark:text-zinc-600 border-r border-stone-100 dark:border-zinc-800"
+          style={{ width: weekCol, flex: `0 0 ${weekCol}px` }}>{compact ? '' : 'Wk'}</div>
+        <div className="flex-1 grid grid-cols-7">
+          {DOW.map(d => (
+            <div key={d} className="text-[10px] uppercase tracking-wide text-center py-1 text-stone-400 dark:text-zinc-500">{d}</div>
+          ))}
+        </div>
       </div>
 
       {weeks.map((w, wi) => {
@@ -99,8 +106,14 @@ export function MonthView({
         const height = rowH;
         const laneTop = (lane: number) => m.headerH + readingH + lane * m.laneH;
         return (
-          <div key={w.dates[0]} className={`relative ${wi < weeks.length - 1 ? 'border-b border-stone-200 dark:border-zinc-800' : ''}`}
+          <div key={w.dates[0]} className={`flex ${wi < weeks.length - 1 ? 'border-b border-stone-200 dark:border-zinc-800' : ''}`}
             style={{ height }}>
+            <div className={`text-center tabular-nums text-stone-400 dark:text-zinc-500 border-r border-stone-100 dark:border-zinc-800 bg-stone-50/60 dark:bg-zinc-950/30 ${
+              compact ? 'text-[9px]' : 'text-[10px]'}`}
+              style={{ width: weekCol, flex: `0 0 ${weekCol}px`, paddingTop: 5 }}>
+              {compact ? isoWeek(w.dates[0]) : `W${isoWeek(w.dates[0])}`}
+            </div>
+            <div className="relative flex-1 min-w-0">
             {/* Day cells: background, date number, click target */}
             <div className="absolute inset-0 grid grid-cols-7">
               {w.dates.map((d, i) => {
@@ -150,6 +163,7 @@ export function MonthView({
                 +{n}{compact ? '' : ' more'}
               </button>
             ))}
+            </div>
           </div>
         );
       })}
@@ -250,10 +264,12 @@ function BookIcon() {
 
 // ── Day list (the pop-up for a date) ────────────────────────────────────────
 
-export function DayList({ date, events, reading, tz, colors, isDark, onOpenEvent }: {
+export function DayList({ date, events, reading, tz, colors, isDark, onOpenEvent, plain = false }: {
   date: string; events: CalendarEvent[]; reading: { e: CalendarEvent; day: number; of: number }[];
   tz: string; colors: Record<string, string>; isDark: boolean;
   onOpenEvent: (e: CalendarEvent) => void;
+  /** Schedule view: no own scroll box, no "Nothing recorded" line. */
+  plain?: boolean;
 }) {
   const time = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
   const short = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
@@ -274,7 +290,7 @@ export function DayList({ date, events, reading, tz, colors, isDark, onOpenEvent
 
   const ink = isDark ? READING_INK_DARK : READING_INK_LIGHT;
   return (
-    <div className="flex flex-col gap-3 max-h-[70vh] overflow-y-auto -mx-1 px-1">
+    <div className={plain ? 'flex flex-col gap-1.5' : 'flex flex-col gap-3 max-h-[70vh] overflow-y-auto -mx-1 px-1'}>
       {reading.length > 0 && (
         <div className="flex flex-col gap-0.5">
           <p className="text-[10px] uppercase tracking-wide text-stone-400 dark:text-zinc-500">Reading &amp; study</p>
@@ -291,7 +307,7 @@ export function DayList({ date, events, reading, tz, colors, isDark, onOpenEvent
         </div>
       )}
       <div className="flex flex-col gap-0.5">
-        {barsFirst.length === 0 && <p className="text-xs text-stone-400 dark:text-zinc-500">Nothing recorded.</p>}
+        {barsFirst.length === 0 && !plain && <p className="text-xs text-stone-400 dark:text-zinc-500">Nothing recorded.</p>}
         {barsFirst.map(e => (
           <button key={e.id} onClick={() => onOpenEvent(e)}
             className="flex items-baseline gap-2 text-xs text-left rounded px-1 -mx-1 py-0.5 hover:bg-stone-100 dark:hover:bg-zinc-800"

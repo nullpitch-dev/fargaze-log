@@ -158,9 +158,21 @@ export function layoutWeek(
 
 export function applyFilters(
   events: CalendarEvent[], hiddenCategories: string[], hiddenCrossActivities: string[],
+  hiddenNames: string[] = [],
 ): CalendarEvent[] {
-  const hc = new Set(hiddenCategories), hx = new Set(hiddenCrossActivities);
-  return events.filter(e => !hc.has(e.category) && !(e.crossActivity && hx.has(e.crossActivity)));
+  const hc = new Set(hiddenCategories), hx = new Set(hiddenCrossActivities), hn = new Set(hiddenNames);
+  return events.filter(e => !hc.has(e.category)
+    && !(e.crossActivity && hx.has(e.crossActivity))
+    && !(e.name && hn.has(e.name)));
+}
+
+/** ISO 8601 week number (weeks start on Monday; week 1 holds the year's first Thursday). */
+export function isoWeek(date: string): number {
+  const d = new Date(`${date}T00:00:00Z`);
+  const thu = new Date(d);
+  thu.setUTCDate(d.getUTCDate() + 3 - ((d.getUTCDay() + 6) % 7));        // Thursday of this week
+  const jan1 = Date.UTC(thu.getUTCFullYear(), 0, 1);
+  return Math.floor((thu.getTime() - jan1) / DAY_MS / 7) + 1;
 }
 
 /** "Day 120 of 474" for a reading period, counted in display dates. */

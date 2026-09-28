@@ -1,7 +1,7 @@
 // src/app/api/calendar/settings/route.ts
 //
 // GET  /api/calendar/settings — the saved Calendar settings, or the defaults.
-// PUT  /api/calendar/settings — body holds any subset of the four fields;
+// PUT  /api/calendar/settings — body holds any subset of the five fields;
 //      only those are replaced.
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -14,10 +14,13 @@ interface CalendarSettingsDTO {
   hiddenCrossActivities: string[];
   colors: Record<string, string>;
   showReading: boolean;
+  hiddenNames: string[];
 }
 
 const DEFAULTS: CalendarSettingsDTO = {
   hiddenCategories: [], hiddenCrossActivities: [], colors: {}, showReading: true,
+  // Starting list until the first change is saved (Hyoje, 28 Sep 2026).
+  hiddenNames: ['정식 운동', '약식 운동'],
 };
 
 function toDTO(doc: any): CalendarSettingsDTO {
@@ -26,6 +29,7 @@ function toDTO(doc: any): CalendarSettingsDTO {
     hiddenCrossActivities: doc?.hiddenCrossActivities ?? DEFAULTS.hiddenCrossActivities,
     colors:                doc?.colors ?? DEFAULTS.colors,
     showReading:           doc?.showReading ?? DEFAULTS.showReading,
+    hiddenNames:           doc?.hiddenNames ?? DEFAULTS.hiddenNames,
   };
 }
 
@@ -68,6 +72,10 @@ export async function PUT(req: NextRequest) {
       && Object.entries(c).every(([k, v]) => k.length <= 100 && typeof v === 'string' && v.length <= 20);
     if (!ok) return NextResponse.json({ error: 'colors' }, { status: 400 });
     set.colors = c;
+  }
+  if ('hiddenNames' in body) {
+    if (!isStrings(body.hiddenNames)) return NextResponse.json({ error: 'hiddenNames' }, { status: 400 });
+    set.hiddenNames = body.hiddenNames;
   }
   if ('showReading' in body) {
     if (typeof body.showReading !== 'boolean') return NextResponse.json({ error: 'showReading' }, { status: 400 });

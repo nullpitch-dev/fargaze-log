@@ -13,6 +13,11 @@
 // Step 2: Week and Day views. The view and date live in the address
 // (?view=week&date=2021-07-09) so the back button and bookmarks work; with no
 // view in the address the page opens on Month.
+// Step 3: Year (per-day counts from the API, a card per day) and Schedule
+// (one month as a list); the category colour palette lives in the filters.
+// 28 Sep: the Year view uses the Month view's day pop-up (fetching that one
+// day itself), every day pop-up has "Open day", and Today in Schedule
+// scrolls to today even when today has no records.
 
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -21,20 +26,24 @@ import { zonedDate, addDays } from '@/lib/calendar/calendar';
 import { useIsDark } from '@/app/insights/_lib/hooks';
 import { ModalShell } from '@/app/insights/_components/ModalShell';
 import {
-  monthGrid, applyFilters, isReading, touches, readingProgress,
+  monthGrid, applyFilters, isReading, touches, readingProgress, READING_NAMES,
 } from './_lib/month-layout';
 import { MonthView, DayList } from './_components/MonthView';
 import { CalendarFilters, type FilterState } from './_components/CalendarFilters';
 import { MonthPicker } from './_components/MonthPicker';
 import { TimeGridView } from './_components/TimeGridView';
+import { YearView } from './_components/YearView';
+import { ScheduleView } from './_components/ScheduleView';
 import { weekOf } from './_lib/time-layout';
 import { DetailPanel, type LogEntry } from '@/app/_components/LogDetailPanel';
 
 const COMPACT_BELOW = 640;   // px of page width
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-type View = 'day' | 'week' | 'month';
-const VIEWS: [View, string][] = [['day', 'Day'], ['week', 'Week'], ['month', 'Month']];
-const SOON = ['Year', 'Schedule'];
+type View = 'day' | 'week' | 'month' | 'year' | 'schedule';
+const VIEWS: [View, string][] = [
+  ['day', 'Day'], ['week', 'Week'], ['month', 'Month'], ['year', 'Year'], ['schedule', 'Schedule'],
+];
+const isView = (v: string | null): v is View => VIEWS.some(([k]) => k === v);
 
 const fmtDate = (d: string, o: Intl.DateTimeFormatOptions) =>
   new Date(`${d}T00:00:00Z`).toLocaleDateString('en-GB', { ...o, timeZone: 'UTC' });
@@ -49,6 +58,7 @@ const SIDEBAR_KEY = 'fargaze.calendar.sidebarOpen';   // per device, like the pa
 
 const DEFAULT_FILTERS: FilterState = {
   hiddenCategories: [], hiddenCrossActivities: [], colors: {}, showReading: true,
+  hiddenNames: ['정식 운동', '약식 운동'],   // same starting list as the API, so nothing flashes before settings load
 };
 
 export default function CalendarPage() {
@@ -76,7 +86,7 @@ function CalendarInner() {
   const urlDate = params.get('date');
   const cursor = urlDate && DATE_RE.test(urlDate) ? urlDate : today;
   const urlView = params.get('view');
-  const view: View = urlView === 'day' || urlView === 'week' ? urlView : 'month';
+  const view: View = isView(urlView) ? urlView : 'month';
   const go = useCallback((d: string, v: View) => {
     router.replace(`/calendar?view=${v}&date=${d}`, { scroll: false });
   }, [router]);
@@ -143,13 +153,19 @@ function CalendarInner() {
   // ── Events for the visible range ──
   const grid = useMemo(() => monthGrid(cursor), [cursor]);
   const week = useMemo(() => weekOf(cursor), [cursor]);
+  const year = Number(cursor.slice(0, 4));
+  const monthFirst = `${cursor.slice(0, 7)}-01`;
+  const monthLast = new Date(Date.UTC(year, Number(cursor.slice(5, 7)), 0)).toISOString().slice(0, 10);
   const range = view === 'month' ? { from: grid.from, to: grid.to }
     : view === 'week' ? { from: week[0], to: week[6] }
+    : view === 'year' ? { from: `${year}-01-01`, to: `${year}-12-31` }
+    : view === 'schedule' ? { from: monthFirst, to: monthLast }
     : { from: cursor, to: cursor };
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
+    if (view === 'year') return;           // the Year view loads counts, below
     const ctl = new AbortController();
     setLoading(true); setError(null);
     const q = new URLSearchParams({ from: range.from, to: range.to, tz });
@@ -162,12 +178,33 @@ function CalendarInner() {
       .catch(e => { if (e.name !== 'AbortError') setError(String(e)); })
       .finally(() => { if (!ctl.signal.aborted) setLoading(false); });
     return () => ctl.abort();
-  }, [range.from, range.to, tz]);
+  }, [view, range.from, range.to, tz]);
+
+  // ── Year view: per-day counts, filtered on the server the page's way ──
+  const [dayCounts, setDayCounts] = useState<Record<string, number>>({});
+  useEffect(() => {
+    if (view !== 'year') return;
+    const ctl = new AbortController();
+    setLoading(true); setError(null);
+    const q = new URLSearchParams({
+      from: range.from, to: range.to, tz, shape: 'days',
+      excludeCategories: filters.hiddenCategories.join(','),
+      excludeCrossActivities: filters.hiddenCrossActivities.join(','),
+      excludeNames: [...filters.hiddenNames, ...READING_NAMES].join(','),
+    });
+    fetch(`/api/calendar?${q}`, { signal: ctl.signal })
+      .then(r => r.json())
+      .then(d => { if (d.error) setError(d.error); else setDayCounts(d.days ?? {}); })
+      .catch(e => { if (e.name !== 'AbortError') setError(String(e)); })
+      .finally(() => { if (!ctl.signal.aborted) setLoading(false); });
+    return () => ctl.abort();
+  }, [view, range.from, range.to, tz, filters.hiddenCategories, filters.hiddenCrossActivities, filters.hiddenNames]);
+
 
   // ── Layout ──
   const shown = useMemo(
-    () => applyFilters(events, filters.hiddenCategories, filters.hiddenCrossActivities),
-    [events, filters.hiddenCategories, filters.hiddenCrossActivities]);
+    () => applyFilters(events, filters.hiddenCategories, filters.hiddenCrossActivities, filters.hiddenNames),
+    [events, filters.hiddenCategories, filters.hiddenCrossActivities, filters.hiddenNames]);
   const reading = useMemo(() => shown.filter(isReading), [shown]);
   const others  = useMemo(() => shown.filter(e => !isReading(e)), [shown]);
 
@@ -182,10 +219,31 @@ function CalendarInner() {
 
   // ── Day pop-up ──
   const [openDay, setOpenDay] = useState<string | null>(null);
-  const dayEvents  = openDay ? others.filter(e => touches(e, openDay)) : [];
+  useEffect(() => { setOpenDay(null); }, [view]);
+
+  // The Year view loads counts only, so its pop-up fetches the one day itself.
+  const [yearDay, setYearDay] = useState<CalendarEvent[] | null>(null);
+  useEffect(() => {
+    if (view !== 'year' || !openDay) return;
+    setYearDay(null);
+    const ctl = new AbortController();
+    fetch(`/api/calendar?${new URLSearchParams({ from: openDay, to: openDay, tz })}`, { signal: ctl.signal })
+      .then(r => r.json())
+      .then(d => setYearDay(d.events ?? []))
+      .catch(e => { if (e.name !== 'AbortError') setYearDay([]); });
+    return () => ctl.abort();
+  }, [view, openDay, tz]);
+  const dayPool = view === 'year'
+    ? applyFilters(yearDay ?? [], filters.hiddenCategories, filters.hiddenCrossActivities, filters.hiddenNames)
+    : shown;
+  const dayLoading = loading || (view === 'year' && openDay !== null && yearDay === null);
+  const dayEvents  = openDay ? dayPool.filter(e => !isReading(e) && touches(e, openDay)) : [];
   const dayReading = openDay && filters.showReading
-    ? reading.filter(e => touches(e, openDay)).map(e => ({ e, ...readingProgress(e, openDay) }))
+    ? dayPool.filter(e => isReading(e) && touches(e, openDay)).map(e => ({ e, ...readingProgress(e, openDay) }))
     : [];
+
+  // Schedule: Today must scroll even when the date is already today.
+  const [jump, setJump] = useState(0);
 
   // ‹ › in the pop-up. A day outside the loaded grid moves the month with it.
   const stepDay = useCallback((n: number) => {
@@ -209,11 +267,13 @@ function CalendarInner() {
   const shift = (n: number) => {
     if (view === 'day') return setCursor(addDays(cursor, n));
     if (view === 'week') return setCursor(addDays(cursor, 7 * n));
+    if (view === 'year') return setCursor(`${year + n}-01-01`);
     const [y, m] = cursor.split('-').map(Number);
     setCursor(new Date(Date.UTC(y, m - 1 + n, 1)).toISOString().slice(0, 10));
   };
-  const unit = view === 'day' ? 'day' : view === 'week' ? 'week' : 'month';
-  const title = view === 'month'
+  const unit = view === 'day' ? 'day' : view === 'week' ? 'week' : view === 'year' ? 'year' : 'month';
+  const title = view === 'year' ? String(year)
+    : view === 'month' || view === 'schedule'
     ? fmtDate(`${grid.month}-01`, { month: 'long', year: 'numeric' })
     : view === 'week' ? weekTitle(week[0], week[6])
     : fmtDate(cursor, compact
@@ -222,7 +282,14 @@ function CalendarInner() {
   const openDate = useCallback((d: string) => go(d, 'day'), [go]);
   const hiddenCount = filters.hiddenCategories.length + filters.hiddenCrossActivities.length;
 
-  const mainView = (isCompact: boolean) => view === 'month'
+  const mainView = (isCompact: boolean) => view === 'year'
+    ? <YearView year={year} counts={dayCounts} today={today} selected={openDay}
+        onDay={setOpenDay} onOpenMonth={d => go(d, 'month')} />
+    : view === 'schedule'
+    ? <ScheduleView from={monthFirst} to={monthLast} cursor={cursor} jump={jump} today={today} events={others} reading={reading}
+        showReading={filters.showReading} tz={tz} colors={filters.colors} isDark={isDark}
+        onOpenDate={openDate} onOpenEvent={openEvent} />
+    : view === 'month'
     ? <MonthView weekDates={grid.weeks} events={others} reading={reading} showReading={filters.showReading}
         month={grid.month} today={today} tz={tz} colors={filters.colors} isDark={isDark} compact={isCompact}
         onOpenDay={setOpenDay} onOpenDate={openDate} onOpenEvent={openEvent} />
@@ -249,7 +316,7 @@ function CalendarInner() {
             </svg>
           </button>
         )}
-        <button onClick={() => setCursor(today)}
+        <button onClick={() => { setCursor(today); setJump(j => j + 1); }}
           className="border border-stone-200 dark:border-zinc-700 rounded px-2.5 py-1 text-[11px] bg-white dark:bg-zinc-900 text-stone-700 dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800">
           Today
         </button>
@@ -269,7 +336,7 @@ function CalendarInner() {
           </button>
           {pickerOpen && (
             <MonthPicker cursor={cursor} today={today} firstYear={firstYear}
-              onPick={d => { setCursor(d); setPickerOpen(false); }}
+              onPick={d => { go(d, view === 'year' ? 'month' : view); setPickerOpen(false); }}
               onClose={() => setPickerOpen(false)} />
           )}
         </div>
@@ -294,12 +361,6 @@ function CalendarInner() {
                 className={`px-2.5 py-1 ${v === view
                   ? 'bg-stone-800 dark:bg-zinc-200 text-white dark:text-zinc-900 font-medium'
                   : 'bg-white dark:bg-zinc-900 text-stone-600 dark:text-zinc-300 hover:bg-stone-50 dark:hover:bg-zinc-800'}`}>
-                {compact ? label[0] : label}
-              </button>
-            ))}
-            {SOON.map(label => (
-              <button key={label} disabled title="Coming next"
-                className="px-2.5 py-1 bg-white dark:bg-zinc-900 text-stone-300 dark:text-zinc-600 cursor-not-allowed">
                 {compact ? label[0] : label}
               </button>
             ))}
@@ -331,7 +392,13 @@ function CalendarInner() {
         <ModalShell onClose={() => setOpenDay(null)}
           actions={
             <>
-              {loading && <span className="text-[10px] text-stone-400 dark:text-zinc-500 mr-1">Loading…</span>}
+              {dayLoading && <span className="text-[10px] text-stone-400 dark:text-zinc-500 mr-1">Loading…</span>}
+              {view !== 'day' && (
+                <button onClick={() => { const d = openDay; setOpenDay(null); openDate(d); }}
+                  className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline mr-1">
+                  Open day ›
+                </button>
+              )}
               {([[-1, '‹', 'Previous day'], [1, '›', 'Next day']] as const).map(([n, s, label]) => (
                 <button key={s} onClick={() => stepDay(n)} aria-label={label} title={`${label} (${n < 0 ? '←' : '→'})`}
                   className="w-7 h-7 rounded-full text-lg leading-none text-stone-500 dark:text-zinc-400 hover:bg-stone-100 dark:hover:bg-zinc-800">

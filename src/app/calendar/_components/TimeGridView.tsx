@@ -17,7 +17,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { CalendarEvent } from '@/lib/calendar/calendar';
-import { layoutWeek, labelOf, isBar } from '../_lib/month-layout';
+import { layoutWeek, labelOf, isBar, isoWeek } from '../_lib/month-layout';
 import { layoutDay, nowMinutes, type Piece } from '../_lib/time-layout';
 import { colorFor, textOn } from '../_lib/calendar-colors';
 import { Bar, ReadingRow } from './MonthView';
@@ -106,9 +106,13 @@ export function TimeGridView({
       className="select-none border border-stone-200 dark:border-zinc-800 rounded-lg overflow-hidden bg-white dark:bg-zinc-900 flex flex-col"
       style={avail > 0 ? { height: Math.max(avail, MIN_GRID + 80) } : { height: 640 }}>
 
-      {/* Header */}
+      {/* Header; the gutter carries the ISO week number */}
       <div className="flex border-b border-stone-200 dark:border-zinc-800" style={reserve}>
-        <div style={gutterStyle} />
+        <div style={gutterStyle} className="flex items-end justify-center pb-2">
+          <span className={`tabular-nums text-stone-400 dark:text-zinc-500 ${compact ? 'text-[9px]' : 'text-[11px]'}`}>
+            W{isoWeek(dates[0])}
+          </span>
+        </div>
         <div className="flex-1 grid" style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}>
           {dates.map(d => {
             const dow = DOW[(new Date(`${d}T00:00:00Z`).getUTCDay() + 6) % 7];
