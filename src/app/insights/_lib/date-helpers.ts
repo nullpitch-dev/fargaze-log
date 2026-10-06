@@ -2,8 +2,14 @@
 
 import { TimeMode, GlobalFilter } from './types';
 
+// Local calendar date (YYYY-MM-DD). toISOString() would give the UTC date,
+// which is still yesterday between midnight and 1 am in British Summer Time.
+function localDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 export function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
+  return localDateStr(new Date());
 }
 
 export function currentMonthStr(): string {
@@ -21,10 +27,22 @@ export function currentWeekStr(): string {
   return `${d.getFullYear()}-W${String(wNum).padStart(2, '0')}`;
 }
 
+// Default Period: the month ending yesterday.
+// On 6 Oct → 6 Sep – 5 Oct; on 1 Oct → 1 Sep – 30 Sep.
+// The start is today's day number in the previous month, clamped to that
+// month's last day (31 Mar → 28 Feb).
 export function defaultPeriodFrom(): string {
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(now.getDate(), lastDay));
+  return localDateStr(d);
+}
+
+export function defaultPeriodTo(): string {
   const d = new Date();
-  d.setMonth(d.getMonth() - 6);
-  return d.toISOString().slice(0, 10);
+  d.setDate(d.getDate() - 1);
+  return localDateStr(d);
 }
 
 export function defaultTimePeriod(mode: TimeMode): string {

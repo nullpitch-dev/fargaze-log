@@ -16,7 +16,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze Log", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Data Design & Requirements Document", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 4.10  |  27 September 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 4.11  |  28 September 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
 );
 C(p([new TextRun({ text: "Structure: ", bold: true }), new TextRun("Part I Foundations · Part II Data · Part III Features · Part IV Operations · Appendices. The body is the complete, always-current source of truth; the changelog below carries one line per version. Work status, open questions and the backlog live in the separate WBS, not here.")]));
 
@@ -56,6 +56,7 @@ C(table(
   ["4.8","13 Sep 2026","MIGRATION TIMEZONE BUG FIXED \u2014 parseDateTime built every instant with new Date(y,m,d,...), which reads the wall clock in the MIGRATION MACHINE\u2019s zone (Europe/London), displacing every record by the UK\u2019s current offset: zero in GMT, one hour in BST. computeTotalSeconds then applied the record\u2019s real offsets on top, so the displacement cancelled on ordinary records and did NOT cancel on any record spanning a UK clock change \u2014 corrupting durations by an hour even for Korean records \u2014 while the one genuine GMT\u2192BST record was corrected twice. Near-midnight summer records were also assigned to the WRONG DAY, affecting Drinking and Diet. parseDateTime now uses Date.UTC and stores the naive local wall clock; offsets are applied in computeTotalSeconds and nowhere else (\u00a75.3). timezoneOffset switched from parseInteger to parseNumber \u2014 IST 5.5 had been truncated to 5. Full re-migration of all years (\u00a710.3.5). SLEEP WIDGET REBUILT \u2014 \u00a79.3.1 rewritten: seven night-assignment rules (8am day boundary, 8pm nap cutoff, timezone-crossing and 15-hour ceiling), new metric=sleep.summary and metric=sleep.trend backed by a shared buildSleepDays pass in sleep.ts; Summary becomes four metrics each with an average, a band pie and a per-day HeatStrip; Trend collapses Duration/Bedtime/Wake into one Session band on CssDualLineChart with Quality as a percent stacked area, on the Weight-style grain \u00d7 count window with leading empty buckets trimmed"],
     ["4.9","26 Sep 2026","Bowel Movement widget (WBS #62) Summary shipped — new §9.3.7. bowel.quality and bowel.characteristics become String[] parsed from ‘+’-joined cells (§5.2, §10.1.4). New Bowel sheet and bowel_score collection (§4.1, §6.8, §12.5) hold the allowed values AND their scores; the daily migration rejects any bowel value not in it, the same way ingredients are validated. The day-score index is defined and verified against all years: movement score = amount + quality + characteristics; day score = the MEAN of the day’s movement scores plus a frequency penalty (3rd movement −2, each after −3); days without a movement score −1/−3/−5/−7/−10; bad day below −3; scored from 2019-09-19 only, because characteristics were not recorded before. metric=bowel.summary. CssDailyChart gained hoverFor; Histogram gained per-bar hover cards and a height prop; MetricPieBlock and HintLabel exported from SleepWidget with unit and legendCols. Stale v4.7 footer corrected"],
     ["4.10","27 Sep 2026","Bowel Movement Trend view shipped — §9.3.7 Trend written. New metric=bowel.trend on the shared grain × count window, anchored at min(period end, YESTERDAY). buildBowelTrend runs buildBowelSummary once per bucket over the bucket’s own dates, so no rule is restated and a Month bucket always equals the Summary for that month — verified on July 2021 and January 2026. New BowelTrendView.tsx with eight tabs: Score (average line + faint bad-day share), Per day / Gap / Duration (percent stacked areas on the Summary’s criteria, each with an average line on the right axis), Quality (all nine values, hard → normal → loose), How it went, Other signs (NOT normalised — each band is % of movements) and Time of day. Summary: a day with no movement is marked × on the Day score; Time of day labels read 5:00~. Shared charts, all additions default-off: CssDailyChart markerFor; CssTrendChart zones, notes and rightSeries.dim; CssStackedAreaChart zeroIsValue. CssTrendChart now thins x labels BEFORE shortening them, so the year appears on the first drawn label of each year, and its hover card shows the full label with the year — this changes Diet and Drinking tooltips for the better; callers passing compressXLabels={false} are unchanged"],
+    ["4.11","28 Sep 2026","CALENDAR (WBS #59) shipped — new §14. A Calendar page (first in the menu, and the home page) with Day, Week, Month, Year and Schedule views plus Search, following Google Calendar. TIME ZONES follow Google: a timed record is one moment (its naive wall clock minus its own offset) shown in ONE display zone — this device’s by default, switchable, not remembered; all-day records stay on their logged dates. §5.3 amended: the Calendar is the one reader that applies offsets at read time; nothing stored changes. New endpoints /api/calendar (events, or per-day counts), /options, /settings, /record and /search. New collection calendar_settings (§6.9) and a Log index on { userId, duration.totalSeconds } for records longer than 31 days (the reading periods, the longest 474 days). Reading & study (독서(기간), 공부(기간)) share ONE row with a show/hide switch. Calendar search uses the Search page’s 상세 검색 fields but CONTAINS matching, newest first, up to 200 (§14.8). The record detail pane moved out of search/page.tsx into src/app/_components/LogDetailPanel.tsx and is shared; ModalShell gained an optional actions slot; the garbled Search hint line was fixed. Four sheet records end before they start (§14.10)"],
   ],
   [1100, 1300, 6960]
 ));
@@ -496,6 +497,7 @@ C(spacer());
 C(bold("THE WALL-CLOCK INVARIANT (v4.8) — do not violate"));
 C(p("start.datetime and end.datetime hold the NAIVE LOCAL WALL CLOCK, encoded as if it were UTC. They are deliberately NOT true instants. A bedtime of 23:00 KST is stored as 23:00Z and reads back as 23:00 wherever and whenever it is read. Hyoje\u2019s rule: the clock on the wall at the time is the truth, and start.timezone records WHERE that wall was."));
 C(p("It follows that the offsets must be applied in computeTotalSeconds and NOWHERE ELSE. Applying them in parseDateTime as well double-counts them; applying them in neither leaves duration wrong across a zone change."));
+C(p("(v4.11) The invariant is about what is STORED. One reader converts at READ time: the Calendar (§14.2) turns each timed record into a true moment with the same formula — naive wall clock minus that end’s own offset — in toInstant() in src/lib/calendar/calendar.ts, then shows it in a display zone. It writes nothing back. Every other consumer (Insights widgets, Search, Cost) keeps working on the logged local dates and wall clocks, so a Calendar count and a widget count for the same month can differ by the records that cross midnight in the display zone. Example: Bowel July 2021 is 39 by logged date and in the Calendar shown in Seoul time, 36 in London time."));
 C(bold("Why this is written down"));
 C(p("Until v4.8 parseDateTime ended with new Date(y, m, d, h, min, 0). That constructor interprets the wall clock in the MIGRATION MACHINE\u2019s timezone \u2014 Europe/London \u2014 so every datetime in the database was displaced by the UK\u2019s current offset: zero in winter, minus one hour in BST. Writing London\u2019s offset as L and the record\u2019s as O, computeTotalSeconds produced (end clock \u2212 start clock) \u2212 (L_end \u2212 L_start) \u2212 (O_end \u2212 O_start). The middle term does not belong. On an ordinary record L is identical at both ends, the term is zero, and the answer came out right BY CANCELLATION \u2014 which is why the defect survived years of correct-looking output."));
 C(p("It stopped cancelling in two places. Any record spanning a UK clock change had one end read as GMT and the other as BST, leaking 60 minutes \u2014 including Korean records, because London switched even though Seoul did not. And the single genuine UK clock-change record was handled correctly by the constructor and then corrected a second time by the offset subtraction. Separately, near-midnight summer records were displaced onto the wrong calendar day, which silently moved Drinking and Diet day assignment for any record within an hour of midnight between late March and late October."));
@@ -613,6 +615,17 @@ C(table(["Field","Value → score"],[
   ["characteristics","편하게 +5 · 힘들게 −1 · 복통 수반 −2 · 냄새 심함 −2 · 가스 많음 −2 · 급하게 −3 · 잔변감 −3 · 뜨거움 −4 · 복통 심함 −5 · 길에서 −7 · 바지에 −10"],
 ],[2000,7360]));
 C(note("편하게 was raised from +3 to +5 during the v4.9 assessment so that a perfect movement (보통 / 좋음 / 편하게) scores 10. That change also made quality and characteristics count roughly equally in the day-to-day variation of the score; at +3 quality counted about twice as much, because 78% of movements are 편하게 and the characteristics part barely varied. 바지에 and 길에서 were deliberately kept at −10 and −7 although they are situational rather than digestive."));
+C(h2("6.9 calendar_settings (added v4.11)"));
+C(p("One document per user holding the Calendar’s filter panel, saved on every change so the phone and the desktop always agree. Read and written only through /api/calendar/settings; the page saves nothing until the stored settings have loaded, so an early click cannot overwrite them with defaults."));
+C(table(["Field","Type","Notes"],[
+  ["userId","String","Required; unique index { userId }"],
+  ["hiddenCategories","[String]","Categories whose tick is off. Stored as the HIDDEN list so a new category shows by default"],
+  ["hiddenCrossActivities","[String]","Cross-activity values switched off. Records without a cross-activity always show"],
+  ["hiddenNames","[String]","Activity names never shown (exact match). No schema default on purpose: while the field is absent the API supplies the starting list 정식 운동, 약식 운동"],
+  ["colors","Mixed","category → palette KEY (not a hex), so colours can be retuned without touching saved data; a category not listed uses its default family colour"],
+  ["showReading","Boolean","The Reading & study row; default true"],
+],[2200,1300,5860]));
+C(p("Collection calendar_settings, model src/models/CalendarSettings.ts (minimize: false). The display time zone and the view are deliberately NOT stored: the zone follows the device (§14.2) and the page always opens on Month. The filter column’s open/closed state is per device, in localStorage key fargaze.calendar.sidebarOpen."));
 
 
 
@@ -727,7 +740,9 @@ C(spacer());
 
 // ===== 8.7 SEARCH UI — RESULT DETAIL PANEL =====
 C(h2("7.7 Search UI — Result Detail Panel"));
-C(p("Selecting a result opens a detail panel (DetailPanel in src/app/search/page.tsx) listing the entry's fields. Food and drink items render their ingredients inline, in parentheses, between the item name and its amount — e.g. 밀크커피 (커피, 우유) 1잔 and 샌드위치 (밀, 가공육, 버터, 치즈, 잎채소) 1 인분. The ingredients come straight from food.foods[].ingredients / food.drinks[].ingredients (the level2 values); the parenthetical is omitted when the array is empty or absent, so alcohols and ingredient-less items are unaffected. The Atlas projection and the regex .select() are both exclusion-only, so these arrays reach the client without an API change."));
+C(p("Selecting a result opens a detail panel (DetailPanel — since v4.11 in src/app/_components/LogDetailPanel.tsx with the LogEntry type and the formatters, shared with the Calendar and drawn through a portal one layer above ModalShell) listing the entry's fields. Food and drink items render their ingredients inline, in parentheses, between the item name and its amount — e.g. 밀크커피 (커피, 우유) 1잔 and 샌드위치 (밀, 가공육, 버터, 치즈, 잎채소) 1 인분. The ingredients come straight from food.foods[].ingredients / food.drinks[].ingredients (the level2 values); the parenthetical is omitted when the array is empty or absent, so alcohols and ingredient-less items are unaffected. The Atlas projection and the regex .select() are both exclusion-only, so these arrays reach the client without an API change."));
+C(h2("7.8 Relationship to the Calendar Search (v4.11)"));
+C(p("The Calendar has its own search (§14.8). It reuses this page’s 상세 검색 fields and labels but not its engine: Atlas Search ranks fuzzy matches and stops at 100, which cannot answer “the latest matches in date order”, so the Calendar uses plain CONTAINS matching on the same field list. This page is unchanged apart from the shared detail pane and one fix: the hint shown when a query is combined with conditions printed a garbled string of broken quotation-mark entities; it now reads “query” + 아래 조건 적용 중."));
 
 
 C(new Paragraph({ children: [new TextRun({ text: "Part III · Features", bold: true, size: 28 })], spacing: { before: 280, after: 140 } }));
@@ -861,7 +876,7 @@ C(table(["Component","File","Description"],[
   ["MetricPieBlock / HintLabel","src/app/insights/_widgets/SleepWidget.tsx","(v4.8, exported v4.9) Pie + legend sharing one hover state, and a label whose explanation opens as the shared hover card. Exported for the Bowel widget rather than extracted, with two default-preserving props on MetricPieBlock: unit (hover text counts \"3 days\" by default, \"3 movements\" for Bowel) and legendCols (2 = legend in two columns once the nearest @container reaches @lg, one column below that so a label never wraps). If a third widget needs them, extract both to _components per A.3"],
   ["CssStackedAreaChart","src/app/insights/_components/charts/css-chart-components.tsx","(v4.2) Stacked area with a continuous total line. A point is {label, total, segments?, meta?} and may carry a total with NO segments, in which case the line runs across it and the coloured fill starts later; nulls break the line rather than interpolating across a gap. Props: segmentDefs (bottom to top), mode 'absolute' | 'percent', baselineZero, formatY, height, maxXLabels. Percent mode normalises each stack to 100 and hides the total line. Bands are clipped to the plot box; a lone point renders as a narrow column so a single-bucket run does not vanish. Nothing in it is weight-specific. v4.5 added highlightable (default false) \u2014 one activeKey state driven from the plot, the legend and the tooltip, with the band under the cursor derived from the cursor height because the hover columns sit above the SVG. v4.6 adds rightLine + formatYRight (default absent, so every existing caller keeps its exact width): ONE extra line on its own right-hand axis, drawn SOLID from values and DASHED across the gaps that bridge fills, the dashed run extended one point each side so it meets the solid line; the right label column, the x-label row padding and the legend entry all appear only when it is passed. v4.10 adds zeroIsValue (default false, absolute mode only): a point whose segments are all zero draws flat on the floor instead of as a gap, for measures where zero is a fact — Bowel Other signs. Everywhere else the settled rule stands: a zero-total bucket is a gap"],
   ["Segmented","src/app/insights/_components/Segmented.tsx","(v4.2) Shared multi-state toggle, generic over string | number so numeric option sets (bucket counts) work alongside string ones. Extracted from DietWidget when WeightTrendView needed the same control. ViewToggle in WidgetCard remains the dedicated Summary/Trend switch"],
-  ["ModalShell","src/app/insights/_components/ModalShell.tsx","(v4.4) Shared centred modal rendered through a React portal on document.body, so it escapes widget-card overflow:hidden. Backdrop click and \u00d7 both close; clicks inside the panel do not bubble. Extracted from DietWidget when ExerciseWidget needed the same shell \u2014 the same trigger that lifted Segmented out at v4.2"],
+  ["ModalShell","src/app/insights/_components/ModalShell.tsx","(v4.11) Optional actions — controls placed before the × (the Calendar day pop-up’s Open day and ‹ › arrows); absent by default, so every Insights modal is unchanged. (v4.4) Shared centred modal rendered through a React portal on document.body, so it escapes widget-card overflow:hidden. Backdrop click and \u00d7 both close; clicks inside the panel do not bubble. Extracted from DietWidget when ExerciseWidget needed the same shell \u2014 the same trigger that lifted Segmented out at v4.2"],
   ["Treemap","src/app/insights/_components/charts/Treemap.tsx","(v3.3) Squarified treemap; CSS-positioned cells measured via ResizeObserver; top-N cap with a neutral 기타 (+N) rollup; per-mode cell text"],
   ["CalendarHeatmap / HeatStrip","src/app/insights/_components/charts/CalendarHeatmap.tsx","(v3.3) Mon–Sun calendar grid (modal) + single-row day strip (inline); range expanded to whole weeks; out-of-range days dimmed; colour via fillFor(date)"],
   ["StackedBars","src/app/insights/_components/charts/StackedBars.tsx","(v3.5) Reusable stacked bars; percent or absolute mode; legend hover-highlight dims the other series; shared by the Diet Composition / Spicy / Relation tabs. The Drinking Type / Occasion / Relation tabs used it until v4.6, when they moved to stacked areas; Diet Composition keeps it deliberately and stays on the short count list instead"],
@@ -1139,7 +1154,7 @@ C(p("Ingredient-group and relationship colours are assigned at runtime by indexi
 C(bold("Components introduced"));
 C(
   bullet("Treemap.tsx — squarified layout, CSS-positioned cells measured by ResizeObserver, top-N cap + neutral 기타 (+N) rollup"),
-  bullet("CalendarHeatmap.tsx — CalendarHeatmap (full Mon–Sun grid, reusable for WBS #59) and HeatStrip (compact inline row)"),
+  bullet("CalendarHeatmap.tsx — CalendarHeatmap (full Mon–Sun grid; the Calendar’s Year view follows its layout but does not import it, since day colouring is deferred) and HeatStrip (compact inline row)"),
   bullet("CssDailyChart (in css-chart-components.tsx) — daily line with average line, zone bands, above-marker value+date tooltip"),
   bullet("CssVerticalBoxPlotChart gained formatY (e.g. HH:MM axis), height, and compact (v3.4 — drops the y-axis and the name legend, labelling max/avg/min directly) so four boxes fit one row"),
 );
@@ -1821,6 +1836,112 @@ C(spacer());
 
 
 
+
+// ===== 14. CALENDAR (v4.11) =====
+C(h1("14. Calendar (WBS #59)"));
+C(p("A native calendar over every record, modelled on Google Calendar. Page src/app/calendar/page.tsx; the menu reads Calendar · Insights · Search · Spending and the home page redirects to it. Read-only until Phase 5; the layout leaves room for creating and moving records."));
+
+C(h2("14.1 Views, Navigation and Layout"));
+C(table(["Item","Behaviour"],[
+  ["Views","Day · Week · Month · Year · Schedule, plus Search. The page always opens on Month. View and date live in the address (?view=week&date=2021-07-09), so the back button and bookmarks work"],
+  ["Toolbar","☰ folds the filter column (wide screens; remembered per device) · Today · ‹ › stepping by the view’s unit (day, week, month, year; Schedule steps a month) · the title, which opens a month picker (year arrows or drop-down from the first record’s year to next year, then twelve months; from Year it opens that month) · the search box · the view switch. A phone shows a Filters button and a search icon instead"],
+  ["Full height","Month, Week/Day, Schedule and Search results fill the window below their own top edge (measured in the browser, re-measured on resize and when the toolbar wraps). Month shares the height equally between week rows and gives each row as many lines as fit (at least two)"],
+  ["Week numbers","ISO 8601 (Monday-first; week 1 holds the year’s first Thursday). Month: a narrow W26 column left of each week. Week and Day: in the corner above the hour labels"],
+  ["Day pop-up","One pop-up for Month, Week, Day and Year: the day’s Reading & study with “day N of M”, then every record with its time range (a record crossing midnight shows the other date). ‹ › and the arrow keys step a day, moving the loaded range when needed; Escape closes; “Open day ›” opens the Day view. Year fetches the day itself, since it loads counts only"],
+  ["Clicks","A record opens the shared detail pane (§7.7). Month: a date number opens that Day view; empty cell space and “+N more” open the pop-up. Week/Day: a header date opens that Day view; empty strip space opens the pop-up. Year: a day opens the pop-up; a month name opens that month. Schedule and Search: a date opens that Day view"],
+],[1800,7560]));
+C(spacer());
+
+C(h2("14.2 Time Zones — Google’s Rule"));
+C(p("Hyoje asked to follow Google Calendar, whose help page says events “are converted into UTC, but you’ll always see them in your local time”, and that on travel “your calendar appears in the local time”."));
+C(
+  bullet("A timed record is ONE MOMENT: each end’s stored naive wall clock minus that end’s own offset (§5.3). A London → Seoul flight is logged in BST at the start and KST at the end; the Calendar shows both ends in London time before departure and both in Seoul time after arrival"),
+  bullet("Every timed record is shown in ONE display zone: this device’s zone by default, switchable in the filter panel (quick picks: this device, Europe/London, Asia/Seoul; then every zone). The choice is not remembered; an amber “Shown in …” label marks a non-device zone"),
+  bullet("All-day records carry no zone and stay on their logged dates. The logged end date is INCLUSIVE — the last day shown. No multi-day all-day record exists in the data today; the “(기간)” periods and 00:00–23:59 holidays are timed"),
+  bullet("Consequence: viewed from the UK, the Korean years shift 8–9 hours earlier and early-morning records land on the previous day. Switching the picker to Seoul restores them. An “as logged” mode was considered and rejected: a Seoul → London flight shown as logged would end before it starts"),
+  bullet("Because widgets count by logged date (§5.3), the Calendar and a widget can differ for the same period; verified on Bowel July 2021 — 39 by logged date and in Seoul time, 36 in London time"),
+);
+
+C(h2("14.3 Events API — GET /api/calendar"));
+C(p("from, to: display dates, inclusive, at most 400 days apart (a Year needs 366). tz: an IANA zone. Optional excludeCategories, crossActivities (include list), excludeCrossActivities, excludeNames. shape=days returns per-day counts instead of events. Logic in src/lib/calendar/calendar.ts."));
+C(bold("Candidate query (loose; the exact cut is in memory)"));
+C(
+  bullet("Timed records starting between the range start minus 15 h minus 31 days and the range end plus 15 h — the 15 h covers any offset, the 31 days records still running"),
+  bullet("All-day records with start.year from the year before the range to its last year"),
+  bullet("Timed records longer than 31 days (duration.totalSeconds), however long ago they started — the reading and study periods; 34 exist, the longest 474 days (주역 역전, from 2019-01-09). Served by the Log index { userId, duration.totalSeconds }"),
+);
+C(bold("Event rules (buildCalendarEvents)"));
+C(
+  bullet("kind: timed; point — a timed record with no end; allDay. An end before its start is drawn as a point and counted in diagnostics.endBeforeStart"),
+  bullet("A timed record is kept if it overlaps the range; one ending exactly at local midnight belongs to the day before. startDate/endDate are display dates; future = starts after now"),
+  bullet("diagnostics: candidates, noStart, noOffset, endBeforeStart (+ first ids), startsInRange by category/name — the verification hook"),
+  bullet("shape=days counts a record on every day it touches; the Year view passes the page’s filters and leaves reading & study out"),
+);
+
+C(h2("14.4 Other Endpoints"));
+C(table(["Endpoint","Returns"],[
+  ["GET /api/calendar/options","categories with all-time counts; crossActivities; firstYear (month picker range); longestTimed, longTimedCount, longTimedLimitDays (31) — the check behind the long-record branch"],
+  ["GET / PUT /api/calendar/settings","calendar_settings (§6.9). PUT replaces only the fields sent, each validated"],
+  ["GET /api/calendar/record?id=","One whole record for the detail pane; the events list carries only what the grid needs"],
+  ["GET /api/calendar/search","§14.8"],
+],[3000,6360]));
+C(spacer());
+
+C(h2("14.5 Layout Rules"));
+C(bold("Month (month-layout.ts)"));
+C(
+  bullet("Bars: all-day records and timed records of 24 h or more, spanning every day they touch and continuing into the next week row (square edge, ‹ on the continuation)"),
+  bullet("Chips: every other timed record, on its START day only (our rule — a night’s sleep would otherwise double every morning). Time is shown only when a day cell is at least 110 px wide; a phone never shows it"),
+  bullet("Lanes: bars first (earliest, then longest), then chips by time, each in the lowest free lane. A day whose items pass the last lane shows “+N more” there instead"),
+);
+C(bold("Week and Day (time-layout.ts, TimeGridView.tsx)"));
+C(
+  bullet("24 hours in the display zone, 48 px an hour (40 on a phone); only the hours scroll; opens at 07:00, or an hour before now when today is in view; a red line marks now and moves each minute"),
+  bullet("A record crossing midnight is cut into one piece per day. Every piece is drawn at least 15 minutes tall so a point stays clickable; overlap is judged on the drawn size"),
+  bullet("Overlapping pieces form a cluster; each takes the first free column; a piece then widens right across every column free for its whole time (Google’s behaviour)"),
+  bullet("The strip above the hours holds the Reading & study row, then bars in up to three lanes, then “+N more”"),
+);
+C(bold("Year, Schedule"));
+C(
+  bullet("Year: twelve Monday-first months; a dark number for a day with records, dim without, a blue circle for today. Colouring days by a measure is deferred (27 Sep) — with every category shown almost every day is dark; filtering (e.g. 골프 only) makes it a “which days” map"),
+  bullet("Schedule: one month as a list; only days with records, plus the chosen day and today (“Nothing recorded.”) so Today can always scroll to its row; each day uses the pop-up’s list; reading appears only on start and finish days"),
+);
+
+C(h2("14.6 Reading & Study"));
+C(p("독서(기간) and 공부(기간) records run for months and overlap (three or four books at once), so they never become bars. They share ONE row per week (Month) or strip (Week/Day): ▶ title on a start day, ✓ title on a finish day, otherwise a book icon with the number ongoing; “+k” when several change on one day. The row appears only in weeks with reading, and a switch in the filter panel hides it everywhere (Hyoje: one strip’s space is expensive on a phone)."));
+
+C(h2("14.7 Filters and Colours"));
+C(
+  bullet("Order in the panel: Time zone · Activity type (cross-activity drop-down) · Rows (Reading & study) · Categories (tick, colour, all-time count; Show all / Hide all) · Hidden activities, FOLDED at the very bottom and folded again on every visit — hidden things stay out of sight"),
+  bullet("Filtering is in the browser for Day/Week/Month/Schedule (instant ticks) and in the API for Year counts and Search, so their limits count only records that would show"),
+  bullet("Colours: a 13-colour palette (red … grey) chosen from each category’s ⋯ button; Default colour removes the choice. Defaults by family so related categories share a colour: 식음 orange; 생리/낮잠 violet; 이동/숙박/여행/출장 sky; 회사 업무/개인 업무/제품 개발 blue; 운동/골프/스키 green; money categories amber; 의료/신체 측정 red; 관계/경조사/가족 예식/기념/종교활동 pink; 육아 purple; 문화/취미/기타 놀이 teal; anything else grey. Bars are filled with white or dark text by luminance; chips carry a coloured dot; future records are drawn at 55% opacity"),
+);
+
+C(h2("14.8 Search"));
+C(p("Google’s model with the Search page’s 상세 검색. The box sits in the toolbar; ▾ opens 기간 (two dates with their own 초기화), 필드 조건 (AND) rows with the Search page’s twelve fields and labels, and 제외 단어 (Google’s “Doesn’t have”). A search is a view of its own in the address (?view=search&q=…&cond=field:value|…&not=…&sfrom=…&sto=…&prev=month); entering it adds a history step, refining replaces it; ← or Escape returns to the view it came from. The filter panel applies."));
+C(table(["Rule","Detail"],[
+  ["Matching","CONTAINS, case-insensitive, over the Search page’s 23 text fields for the main box, or the one field of a condition row. Words separated by spaces must ALL appear; “quoted phrases” stay together; 제외 단어 removes records containing any of its words. Not fuzzy — and so 대변 also matches 대변 실패"],
+  ["Order and limit","Newest day first, each day’s records in time order. Up to 2,000 matches are fetched newest first and cut exactly by display date; the latest 200 are shown. Above 200 (or 2,000) a line says so and suggests a date range, as Google does"],
+  ["Dates","A match must START on a display date inside 기간"],
+  ["Speed","Measured on real data: ~0.27 s for a month-bounded search, ~1.2 s for 체중 across every year (2,000+ matches). A text index is the remedy if it ever feels slow"],
+],[1800,7560]));
+C(spacer());
+
+C(h2("14.9 Verified Values"));
+C(table(["Check","Result"],[
+  ["Bowel movements, July 2021, events API in Seoul time","39 — equals the Bowel Summary"],
+  ["Same month in London time","36; the first record 08:11 KST reads 00:11 BST on 1 July"],
+  ["Long-record branch","주역 역전 appears in December 2019 with dates 2019-01-09 → 2020-04-28"],
+  ["Diagnostics, 2019–2026 samples","noStart 0, noOffset 0"],
+  ["Search: 활동명 대변, July 2021, Seoul","42 (39 + 3 대변 실패); with 제외 단어 실패, 39"],
+  ["Search: “여름 휴가”, July 2021","6 — five all-day 휴가 records (26–30 Jul) and the 여행(기간) 부산 본가 방문"],
+  ["ISO weeks","2021-07-05 → W27; 2021-01-01 → W53 (of 2020); 2025-12-29 → W1; 2026-09-28 → W40"],
+],[4000,5360]));
+C(spacer());
+
+C(h2("14.10 Sheet Anomalies Found"));
+C(p("Records whose end is before their start (drawn as points until corrected in the sheet): 6ab7da3f5ef99b2c70d6c1eb and 6ab7da3f5ef99b2c70d6c1f4 (December 2019), 6ab7da445ef99b2c70d71fd8 (July 2021), and three in 2025 whose ids are listed by /api/calendar?from=2025-01-01&to=2025-12-31 under diagnostics.endBeforeStartIds."));
+
 C(new Paragraph({ children: [new TextRun({ text: "Appendices", bold: true, size: 28 })], spacing: { before: 280, after: 140 } }));
 
 // ===== APPENDICES =====
@@ -1846,6 +1967,7 @@ C(h3("A.2 Data & Query Conventions"));
 C(
   bullet("MongoDB date-range queries filter on the local date fields (start.year/month/day) via $expr + $dateFromParts, never on start.datetime (UTC), to avoid timezone-shift errors."),
   bullet("Atlas aggregations always begin with userId as the first match condition."),
+  bullet("(v4.11) The one exception to filtering on local date fields: the Calendar queries start.datetime with ±15 h of padding and makes the exact cut in memory by DISPLAY date, because it shows every record in one chosen zone (§14.2). Its counts can therefore differ from a widget’s for the same month; both are correct for their own rule."),
   bullet("Filtered aggregations that depend on uniqueness (e.g. unique-people counts) are recomputed server-side — they cannot be derived from marginal totals."),
   bullet("The 6am day boundary (assignDrinkingDate) is the canonical 'when did this day start' rule, shared by the drinking and diet widgets; 아침 (breakfast) records are exempt from the rollback."),
   bullet("(v4.9) A value that has only been recorded from some date onward is UNKNOWN before that date, never a default. Check per-field coverage by year before designing any widget — spiciness (v4.7) and bowel characteristics (v4.9) both had this shape."),
@@ -1914,10 +2036,10 @@ C(table(["Path","Purpose"],[
   ["src/lib/insights/exercise-trend.ts","(v4.5) computeExerciseTrend and computeExerciseItemTrend \u2014 same unbounded-fetch, cut-in-memory approach; bucketKey/buildBuckets (day / ISO-Monday week / month) with per-bucket period-day counts; grouping read from activity.name; names the \ucd1d marker DAY_TOTAL_MARK rather than repeating the REST_PAUSE misnomer; private date-helper mirrors of exercise.ts — a third copy is the signal to extract them to dates.ts"],
   ["src/models/AlcoholConversion.ts","Mongoose model for alcohol_conversion collection"],
   ["src/models/IngredientMaster.ts","Mongoose model for ingredient_master collection (NEW v3.1); unique index { userId, level2 }"],
-  ["src/models/Log.ts","Mongoose model for log collection; food.spiciness added v3.0; food.foods[].ingredients (foodsItemSchema) added v3.1; food.drinks[].ingredients (drinksItemSchema) added v3.2; exercise[].loadKg and exercise[].setStyle added v4.3 to both ILog and LogSchema; alcohols unchanged"],
+  ["src/models/Log.ts","Mongoose model for log collection; (v4.11) second index { userId, duration.totalSeconds } for the Calendar’s long-record query; food.spiciness added v3.0; food.foods[].ingredients (foodsItemSchema) added v3.1; food.drinks[].ingredients (drinksItemSchema) added v3.2; exercise[].loadKg and exercise[].setStyle added v4.3 to both ILog and LogSchema; alcohols unchanged"],
   ["src/lib/migration/rowToDocument.ts","Maps Google Sheets row to MongoDB document; FOOD_ITEM col 45, DRINK_ITEM col 41; foods AND drinks post-processed via parseFoodIngredients (foods v3.1, drinks v3.2); v4.3 shifts every index after col 71 by +2 and reads exercise[].loadKg (col 72) and exercise[].setStyle (col 73) per item"],
   ["src/lib/migration/transform.ts","Transformation utilities; v3.1 adds parseFoodIngredients(), loadValidLevel2(), resetValidLevel2(), IngredientValidationError; v4.9 adds parsePlusList(), loadBowelVocabulary(), parseBowelValue(), parseBowelList(), BowelValidationError and imports BowelScore"],
-  ["src/app/search/page.tsx","Search UI — LogEntry type and DetailPanel; food.spiciness added v3.0; mixed phrase/token query hint (v3.1); client-side tri-state sortable result columns (v3.6)"],
+  ["src/app/search/page.tsx","Search UI — (v4.11) LogEntry and DetailPanel now imported from src/app/_components/LogDetailPanel.tsx; garbled conditions hint fixed; food.spiciness added v3.0; mixed phrase/token query hint (v3.1); client-side tri-state sortable result columns (v3.6)"],
   ["src/app/api/search/route.ts","GET /api/search — Atlas Search primary + regex fallback; parseQuery mixed phrase/token (v3.1); per-field exact-phrase conditions mirrored across the Atlas and regex condition loops (v3.6)"],
   ["scripts/migrate.ts","Daily migration runner; calls loadValidLevel2 and (v4.9) loadBowelVocabulary at start; uncomment ~2025 block for full re-migration, and re-comment it afterwards; fetch range A:CI from v4.3 (was A:CG)"],
   ["scripts/migrate-alcohol-conversion.ts","One-time migration: reads AlcoholConv sheet → inserts into alcohol_conversion"],
@@ -1930,11 +2052,33 @@ C(table(["Path","Purpose"],[
   ["scripts/inspect-drinks.ts","Survey for drinks: docs with drinks, items with/without ingredients, Not Defined count, top level2 distribution, samples (NEW v3.2)"],
   ["scripts/inspect-exercise.ts","Survey for exercise: entry and day counts, distinct items and units, records per day, per-year distribution. Does not report loadKg or setStyle"],
   ["scripts/check-exercise-fields.ts","Verifies loadKg and setStyle reached MongoDB after a migration; unwinds exercise[] and prints load by item plus setStyle counts (NEW v4.3)"],
+  ["src/app/calendar/page.tsx","(v4.11) Calendar page (WBS #59): view/date/search in the address, display zone, filters and settings save, fetching for every view, day pop-up with ‹ › and Open day, detail pane, toolbar"],
+  ["src/app/calendar/_components/MonthView.tsx","(v4.11) Month view (full height, ISO week column); exports Bar, ReadingRow and DayList, shared by the other views"],
+  ["src/app/calendar/_components/TimeGridView.tsx","(v4.11) Week (7 columns) and Day (1 column): header, strip, 24-hour grid, now line"],
+  ["src/app/calendar/_components/YearView.tsx","(v4.11) Twelve month grids with has-records numbers"],
+  ["src/app/calendar/_components/ScheduleView.tsx","(v4.11) One month as a day list"],
+  ["src/app/calendar/_components/SearchBox.tsx","(v4.11) Toolbar search box with the 상세 검색 panel"],
+  ["src/app/calendar/_components/SearchResultsView.tsx","(v4.11) Search results, newest day first"],
+  ["src/app/calendar/_components/CalendarFilters.tsx","(v4.11) Time zone, activity type, Reading & study, categories with the colour palette, folded Hidden activities"],
+  ["src/app/calendar/_components/MonthPicker.tsx","(v4.11) Year + month picker on the title"],
+  ["src/app/calendar/_lib/month-layout.ts","(v4.11) Pure: month grid, lanes for any column count (Month rows and the Week/Day strip), bars vs chips, reading cells, filters, isoWeek, readingProgress"],
+  ["src/app/calendar/_lib/time-layout.ts","(v4.11) Pure: per-day pieces, clusters, columns and widening; nowMinutes; weekOf"],
+  ["src/app/calendar/_lib/calendar-colors.ts","(v4.11) The 13-key palette, default family colours, textOn, reading tints"],
+  ["src/lib/calendar/calendar.ts","(v4.11) Pure event logic: zone helpers (Intl only), toInstant, resolveRange, candidateFilter, buildCalendarEvents, countByDay"],
+  ["src/lib/calendar/search.ts","(v4.11) Pure search rules: field lists, parseTerms, parseConditions, buildSearchFilter, limits"],
+  ["src/app/api/calendar/route.ts","(v4.11) GET events / per-day counts"],
+  ["src/app/api/calendar/options/route.ts","(v4.11) Filter options and the long-record check"],
+  ["src/app/api/calendar/settings/route.ts","(v4.11) GET / PUT calendar_settings"],
+  ["src/app/api/calendar/record/route.ts","(v4.11) One record for the detail pane"],
+  ["src/app/api/calendar/search/route.ts","(v4.11) Calendar search"],
+  ["src/models/CalendarSettings.ts","(v4.11) calendar_settings model"],
+  ["src/app/_components/LogDetailPanel.tsx","(v4.11) The record detail pane, LogEntry type and formatters, moved out of search/page.tsx; portal at z-60; used by Search and Calendar"],
+  ["src/app/NavBar.tsx, src/app/page.tsx","(v4.11) Menu order Calendar · Insights · Search · Spending; the home page redirects to /calendar"],
 ],[3400,5960]));
 C(spacer());
 
 // ===== FOOTER =====
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.10 — 27 September 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.11 — 28 September 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 
 // ===== DOCUMENT ASSEMBLY =====
@@ -1971,6 +2115,6 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-Log-Data-Design-v4.10.docx", buffer);
-  console.log("Wrote FarGaze-Log-Data-Design-v4.10.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-Log-Data-Design-v4.11.docx", buffer);
+  console.log("Wrote FarGaze-Log-Data-Design-v4.11.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });

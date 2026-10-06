@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { GlobalFilter, WidgetProps, WidgetSize } from './_lib/types';
-import { currentMonthStr, defaultPeriodFrom, todayStr } from './_lib/date-helpers';
+import { defaultPeriodFrom, defaultPeriodTo } from './_lib/date-helpers';
 import { GlobalFilterBar } from './_components/GlobalFilterBar';
 import { SleepWidget } from './_widgets/SleepWidget';
 import { InteractionsWidget } from './_widgets/InteractionsWidget';
@@ -46,10 +46,10 @@ const SIZE_BREAK: Record<WidgetSize, string> = {
 export default function InsightsPage() {
   const [crossActivityOptions, setCrossActivityOptions] = useState<string[]>([]);
   const [appliedFilter, setAppliedFilter] = useState<GlobalFilter>({
-    timeMode: 'month',
-    timePeriod: currentMonthStr(),
+		timeMode: 'period',
+    timePeriod: '',
     dateFrom: defaultPeriodFrom(),
-    dateTo: todayStr(),
+    dateTo: defaultPeriodTo(),
     crossActivities: [],
   });
 

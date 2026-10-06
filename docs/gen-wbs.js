@@ -11,7 +11,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Service Concept & Work Breakdown Structure", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 3.10  |  27 September 2026", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 3.11  |  28 September 2026", size: 24 })], spacing: { after: 240 } }),
 );
 
 C(h1("Version History"));
@@ -45,6 +45,7 @@ C(table(["Version","Date","Headline"],[
   ["3.8","13 Sep 2026","MIGRATION TIMEZONE BUG FOUND AND FIXED \u2014 parseDateTime read the wall clock in the migration machine\u2019s zone (Europe/London), displacing every datetime by the UK offset; the error cancelled on ordinary records and did NOT cancel across a UK clock change, corrupting eleven sleep durations by an hour INCLUDING Korean ones, and moving near-midnight summer records onto the wrong day (which silently affected Drinking and Diet day assignment). Fixed with Date.UTC; offsets now applied in computeTotalSeconds only. timezoneOffset parseInteger \u2192 parseNumber (IST 5.5 was truncated to 5). Full re-migration of all years, plus 23 source-sheet corrections. #53 SLEEP WIDGET REBUILT on seven explicit night-assignment rules \u2014 metric=sleep.summary and metric=sleep.trend on a shared buildSleepDays pass; Summary is four metrics with pies and day-aligned strips; Trend collapses three charts into one Session band with a right-axis duration line, plus Quality as a percent stacked area; Sleep joins the shared grain \u00d7 count window, the last widget to do so"],
   ["3.9","26 Sep 2026","#62 BOWEL MOVEMENT WIDGET — Summary COMPLETE, Trend not started. bowel.quality and bowel.characteristics now String[]; new Bowel sheet + bowel_score collection (allowed values AND scores; npm run migrate-bowel) and the daily migration rejects any bowel value not in it. Day-score index defined and verified on all years (mean movement score + frequency penalty −2 / −3, gap scale −1…−10, bad day below −3, scored from 2019-09-19). metric=bowel.summary, BowelWidget.tsx with a width-responsive layout; CssDailyChart hoverFor, Histogram hover + height, MetricPieBlock / HintLabel exported with unit and legendCols. Stale v3.7 footer corrected. Mirrors Design Doc v4.9"],
   ["3.10","27 Sep 2026","#62 BOWEL MOVEMENT WIDGET COMPLETE — Trend view shipped. metric=bowel.trend on the shared grain × count window, anchored at min(period end, yesterday); buildBowelTrend runs the Summary builder once per bucket, so Month buckets equal the Summary (verified on July 2021 and January 2026). BowelTrendView.tsx: Score, Per day, Gap, Duration, Quality (all nine values), How it went, Other signs (% of movements, not normalised) and Time of day. Summary: × marks days with no movement; Time of day labels read 5:00~. Shared charts, all additions default-off: CssDailyChart markerFor; CssTrendChart zones, notes, rightSeries.dim; CssStackedAreaChart zeroIsValue. CssTrendChart now thins labels before shortening them (year shown on each new year) and its hover card shows the full label. npm run build passed. Mirrors Design Doc v4.10"],
+  ["3.11","28 Sep 2026","#59 CALENDAR COMPLETE — PHASE 4 COMPLETE. A Google-style Calendar page (first in the menu, the home page) with Day, Week, Month, Year and Schedule views and Search. Timed records are shown as moments in one display zone (the device’s by default, switchable, not remembered) — Google’s rule; all-day records stay on their dates. Reading & study periods share one row with a show/hide switch. Filters (time zone, activity type, categories with a 13-colour palette, hidden activity names — default 정식 운동, 약식 운동) are saved to the new calendar_settings collection. Search reuses 상세 검색 with contains matching, newest first, 200 shown. New APIs /api/calendar, /options, /settings, /record, /search; Log index on duration for records over 31 days. Detail pane shared with Search via src/app/_components/LogDetailPanel.tsx; Search’s garbled conditions hint fixed. Mirrors Design Doc v4.11 (§14)"],
 ],[1100,1300,6960]));
 C(spacer());
 
@@ -98,11 +99,11 @@ C(table(["Phase","Status","Detail"],[
   ["1 — Base Infrastructure & Auth","\u2705 Complete","Subscription-architecture placeholder still pending"],
   ["2 — Data Structure Design","\u2705 Complete","Schema, supporting collections, Mongoose models"],
   ["3 — Migration Tool","\u2705 Complete","Delete-all + re-insert; incremental sync deferred to post-MVP"],
-  ["4 — Analytics & Search","\u2B1C In progress","Done: search, cost dashboard, Interactions / Drinking / Diet / Weight / Exercise widgets (all with Summary and Trend), food + drink ingredient taxonomies. Done: Drinking rest-scoring redesign + Interactions and Drinking trend windows (11 Sep), Diet (12 Sep). Done: migration timezone fix + #53 Sleep rebuilt on night-assignment rules (13 Sep) — Sleep was the last widget still on the old 3/6/12 selector, so every widget is now on the shared window. Done: #62 Bowel Movement Summary (26 Sep) and Trend (27 Sep). Remaining: #59 Calendar"],
+  ["4 — Analytics & Search","\u2705 Complete","Done: search, cost dashboard, Interactions / Drinking / Diet / Weight / Exercise widgets (all with Summary and Trend), food + drink ingredient taxonomies. Done: Drinking rest-scoring redesign + Interactions and Drinking trend windows (11 Sep), Diet (12 Sep). Done: migration timezone fix + #53 Sleep rebuilt on night-assignment rules (13 Sep) — Sleep was the last widget still on the old 3/6/12 selector, so every widget is now on the shared window. Done: #62 Bowel Movement Summary (26 Sep) and Trend (27 Sep). Done: #59 Calendar with Search (27–28 Sep)"],
   ["5 — Data Entry","\u2B1C Not started","Post-MVP"],
 ],[2900,1700,4760]));
 C(spacer());
-C(p([new TextRun({ text: "Current focus: ", bold: true }), new TextRun("#62 Bowel Movement is complete — Summary (26 Sep) and Trend (27 Sep); every widget now has Summary and Trend on the shared window. Next: #59 Calendar view, then Phase 5 (data entry).")]));
+C(p([new TextRun({ text: "Current focus: ", bold: true }), new TextRun("Phase 4 is complete: #59 Calendar shipped on 28 Sep with all five views and Search, after #62 Bowel (26–27 Sep). Next: Phase 5 (data entry). The Calendar is read-only until then; creating a record from an empty slot and moving one by dragging belong to Phase 5.")]));
 
 C(h1("5. Work Breakdown Structure"));
 C(p("\u2705 = Complete   \u2B1C = Pending   DESCOPED = out of MVP scope. Each line states current state, not how it evolved (see the changelog for history)."));
@@ -150,7 +151,7 @@ C(
   bullet("\u2705 11. Migration fix: filter 등 token from people[].target during parsePeople()"),
 );
 
-C(h2("Phase 4 — Analytics & Search \u2B1C"));
+C(h2("Phase 4 — Analytics & Search \u2705"));
 C(
   bullet("\u2705 41. Schema: duration.totalSeconds (d/h/m/s removed)"),
   bullet("\u2705 42–44. rowToDocument.ts + Log.ts updated; full re-migration"),
@@ -170,7 +171,7 @@ C(
   bullet("\u2705 54. Weight widget — Summary (box plot + body composition) and Trend (stacked area) both complete — see sub-items"),
   bullet("\u2705 55. Average bed-time widget — CLOSED as covered by the Sleep widget (Summary bedtime + Trend › Session); no separate widget will be built"),
   bullet("\u2705 58. Exercise widget — Summary complete (per-item box plots, all-time bests, daily charts in a modal); Trend view deferred — see sub-items"),
-  bullet("\u2B1C 59. Native calendar view — reuses the CalendarHeatmap built for #61 (the full Mon–Sun grid, not the inline HeatStrip). Design not started; begins with a design conversation in plain English, not code"),
+  bullet("\u2705 59. Calendar view — Day, Week, Month, Year and Schedule views plus Search, following Google Calendar (27–28 Sep) — see sub-items. Design Doc §14"),
   bullet("\u2705 62. Bowel Movement (배변) widget — Summary (26 Sep) and Trend (27 Sep) complete — see sub-items. Source columns BJ (량) / BK (질) / BL (특징) → bowel.amount / .quality / .characteristics. NOTE: #62 is also the number of the drink ingredient taxonomy item — the two are unrelated"),
 );
 C(h3("Sub-items for #58 (Exercise Widget):"));
@@ -414,6 +415,36 @@ C(
   bullet("\u2705 (v3.7) DietTrendView.tsx rewritten; the trend tab, grain, count, short count and server-echoed grain now live in DietWidget, because the widget is what fetches and has to know which count list the active tab wants"),
 );
 
+C(h3("Sub-items for #59 (Calendar):"));
+C(p("Built in steps on 27–28 Sep, each rendered with real API responses before delivery. Design Doc §14 carries the rules; this list is what exists."));
+C(bold("Done — data and API"));
+C(
+  bullet("✅ /api/calendar: events touching a range in a display zone, or per-day counts (shape=days); candidate query with ±15 h padding, a 31-day look-back and a separate branch for longer records; diagnostics for verification"),
+  bullet("✅ Log index { userId, duration.totalSeconds } for the 34 records longer than 31 days (reading and study periods; the longest 474 days)"),
+  bullet("✅ /api/calendar/options, /settings (calendar_settings collection), /record, /search"),
+  bullet("✅ Verified: Bowel July 2021 = 39 in Seoul time (equals the Summary), 36 in London time; noStart 0, noOffset 0; 주역 역전 found across its whole period"),
+);
+C(bold("Done — views"));
+C(
+  bullet("✅ Month: bars (all-day, 24 h+) and chips (start day only), lanes and +N more, full window height, ISO week column, time shown only in wide cells"),
+  bullet("✅ Week and Day: 24-hour grid, pieces cut at midnight, 15-minute minimum, clusters with Google-style widening, strip with bars and reading, now line, ISO week in the corner"),
+  bullet("✅ Year: twelve months, has-records numbers, the shared day pop-up; Schedule: one month as a list, Today always scrolls to today"),
+  bullet("✅ Shared day pop-up with Reading & study, ‹ › and arrow keys, Open day; record clicks open the Search detail pane"),
+  bullet("✅ Toolbar: collapsible filters (per device), Today, ‹ ›, month picker on the title, view switch; view and date in the address"),
+);
+C(bold("Done — filters and search"));
+C(
+  bullet("✅ Time zone picker (device by default, not remembered), activity type, Reading & study switch, categories with a 13-colour palette, Hidden activities folded at the bottom (default 정식 운동, 약식 운동) — all but the zone saved to the account"),
+  bullet("✅ Search: toolbar box + 상세 검색 (기간 with its own 초기화, 필드 조건 rows, 제외 단어); contains matching, all words required, quoted phrases; newest first, 200 shown of up to 2,000; ← / Escape return; filters apply. Verified 42 / 39 / 6 against known counts"),
+  bullet("✅ Menu order Calendar · Insights · Search · Spending; home page opens the Calendar"),
+);
+C(bold("Deliberately not done"));
+C(
+  bullet("DESCOPED for now — colouring days by a measure (Sleep, Bowel …) in Month and Year: too many colours hurt readability; revisit once everything else has settled"),
+  bullet("DEFERRED — a 3-day view for phones (Hyoje will ask when needed)"),
+  bullet("PHASE 5 — creating a record from an empty slot, moving one by dragging"),
+);
+
 C(h2("Phase 5 — Data Entry \u2B1C"));
 C(
   bullet("\u2B1C 1. Daily log entry form (web)"),
@@ -451,6 +482,9 @@ C(
   bullet("\u2B1C Summary card does not read dryDaysAtEnd \u2014 a fully dry period therefore shows a blank average with nothing in its place. Rare in the data; wire it in when the widget is next open"),
   bullet("\u2B1C CssDailyChart x-axis labels are M/D with no year, so a multi-year period is hard to read (visible on the Bowel Day score). Also affects Diet and Exercise modals"),
   bullet("\u2B1C MetricPieBlock and HintLabel live in SleepWidget.tsx and are imported by BowelWidget. Extract both to _components if a third widget needs them"),
+  bullet("\u2B1C Calendar: correct four records that end before they start — 6ab7da3f5ef99b2c70d6c1eb and 6ab7da3f5ef99b2c70d6c1f4 (Dec 2019), 6ab7da445ef99b2c70d71fd8 (Jul 2021), and three in 2025 (ids from /api/calendar?from=2025-01-01&to=2025-12-31, diagnostics.endBeforeStartIds). Until then they draw as points"),
+  bullet("\u2B1C Calendar: colour days by a measure in Month and Year (deferred 27 Sep); a 3-day phone view (Hyoje, later)"),
+  bullet("\u2B1C Calendar search takes ~1.2 s for a broad all-years term (contains matching scans the collection). Add a text index only if it starts to feel slow"),
 );
 C(spacer());
 
@@ -471,10 +505,13 @@ C(table(["File","Used by","Rule"],[
   ["src/app/insights/_lib/format.ts","All widgets via chart-components","Targeted patches only. formatBucketLabel handles month, week (raw + compressed), and day formats."],
   ["src/app/insights/_components/GlobalFilterBar.tsx","Insights page","Targeted patches only. Activity Type filter commits on Apply."],
   ["src/app/insights/_components/WidgetCard.tsx","All widgets","Targeted patches only. Changes affect every widget simultaneously."],
-  ["src/app/insights/_components/ModalShell.tsx","Diet, Exercise","(v3.4) Targeted patches only. Portal modal on document.body; it exists specifically to escape widget-card overflow:hidden, so do not reparent it into the card."],
+  ["src/app/insights/_components/ModalShell.tsx","Diet, Exercise, Calendar","(v3.4) Targeted patches only. (v3.11) optional actions slot, default absent. Portal modal on document.body; it exists specifically to escape widget-card overflow:hidden, so do not reparent it into the card."],
   ["src/lib/migration/transform.ts","migrate, fill, reconcile, scan scripts","Targeted patches only. parseFoodIngredients / loadValidLevel2 are shared. Keep IngredientMaster import at top of file. (v3.9) The bowel vocabulary block is appended at the END of the file and needs BowelScore imported at the top."],
   ["src/app/insights/_widgets/SleepWidget.tsx","Sleep, Bowel","(v3.9) MetricPieBlock, HintLabel and Seg are exported and imported by BowelWidget — changing their props or layout changes both widgets. unit and legendCols default to Sleep’s behaviour."],
   ["src/app/insights/_components/charts/Histogram.tsx","Drinking, Bowel","(v3.9) hover, hoverPlacement and height are default-off / 64px; Drinking passes none of them."],
+  ["src/app/_components/LogDetailPanel.tsx","Search, Calendar","(v3.11) The record detail pane and its formatters. A field added here appears on both pages; it renders through a portal at z-60, above ModalShell, so it can open from the Calendar pop-up."],
+  ["src/lib/calendar/calendar.ts","Every Calendar view, the events and search APIs","(v3.11) The ONE place the Calendar applies time zone offsets (toInstant). Keep it pure; the rules are Design Doc §14.2–14.3."],
+  ["src/app/calendar/_lib/month-layout.ts","Month, Week/Day strip, Year, Schedule, Search","(v3.11) layoutWeek works for any column count — the Week (7) and Day (1) strips use it too."],
   ["src/lib/insights/bowel.ts","Bowel Summary AND Trend","(v3.10) The Trend runs buildBowelSummary per bucket — a change to any Summary rule changes the Trend too, which is the intent. Check a Month bucket against the Summary for the same month after any rule change."],
 ],[3000,2600,3760]));
 C(spacer());
@@ -488,6 +525,7 @@ C(
   bullet("Auth: All widgets return data (not 403). Confirm session?.user?.userId is read correctly."),
   bullet("Weight widget: Summary shows the box plot with printed values, both composition bars, the delta strip and one legend. Filtering to a pre-InBody month gives un-segmented bars; LATEST still shows the most recent date overall."),
   bullet("Bowel widget: September 2026 shows 21/25 days, Avg 6.7, 1 bad day; 2025 shows Avg 2.0 and 48 bad days. Day-score hover lists every movement. Three histograms side by side at two-column width, stacked at three-column width. (v3.10) × on days with no movement. Trend: July 2021 Month bucket shows average −0.4 and 7 bad days, the same as the Summary for July 2021; Month × 120 starts at 19.06 and every x-axis year is marked."),
+  bullet("Calendar: July 2021 in Seoul time — Month shows W26–W30 and 9 Jul reads ▶ 자치통감6 +1; the Busan trip bar runs 24–28 Jul across two week rows; Week 19–25 Jul fills the window; search 활동명 대변 with 기간 July 2021 gives 42, and 39 with 제외 단어 실패."),
   bullet("Dark mode: All charts render correctly in both light and dark mode."),
 );
 C(h2("A.4 API Route Safety"));
@@ -524,7 +562,7 @@ C(
 );
 C(spacer());
 
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze — Service Concept & WBS v3.10 — 27 September 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze — Service Concept & WBS v3.11 — 28 September 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 const doc = new Document({
   styles: {
@@ -550,6 +588,6 @@ const doc = new Document({
   sections: [{ properties: { page: PAGE }, children }],
 });
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-WBS-v3.10.docx", buffer);
-  console.log("Wrote FarGaze-WBS-v3.10.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-WBS-v3.11.docx", buffer);
+  console.log("Wrote FarGaze-WBS-v3.11.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });

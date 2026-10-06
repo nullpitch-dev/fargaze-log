@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { GlobalFilter, TimeMode } from '../_lib/types';
-import { todayStr, defaultPeriodFrom, defaultTimePeriod } from '../_lib/date-helpers';
+import { defaultPeriodFrom, defaultPeriodTo, defaultTimePeriod } from '../_lib/date-helpers';
 import { MultiSelectDropdown } from './MultiSelectDropdown';
 
 const TIME_MODE_LABELS: Record<TimeMode, string> = {
@@ -25,7 +25,7 @@ export function GlobalFilterBar({ filter, onApply, crossActivityOptions }: {
       timeMode: mode,
       timePeriod: defaultTimePeriod(mode),
       dateFrom: prev.dateFrom || defaultPeriodFrom(),
-      dateTo: prev.dateTo || todayStr(),
+			dateTo: prev.dateTo || defaultPeriodTo(),
     }));
   }
 
