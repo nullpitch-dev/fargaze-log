@@ -19,6 +19,7 @@ import { computeExerciseSummary } from '@/lib/insights/exercise';
 import { computeExerciseTrend, computeExerciseItemTrend } from '@/lib/insights/exercise-trend';
 import type { ExerciseTrendGrain } from '@/lib/insights/exercise-trend';
 import { computeBowelSummary, computeBowelTrend } from '@/lib/insights/bowel';
+import { computeTransportSummary } from '@/lib/insights/transport';
 
 // ── Main route ────────────────────────────────────────────────────────────────
 
@@ -375,6 +376,16 @@ export async function GET(req: NextRequest) {
 
     const trend = await computeBowelTrend(userId, grain, start, end);
     return NextResponse.json(trend);
+  }
+
+	// ── transport.summary ─────────────────────────────────────────────────────
+  // Summary mode only for now. The compute module fetches every 이동 row and
+  // cuts the period itself (workplaces and the 퇴근 stop rule need history).
+  // Period runs to min(period end, yesterday).
+  if (metric === 'transport.summary') {
+    const { start, end } = buildDateRange(timeMode, timePeriod, dateFrom, dateTo);
+    const summary = await computeTransportSummary(userId, start, end, crossActivities);
+    return NextResponse.json({ summary });
   }
 
   // ── exercise.summary ──

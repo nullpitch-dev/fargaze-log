@@ -53,8 +53,10 @@ export interface Seg { key: string; label: string; value: number; color: string;
  * The card hangs below the block rather than below the pie, so it never lands
  * on top of the legend it is explaining.
  */
-export function MetricPieBlock({ segments, title, size = 56, isDark, flip = false, unit = 'day', legendCols = 1 }: {
+export function MetricPieBlock({ segments, title, size = 56, isDark, flip = false, unit = 'day', legendCols = 1, legendDetail }: {
   segments: Seg[]; title: string; size?: number; isDark: boolean; flip?: boolean;
+  /** extra text after the % in each legend row (e.g. "30 · 5h 20m"); off by default */
+  legendDetail?: (s: Seg) => string;
   /** what one unit of value counts, for the hover card: "3 days", "3 movements" */
   unit?: string;
   /** 2 = legend in two columns, for pies with many bands */
@@ -122,7 +124,8 @@ export function MetricPieBlock({ segments, title, size = 56, isDark, flip = fals
             onMouseEnter={() => setHoverKey(s.key)}>
             <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: s.color }} />
             <span className="text-[9px] leading-tight text-stone-500 dark:text-zinc-400">
-              {s.label} {total ? Math.round((s.value / total) * 100) : 0}%
+						  {s.label} {total ? Math.round((s.value / total) * 100) : 0}%
+              {legendDetail && <span className="text-stone-400 dark:text-zinc-500"> · {legendDetail(s)}</span>}
             </span>
           </div>
         ))}
