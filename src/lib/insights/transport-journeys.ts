@@ -33,6 +33,7 @@ export interface Leg {
   returnType: string;
   crossActivity: string;
   people: Person[];
+  km: number | null;        // straight line From → To; null until set from place_coord
 }
 
 export interface Journey {
@@ -120,6 +121,7 @@ export function legsFromDocs(docs: any[]): Leg[] {
       people: (d.people ?? [])
         .map((p: any) => ({ name: s(p.target), category: s(p.category) || '기타' }))
         .filter((p: Person) => p.name && p.name !== '등'),
+      km: null,
     }))
     .sort((a, b) => a.startAt - b.startAt);
 }

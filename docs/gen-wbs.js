@@ -11,7 +11,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Service Concept & Work Breakdown Structure", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 3.11  |  28 September 2026", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 3.12  |  9 October 2026", size: 24 })], spacing: { after: 240 } }),
 );
 
 C(h1("Version History"));
@@ -46,6 +46,7 @@ C(table(["Version","Date","Headline"],[
   ["3.9","26 Sep 2026","#62 BOWEL MOVEMENT WIDGET — Summary COMPLETE, Trend not started. bowel.quality and bowel.characteristics now String[]; new Bowel sheet + bowel_score collection (allowed values AND scores; npm run migrate-bowel) and the daily migration rejects any bowel value not in it. Day-score index defined and verified on all years (mean movement score + frequency penalty −2 / −3, gap scale −1…−10, bad day below −3, scored from 2019-09-19). metric=bowel.summary, BowelWidget.tsx with a width-responsive layout; CssDailyChart hoverFor, Histogram hover + height, MetricPieBlock / HintLabel exported with unit and legendCols. Stale v3.7 footer corrected. Mirrors Design Doc v4.9"],
   ["3.10","27 Sep 2026","#62 BOWEL MOVEMENT WIDGET COMPLETE — Trend view shipped. metric=bowel.trend on the shared grain × count window, anchored at min(period end, yesterday); buildBowelTrend runs the Summary builder once per bucket, so Month buckets equal the Summary (verified on July 2021 and January 2026). BowelTrendView.tsx: Score, Per day, Gap, Duration, Quality (all nine values), How it went, Other signs (% of movements, not normalised) and Time of day. Summary: × marks days with no movement; Time of day labels read 5:00~. Shared charts, all additions default-off: CssDailyChart markerFor; CssTrendChart zones, notes, rightSeries.dim; CssStackedAreaChart zeroIsValue. CssTrendChart now thins labels before shortening them (year shown on each new year) and its hover card shows the full label. npm run build passed. Mirrors Design Doc v4.10"],
   ["3.11","28 Sep 2026","#59 CALENDAR COMPLETE — PHASE 4 COMPLETE. A Google-style Calendar page (first in the menu, the home page) with Day, Week, Month, Year and Schedule views and Search. Timed records are shown as moments in one display zone (the device’s by default, switchable, not remembered) — Google’s rule; all-day records stay on their dates. Reading & study periods share one row with a show/hide switch. Filters (time zone, activity type, categories with a 13-colour palette, hidden activity names — default 정식 운동, 약식 운동) are saved to the new calendar_settings collection. Search reuses 상세 검색 with contains matching, newest first, 200 shown. New APIs /api/calendar, /options, /settings, /record, /search; Log index on duration for records over 31 days. Detail pane shared with Search via src/app/_components/LogDetailPanel.tsx; Search’s garbled conditions hint fixed. Mirrors Design Doc v4.11 (§14)"],
+  ["3.12","9 Oct 2026","#63 JOURNEYS (이동) WIDGET — Summary COMPLETE; Trend, geocoding and the map not started. Phase 5 postponed by Hyoje until a few more widgets have tested whether the data supports analysis. Transport data surveyed and cleaned in the sheet (all checks at zero except confirmed intentional cases); consecutive legs joined into journeys (30-min rule); new favorite_place collection + FavoritePlace sheet + npm run migrate-favorite-place; metric=transport.summary; JourneysWidget with Overview, Commute, Getting home and Places. Global filter now opens on the month ending yesterday; todayStr uses the local date. Mirrors Design Doc v4.12 (§9.3.8, §6.10, §12.6)"],
 ],[1100,1300,6960]));
 C(spacer());
 
@@ -99,11 +100,11 @@ C(table(["Phase","Status","Detail"],[
   ["1 — Base Infrastructure & Auth","\u2705 Complete","Subscription-architecture placeholder still pending"],
   ["2 — Data Structure Design","\u2705 Complete","Schema, supporting collections, Mongoose models"],
   ["3 — Migration Tool","\u2705 Complete","Delete-all + re-insert; incremental sync deferred to post-MVP"],
-  ["4 — Analytics & Search","\u2705 Complete","Done: search, cost dashboard, Interactions / Drinking / Diet / Weight / Exercise widgets (all with Summary and Trend), food + drink ingredient taxonomies. Done: Drinking rest-scoring redesign + Interactions and Drinking trend windows (11 Sep), Diet (12 Sep). Done: migration timezone fix + #53 Sleep rebuilt on night-assignment rules (13 Sep) — Sleep was the last widget still on the old 3/6/12 selector, so every widget is now on the shared window. Done: #62 Bowel Movement Summary (26 Sep) and Trend (27 Sep). Done: #59 Calendar with Search (27–28 Sep)"],
+  ["4 — Analytics & Search","\u2705 Complete","Done: search, cost dashboard, Interactions / Drinking / Diet / Weight / Exercise widgets (all with Summary and Trend), food + drink ingredient taxonomies. Done: Drinking rest-scoring redesign + Interactions and Drinking trend windows (11 Sep), Diet (12 Sep). Done: migration timezone fix + #53 Sleep rebuilt on night-assignment rules (13 Sep) — Sleep was the last widget still on the old 3/6/12 selector, so every widget is now on the shared window. Done: #62 Bowel Movement Summary (26 Sep) and Trend (27 Sep). Done: #59 Calendar with Search (27–28 Sep). Done after completion: #63 Journeys Summary (6–9 Oct)"],
   ["5 — Data Entry","\u2B1C Not started","Post-MVP"],
 ],[2900,1700,4760]));
 C(spacer());
-C(p([new TextRun({ text: "Current focus: ", bold: true }), new TextRun("Phase 4 is complete: #59 Calendar shipped on 28 Sep with all five views and Search, after #62 Bowel (26–27 Sep). Next: Phase 5 (data entry). The Calendar is read-only until then; creating a record from an empty slot and moving one by dragging belong to Phase 5.")]));
+C(p([new TextRun({ text: "Current focus: ", bold: true }), new TextRun("Phase 5 (data entry) is postponed by Hyoje: a few more widgets come first, because only a widget shows whether the logged data is meaningful for analysis. #63 Journeys Summary shipped 9 Oct. Next: Hyoje’s choice — geocoding + distance + map for Journeys, the Journeys Trend view, or the next widget from the backlog (Place, Purchase, Income, Travel, Time spent by activity, Golf / Movies / Reading, Misc recurrence).")]));
 
 C(h1("5. Work Breakdown Structure"));
 C(p("\u2705 = Complete   \u2B1C = Pending   DESCOPED = out of MVP scope. Each line states current state, not how it evolved (see the changelog for history)."));
@@ -173,6 +174,7 @@ C(
   bullet("\u2705 58. Exercise widget — Summary complete (per-item box plots, all-time bests, daily charts in a modal); Trend view deferred — see sub-items"),
   bullet("\u2705 59. Calendar view — Day, Week, Month, Year and Schedule views plus Search, following Google Calendar (27–28 Sep) — see sub-items. Design Doc §14"),
   bullet("\u2705 62. Bowel Movement (배변) widget — Summary (26 Sep) and Trend (27 Sep) complete — see sub-items. Source columns BJ (량) / BK (질) / BL (특징) → bowel.amount / .quality / .characteristics. NOTE: #62 is also the number of the drink ingredient taxonomy item — the two are unrelated"),
+  bullet("\u2705 63. Journeys (이동) widget — Summary complete (9 Oct); Trend, geocoding and map pending — see sub-items. Design Doc §9.3.8"),
 );
 C(h3("Sub-items for #58 (Exercise Widget):"));
 C(p("Data preparation, the compute module, the API branch and the Summary view are all complete and in use. The Trend view is deferred and has no agreed design. Design Doc \u00a79.3.6 carries the full widget specification and the reasoning behind each decision."));
@@ -445,6 +447,30 @@ C(
   bullet("PHASE 5 — creating a record from an empty slot, moving one by dragging"),
 );
 
+C(h3("Sub-items for #63 (Journeys Widget):"));
+C(bold("Done — data"));
+C(
+  bullet("\u2705 Survey (scripts/check-transport-data.ts): 8,297 이동 rows; From / To / Purpose / Method filled 99–100% every year; ReturnType only on legs arriving at 집"),
+  bullet("\u2705 Clean-up in the sheet (scripts/check-transport-cleanup.ts): missing purpose / method / From / To, zero durations, overlaps and ReturnType placement all at zero; remaining flags confirmed intentional (회사차, 대리, 자전거 logged as 도보, dominant mode for combined legs, area names in Place, long drives); spelling variants standardised; 내집 → 라클라스 집; M5422 버스 → M5422번 버스"),
+  bullet("\u2705 favorite_place: FavoritePlace sheet, model, parser with validation, npm run migrate-favorite-place; 11 rows (four homes, 회사, two sites, three cars)"),
+);
+C(bold("Done — API and Summary view"));
+C(
+  bullet("\u2705 Journeys from legs: 30-min gap, To = next From, same purpose, never across 집 (8,297 legs → 6,993 journeys); flights split out"),
+  bullet("\u2705 Commute: 출근 = first commute of the day (moves between workplaces left out); 퇴근 incl. 퇴근길 식사 / 볼일 with the stop’s time removed (legs summed); 6 am rule for evening times"),
+  bullet("\u2705 Getting home: All, From work, After work dinner, After dinner with friends; golf excluded from both dinner groups"),
+  bullet("\u2705 metric=transport.summary with all / weekday / weekend blocks and a checks section"),
+  bullet("\u2705 JourneysWidget: Overview (per-day figures, three pies with every category, Most often with), Commute (time strip by method combination), Getting home (box plots), Places (top lists)"),
+);
+C(bold("Pending"));
+C(
+  bullet("\u2B1C Geocoding: distinct names used 3+ times → coordinates; site codes by hand; then distance per day / per purpose / per method and the commute distance"),
+  bullet("\u2B1C Map: places as dots sized by arrivals, routes as lines thickened by count (free map library + OpenStreetMap tiles)"),
+  bullet("\u2B1C Trend view (not designed; getting-home time over the years is a candidate)"),
+  bullet("\u2B1C Usage per car (내차 via favorite_place) — not a priority"),
+);
+C(note("Logging convention agreed: for 퇴근길 식사, log office → restaurant and restaurant → 집 both with purpose 귀가 and put 퇴근길 식사 후 귀가 on the last leg. 식음 is for 회식 and 친목. A meal after a late meeting is 퇴근길 식사 or 업무회식 as appropriate, not 근무 후 귀가."));
+
 C(h2("Phase 5 — Data Entry \u2B1C"));
 C(
   bullet("\u2B1C 1. Daily log entry form (web)"),
@@ -484,6 +510,8 @@ C(
   bullet("\u2B1C MetricPieBlock and HintLabel live in SleepWidget.tsx and are imported by BowelWidget. Extract both to _components if a third widget needs them"),
   bullet("\u2B1C Calendar: correct four records that end before they start — 6ab7da3f5ef99b2c70d6c1eb and 6ab7da3f5ef99b2c70d6c1f4 (Dec 2019), 6ab7da445ef99b2c70d71fd8 (Jul 2021), and three in 2025 (ids from /api/calendar?from=2025-01-01&to=2025-12-31, diagnostics.endBeforeStartIds). Until then they draw as points"),
   bullet("\u2B1C Calendar: colour days by a measure in Month and Year (deferred 27 Sep); a 3-day phone view (Hyoje, later)"),
+  bullet("\u2B1C Journeys: geocoding, map, Trend view, usage per car (see #63)"),
+  bullet("\u2B1C Widget backlog: Place, Purchase, Income, Travel / business trips, Time spent by activity, Golf / Movies / Reading, Misc recurrence"),
   bullet("\u2B1C Calendar search takes ~1.2 s for a broad all-years term (contains matching scans the collection). Add a text index only if it starts to feel slow"),
 );
 C(spacer());
@@ -562,7 +590,7 @@ C(
 );
 C(spacer());
 
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze — Service Concept & WBS v3.11 — 28 September 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze — Service Concept & WBS v3.12 — 9 October 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 const doc = new Document({
   styles: {
@@ -588,6 +616,6 @@ const doc = new Document({
   sections: [{ properties: { page: PAGE }, children }],
 });
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-WBS-v3.11.docx", buffer);
-  console.log("Wrote FarGaze-WBS-v3.11.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-WBS-v3.12.docx", buffer);
+  console.log("Wrote FarGaze-WBS-v3.12.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });

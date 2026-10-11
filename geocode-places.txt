@@ -1,0 +1,317 @@
+◇ injected env (9) from .env.local // tip: ⌘ override existing { override: true }
+=== PlaceCoord sheet: 5 names listed, 5 with a point (31.2% of uses) ===
+
+=== NEW: names used 3+ times not in the sheet (443) ===
+status     | names | share of all endpoint uses
+by hand    |    58 |  26.5%
+not found  |   126 |   6.5%
+check      |   115 |   5.5%
+found      |   144 |  17.1%
+(518 new questions sent to OpenStreetMap; the rest came from the cache)
+
+=== BY HAND (most used first) ===
+1056 | MR1
+ 905 | SDS 잠실 본사
+ 677 | 2단지
+ 425 | KCC
+ 226 | MCS 2단지
+ 207 | 정문 주차타워
+ 122 | ACS
+ 110 | 부산 본가
+ 102 | 처가집
+  49 | SR1
+  47 | R4
+  39 | 박준영 집
+  32 | 노재헌 집
+  29 | 처제집
+  26 | SEA Dallas
+  24 | 황전무님 댁
+  23 | 김성준 집
+  22 | 김형찬 집
+  19 | MCS 1식당동
+  16 | 주재한 집
+  16 | Kuni 집
+  13 | 이성훈 집
+  12 | 서래횟집
+  12 | o9 인도 사무실
+  12 | Flor 집
+  12 | Blake 집
+  11 | DSR
+  11 | 본가
+  10 | 이준관 집
+  10 | 판교 사무실
+   8 | R5
+   8 | o9 본사
+   7 | 속초집
+   6 | Poppy 집
+   4 | SEA New Jersey
+   4 | 김민정 집
+   4 | 새벽집
+   4 | 서동기 수석집
+   4 | 형찬형집
+   4 | 이정석 집
+   4 | 하경진 집
+   4 | 윤동환 집
+   4 | 숲속의 맛집
+   4 | 싱싱활어횟집
+   4 | 외할머니집
+   4 | 윤유신 집
+   4 | 정준호 집
+   4 | 황성수 집
+   4 | o9 사무실
+   4 | 성빈네횟집
+   4 | 홍천농가맛집
+   4 | 남윤진 집
+   4 | Alice 집
+   4 | Biba 집
+   3 | 연합횟집
+   3 | 정문이 사무실
+   3 | H1
+   3 | 이창섭 집
+
+=== NOT FOUND (most used first) ===
+ 135 | 미라클 스크린골프 아카데미
+  81 | 발자국소리가큰아이들
+  46 | 반디라
+  31 | 서도냉면
+  25 | 연세권아름성장의원
+  18 | 곤지암리조트
+  18 | Cahchi
+  17 | 더바른치과의원
+  16 | 우성천서리막국수
+  16 | 더클래스효성 메르세데스벤츠 서초서비스센터
+  14 | 베네베네2010
+  14 | 베어크리크
+  13 | 천상한우
+  13 | 360도 CC
+  13 | da pitta second kitchen
+  12 | 르뺑아쎄르
+  11 | 캠프운악
+  11 | 예드림안과의원
+  10 | 원조이영희맛집순두부
+  10 | 골프메신저
+  10 | 사우스스프링스
+   9 | 샘밭막국수
+   9 | 다함영재원
+   9 | 빛치과의원
+   8 | 원소리막국수
+   8 | 호메밀막국수
+   8 | 포명천천
+   8 | 원조이동김미자할머니갈비
+   8 | 분당중앙공원A주차장
+   8 | 스카이부동산
+   8 | 유명골프연습장
+   8 | 르네블루 바이 워커힐
+   8 | 동산참숯갈비
+   8 | 우성해장국
+   8 | 에코스디테일 서초점
+   8 | 전국제일순대 삼성점
+   8 | 권할머니한우해장국흑염소
+   8 | 원집 능이전문점
+   8 | 골프존파크 서초 남부터미널역점
+   8 | Barley Flower Studio
+   7 | 운악산한함지
+   7 | 제2롯데
+   6 | Courtyard by Marriott NYC Area Edgewater
+   6 | 글라스하우스
+   6 | 랜퍼스
+   6 | 한아람
+   6 | 라카이 샌드파인
+   6 | 아루나
+   6 | 워시박스 방이점
+   6 | 동작 주차공원 임시선별검사소
+   6 | 더클래스 효성 서초 서비스 센터
+   6 | 우진가 더 챔버스 역삼점
+   6 | 센추리21
+   6 | 일상하나
+   6 | 부산마이크로병원
+   6 | 최미자원조양평해장국
+   6 | 분당서울대병원 장례식장
+   6 | 노스티모
+   6 | 박신희하우스
+   6 | 운중양평해장국설렁탕
+   6 | 코스트코
+   5 | 꼬끼꼬끼 치킨호프
+   5 | 한우장터
+   5 | 캐틀하우스 참숯 정육식당
+   5 | 몽마르뜨 공원
+   5 | 베이커리로컬
+   5 | 서래골프존
+   5 | 홀리데이인스위트 평창
+   5 | 녹천탕
+   5 | Riverside Apartment - Woodsmill Quay
+   4 | CASA DEL AYA
+   4 | 청담이든소아청소년과의원
+   4 | 약수순대
+   4 | 광교이편한세상 6105동 904호
+   4 | 홍익가족유치원
+   4 | 우면캠퍼스
+   4 | 메종조
+   4 | 갤러리약국
+   4 | 라비에벨올드CC
+   4 | 석촌카센타
+   4 | 히든밸리
+   4 | 엽돈재토종청국장
+   4 | 백촌막국수
+   4 | 강남포차
+   4 | 파네트리 김영모
+   4 | 장털보 설렁탕
+   4 | 설원다식
+   4 | 비갠숲
+   4 | 장미계
+   4 | 설악산책
+   4 | 국제밀면
+   4 | 레인보우힐스
+   4 | 고속버스터미널역
+   4 | 젠스필드
+   4 | 롯데렌터카 제주 오토하우스
+   4 | 더보울
+   4 | 센테리움CC
+   4 | 서원힐스
+   4 | 서산수골프앤리조트
+   4 | 레이크우드CC
+   4 | 두성스크린
+   4 | 시래기밥상
+   4 | 7HUNDRED
+   4 | 김순남청국장
+   4 | Seetharam Palya Metro Station
+   4 | 힐가든
+   4 | 설국 장작불설렁탕
+   4 | 홀리데이인리조트스위트 평창
+   4 | 레이크사이드
+   4 | 영통문
+   4 | 일미정한우
+   4 | Weybourne Gymnastics Club, Unit 2, Canal Bridge Works, Byfleet Road, New Haw, KT15 3JE
+   3 | 화씨2192F
+   3 | 강구미주구리
+   3 | 청키면가
+   3 | 나인원한남
+   3 | 서산수CC
+   3 | 하오옌
+   3 | 김영모 제과점
+   3 | 월매네 주막
+   3 | 스노우뱅크
+   3 | 필즈
+   3 | 옳은고기
+   3 | idHAIR 반포원베일리점
+   3 | 가우초곱창
+   3 | 황소 앞 편의점
+
+=== CHECK (most used first) ===
+ 107 | 신세계백화점 강남점 | 신세계백화점, 176, 신반포로, 반포4동, 서초구, 서울특별시, 06546, 대한민국 · found as "신세계백화점"
+  68 | 부산역 | 부산역, 중앙대로, 초량2동, 동구, 부산광역시, 48760, 대한민국 · 321 km from 라클라스 집
+  51 | Courtyard Dallas Richardson At Campbell | Courtyard Dallas Richardson at Campbell, 2191, North Greenville Avenue, 리처드슨, Da · 10959 km from 리센츠 242동 집
+  49 | 쟈끄데상쥬 강남삼성타운점 | 쟈끄데상쥬, 논현로175길, 신사동 가로수길, 신사동, 강남구, 서울특별시, 06029, 대한민국 · found as "쟈끄데상쥬"
+  34 | The Drift | The Drift, Ockham, East Horsley, 길드퍼드구, 서리주, 잉글랜드, KT24 5HD, 영국 · matched a unclassified
+  23 | 진양밸리 | 진양밸리, 금일로, 대사리, 음성군, 충청북도, 27645, 대한민국 · 66 km from 라클라스 집
+  20 | Oatlands Park Hotel | Oatlands Park Hotel, Weybridge, 엘름브리지, 서리주, 잉글랜드, KT13 9HB, 영국 · matched a grass · 8890 km from 라클라스 집
+  14 | 인천공항(T2) | 인천국제공항, 272, 공항대로, 운서동, 영종구, 인천광역시, 22382, 대한민국 · 51 km from 라클라스 집
+  13 | 논현역 | 논현역, 강남대로, 논현동, 논현1동, 강남구, 서울특별시, 06541, 대한민국 · matched a platform
+  13 | The Wilde Resort and Spa | The Wilde Resort and Spa, 2250, Goodrow Lane, West Sedona, 세도나, Yavapai County,  · 9938 km from 라클라스 집
+  12 | 인천공항(T1) | 인천국제공항, 272, 공항대로, 운서동, 영종구, 인천광역시, 22382, 대한민국 · 51 km from 라클라스 집
+  12 | Renaissance Dallas North Hotel | Renaissance Dallas North Hotel, 1590, Lyndon B Johnson Freeway, Farmers Branch,  · 10960 km from 라클라스 집
+  12 | Westbury Dental Care | Westbury Dental Care, 269a, Southmead Road, Southmead, 브리스틀, West of England, 잉글 · 151 km from Weybridge 집
+  10 | 남여주GC | 남여주GC, 가여로, 삼교동, 안금리, 여주시, 경기도, 12659, 대한민국 · 62 km from 라클라스 집
+  10 | Pestana Vintage Porto Hotel | Hotel Pestana, 1, Praça da Ribeira, Barredo, Ribeira, Historic Centre of Porto,  · 1297 km from Weybridge 집
+   8 | 인천공항 제2터미널 | 인천국제공항, 272, 공항대로, 운서동, 영종구, 인천광역시, 22382, 대한민국 · found as "인천공항" · 58 km from 리센츠 242동 집
+   8 | 서울성모병원 장례식장 | 가톨릭대학교 서울성모병원, 222, 반포대로, 반포4동, 서초구, 서울특별시, 06591, 대한민국 · found as "서울성모병원"
+   8 | 명륜역 | 명륜역, 온천장로, 온천동, 온천1동, 동래구, 부산광역시, 47741, 대한민국 · 314 km from 라클라스 집
+   8 | 제주공항 | 제주국제공항, 2, 공항로, 용담이동, 용담2동, 제주시, 제주특별자치도, 63115, 대한민국 · 447 km from 라클라스 집
+   8 | 김해공항 | 김해국제공항, 108, 공항진입로, 대저2동, 강서구, 부산광역시, 46721, 대한민국 · 310 km from 라클라스 집
+   8 | 모나용평 그린피아 | 용평리조트, 용산리, 대관령면, 평창군, 강원특별자치도, 25352, 대한민국 · found as "모나용평" · matched a winter_sports · 147 km from 라클라스 집
+   8 | Hilton Garden Inn Ridgefield Park | Hilton Garden Inn, 70, Challenger Road, Ridgefield Park, Bergen County, 뉴저지, 076 · 11044 km from 라클라스 집
+   8 | Four Points by Sheraton Bengaluru, Whitefield | Four Points by Sheraton, 43/3, Whitefield Main Road, Prashanth Extension, Pattan · 5573 km from 라클라스 집
+   8 | DoubleTree by Hilton Bengaluru Whitefield | DoubleTree by Hilton Bengaluru Whitefield, Naga Lingeshwara Temple Road, Kalyani · 5576 km from 라클라스 집
+   8 | SENZA HOTEL | SENZA Hotel, 4066, Bella Drive, Salvador, Napa, Napa County, 캘리포니아, 94558, 미국 · 8996 km from 라클라스 집
+   8 | 김포공항 국내선 | 김포공항, 하늘길, 방화2동, 강서구, 서울특별시, 07622, 대한민국 · found as "김포공항"
+   8 | Sandown Park Golf Center | Sandown Park Golf Centre, More Lane, Lower Green Esher, 에셔, 엘름브리지, 서리주, 잉글랜드, KT · found as "Sandown Park Golf"
+   7 | 소노캄 델피노 | 소노캄 델피노, 미시령옛길, 원암리, 토성면, 고성군, 강원특별자치도, 24768, 대한민국 · 152 km from 라클라스 집
+   7 | 원베일리 상가 | 아이디헤어 반포원베일리, 291, 원베일리 스퀘어 지하1층 B170,B171,B172호, 반포대로, 반포동, 반포2동, 서초구, 서울특별시, 0 · found as "원베일리"
+   7 | Lodore Falls Hotel & Spa | Lodore Falls Hotel, B5289, Grange, Borrowdale, Cumberland, 잉글랜드, CA12 5UX, 영국 · found as "Lodore Falls Hotel &" · 399 km from Weybridge 집
+   6 | 스타벅스 갤러리아팰리스 | 스타벅스, 명동9가길, 명동1가, 명동, 중구, 서울특별시, 04534, 대한민국 · found as "스타벅스"
+   6 | 마릴린 와인365 | 마릴린, 31-4, 행복5길, 침산리먹자골목, 조치원읍, 세종특별자치시, 30021, 대한민국 · found as "마릴린" · 102 km from 리센츠 238동 집
+   6 | 꼼떼 한우 | 꼼떼(주), 317-14, 중대로, 오금동, 송파구, 서울특별시, 05654, 대한민국 · found as "꼼떼"
+   6 | 포시즌스 호텔 | 포시즌스(FOUR SEASONS), 15, 2층 202호, 압구정로54길, 압구정로데오거리, 신사동, 강남구, 서울특별시, 06018, 대한민국 · found as "포시즌스"
+   6 | 라마다호텔 평창 | 라마다호텔, 150, 중부대로, 인계동, 팔달구, 수원시, 경기도, 19483, 대한민국 · found as "라마다호텔"
+   6 | 그랜드 조선 제주 | 그랜드 조선 제주, 중문관광로72번길, 예래동, 서귀포시, 제주특별자치도, 63535, 대한민국 · 476 km from 라클라스 집
+   6 | 경희대 앞 | 경희대입구, 회기로, 회기동, 동대문구, 서울특별시, 02459, 대한민국 · found as "경희대"
+   6 | 아이디헤어 반포원베일리점 | 아이디헤어, 언주로7길, 개포래미안포레스트아파트, 개포4동, 강남구, 서울특별시, 06316, 대한민국 · found as "아이디헤어"
+   6 | Kinjo | Kinjo, Station Road East, Hurst Green, Oxted, Limpsfield, 탠드리지구, 서리주, 잉글랜드, RH8  · 8881 km from 라클라스 집
+   6 | Hollyhedge Car Park | Car Service Centre, 28b, Hollyhedge Lane, Birchills Retail Area, Birchills, Blox · found as "Hollyhedge Car" · 173 km from Weybridge 집
+   5 | 신라CC | 신라CC, 선돌로, 북내면, 여주시, 경기도, 12614, 대한민국 · 62 km from 라클라스 집
+   5 | 신사역 | 신사역, 강남대로, 논현동, 논현1동, 강남구, 서울특별시, 06531, 대한민국 · matched a platform
+   5 | 한성자동차 메르세데스벤츠 수원서비스센터 | 한성자동차 메르세데스벤츠 안성서비스센터, 서동대로, 진사리, 공도읍, 안성시, 경기도, 17563, 대한민국 · found as "한성자동차 메르세데스벤츠" · 57 km from 라클라스 집
+   5 | Heathrow 공항(T4) | 런던히드로공항, Bedfont Court, 힐링던구, 그레이터런던, 잉글랜드, TW19 6BP, 영국 · 8883 km from 라클라스 집
+   5 | Ash Farm Cotswolds | Ash Farm, Bousley Rise, Ottershaw, 러니미드구, 서리주, 잉글랜드, KT16 0JY, 영국 · found as "Ash Farm" · matched a farm
+   5 | Nunnery Lane Car Park | Nunnery Lane Car Park, Nunnery Lane, Scarcroft, Bishophill, 요크, York and North Y · 292 km from Weybridge 집
+   4 | Pho Pasteur | Pho Pasteur, 137, Church Street, Parramatta, New South Wales, 2150, 오스트레일리아 · 8309 km from 리센츠 242동 집
+   4 | Allen Premium Outlet | Allen Premium Outlets, 820, Cottonwood Creek, 앨런, Collin County, 텍사스, 75013, 미국 · found as "Allen Premium" · matched a retail · 10947 km from 리센츠 242동 집
+   4 | Denver Int'l Airport | Denver International Airport Maintenance Operations, 덴버, 콜로라도, 미국 · found as "Denver Int'l" · matched a industrial · 9924 km from 리센츠 242동 집
+   4 | DFW Airport Terminal 0 | Dallas/Fort Worth International Airport, 2400, Aviation Drive, 댈러스, Tarrant Coun · found as "DFW Airport" · 10949 km from 리센츠 242동 집
+   4 | Sheraton Atlanta Perimeter North Hotel | Sheraton Atlanta Perimeter North Hotel, 800, Hammond Drive, 애틀랜타, Fulton County, · 11432 km from 리센츠 242동 집
+   4 | 범어사 | 범어사, 250, 범어사로, 청룡동, 청룡노포동, 금정구, 부산광역시, 46200, 대한민국 · 305 km from 리센츠 238동 집
+   4 | 무교동홍낙 올림픽공원점 | 무교동홍낙(수서점), 196, 광평로, 일원동, 일원본동, 강남구, 서울특별시, 06362, 대한민국 · found as "무교동홍낙"
+   4 | 여주 프리미엄 아웃렛 | 여주 프리미엄 아울렛, 영동고속도로, 점봉동, 점봉1리, 안금리, 여주시, 경기도, 12646, 대한민국 · found as "여주 프리미엄" · 55 km from 리센츠 238동 집
+   4 | 서울숲 갤러리아포레2관(B2층) | 서울숲, 왕십리로, 성수동1가, 성수1가1동, 성동구, 서울특별시, 04778, 대한민국 · found as "서울숲"
+   4 | 남서울농협 교대역지점 | 남서울농협, 남부순환로350길, 양재1동, 서초구, 서울특별시, 06737, 대한민국 · found as "남서울농협"
+   4 | 동해막국수 | 동해막국수 분점, 포월윗말길, 포월리, 양양읍, 양양군, 강원특별자치도, 25013, 대한민국 · 150 km from 리센츠 238동 집
+   4 | 남서울컨트리클럽 제2연습장 | 남서울cc, 161, 두밀로, 하산운동, 남서울파크힐, 분당구, 성남시, 경기도, 13541, 대한민국 · found as "남서울컨트리클럽"
+   4 | 롯데백화점 명동본점 | 롯데백화점 강남점, 선릉로62길, 대치4동, 강남구, 서울특별시, 06206, 대한민국 · found as "롯데백화점"
+   4 | 동촌GC | 동촌GC, 감노로, 문성리, 충주시, 충청북도, 27452, 대한민국 · 77 km from 리센츠 238동 집
+   4 | 골프존파크 구미월드 | 골프존파크, 30, 남대문로, 남대문로3가, 회현동, 중구, 서울특별시, 04529, 대한민국 · found as "골프존파크"
+   4 | 소호정 본점 | 소호정, 27, 논현로, 양재2동, 서초구, 서울특별시, 06783, 대한민국 · found as "소호정"
+   4 | 휘닉스평창 | 휘닉스평창 기숙사, 무이리, 봉평면, 평창군, 강원특별자치도, 대한민국 · matched a residential · 115 km from 라클라스 집
+   4 | 감나무식당 | 감나무식당, 안산1길, 간리, 손양면, 양양군, 강원특별자치도, 25032, 대한민국 · 155 km from 라클라스 집
+   4 | 소문난 장터순대 | 소문난, 26, 삼양로123길, 우이동, 인수동, 강북구, 서울특별시, 01015, 대한민국 · found as "소문난"
+   4 | 신경주역 | 경주, 내외로, 건천읍, 경주시, 경상북도, 38183, 대한민국 · 268 km from 라클라스 집
+   4 | 이춘복참치 강남점 | 이춘복참치, 266-2, 한강대로, 남영동, 용산구, 서울특별시, 04352, 대한민국 · found as "이춘복참치"
+   4 | 큰우리 | 큰우리 요양병원, 학하서로, 덕명동, 학하동, 유성구, 대전광역시, 34208, 대한민국 · 131 km from 라클라스 집
+   4 | 광주송정역 | 광주송정역, 상무대로, 송정동, 광산구, 광주, 전남광주통합특별시, 62430, 대한민국 · 264 km from 라클라스 집
+   4 | 가고파 펜션 | 가고파, 중부흥2길, 해솔길마을, 대부동, 단원구, 안산시, 경기도, 15645, 대한민국 · found as "가고파"
+   4 | 빨간거짱구네 청라점 | 빨간거짱구네, 18-7, 햇내로안길, 은골카페거리, 운서동, 공항신도시, 영종구, 인천광역시, 22361, 대한민국 · found as "빨간거짱구네"
+   4 | 오리지널팬케이크하우스 잠원파스텔점 | 오리지널팬케이크하우스, 175, 세종대로, 종로1가, 중학동, 종로1·2·3·4가동, 종로구, 서울특별시, 03172, 대한민국 · found as "오리지널팬케이크하우스"
+   4 | 용평리조트 | 용평리조트, 용산리, 대관령면, 평창군, 강원특별자치도, 25352, 대한민국 · matched a winter_sports · 147 km from 라클라스 집
+   4 | 푸에르코 판교점 | 푸에르코, 마곡서로, 마곡동, 방화1동, 강서구, 서울특별시, 07797, 대한민국 · found as "푸에르코"
+   4 | 평가옥 삼성점 | 평가옥, 37, 삼성로95길, 삼성2동, 강남구, 서울특별시, 06159, 대한민국 · found as "평가옥"
+   4 | 성남시청 주차장 | 성남시청, 997, 성남대로, 여수동, 중원구, 성남시, 경기도, 13437, 대한민국 · found as "성남시청"
+   4 | 경기광주휴게소 | 경기광주휴게소(경기광주방향), 광주원주고속도로, 곤지암읍, 광주시, 경기도, 12726, 대한민국 · matched a services
+   4 | JFK공항 T1 | International Airport Center Boulevard, JFK Logistics Center, 퀸스, 퀸스 카운티, 뉴욕, 11 · matched a service · 11071 km from 라클라스 집
+   4 | Bengaluru Kempegowda 공항 T2 | Kempegowda International Airport Southern Access Road, Anneshvara, Devanahalli t · matched a secondary · 5561 km from 라클라스 집
+   4 | ZARF in Sheraton | Zarf, Whitefield Road, Tigalarapalya, Hoodi, Bengaluru East City Corporation, 벵갈 · found as "ZARF in" · 5574 km from 라클라스 집
+   4 | Bangalore Kempegowda 공항(T2) | Kempegowda International Airport, KIAL Exit Road, 벵갈루루, Devanahalli taluku, Beng · 5561 km from 라클라스 집
+   4 | The Charter Oak Restaurant | The charter oak restaurant, Charter Oak Avenue, St. Helena, Napa County, 캘리포니아,  · 8975 km from 라클라스 집
+   4 | Residence Inn by Marriott San Jose Cupertino | Residence Inn San Jose North/Silicon Valley, 656, America Center Court, America  · found as "Residence Inn by Marriott San Jose" · 9086 km from 라클라스 집
+   4 | Sedona Airport Scenic Lookout | Sedona Airport, 235, Air Terminal Drive, 세도나, Yavapai County, 애리조나, 86336, 미국 · found as "Sedona Airport" · 9940 km from 라클라스 집
+   4 | Disneyland Hotel | Disneyland Hotel, Rue de la Marnière, Chessy, 토르시, 센에마른, 일드프랑스, 프랑스 본토, 77700, 프 · 8952 km from 라클라스 집
+   4 | Shore Hotel | Shore Hotel, Old Laxey Hill, Laxey, Garff, IM4 7DA, 맨섬 · 8808 km from 라클라스 집
+   4 | 부산의료원 장례식장 | 부산의료원, 359, 월드컵대로, 거제동, 거제2동, 연제구, 부산광역시, 47527, 대한민국 · found as "부산의료원" · 316 km from 라클라스 집
+   4 | 모나용평 타워콘도 | 용평리조트, 용산리, 대관령면, 평창군, 강원특별자치도, 25352, 대한민국 · found as "모나용평" · matched a winter_sports · 147 km from 라클라스 집
+   4 | 모나용평 | 용평리조트, 용산리, 대관령면, 평창군, 강원특별자치도, 25352, 대한민국 · matched a winter_sports · 147 km from 라클라스 집
+   4 | 배배 젤라또 | 배배 게스트하우스, 20, 신창1길, 신창리, 한경면, 제주시, 제주특별자치도, 63002, 대한민국 · found as "배배" · 468 km from 라클라스 집
+   4 | 김해공항 국내선 | 김해국제공항, 108, 공항진입로, 대저2동, 강서구, 부산광역시, 46721, 대한민국 · found as "김해공항" · 310 km from 라클라스 집
+   4 | El Meson De Los Hermanos | Restaurante El Meson De Los Hermanos, 20, Baker Street, Weybridge, 엘름브리지, 서리주, 잉 · found as "El Meson De Los" · 8891 km from 라클라스 집
+   4 | Waterloo 역 | Waterloo Station, The Balcony, South Bank, Waterloo, 램버스구, 그레이터런던, 잉글랜드, SE1 7LY · matched a house
+   4 | Gatwick 공항 Long Stay South | London Gatwick Airport, Perimeter Road East, Lowfield Heath, Tinsley Green, 크롤리, · found as "Gatwick Airport"
+   4 | Porto 공항 | Aeroporto Francisco Sá Carneiro, Rua Doutor José Domingos dos Santos, Lavra, Mat · 1289 km from Weybridge 집
+   4 | Oxford Thornhill Park & Ride | Thornhill Park and Ride, A40, Risinghurst and Sandhills, 옥스퍼드, 옥스퍼드셔주, 잉글랜드, OX3 · 68 km from Weybridge 집
+   4 | Eurotunnel Terminal Building (Folkestone) | U41 Customs Control Building, Ashford Road, St Martin's Plain, Hornstreet, Cheri · 113 km from Weybridge 집
+   4 | Calais Eurotunnel | Centre de secours Eurotunnel, Chemin du Vieux Coquelles, Vieux Coquelles, Coquel · 163 km from Weybridge 집
+   4 | Novotel Edinburgh Park | Novotel Edinburgh Park, 15, Lochside Avenue, Sighthill, 에든버러, 스코틀랜드, EH12 9DJ, 영 · 542 km from Weybridge 집
+   4 | Edinburgh Park Station | Edinburgh Park Station, Lochside Crescent, Edinburgh Park, South Gyle, 에든버러, 스코틀 · 542 km from Weybridge 집
+   4 | Edinburgh Waverley 역 | RBS, Waverley Station Concourse, Old Town, 에든버러, 스코틀랜드, EH1 1BB, 영국 · 542 km from Weybridge 집
+   4 | Sunningdale 주차장 | Sunningdale, Cedar Drive, Sunningdale, 윈저 메이든헤드 왕립구, 잉글랜드, SL5 0UA, 영국 · found as "Sunningdale"
+   3 | Pho Bac Restaurant | Pho Bac, 7700, West Goddard Road, West Bench Neighborhood Association, 보이시, Ada  · 8965 km from 리센츠 242동 집
+   3 | 백마 김씨네 | 백마, 고일로174번길, 풍동, 풍산동, 일산동구, 고양시, 경기도, 10300, 대한민국 · found as "백마"
+   3 | 몽중헌 방이점 | 몽중헌 (Mong Joong Hun), 도산대로81길, 청담동, 강남구, 서울특별시, 06010, 대한민국 · found as "몽중헌"
+   3 | 속초집 역삼본점 | 속초집, 7, 퇴계로6길, 남창동, 회현동, 중구, 서울특별시, 04635, 대한민국 · found as "속초집"
+   3 | 몽중헌 청담점 | 몽중헌 (Mong Joong Hun), 도산대로81길, 청담동, 강남구, 서울특별시, 06010, 대한민국 · found as "몽중헌"
+   3 | 역삼동 | 역삼동, 강남구, 서울특별시, 대한민국 · matched a legal
+   3 | SG골프 동탄 | SG골프 미사어반스크린, 미사강변중앙로, 풍산동, 온천마을, 미사3동, 하남시, 경기도, 12938, 대한민국 · found as "SG골프"
+   3 | 강북삼성병원 종합건진센터 | 강북삼성병원, 29, 새문안로, 평동, 교남동, 종로구, 서울특별시, 03181, 대한민국 · found as "강북삼성병원"
+   3 | 미리내 매운탕 | 미리내, 10-07, 을지로20길, 산림동, 을지로동, 중구, 서울특별시, 04549, 대한민국 · found as "미리내"
+   3 | 하이원리조트 | 하이원리조트 운암정, 하이원길, 사북리, 사북읍, 정선군, 강원특별자치도, 26154, 대한민국 · 163 km from 라클라스 집
+   3 | 신미 | 신미1길, 미장리, 삼죽면, 안성시, 경기도, 17517, 대한민국 · matched a unclassified · 60 km from 라클라스 집
+   3 | Singapore Changi 공항(T2) | 싱가포르 창이 공항, Aviation Park Road, Changi, East Region, 싱가포르, 499675, 싱가포르 · 4659 km from 라클라스 집
+   3 | San Francisco 공항 | San Francisco International Airport, 780, South Airport Boulevard, 샌프란시스코, San M · 9045 km from 라클라스 집
+
+Wrote place-coords-new.csv (443 rows).

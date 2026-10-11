@@ -11,7 +11,8 @@
     "migrate-alcohol": "tsx scripts/migrate-alcohol-conversion.ts",
 		"migrate-ingredient": "tsx scripts/migrate-ingredient.ts",
 		"migrate-bowel": "tsx scripts/migrate-bowel-score.ts",
-		"migrate-favorite-place": "tsx scripts/migrate-favorite-place.ts"
+		"migrate-favorite-place": "tsx scripts/migrate-favorite-place.ts",
+		"migrate-place-coord": "tsx scripts/migrate-place-coord.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

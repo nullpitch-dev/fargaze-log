@@ -16,7 +16,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze Log", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Data Design & Requirements Document", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 4.11  |  28 September 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 4.12  |  9 October 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
 );
 C(p([new TextRun({ text: "Structure: ", bold: true }), new TextRun("Part I Foundations · Part II Data · Part III Features · Part IV Operations · Appendices. The body is the complete, always-current source of truth; the changelog below carries one line per version. Work status, open questions and the backlog live in the separate WBS, not here.")]));
 
@@ -57,6 +57,7 @@ C(table(
     ["4.9","26 Sep 2026","Bowel Movement widget (WBS #62) Summary shipped — new §9.3.7. bowel.quality and bowel.characteristics become String[] parsed from ‘+’-joined cells (§5.2, §10.1.4). New Bowel sheet and bowel_score collection (§4.1, §6.8, §12.5) hold the allowed values AND their scores; the daily migration rejects any bowel value not in it, the same way ingredients are validated. The day-score index is defined and verified against all years: movement score = amount + quality + characteristics; day score = the MEAN of the day’s movement scores plus a frequency penalty (3rd movement −2, each after −3); days without a movement score −1/−3/−5/−7/−10; bad day below −3; scored from 2019-09-19 only, because characteristics were not recorded before. metric=bowel.summary. CssDailyChart gained hoverFor; Histogram gained per-bar hover cards and a height prop; MetricPieBlock and HintLabel exported from SleepWidget with unit and legendCols. Stale v4.7 footer corrected"],
     ["4.10","27 Sep 2026","Bowel Movement Trend view shipped — §9.3.7 Trend written. New metric=bowel.trend on the shared grain × count window, anchored at min(period end, YESTERDAY). buildBowelTrend runs buildBowelSummary once per bucket over the bucket’s own dates, so no rule is restated and a Month bucket always equals the Summary for that month — verified on July 2021 and January 2026. New BowelTrendView.tsx with eight tabs: Score (average line + faint bad-day share), Per day / Gap / Duration (percent stacked areas on the Summary’s criteria, each with an average line on the right axis), Quality (all nine values, hard → normal → loose), How it went, Other signs (NOT normalised — each band is % of movements) and Time of day. Summary: a day with no movement is marked × on the Day score; Time of day labels read 5:00~. Shared charts, all additions default-off: CssDailyChart markerFor; CssTrendChart zones, notes and rightSeries.dim; CssStackedAreaChart zeroIsValue. CssTrendChart now thins x labels BEFORE shortening them, so the year appears on the first drawn label of each year, and its hover card shows the full label with the year — this changes Diet and Drinking tooltips for the better; callers passing compressXLabels={false} are unchanged"],
     ["4.11","28 Sep 2026","CALENDAR (WBS #59) shipped — new §14. A Calendar page (first in the menu, and the home page) with Day, Week, Month, Year and Schedule views plus Search, following Google Calendar. TIME ZONES follow Google: a timed record is one moment (its naive wall clock minus its own offset) shown in ONE display zone — this device’s by default, switchable, not remembered; all-day records stay on their logged dates. §5.3 amended: the Calendar is the one reader that applies offsets at read time; nothing stored changes. New endpoints /api/calendar (events, or per-day counts), /options, /settings, /record and /search. New collection calendar_settings (§6.9) and a Log index on { userId, duration.totalSeconds } for records longer than 31 days (the reading periods, the longest 474 days). Reading & study (독서(기간), 공부(기간)) share ONE row with a show/hide switch. Calendar search uses the Search page’s 상세 검색 fields but CONTAINS matching, newest first, up to 200 (§14.8). The record detail pane moved out of search/page.tsx into src/app/_components/LogDetailPanel.tsx and is shared; ModalShell gained an optional actions slot; the garbled Search hint line was fixed. Four sheet records end before they start (§14.10)"],
+    ["4.12","9 Oct 2026","JOURNEYS WIDGET (이동, WBS #63) Summary shipped — new §9.3.8. Consecutive 이동 rows are joined into journeys (gap ≤ 30 min, To = next From, same purpose, never across 집); flights are reported on their own line; a journey belongs to its local start date with the 6 am rule. Four tabs: Overview (per-day figures, By purpose / By method / With whom pies, Most often with), Commute (출근 = the first commute of the day; 퇴근 includes 퇴근길 식사 / 볼일 with the stop’s time left out), Getting home (귀가 시간 box plots: All, From work, After work dinner, After dinner with friends; golf excluded from the two dinner groups), Places (top places and routes). New metric=transport.summary. New collection favorite_place (§6.10) resolves 집 / 회사 / 사이트 / 내차 to the real place by period; new procedure §12.6. Global filter now opens on Period = the month ending yesterday (§9.2.1), and todayStr uses the local date. MetricPieBlock gains an optional legendDetail. Distances and the map wait for geocoding"],
   ],
   [1100, 1300, 6960]
 ));
@@ -629,6 +630,17 @@ C(p("Collection calendar_settings, model src/models/CalendarSettings.ts (minimiz
 
 
 
+C(h2("6.10 favorite_place (added v4.12)"));
+C(p("Generic labels in the transport fields mean different real places at different times: 집 was four homes, 사이트 two client sites, 내차 three cars. The log keeps the labels — they carry meaning a real name loses (“time at home” across every house) and the sheet import would undo any rename. favorite_place records which real place each label meant during each period."));
+C(table(["Field","Type","Notes"],[
+  ["userId","String","Required"],
+  ["label","String","집, 회사, 사이트, 내차 …"],
+  ["name","String","The real place for that period, e.g. 라클라스 집, SDS 잠실 본사, Lexus UX250h"],
+  ["from / to","{ timezone, local, at } | null","Each boundary keeps the sheet’s time-zone code and local ‘YYYY-MM-DD HH:mm’, plus at = the true UTC instant computed with timezone_master offsets. null = open (since the beginning / still current). Both ends inclusive"],
+],[2000,2400,4960]));
+C(p("Records are matched on the TRUE instant, because periods cross zones (KST → GMT). Gaps between periods are allowed (travel days, weeks without a car): a record in a gap resolves to no name and keeps its label. Periods of the same label must not overlap. Source: Active file > FavoritePlace sheet (§12.6). Model src/models/FavoritePlace.ts; parsing and resolveFavoritePlace in src/lib/migration/favoritePlace.ts."));
+C(spacer());
+
 C(h1("7. Search — Index, API & UI"));
 C(h2("7.1 Overview"));
 C(p("MongoDB Atlas Search (Lucene-based) is used for full-text keyword search across all relevant log fields. A single search index named log_search is defined on the log collection."));
@@ -852,6 +864,7 @@ C(
   bullet("Two-dimensional framework: horizontal axis = subject domain; vertical axis = analytical floor (0→4, increasing depth)"),
   bullet("All widgets share: WidgetCard shell, global filter, Summary/Trend mode toggle"),
   bullet("Page layout: CSS columns (columns-1 md:columns-2 lg:columns-3) — masonry-style packing, no empty gaps under shorter widgets"),
+  bullet("(v4.12) Global filter default: the page opens on Period mode covering the month ending YESTERDAY — on 6 Oct, 6 Sep to 5 Oct; the start is today’s day number in the previous month, clamped to that month’s last day (31 Mar → 28 Feb). defaultPeriodFrom / defaultPeriodTo in date-helpers.ts. todayStr now returns the LOCAL date (it used toISOString, which gave yesterday between midnight and 1 am in BST); this also fixes the Day-mode default"),
 );
 
 C(h3("9.2.2 Colour System"));
@@ -874,6 +887,7 @@ C(table(["Component","File","Description"],[
   ["CssRestChart","src/app/insights/_components/charts/css-chart-components.tsx","Stacked histogram bars + avg spline overlay; unified SVG coordinate space; PLOT_T/PLOT_B bounds. avgRestDays became number | null at v4.6 and the average spline is drawn as segments so a bucket with no value breaks the line rather than dropping to zero. NOW UNUSED \u2014 the Drinking Rest tab moved to CssStackedAreaChart with a right-axis line at v4.6; the component and its exported REST_BUCKET_ORDER / REST_BUCKET_COLORS_LIGHT / REST_BUCKET_COLORS_DARK remain, the colour exports deliberately, so the bands have ONE source of truth"],
   ["CssDailyChart","src/app/insights/_components/charts/css-chart-components.tsx","(v3.3) Single daily-series line; optional dashed average line + zone bands; tooltip floats above the marker showing value + date; baselineZero option. (v4.9) Optional hoverFor(i) returning { title, rows, note } | null: when given, the shared ChartHoverCard replaces the value + date bubble and hangs BELOW the plot, so a long multi-row card never covers the line. It is also shown for days whose value is null. Default off; Diet and Exercise unchanged. (v4.10) Optional markerFor(i) returning 'dot' | 'cross': a cross draws a bold × in place of the dot (Bowel: a day with no movement). Default every point is a dot"],
   ["MetricPieBlock / HintLabel","src/app/insights/_widgets/SleepWidget.tsx","(v4.8, exported v4.9) Pie + legend sharing one hover state, and a label whose explanation opens as the shared hover card. Exported for the Bowel widget rather than extracted, with two default-preserving props on MetricPieBlock: unit (hover text counts \"3 days\" by default, \"3 movements\" for Bowel) and legendCols (2 = legend in two columns once the nearest @container reaches @lg, one column below that so a label never wraps). If a third widget needs them, extract both to _components per A.3"],
+  ["MetricPieBlock legendDetail","src/app/insights/_widgets/SleepWidget.tsx","(v4.12) Optional legendDetail(seg) → text printed after the % in each legend row (Journeys shows the count or the time, following its Count / Time switch). Absent by default, so Sleep and Bowel are unchanged"],
   ["CssStackedAreaChart","src/app/insights/_components/charts/css-chart-components.tsx","(v4.2) Stacked area with a continuous total line. A point is {label, total, segments?, meta?} and may carry a total with NO segments, in which case the line runs across it and the coloured fill starts later; nulls break the line rather than interpolating across a gap. Props: segmentDefs (bottom to top), mode 'absolute' | 'percent', baselineZero, formatY, height, maxXLabels. Percent mode normalises each stack to 100 and hides the total line. Bands are clipped to the plot box; a lone point renders as a narrow column so a single-bucket run does not vanish. Nothing in it is weight-specific. v4.5 added highlightable (default false) \u2014 one activeKey state driven from the plot, the legend and the tooltip, with the band under the cursor derived from the cursor height because the hover columns sit above the SVG. v4.6 adds rightLine + formatYRight (default absent, so every existing caller keeps its exact width): ONE extra line on its own right-hand axis, drawn SOLID from values and DASHED across the gaps that bridge fills, the dashed run extended one point each side so it meets the solid line; the right label column, the x-label row padding and the legend entry all appear only when it is passed. v4.10 adds zeroIsValue (default false, absolute mode only): a point whose segments are all zero draws flat on the floor instead of as a gap, for measures where zero is a fact — Bowel Other signs. Everywhere else the settled rule stands: a zero-total bucket is a gap"],
   ["Segmented","src/app/insights/_components/Segmented.tsx","(v4.2) Shared multi-state toggle, generic over string | number so numeric option sets (bucket counts) work alongside string ones. Extracted from DietWidget when WeightTrendView needed the same control. ViewToggle in WidgetCard remains the dedicated Summary/Trend switch"],
   ["ModalShell","src/app/insights/_components/ModalShell.tsx","(v4.11) Optional actions — controls placed before the × (the Calendar day pop-up’s Open day and ‹ › arrows); absent by default, so every Insights modal is unchanged. (v4.4) Shared centred modal rendered through a React portal on document.body, so it escapes widget-card overflow:hidden. Backdrop click and \u00d7 both close; clicks inside the panel do not bubble. Extracted from DietWidget when ExerciseWidget needed the same shell \u2014 the same trigger that lifted Segmented out at v4.2"],
@@ -1411,6 +1425,58 @@ C(spacer());
 C(p("Stacked tabs are percent, not counts, so buckets of different lengths compare. Scales keep their own order bottom to top; only Other signs, which has no order, runs by size. Average lines over the bands take the value ink (stone-800 / zinc-100) rather than a band colour."));
 C(p("API: metric=bowel.trend&grain=&buckets= → { grain, windowStart, windowEnd, perDayLabels, gapLabels, durationLabels, qualityOrder, signKeys, timeGroups, buckets[] }. Each bucket: label, start, end (last day counted), daysInBucket, movementDays, movements; score { average, scoredDays, badDays, badShare, worst { date, score } }; perDay { average, counts }; gap { average, counts }; duration { average, counts, counted }; quality (value → share %); qualityCount; howItWent (value → movements, incl. Not recorded); otherSigns { movements, pct }; timeOfDay (group key → movements). Per bucket, perDay.counts sum to daysInBucket and gap.counts to movementDays (except the very first movement in the log)."));
 
+// ── 9.3.8 Journeys ──────────────────────────────────────────────────────────
+C(h3("9.3.8 Journeys — 이동 (WBS #63)"));
+C(bold("Purpose"));
+C(p("Whether the effort of logging every trip pays off: how much of life goes on travel, what for, by what, with whom, when he gets home, and what the commute looks like. Named Journeys rather than Transport: the widget counts trips and their purpose, not vehicles, and Travel is kept for the future trips widget."));
+
+C(bold("Scope and journeys"));
+C(p("Only activity.category = 이동. Rows elsewhere that borrow the transport fields (이사, 등산 / 하산, 가족 기록 …) are notes, not travel. Consecutive legs are joined into one journey by src/lib/insights/transport-journeys.ts when ALL hold:"));
+C(
+  bullet("the gap between them is 0–30 minutes, measured on true instants so time zones are safe (Hyoje’s threshold; 15 was too tight for real transfers)"),
+  bullet("the first leg’s To equals the next leg’s From"),
+  bullet("both legs have the same purpose"),
+  bullet("the first leg does not end at 집 — arriving home always ends a journey"),
+);
+C(p("ReturnType is logged only on the leg that arrives at 집, which is always a journey’s last leg; the journey takes it from there. Checked on all history: 8,297 legs → 6,993 journeys, every 귀가 journey ending at 집 has its ReturnType. Flights (method 비행기) are removed BEFORE joining and reported as their own line, so one long-haul flight cannot swamp the averages. A journey belongs to its local start date, except that a start before 06:00 belongs to the previous day (the Sleep rule); weekday / weekend is decided on that day. The period runs to min(period end, yesterday)."));
+
+C(bold("Rules"));
+C(table(["Item","Rule"],[
+  ["Workplace","Any final destination of 3+ 출근 journeys, all-time, never 집. Includes places he commutes to that are not offices (정문 주차타워, 미래기술캠퍼스)"],
+  ["출근 (commute out)","The FIRST 출근 journey of each day, unless it starts at a workplace or ends at 집. Later 출근 journeys that day are moves between workplaces (회사 → 2단지) — even when they pass through 집 to drop the car — and are left out. Verified on 2025-03-21 and 2024-10-02"],
+  ["퇴근 (commute back)","근무 후 귀가: the journey itself, first start → last end, transfer waits included. 퇴근길 식사 / 볼일 후 귀가: leaving work → reaching 집, travel time = the SUM OF THE LEGS, so time at the stop never counts. Both legs are logged with purpose 귀가 (식음 is for 회식 and 친목), so a stop under 30 min joins them into one journey — summing legs covers that case too. When the stop leg is a separate journey, the journey before it must start at a workplace, end where this one starts, and lie within 6 hours. A 퇴근길 journey that itself starts at a workplace (a minor stop not split out) is an ordinary 퇴근. A 근무 후 귀가 journey that starts elsewhere (e.g. a restaurant after a late meeting) is counted as it is — Hyoje’s decision: fix the logging, not the logic"],
+  ["Getting home (귀가 시간)","Arrival at 집 of 귀가 journeys. From work = 근무 후 / 퇴근길 식사 / 퇴근길 볼일; After work dinner = 업무회식 후 귀가; After dinner with friends = 친목모임 후 귀가. Journeys whose cross-activity is 골프 are excluded from the two dinner groups (tee times make those arrivals early). All = the three groups together"],
+  ["Clock averages","Evening times (퇴근, getting home) use the 6 am rule: 01:10 counts as 25:10. 출근 times do not"],
+  ["With whom","people[].target per journey (all legs, distinct by name, 등 ignored). A journey’s relationship is its dominant people category; Alone = no people"],
+  ["Distance","Straight line between From and To coordinates. Not built: every distance is null until geocoding, and the Distance switches stay hidden"],
+],[2200,7160]));
+C(spacer());
+
+C(bold("API / data shape"));
+C(p("metric=transport.summary → { summary }. src/lib/insights/transport.ts: computeTransportSummary fetches every 이동 row and favorite_place (unbounded, cut in memory — workplaces and the 퇴근 stop rule need history) and hands them to the pure buildTransportSummary. crossActivities filters journeys by the last leg’s cross-activity. The payload holds period { from, to }, blocks { all, weekday, weekend } — all three sent at once so the day switch never refetches — and checks { workplaces, betweenWorkplaces, stopTripsMatched, stopTripsUnmatched, favoritePlaces } for verification. Each block: days; overview (journeys, legs, minutes, km, kmCoverage, perDay, perWeek); byPurpose (per journey) and byMethod (per LEG) as { key, count, minutes, km }; withWhom { alone, byCategory, people top 15 }; commute { out, back } each with count, avgDepart, avgArrive, avgDurationMin, avgKm, places, combos (top 5 method sequences); comingHome [All + three groups] with count, avgArrive and box { min, p25, avg, p75, max }; map { places, routes } top 30; flights { count, minutes, km }. Display names resolve 집 / 회사 / 사이트 through favorite_place."));
+
+C(bold("Summary view"));
+C(table(["Area","Content"],[
+  ["Header","Tab pills on the left in the Trend-view style (Overview · Commute · Getting home · Places); All · Wkday · Wkend switch on the right, applying to every tab; then ‘N days · N journeys’"],
+  ["Overview","Wide card (container ≥ 36rem): Journeys / Time / Distance per day stacked on the left with ‘/ week’ beneath, and the Count / Time switch at the bottom of that column; on the right a 2 × 2 (from 24rem) of By purpose, By method and With whom pies plus Most often with. Pies show EVERY category, no Other; legends in two columns with the % and the selected measure. Most often with: bars in the person’s relationship colour from the With whom pie, ranked and sized by the selected measure. Flights line at the bottom"],
+  ["Commute","출근 / 퇴근 switch; headline row Leave · Arrive · Takes · Distance with the trip count. Then 2 : 1 — a time strip (All, then the top 5 method combinations as ‘운전 (11)’: a bar from average leave to average arrive on a shared clock axis with light full-height hour lines, travel time on the right) beside Commuted to / Left from (top 5 bars)"],
+  ["Getting home","Diet Summary style: four columns — All, From work, After work dinner, After dinner with friends — each titled with its count, a compact box plot whose whiskers are the TRUE earliest and latest arrival (extremes stay visible; height fixed). ‘+00:40’ marks past midnight"],
+  ["Places","Top 10 places by arrivals and top 10 routes (From → To). The map waits for geocoding"],
+],[1800,7560]));
+C(spacer());
+C(p("Chart rule settled here and applying to new work: a PIE for a fixed, mutually exclusive set of categories; BARS for open lists (top N of many) and for comparing similar sizes."));
+
+C(bold("Trend view"));
+C(p("Not designed. The ViewToggle is shown disabled. Candidate content from the design conversation: getting-home time over the years (Korea vs UK, before and after the 2020 role change)."));
+
+C(bold("Notes"));
+C(
+  bullet("Geocoding (deferred): 1,884 distinct From / To names; 집 is ~31% of endpoints and the top 80 names cover most of the rest. Plan: geocode names used 3+ times once into a place table, enter site codes (MR1, 2단지, KCC, SR1, R4 …) by hand, show the share of journeys with a distance rather than pretend full coverage. Kakao’s Local API is the fallback for Korean names"),
+  bullet("Method comes from the Method field (10 clean values), not Place (306 values: bus numbers, other people’s cars). Place is extra detail; rows naming several modes are < 1%. 자전거 is logged as 도보 and the dominant mode of a combined leg is used on purpose"),
+  bullet("Usage per car (내차 via favorite_place) — wanted, not a priority"),
+);
+C(spacer());
+
 C(new Paragraph({ children: [new TextRun({ text: "Part IV · Operations", bold: true, size: 28 })], spacing: { before: 280, after: 140 } }));
 
 
@@ -1760,6 +1826,14 @@ C(
   num("A score change needs nothing else: the widget reads bowel_score at query time. A NEW value must be loaded before the next npm run migrate, or every row using it is rejected"),
 );
 
+C(h2("12.6 Updating Favourite Places (favorite_place, v4.12)"));
+C(p("favorite_place (§6.10) tells the Journeys widget which real place 집 / 회사 / 사이트 / 내차 meant in each period. To add a move, a new job or a new car:"));
+C(
+  num("Edit the FavoritePlace sheet in the Active spreadsheet. Columns A–H: label · name · from_timezone · from_date · from_time · to_timezone · to_date · to_time. Dates YYYY-MM-DD, times H:mm. Leave all three of a side blank for an open end; close the previous period when a new one starts"),
+  num("Run npm run migrate-favorite-place — delete-all + re-insert. It reads offsets from timezone_master, so every code must exist in the TimeDiff sheet. It refuses to touch the collection if any row is half-filled, has an unknown zone or an impossible date, ends before it starts, or overlaps another period of the same label, and prints each row’s start and end in UTC for checking"),
+  num("Nothing else: the log is not touched, and the widget resolves names at read time"),
+);
+
 // ===== 13. GOOGLE CALENDAR SYNC =====
 C(h1("13. Google Calendar Sync"));
 C(p("A Google Apps Script pushes selected Active and Future rows into a Google Calendar. It predates the FarGaze Log project and is documented here from v4.3 because it reads and writes source-sheet columns by position, which makes it sensitive to any column insertion. It is independent of MongoDB \u2014 nothing in this section affects migration or the dashboards."));
@@ -1989,7 +2063,7 @@ C(
 
 C(h1("Appendix B — Directory Map"));
 C(table(["Path","Purpose"],[
-  ["src/app/insights/page.tsx","Insights master page — CSS columns layout; widget registry (WIDGETS array); ExerciseWidget registered v4.4; BowelWidget registered v4.9, directly after Sleep"],
+  ["src/app/insights/page.tsx","Insights master page — CSS columns layout; widget registry (WIDGETS array); ExerciseWidget registered v4.4; BowelWidget registered v4.9, directly after Sleep; JourneysWidget registered v4.12"],
   ["src/app/insights/_widgets/BowelWidget.tsx","(v4.9) Bowel Movement widget (WBS #62). (v4.10) Summary/Trend ViewToggle, trend tab / grain / count state, and the fetch for either metric; the count resets on a grain switch. Header; Day score CssDailyChart with hoverFor; Per day / Gap / Duration HistBlocks; Quality and How it went pies with Other signs; Time of day. The root is an @container, so its rows respond to the widget’s width, not the screen’s. Quality colour families and display order live here. Draws only — every rule is in bowel.ts"],
   ["src/lib/insights/bowel.ts","(v4.9) computeBowelSummary (fetch) + buildBowelSummary (pure, all rules), scoreTableFrom; exports DAY_SCORE_START, BAD_DAY_BELOW, HOW_IT_WENT, TIME_GROUPS. (v4.10) computeBowelTrend (fetch) + buildBowelTrend (pure — one buildBowelSummary per bucket); exports QUALITY_ORDER, TREND_SIGN_TOP, TREND_SIGN_OTHER"],
   ["src/app/insights/_widgets/BowelTrendView.tsx","(v4.10) Bowel Trend view — eight tabs (Score, Per day, Gap, Duration, Quality, How it went, Other signs, Time of day) over CssTrendChart and CssStackedAreaChart. Holds the tab colour ramps; Quality and How it went colours repeat the Summary pies’. Draws only"],
@@ -2021,9 +2095,9 @@ C(table(["Path","Purpose"],[
   ["src/app/insights/_lib/chart-colors.ts","chartColors(isDark), PERSON_COLORS_LIGHT/DARK, categoryColors (v3.3), rankFlowColors (v3.5), BAR_COLORS_LIGHT/DARK + barColors(isDark) + autoColorMap (v3.6)"],
   ["src/app/insights/_lib/format.ts","formatDuration, formatBucketLabel (handles month, week raw/compressed, day)"],
   ["src/app/insights/_lib/hooks.ts","useIsDark()"],
-  ["src/app/insights/_lib/date-helpers.ts","buildParams, currentMonthStr, todayStr, defaultPeriodFrom"],
+  ["src/app/insights/_lib/date-helpers.ts","buildParams, currentMonthStr, todayStr (local date since v4.12), defaultPeriodFrom / defaultPeriodTo (v4.12: the month ending yesterday)"],
   ["src/app/insights/_components/WidgetCard.tsx","WidgetCard, ViewToggle, BucketSelector, FloorBadge"],
-  ["src/app/insights/_components/GlobalFilterBar.tsx","Global filter bar — 4 time modes, cross-activity multi-select"],
+  ["src/app/insights/_components/GlobalFilterBar.tsx","Global filter bar — 4 time modes, cross-activity multi-select; (v4.12) opens on Period, the month ending yesterday"],
   ["src/app/insights/_components/MultiSelectDropdown.tsx","Reusable multi-select dropdown"],
   ["src/app/api/insights/stats/route.ts","GET /api/insights/stats — thin dispatcher (v3.4): auth + param parsing; routes metric/mode to the per-widget compute modules below; exercise.summary branch added v4.4 (no date filter passed through \u2014 the compute module cuts the period itself); exercise.trend / exercise.itemTrend branch added v4.5 — resolves the Weight-style grain \u00d7 buckets window (anchor min(period end, today), start snapped to a bucket boundary) and passes it down; interactions.trend and drinking.trend branches added v4.6 on the same window model via trend-window.ts — the former fetches and passes documents, the latter passes only the window because its compute module needs the conversion table and the prior-drink lookup anyway. The old interactions.summary&mode=trend and drinking.summary&mode=trend paths are untouched and retire once the UIs stop calling them. (v4.10) bowel.trend on the same window model, anchored at min(period end, YESTERDAY); crossActivities ignored, as for bowel.summary"],
   ["src/lib/insights/dates.ts","Shared date/period helpers (v3.4): buildDateRange, stepBack, labelForPeriod, currentPeriod, assignDrinkingDate, assignSleepDate, hourStringToMinutes, yesterdayStr, diffDays, SLEEP_THRESHOLD_HOUR"],
@@ -2072,13 +2146,21 @@ C(table(["Path","Purpose"],[
   ["src/app/api/calendar/record/route.ts","(v4.11) One record for the detail pane"],
   ["src/app/api/calendar/search/route.ts","(v4.11) Calendar search"],
   ["src/models/CalendarSettings.ts","(v4.11) calendar_settings model"],
+  ["src/app/insights/_widgets/JourneysWidget.tsx","(v4.12) Journeys widget (WBS #63), Summary view: tab pills + All / Wkday / Wkend; Overview, Commute (TimeStrip), Getting home, Places"],
+  ["src/lib/insights/transport.ts","(v4.12) computeTransportSummary (fetch) + buildTransportSummary (pure, all rules): workplaces, first-commute rule, 퇴근 stop trips, getting-home groups, three day blocks, checks"],
+  ["src/lib/insights/transport-journeys.ts","(v4.12) legsFromDocs, canJoin, buildJourneys — the 30-minute joining rule; shared by the widget module and the check scripts"],
+  ["src/models/FavoritePlace.ts","(v4.12) favorite_place model; index { userId, label, from.at }"],
+  ["src/lib/migration/favoritePlace.ts","(v4.12) buildFavoritePlaces (parse + validate the sheet) and resolveFavoritePlace(label, instant). Pure"],
+  ["scripts/migrate-favorite-place.ts","(v4.12) npm run migrate-favorite-place — FavoritePlace sheet → favorite_place; refuses on any problem"],
+  ["scripts/check-transport-data.ts","(v4.12) Read-only survey of 이동 rows: fill rates by year, value lists, place names, routes, gaps between legs"],
+  ["scripts/check-transport-cleanup.ts","(v4.12) Read-only: rows to fix, spelling-variant candidates, a journeys preview and companions"],
   ["src/app/_components/LogDetailPanel.tsx","(v4.11) The record detail pane, LogEntry type and formatters, moved out of search/page.tsx; portal at z-60; used by Search and Calendar"],
   ["src/app/NavBar.tsx, src/app/page.tsx","(v4.11) Menu order Calendar · Insights · Search · Spending; the home page redirects to /calendar"],
 ],[3400,5960]));
 C(spacer());
 
 // ===== FOOTER =====
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.11 — 28 September 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.12 — 9 October 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 
 // ===== DOCUMENT ASSEMBLY =====
@@ -2115,6 +2197,6 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-Log-Data-Design-v4.11.docx", buffer);
-  console.log("Wrote FarGaze-Log-Data-Design-v4.11.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-Log-Data-Design-v4.12.docx", buffer);
+  console.log("Wrote FarGaze-Log-Data-Design-v4.12.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });

@@ -47,14 +47,17 @@
 // 01:10 counts as 25:10, so late nights average correctly. 출근 times do not.
 //
 // ── Distance ────────────────────────────────────────────────────────────────
-// Straight line between From and To coordinates. Coordinates come from the
-// geocoding step, which is not built yet — until then every distance is null
-// and coverage is 0.
+// Straight line between From and To. Each end is first resolved to its real
+// name (집 → 라클라스 집 …), then looked up in place_coord (the PlaceCoord sheet).
+// A leg has a distance only when both ends have a point; a journey only when
+// every leg has one. kmCoverage says how many journeys that is.
 
 import Log from '@/models/Log';
 import FavoritePlace from '@/models/FavoritePlace';
+import PlaceCoord from '@/models/PlaceCoord';
 import { buildJourneys, legsFromDocs, HOME, type Journey, type Leg } from './transport-journeys';
 import { resolveFavoritePlace, type FavoritePlaceDoc } from '@/lib/migration/favoritePlace';
+import type { PlaceCoordDoc } from '@/lib/migration/placeCoord';
 import { percentile } from './util';
 
 export const FLIGHT = '비행기';
@@ -137,6 +140,8 @@ export interface TransportSummary {
     stopTripsMatched: number;                  // 퇴근길 식사/볼일 joined to the leg from work
     stopTripsUnmatched: { date: string; from: string; returnType: string }[];
     favoritePlaces: number;                    // rows in favorite_place (0 → names not resolved)
+    places: number;                            // rows in place_coord (0 → no distances)
+    placesWithoutPoint: { name: string; uses: number }[];   // top 15 ends in the period with no point
   };
 }
 
@@ -148,15 +153,17 @@ export async function computeTransportSummary(
   periodEnd: Date,
   crossActivities: string[],
 ): Promise<TransportSummary> {
-  const [docs, favorites] = await Promise.all([
+  const [docs, favorites, places] = await Promise.all([
     Log.find(
       { userId, 'activity.category': '이동' },
       { start: 1, end: 1, activity: 1, location: 1, transport: 1, people: 1 },
     ).lean(),
     FavoritePlace.find({ userId }).lean(),
+    PlaceCoord.find({ userId }, { name: 1, lat: 1, lng: 1 }).lean(),
   ]);
   return buildTransportSummary(
     docs as any[], favorites as any[], utcDateStr(periodStart), utcDateStr(periodEnd), crossActivities, localToday(),
+    places as any[],
   );
 }
 
@@ -168,6 +175,7 @@ export function buildTransportSummary(
   endStr: string,
   crossActivities: string[],
   todayStr: string,
+  placeCoords: Pick<PlaceCoordDoc, 'name' | 'lat' | 'lng'>[] = [],
 ): TransportSummary {
   const yesterday = addDays(todayStr, -1);
   const lastDay = endStr < yesterday ? endStr : yesterday;
@@ -184,6 +192,13 @@ export function buildTransportSummary(
   }));
   const named = (label: string, atMs: number) =>
     resolveFavoritePlace(fav, label, new Date(atMs)) ?? label;
+
+  // Distances: both ends by real name → place_coord. Set once on every leg (flights too).
+  const pointOf = new Map(placeCoords.map(p => [p.name, { lat: p.lat, lng: p.lng }]));
+  for (const l of allLegs) {
+    const a = pointOf.get(named(l.from, l.startAt)), b = pointOf.get(named(l.to, l.endAt));
+    l.km = a && b ? haversineKm(a, b) : null;
+  }
 
   // Workplaces (all-time)
   const commuteCounts = tally(journeys.filter(j => j.purpose === '출근').map(j => j.to));
@@ -243,6 +258,13 @@ export function buildTransportSummary(
 
   const betweenWorkplaces = periodJourneys.filter(j => j.purpose === '출근' && !firstCommute.has(j)).length;
 
+  const missing = new Map<string, number>();
+  for (const l of periodJourneys.flatMap(j => j.legs)) {
+    for (const n of [named(l.from, l.startAt), named(l.to, l.endAt)]) {
+      if (!pointOf.has(n)) missing.set(n, (missing.get(n) ?? 0) + 1);
+    }
+  }
+
   return {
     period: { from: startStr, to: lastDay },
     blocks,
@@ -253,6 +275,9 @@ export function buildTransportSummary(
       stopTripsMatched: backTrips.filter(t => t.parts.length === 2).length,
       stopTripsUnmatched: unmatched,
       favoritePlaces: favorites.length,
+      places: placeCoords.length,
+      placesWithoutPoint: [...missing].sort((a, b) => b[1] - a[1]).slice(0, 15)
+        .map(([name, uses]) => ({ name, uses })),
     },
   };
 }
@@ -396,13 +421,10 @@ function commuteSide(trips: Trip[], evening: boolean): CommuteSide {
   };
 }
 
-// ── Distance (filled in by the geocoding step) ──────────────────────────────
-
-const PLACE_COORDS = new Map<string, { lat: number; lng: number }>();
+// ── Distance (each leg's km is set in buildTransportSummary) ────────────────
 
 function legKm(l: Leg): number | null {
-  const a = PLACE_COORDS.get(l.from), b = PLACE_COORDS.get(l.to);
-  return a && b ? haversineKm(a, b) : null;
+  return l.km;
 }
 
 function journeyKm(j: Journey): number | null {
