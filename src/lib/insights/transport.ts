@@ -65,6 +65,8 @@ export const GOLF = '골프';
 export const WORKPLACE_MIN_COMMUTES = 3;
 export const STOP_MAX_HOURS = 6;           // workplace → stop → 집 must fit in this
 const EVENING_WRAP_HOUR = 6;
+const MAP_PLACES = 100;
+const MAP_ROUTES = 150;
 
 export const RT_WORK = '근무 후 귀가';
 export const RT_WORK_MEAL = '퇴근길 식사 후 귀가';
@@ -124,9 +126,15 @@ export interface TransportBlock {
     // Arrival times in minutes (6 am rule): true earliest / latest, quartiles, mean
     box: { min: number; p25: number; avg: number; p75: number; max: number } | null;
   }[];
+  // Places by arrivals (top 100) and routes by journeys (top 150), each with its
+  // point when PlaceCoord has one (null otherwise). Totals cover every arrival,
+  // so the map can say how much it leaves out.
   map: {
-    places: { name: string; arrivals: number }[];
-    routes: { from: string; to: string; count: number }[];
+    places: { name: string; arrivals: number; lat: number | null; lng: number | null; home: boolean }[];
+    routes: { from: string; to: string; count: number; a: [number, number] | null; b: [number, number] | null }[];
+    arrivals: number;
+    arrivalsWithPoint: number;
+    missing: { name: string; arrivals: number }[];   // every arrival place without a point, busiest first
   };
   flights: { count: number; minutes: number; km: number | null };
 }
@@ -141,7 +149,7 @@ export interface TransportSummary {
     stopTripsUnmatched: { date: string; from: string; returnType: string }[];
     favoritePlaces: number;                    // rows in favorite_place (0 → names not resolved)
     places: number;                            // rows in place_coord (0 → no distances)
-    placesWithoutPoint: { name: string; uses: number }[];   // top 15 ends in the period with no point
+    placesWithoutPoint: { name: string; uses: number }[];   // top 100 ends in the period with no point
   };
 }
 
@@ -195,6 +203,7 @@ export function buildTransportSummary(
 
   // Distances: both ends by real name → place_coord. Set once on every leg (flights too).
   const pointOf = new Map(placeCoords.map(p => [p.name, { lat: p.lat, lng: p.lng }]));
+  const homeNames = new Set(fav.filter(f => f.label === HOME).map(f => f.name));
   for (const l of allLegs) {
     const a = pointOf.get(named(l.from, l.startAt)), b = pointOf.get(named(l.to, l.endAt));
     l.km = a && b ? haversineKm(a, b) : null;
@@ -253,6 +262,8 @@ export function buildTransportSummary(
       flights: periodFlights.filter(l => match(dayOf(l.startLocal))),
       firstCommute,
       named,
+      pointOf,
+      homeNames,
     });
   }
 
@@ -276,7 +287,7 @@ export function buildTransportSummary(
       stopTripsUnmatched: unmatched,
       favoritePlaces: favorites.length,
       places: placeCoords.length,
-      placesWithoutPoint: [...missing].sort((a, b) => b[1] - a[1]).slice(0, 15)
+      placesWithoutPoint: [...missing].sort((a, b) => b[1] - a[1]).slice(0, 100)
         .map(([name, uses]) => ({ name, uses })),
     },
   };
@@ -299,6 +310,8 @@ function buildBlock(a: {
   flights: Leg[];
   firstCommute: Set<Journey>;
   named: (label: string, atMs: number) => string;
+  pointOf: Map<string, { lat: number; lng: number }>;
+  homeNames: Set<string>;
 }): TransportBlock {
   const { days, journeys } = a;
   const legs = journeys.flatMap(j => j.legs);
@@ -357,11 +370,19 @@ function buildBlock(a: {
     },
     comingHome: comingHome(journeys),
     map: {
-      places: [...arrivals].sort((x, y) => y[1] - x[1]).slice(0, 30).map(([name, n]) => ({ name, arrivals: n })),
-      routes: [...routes].sort((x, y) => y[1] - x[1]).slice(0, 30).map(([k, n]) => {
-        const [from, to] = k.split('\u0000');
-        return { from, to, count: n };
+      places: [...arrivals].sort((x, y) => y[1] - x[1]).slice(0, MAP_PLACES).map(([name, n]) => {
+        const p = a.pointOf.get(name);
+        return { name, arrivals: n, lat: p?.lat ?? null, lng: p?.lng ?? null, home: a.homeNames.has(name) };
       }),
+      routes: [...routes].sort((x, y) => y[1] - x[1]).slice(0, MAP_ROUTES).map(([k, n]) => {
+        const [from, to] = k.split('\u0000');
+        const pa = a.pointOf.get(from), pb = a.pointOf.get(to);
+        return { from, to, count: n, a: pa ? [pa.lat, pa.lng] as [number, number] : null, b: pb ? [pb.lat, pb.lng] as [number, number] : null };
+      }),
+      arrivals: journeys.length,
+      arrivalsWithPoint: [...arrivals].filter(([name]) => a.pointOf.has(name)).reduce((n, [, c]) => n + c, 0),
+      missing: [...arrivals].filter(([name]) => !a.pointOf.has(name))
+        .sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0])).map(([name, n]) => ({ name, arrivals: n })),
     },
     flights: {
       count: a.flights.length,

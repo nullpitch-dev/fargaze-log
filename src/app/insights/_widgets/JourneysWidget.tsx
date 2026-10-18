@@ -14,14 +14,16 @@
 //                   combination (2/3) beside where (1/3)
 //   Getting home  — 귀가 시간: From work / After work dinner / After dinner with
 //                   friends, Diet-style box plots with avg, earliest, latest
-//   Places        — top places and routes (the map comes with geocoding)
+//   Places        — map (Google Maps: dots by arrivals, lines by journeys) above
+//                   the top-10 places and routes
 //
 // Chart rule: a pie for a fixed, mutually exclusive set of categories (every
 // category shown, no "Other"); bars for open lists (top N of many).
 //
 // All rules (joining legs, the day a journey belongs to, commute and 퇴근,
 // golf, flights) live in src/lib/insights/transport.ts. This file lays out.
-// Distances are null until geocoding; those slots read "—".
+// A distance is known only when both ends have a point in PlaceCoord; unknown
+// slots read "—".
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { WidgetCard, ViewToggle } from '../_components/WidgetCard';
@@ -32,6 +34,8 @@ import { MetricPieBlock, type Seg } from './SleepWidget';
 import { autoColorMap } from '../_lib/chart-colors';
 import { useIsDark } from '../_lib/hooks';
 import { buildParams } from '../_lib/date-helpers';
+import { JourneyMap, type MapPlace, type MapRoute } from '../_components/JourneyMap';
+import { ModalShell } from '../_components/ModalShell';
 import type { WidgetProps } from '../_lib/types';
 
 // ── Types (mirror src/lib/insights/transport.ts) ──────────────────────────────
@@ -70,8 +74,11 @@ interface Block {
     box: { min: number; p25: number; avg: number; p75: number; max: number } | null;
   }[];
   map: {
-    places: { name: string; arrivals: number }[];
-    routes: { from: string; to: string; count: number }[];
+    places: MapPlace[];
+    routes: MapRoute[];
+    arrivals: number;
+    arrivalsWithPoint: number;
+    missing: { name: string; arrivals: number }[];
   };
   flights: { count: number; minutes: number; km: number | null };
 }
@@ -457,14 +464,82 @@ function GettingHome({ b, isDark }: { b: Block; isDark: boolean }) {
 
 // ── Tab: Places ───────────────────────────────────────────────────────────────
 
-function Places({ b }: { b: Block }) {
+// Places-tab list: label 3/4 of the row, a short bar, the number. Routes are
+// longer than place names, so the two lists sit 4 : 6.
+function NameBars({ title, rows }: { title: string; rows: { label: string; value: number }[] }) {
+  const max = rows[0]?.value ?? 1;
   return (
-    <div className="flex flex-col gap-4">
-      <RankBars title="Most visited (arrivals)"
-        rows={b.map.places.slice(0, 10).map(p => ({ label: p.name, value: p.arrivals }))} />
-      <RankBars title="Most travelled routes"
-        rows={b.map.routes.slice(0, 10).map(r => ({ label: `${r.from} → ${r.to}`, value: r.count }))} />
-      <p className="text-[10px] text-stone-400 dark:text-zinc-500">The map view comes with geocoding.</p>
+    <div className="flex flex-col gap-1 min-w-0">
+      <Title>{title}</Title>
+      {rows.map(r => (
+        <div key={r.label} className="flex items-center gap-2 text-[11px]">
+          <span className="flex-1 min-w-0 truncate text-stone-600 dark:text-zinc-300" title={r.label}>{r.label}</span>
+          <div className="w-12 shrink-0 h-1.5 rounded-full bg-stone-100 dark:bg-zinc-800 overflow-hidden">
+            <div className="h-full rounded-full bg-stone-400 dark:bg-zinc-500" style={{ width: `${(r.value / max) * 100}%` }} />
+          </div>
+          <span className="w-7 shrink-0 text-right tabular-nums text-stone-500 dark:text-zinc-400">{num(r.value)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MissingModal({ rows, onClose }: { rows: { name: string; arrivals: number }[]; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    navigator.clipboard?.writeText(rows.map(r => r.name).join('\n'))
+      .then(() => setCopied(true)).catch(() => {});
+  };
+  return (
+    <ModalShell title={`Places without a point (${rows.length})`} onClose={onClose}
+      actions={
+        <button onClick={copy}
+          className="text-[11px] px-2 py-0.5 rounded border border-stone-200 dark:border-zinc-700 text-stone-600 dark:text-zinc-300 hover:bg-stone-50 dark:hover:bg-zinc-800">
+          {copied ? 'Copied' : 'Copy names'}
+        </button>
+      }>
+      <p className="text-[11px] text-stone-500 dark:text-zinc-400 leading-snug">
+        Arrivals in this period at places with no point in the PlaceCoord sheet, busiest first.
+        Add a name exactly as shown (Copy names puts one per line, ready for the Name column),
+        then run <code className="text-[10px]">npm run migrate-place-coord</code>.
+      </p>
+      <div className="max-h-80 overflow-y-auto flex flex-col">
+        {rows.map(r => (
+          <div key={r.name} className="flex items-center gap-2 py-0.5 text-[12px] border-b border-stone-100 dark:border-zinc-800 last:border-0">
+            <span className="flex-1 min-w-0 truncate text-stone-700 dark:text-zinc-200" title={r.name}>{r.name}</span>
+            <span className="tabular-nums text-stone-500 dark:text-zinc-400">{r.arrivals}</span>
+          </div>
+        ))}
+      </div>
+    </ModalShell>
+  );
+}
+
+function Places({ b, isDark }: { b: Block; isDark: boolean }) {
+  const { arrivals, arrivalsWithPoint } = b.map;
+  const missing = arrivals - arrivalsWithPoint;
+  const [showMissing, setShowMissing] = useState(false);
+  return (
+    <div className="@container flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <JourneyMap places={b.map.places} routes={b.map.routes} isDark={isDark}
+          accent={isDark ? ACCENT_DARK : ACCENT_LIGHT} />
+        <p className="text-[10px] text-stone-400 dark:text-zinc-500 leading-snug">
+          Showing {arrivalsWithPoint} of {arrivals} arrivals
+          {missing > 0 && <> — <button onClick={() => setShowMissing(true)}
+            className="underline decoration-dotted underline-offset-2 hover:text-stone-700 dark:hover:text-zinc-200">
+            {missing} at places without a point</button></>}.
+          Dot size = arrivals; line width = journeys (straight lines, both directions together).
+          Dark dots are homes. Click a dot to see its routes; Ctrl + scroll to zoom.
+        </p>
+      </div>
+      <div className="grid gap-4 @[36rem]:grid-cols-[4fr_6fr]">
+        <NameBars title="Most visited (arrivals)"
+          rows={b.map.places.slice(0, 10).map(p => ({ label: p.name, value: p.arrivals }))} />
+        <NameBars title="Most travelled routes"
+          rows={b.map.routes.slice(0, 10).map(r => ({ label: `${r.from} → ${r.to}`, value: r.count }))} />
+      </div>
+      {showMissing && <MissingModal rows={b.map.missing} onClose={() => setShowMissing(false)} />}
     </div>
   );
 }
@@ -517,7 +592,7 @@ export function JourneysWidget({ globalFilter }: WidgetProps) {
         ) : tab === 'home' ? (
           <GettingHome b={b!} isDark={isDark} />
         ) : (
-          <Places b={b!} />
+          <Places b={b!} isDark={isDark} />
         )}
       </div>
     </WidgetCard>
