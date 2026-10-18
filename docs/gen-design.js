@@ -16,7 +16,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze Log", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Data Design & Requirements Document", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 4.12  |  9 October 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 4.13  |  18 October 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
 );
 C(p([new TextRun({ text: "Structure: ", bold: true }), new TextRun("Part I Foundations · Part II Data · Part III Features · Part IV Operations · Appendices. The body is the complete, always-current source of truth; the changelog below carries one line per version. Work status, open questions and the backlog live in the separate WBS, not here.")]));
 
@@ -58,6 +58,7 @@ C(table(
     ["4.10","27 Sep 2026","Bowel Movement Trend view shipped — §9.3.7 Trend written. New metric=bowel.trend on the shared grain × count window, anchored at min(period end, YESTERDAY). buildBowelTrend runs buildBowelSummary once per bucket over the bucket’s own dates, so no rule is restated and a Month bucket always equals the Summary for that month — verified on July 2021 and January 2026. New BowelTrendView.tsx with eight tabs: Score (average line + faint bad-day share), Per day / Gap / Duration (percent stacked areas on the Summary’s criteria, each with an average line on the right axis), Quality (all nine values, hard → normal → loose), How it went, Other signs (NOT normalised — each band is % of movements) and Time of day. Summary: a day with no movement is marked × on the Day score; Time of day labels read 5:00~. Shared charts, all additions default-off: CssDailyChart markerFor; CssTrendChart zones, notes and rightSeries.dim; CssStackedAreaChart zeroIsValue. CssTrendChart now thins x labels BEFORE shortening them, so the year appears on the first drawn label of each year, and its hover card shows the full label with the year — this changes Diet and Drinking tooltips for the better; callers passing compressXLabels={false} are unchanged"],
     ["4.11","28 Sep 2026","CALENDAR (WBS #59) shipped — new §14. A Calendar page (first in the menu, and the home page) with Day, Week, Month, Year and Schedule views plus Search, following Google Calendar. TIME ZONES follow Google: a timed record is one moment (its naive wall clock minus its own offset) shown in ONE display zone — this device’s by default, switchable, not remembered; all-day records stay on their logged dates. §5.3 amended: the Calendar is the one reader that applies offsets at read time; nothing stored changes. New endpoints /api/calendar (events, or per-day counts), /options, /settings, /record and /search. New collection calendar_settings (§6.9) and a Log index on { userId, duration.totalSeconds } for records longer than 31 days (the reading periods, the longest 474 days). Reading & study (독서(기간), 공부(기간)) share ONE row with a show/hide switch. Calendar search uses the Search page’s 상세 검색 fields but CONTAINS matching, newest first, up to 200 (§14.8). The record detail pane moved out of search/page.tsx into src/app/_components/LogDetailPanel.tsx and is shared; ModalShell gained an optional actions slot; the garbled Search hint line was fixed. Four sheet records end before they start (§14.10)"],
     ["4.12","9 Oct 2026","JOURNEYS WIDGET (이동, WBS #63) Summary shipped — new §9.3.8. Consecutive 이동 rows are joined into journeys (gap ≤ 30 min, To = next From, same purpose, never across 집); flights are reported on their own line; a journey belongs to its local start date with the 6 am rule. Four tabs: Overview (per-day figures, By purpose / By method / With whom pies, Most often with), Commute (출근 = the first commute of the day; 퇴근 includes 퇴근길 식사 / 볼일 with the stop’s time left out), Getting home (귀가 시간 box plots: All, From work, After work dinner, After dinner with friends; golf excluded from the two dinner groups), Places (top places and routes). New metric=transport.summary. New collection favorite_place (§6.10) resolves 집 / 회사 / 사이트 / 내차 to the real place by period; new procedure §12.6. Global filter now opens on Period = the month ending yesterday (§9.2.1), and todayStr uses the local date. MetricPieBlock gains an optional legendDetail. Distances and the map wait for geocoding"],
+    ["4.13","18 Oct 2026","JOURNEYS DISTANCE AND MAP. New collection place_coord (§6.11) from a new PlaceCoord sheet: one point per From / To name, after 집 / 회사 / 사이트 / 내차 are resolved. Points come from OpenStreetMap (Nominatim) through scripts/geocode-places.ts, which writes a CSV to paste into the sheet, plus hand entry for homes, sites and personal places; npm run migrate-place-coord loads it (§12.7). Kakao and Google search results were rejected because their terms forbid keeping results. Distance = straight line between the two points; a leg whose straight line beats its method’s speed limit (도보 15, 기차 350, 비행기 1,100, others 150 km/h; legs under 2 km never flagged) is treated as having no distance and listed in checks.tooFast. The Places tab gains a Google Maps map (JourneyMap.tsx: dots sized by arrivals, lines by journeys, 5 permanent labels, click to highlight, start view = busiest place + 50 km), 4 : 6 top-10 lists and a pop-up of places without a point. New env vars NEXT_PUBLIC_GOOGLE_MAPS_API_KEY and NOMINATIM_EMAIL. INSIGHTS PAGE: widgets grouped into foldable sections (Health with Inputs / Outcomes, Work & Social, Places & Travel), fold state per device, folded groups not mounted (§9.2.1)"],
   ],
   [1100, 1300, 6960]
 ));
@@ -128,6 +129,7 @@ C(table(["Layer","Technology","Notes"],[
   ["Auth","Auth.js (NextAuth) v5","Google OAuth; EMAIL_TO_USER_ID in src/auth.ts"],
   ["Drag & Drop","@dnd-kit/core + @dnd-kit/sortable","Used in spending pivot table"],
   ["Charts","Custom CSS + SVG components","CSS-first; SVG only for curved line paths in trend charts"],
+  ["Maps","Google Maps JavaScript API (v4.13)","Journeys Places map only; loaded by a script tag when the tab opens; no Map ID, plain style arrays; dots and labels drawn by one custom OverlayView"],
   ["Hosting","Vercel","Environment variables set in Vercel dashboard"],
 ],[2000,2800,4560]));
 C(spacer());
@@ -144,6 +146,8 @@ C(table(["Variable","Where","Purpose"],[
   ["SPREADSHEET_ID_ACTIVE","Vercel + .env.local","Google Sheets file ID for Active spreadsheet (incl. AlcoholConv, Ingredient sheets)"],
   ["SPREADSHEET_ID_ARCHIVE","Vercel + .env.local","Google Sheets file ID for Full Archive (~2025 + 2026)"],
   ["ANTHROPIC_API_KEY","Vercel + .env.local","Anthropic API key (for future LLM features)"],
+  ["NEXT_PUBLIC_GOOGLE_MAPS_API_KEY","Vercel + .env.local","(v4.13) Browser key for the Journeys map. Visible in the page by design, so restricted in Google Cloud to the websites http://localhost:3000/* and https://log.fargaze.co/* and to the Maps JavaScript API only; Vercel preview URLs therefore show no map. Billing account (KRW) linked to the project; usage sits inside the free monthly allowance"],
+  ["NOMINATIM_EMAIL",".env.local only","(v4.13) Contact address OpenStreetMap asks every Nominatim caller to send; read by scripts/geocode-places.ts"],
 ],[3000,2400,3960]));
 C(spacer());
 
@@ -641,6 +645,18 @@ C(table(["Field","Type","Notes"],[
 C(p("Records are matched on the TRUE instant, because periods cross zones (KST → GMT). Gaps between periods are allowed (travel days, weeks without a car): a record in a gap resolves to no name and keeps its label. Periods of the same label must not overlap. Source: Active file > FavoritePlace sheet (§12.6). Model src/models/FavoritePlace.ts; parsing and resolveFavoritePlace in src/lib/migration/favoritePlace.ts."));
 C(spacer());
 
+C(h2("6.11 place_coord (added v4.13)"));
+C(p("One point per place name used in the transport From / To fields, so the Journeys widget can compute straight-line distances and draw its map. Names are stored AFTER favorite_place resolution: a home appears under its real name (라클라스 집, Weybridge 집), never as 집; 내차 has no point."));
+C(table(["Field","Type","Notes"],[
+  ["userId","String","Required"],
+  ["name","String","Exactly as logged (after resolution). Unique per user"],
+  ["lat / lng","Number","WGS84 degrees"],
+  ["source","String","manual (blank in the sheet) or osm"],
+  ["note","String","Free text — the matched OpenStreetMap address for osm rows"],
+],[2000,2400,4960]));
+C(p("Source: Active file > PlaceCoord sheet (§12.7). A sheet row with a blank Coords cell is a name that has been looked at and has no point yet: it is not loaded, and the geocoding script never searches it again. Model src/models/PlaceCoord.ts (unique index { userId, name }); parsing in src/lib/migration/placeCoord.ts. Why a sheet and OpenStreetMap: Kakao’s Local API and Google’s Places / Geocoding terms do not allow results to be kept in your own database; OpenStreetMap data may be kept with attribution, and the sheet keeps hand corrections permanent."));
+C(spacer());
+
 C(h1("7. Search — Index, API & UI"));
 C(h2("7.1 Overview"));
 C(p("MongoDB Atlas Search (Lucene-based) is used for full-text keyword search across all relevant log fields. A single search index named log_search is defined on the log collection."));
@@ -865,6 +881,7 @@ C(
   bullet("All widgets share: WidgetCard shell, global filter, Summary/Trend mode toggle"),
   bullet("Page layout: CSS columns (columns-1 md:columns-2 lg:columns-3) — masonry-style packing, no empty gaps under shorter widgets"),
   bullet("(v4.12) Global filter default: the page opens on Period mode covering the month ending YESTERDAY — on 6 Oct, 6 Sep to 5 Oct; the start is today’s day number in the previous month, clamped to that month’s last day (31 Mar → 28 Feb). defaultPeriodFrom / defaultPeriodTo in date-helpers.ts. todayStr now returns the LOCAL date (it used toISOString, which gave yesterday between midnight and 1 am in BST); this also fixes the Day-mode default"),
+  bullet("(v4.13) Widget groups: the page shows foldable groups instead of one grid — Health (sub-groups Inputs: Diet, Drinking, Exercise; Outcomes: Sleep, Weight, Bowel Movement), Work & Social (Interactions), Places & Travel (Journeys). Each sub-group is its own columns grid. A group header shows ▸ / ▾, the title and, when folded, the widget names in grey; Fold all · Unfold all sit by the page title. Fold state is saved per device (localStorage fargaze.insights.foldedGroups, an array of group ids); first visit = all open. A folded group does NOT mount its widgets, so they never fetch — the cost is that unfolding reloads them on their default tabs (Hyoje’s choice, may revisit). Planned groups are added when their first widget exists: Hobbies & Interests, Finances, Everyday Life, Time Use. Registry: GROUPS in page.tsx; component WidgetGroup.tsx"),
 );
 
 C(h3("9.2.2 Colour System"));
@@ -891,6 +908,7 @@ C(table(["Component","File","Description"],[
   ["CssStackedAreaChart","src/app/insights/_components/charts/css-chart-components.tsx","(v4.2) Stacked area with a continuous total line. A point is {label, total, segments?, meta?} and may carry a total with NO segments, in which case the line runs across it and the coloured fill starts later; nulls break the line rather than interpolating across a gap. Props: segmentDefs (bottom to top), mode 'absolute' | 'percent', baselineZero, formatY, height, maxXLabels. Percent mode normalises each stack to 100 and hides the total line. Bands are clipped to the plot box; a lone point renders as a narrow column so a single-bucket run does not vanish. Nothing in it is weight-specific. v4.5 added highlightable (default false) \u2014 one activeKey state driven from the plot, the legend and the tooltip, with the band under the cursor derived from the cursor height because the hover columns sit above the SVG. v4.6 adds rightLine + formatYRight (default absent, so every existing caller keeps its exact width): ONE extra line on its own right-hand axis, drawn SOLID from values and DASHED across the gaps that bridge fills, the dashed run extended one point each side so it meets the solid line; the right label column, the x-label row padding and the legend entry all appear only when it is passed. v4.10 adds zeroIsValue (default false, absolute mode only): a point whose segments are all zero draws flat on the floor instead of as a gap, for measures where zero is a fact — Bowel Other signs. Everywhere else the settled rule stands: a zero-total bucket is a gap"],
   ["Segmented","src/app/insights/_components/Segmented.tsx","(v4.2) Shared multi-state toggle, generic over string | number so numeric option sets (bucket counts) work alongside string ones. Extracted from DietWidget when WeightTrendView needed the same control. ViewToggle in WidgetCard remains the dedicated Summary/Trend switch"],
   ["ModalShell","src/app/insights/_components/ModalShell.tsx","(v4.11) Optional actions — controls placed before the × (the Calendar day pop-up’s Open day and ‹ › arrows); absent by default, so every Insights modal is unchanged. (v4.4) Shared centred modal rendered through a React portal on document.body, so it escapes widget-card overflow:hidden. Backdrop click and \u00d7 both close; clicks inside the panel do not bubble. Extracted from DietWidget when ExerciseWidget needed the same shell \u2014 the same trigger that lifted Segmented out at v4.2"],
+  ["WidgetGroup / WidgetSubgroupLabel","src/app/insights/_components/WidgetGroup.tsx","(v4.13) Foldable group section for the Insights page: header button (arrow, title, widget names when folded, count when open); children rendered only when unfolded. WidgetSubgroupLabel is the small uppercase sub-group caption"],
   ["Treemap","src/app/insights/_components/charts/Treemap.tsx","(v3.3) Squarified treemap; CSS-positioned cells measured via ResizeObserver; top-N cap with a neutral 기타 (+N) rollup; per-mode cell text"],
   ["CalendarHeatmap / HeatStrip","src/app/insights/_components/charts/CalendarHeatmap.tsx","(v3.3) Mon–Sun calendar grid (modal) + single-row day strip (inline); range expanded to whole weeks; out-of-range days dimmed; colour via fillFor(date)"],
   ["StackedBars","src/app/insights/_components/charts/StackedBars.tsx","(v3.5) Reusable stacked bars; percent or absolute mode; legend hover-highlight dims the other series; shared by the Diet Composition / Spicy / Relation tabs. The Drinking Type / Occasion / Relation tabs used it until v4.6, when they moved to stacked areas; Diet Composition keeps it deliberately and stays on the short count list instead"],
@@ -1448,12 +1466,13 @@ C(table(["Item","Rule"],[
   ["Getting home (귀가 시간)","Arrival at 집 of 귀가 journeys. From work = 근무 후 / 퇴근길 식사 / 퇴근길 볼일; After work dinner = 업무회식 후 귀가; After dinner with friends = 친목모임 후 귀가. Journeys whose cross-activity is 골프 are excluded from the two dinner groups (tee times make those arrivals early). All = the three groups together"],
   ["Clock averages","Evening times (퇴근, getting home) use the 6 am rule: 01:10 counts as 25:10. 출근 times do not"],
   ["With whom","people[].target per journey (all legs, distinct by name, 등 ignored). A journey’s relationship is its dominant people category; Alone = no people"],
-  ["Distance","Straight line between From and To coordinates. Not built: every distance is null until geocoding, and the Distance switches stay hidden"],
+  ["Distance","(v4.13) Straight line between From and To. Each end is resolved to its real name (favorite_place), then looked up in place_coord; a leg has a distance only when both ends have a point, a journey only when every leg does. kmCoverage = share of journeys with a distance, shown as ‘N% known’. When any distance exists the Overview Share by switch gains Distance"],
+  ["Speed check","(v4.13) A leg whose straight line means travelling faster than its method allows — 도보 15 km/h, 기차 350, 비행기 1,100, every other method 150 — almost always has a wrong point at one end, so it is treated as having NO distance. Legs under 2 km are never flagged (a point a few hundred metres off makes a two-minute walk look fast); durations count as at least one minute. checks.tooFastLegs counts them and checks.tooFast lists the place pairs, all history, most frequent first — the to-do list for correcting the sheet"],
 ],[2200,7160]));
 C(spacer());
 
 C(bold("API / data shape"));
-C(p("metric=transport.summary → { summary }. src/lib/insights/transport.ts: computeTransportSummary fetches every 이동 row and favorite_place (unbounded, cut in memory — workplaces and the 퇴근 stop rule need history) and hands them to the pure buildTransportSummary. crossActivities filters journeys by the last leg’s cross-activity. The payload holds period { from, to }, blocks { all, weekday, weekend } — all three sent at once so the day switch never refetches — and checks { workplaces, betweenWorkplaces, stopTripsMatched, stopTripsUnmatched, favoritePlaces } for verification. Each block: days; overview (journeys, legs, minutes, km, kmCoverage, perDay, perWeek); byPurpose (per journey) and byMethod (per LEG) as { key, count, minutes, km }; withWhom { alone, byCategory, people top 15 }; commute { out, back } each with count, avgDepart, avgArrive, avgDurationMin, avgKm, places, combos (top 5 method sequences); comingHome [All + three groups] with count, avgArrive and box { min, p25, avg, p75, max }; map { places, routes } top 30; flights { count, minutes, km }. Display names resolve 집 / 회사 / 사이트 through favorite_place."));
+C(p("metric=transport.summary → { summary }. src/lib/insights/transport.ts: computeTransportSummary fetches every 이동 row and favorite_place (unbounded, cut in memory — workplaces and the 퇴근 stop rule need history) and hands them to the pure buildTransportSummary. crossActivities filters journeys by the last leg’s cross-activity. The payload holds period { from, to }, blocks { all, weekday, weekend } — all three sent at once so the day switch never refetches — and checks { workplaces, betweenWorkplaces, stopTripsMatched, stopTripsUnmatched, favoritePlaces, places (rows in place_coord), placesWithoutPoint (top 100 in the period), tooFastLegs, tooFast (top 30 pairs, all time) } for verification and for the correction routine (§12.7). place_coord is fetched alongside (v4.13) and passed to buildTransportSummary as an optional last argument. Each block: days; overview (journeys, legs, minutes, km, kmCoverage, perDay, perWeek); byPurpose (per journey) and byMethod (per LEG) as { key, count, minutes, km }; withWhom { alone, byCategory, people top 15 }; commute { out, back } each with count, avgDepart, avgArrive, avgDurationMin, avgKm, places, combos (top 5 method sequences); comingHome [All + three groups] with count, avgArrive and box { min, p25, avg, p75, max }; map (v4.13) { places top 100 by arrivals as { name, arrivals, lat, lng, home }, routes top 150 by journeys as { from, to, count, a, b } with a / b = [lat, lng] or null, arrivals, arrivalsWithPoint, missing = every arrival place without a point }; flights { count, minutes, km }. Display names resolve 집 / 회사 / 사이트 through favorite_place."));
 
 C(bold("Summary view"));
 C(table(["Area","Content"],[
@@ -1461,17 +1480,29 @@ C(table(["Area","Content"],[
   ["Overview","Wide card (container ≥ 36rem): Journeys / Time / Distance per day stacked on the left with ‘/ week’ beneath, and the Count / Time switch at the bottom of that column; on the right a 2 × 2 (from 24rem) of By purpose, By method and With whom pies plus Most often with. Pies show EVERY category, no Other; legends in two columns with the % and the selected measure. Most often with: bars in the person’s relationship colour from the With whom pie, ranked and sized by the selected measure. Flights line at the bottom"],
   ["Commute","출근 / 퇴근 switch; headline row Leave · Arrive · Takes · Distance with the trip count. Then 2 : 1 — a time strip (All, then the top 5 method combinations as ‘운전 (11)’: a bar from average leave to average arrive on a shared clock axis with light full-height hour lines, travel time on the right) beside Commuted to / Left from (top 5 bars)"],
   ["Getting home","Diet Summary style: four columns — All, From work, After work dinner, After dinner with friends — each titled with its count, a compact box plot whose whiskers are the TRUE earliest and latest arrival (extremes stay visible; height fixed). ‘+00:40’ marks past midnight"],
-  ["Places","Top 10 places by arrivals and top 10 routes (From → To). The map waits for geocoding"],
+  ["Places","(v4.13) The map (below), a grey line ‘Showing N of M arrivals — K at places without a point’ whose count opens a pop-up listing those places with their arrivals and a Copy names button (one name per line, for the PlaceCoord Name column), then the top 10 places and top 10 routes side by side at 4 : 6 (routes are longer): name takes the row, a short fixed bar, the number. Stacked on a narrow card"],
 ],[1800,7560]));
 C(spacer());
 C(p("Chart rule settled here and applying to new work: a PIE for a fixed, mutually exclusive set of categories; BARS for open lists (top N of many) and for comparing similar sizes."));
+
+C(bold("Places map (v4.13)"));
+C(table(["Item","Rule"],[
+  ["Base map","Google Maps JavaScript API (Hyoje chose it over a free OpenStreetMap base). Points of interest and transit icons hidden; a night style in dark mode. 20rem tall, full card width"],
+  ["Places","Dots whose AREA grows with arrivals (6–28 px), so twice the visits looks twice as big; homes (favorite_place names of 집) dark, the rest in the accent colour; smaller dots on top. The 5 busiest places carry a permanent label; every dot shows ‘name · N arrivals’ on hover"],
+  ["Routes","Straight lines, A→B and B→A drawn as one line with the counts added; width 1–8 px by journeys, semi-transparent so overlaps build up. Self-routes and routes with an end lacking a point are not drawn. Flights are not drawn"],
+  ["Interaction","Click a dot: its routes stay strong, the rest fade, and a line under the map reads ‘name · N arrivals · N routes’. Click empty map to reset. gestureHandling ‘cooperative’: the wheel scrolls the page, Ctrl + wheel zooms, two fingers on a phone"],
+  ["Start view","The busiest place and every place within 50 km of it — the daily area. Replaced the first rule (smallest set holding 90% of arrivals), which zoomed out to all of Britain on a short period because a few far trips fell inside the 90%. Far places stay drawn; zoom out to see them"],
+  ["Implementation","JourneyMap.tsx loads the API once per page with a script tag (no package). Lines are Polylines; dots and labels are ONE custom OverlayView of plain DOM elements, so no Map ID and no deprecated Marker class. React renders nothing inside the map div — Google replaces its children, and a React child there threw ‘removeChild … not a child’; the loading note is a sibling laid over it. Without the key the tab shows a one-line note and the lists still work"],
+],[2000,7360]));
+C(spacer());
 
 C(bold("Trend view"));
 C(p("Not designed. The ViewToggle is shown disabled. Candidate content from the design conversation: getting-home time over the years (Korea vs UK, before and after the 2020 role change)."));
 
 C(bold("Notes"));
 C(
-  bullet("Geocoding (deferred): 1,884 distinct From / To names; 집 is ~31% of endpoints and the top 80 names cover most of the rest. Plan: geocode names used 3+ times once into a place table, enter site codes (MR1, 2단지, KCC, SR1, R4 …) by hand, show the share of journeys with a distance rather than pretend full coverage. Kakao’s Local API is the fallback for Korean names"),
+  bullet("(v4.13) Geocoding results: 1,801 distinct names after favorite_place resolution; names used 3+ times are 449 and cover ~76% of legs (2+ = 1,291 names, 94%). The OpenStreetMap trial on those found or nearly found ~45% of Korean names and most UK ones; small Korean restaurants and clinics are the gap. Hyoje then corrected 252 points by hand. First result: Distance known for 80% of journeys in the month to 13 Oct, 18.4 km / day straight-line; only 4 place pairs failed the speed check over all history. Correction is an ongoing job (§12.7)"),
+  bullet("Six legs on 2026-01-23 and 2026-03-07 resolve 집 to no home: the move from Korea to the UK, when there was no 집 — intended, and those legs simply have no distance"),
   bullet("Method comes from the Method field (10 clean values), not Place (306 values: bus numbers, other people’s cars). Place is extra detail; rows naming several modes are < 1%. 자전거 is logged as 도보 and the dominant mode of a combined leg is used on purpose"),
   bullet("Usage per car (내차 via favorite_place) — wanted, not a priority"),
 );
@@ -1834,6 +1865,20 @@ C(
   num("Nothing else: the log is not touched, and the widget resolves names at read time"),
 );
 
+C(h2("12.7 Place Points and Geocoding (place_coord, v4.13)"));
+C(p("place_coord (§6.11) holds a point for each From / To name. The PlaceCoord tab in the Active spreadsheet is the source: A Name · B Coords (‘37.27011, 127.04782’ as Google Maps or OpenStreetMap copies it) · C Source (blank = manual, osm) · D Note; columns E onward (Uses, Status, Map) are for reading only and are ignored."));
+C(bold("Finding points for new names"));
+C(
+  num("Run npx tsx --tsconfig tsconfig.json scripts/geocode-places.ts > geocode-places.txt (optional argument: minimum uses, default 3). It reads the sheet and the log, skips every name already in the sheet, and asks OpenStreetMap (Nominatim, ~1 s per question; answers cached in myfiles/geocode-cache.json, so a re-run never asks twice). Read-only on the database and the sheet. Needs NOMINATIM_EMAIL"),
+  num("How it searches: the name is tidied for searching only (‘(T2)’ and ‘8번출구’ dropped; outside Korea ‘X 역’ → ‘X station’, ‘공항’ → ‘Airport’); it looks within ~40 km of the home in use when the name was mostly used and takes the match nearest home, then the whole country; then without the branch name (‘… 강남점’) or the last word. Homes, site codes, offices, ‘… 집 / 댁’ and personal places go straight to ‘by hand’"),
+  num("It writes place-coords-new.csv in the sheet’s columns, worst first: by hand → not found → check (a dropped branch name, a district or road match, or > 50 km from home) → found. Import it into the PlaceCoord tab (File → Import → Upload, Append to current sheet, Comma, ‘Convert text to numbers…’ UNTICKED) and delete the CSV’s own header row"),
+  num("Fix what is worth fixing. A wrong point: replace it, or CLEAR the Coords cell and keep the row — deleting the row makes the next search find the same wrong answer. Korean places: Google Maps hides coordinates for Korea, so use openstreetmap.org (right-click → Show address puts the numbers in the search box); UK places: Google Maps’ right-click menu shows them"),
+  num("Run npm run migrate-place-coord — delete-all + re-insert of the rows that have a point; it refuses to touch the collection if a Coords cell is not ‘lat, lng’ or a name appears twice. No restart needed after the first load"),
+);
+C(bold("Ongoing correction routine"));
+C(p("Open /api/insights/stats?metric=transport.summary&timeMode=period&dateFrom=2019-01-01&dateTo=<yesterday> and read checks: tooFast (all time — one end of each pair is a wrong point, usually the less familiar one) and placesWithoutPoint (the busiest names with no point in the dates asked). The Places tab’s missing-places pop-up gives the same list for the current filter, with Copy names. Fix a few in the sheet, run the migration, and the ‘% known’ figure rises."));
+C(note("Rejected: Kakao Local API and Google Geocoding / Places as the source — their terms forbid storing results (Kakao staff, Aug 2026: real-time calls only, not even temporary storage). Naver’s local search returns at most five results with no location bias."));
+
 // ===== 13. GOOGLE CALENDAR SYNC =====
 C(h1("13. Google Calendar Sync"));
 C(p("A Google Apps Script pushes selected Active and Future rows into a Google Calendar. It predates the FarGaze Log project and is documented here from v4.3 because it reads and writes source-sheet columns by position, which makes it sensitive to any column insertion. It is independent of MongoDB \u2014 nothing in this section affects migration or the dashboards."));
@@ -2063,7 +2108,14 @@ C(
 
 C(h1("Appendix B — Directory Map"));
 C(table(["Path","Purpose"],[
-  ["src/app/insights/page.tsx","Insights master page — CSS columns layout; widget registry (WIDGETS array); ExerciseWidget registered v4.4; BowelWidget registered v4.9, directly after Sleep; JourneysWidget registered v4.12"],
+  ["src/app/insights/page.tsx","Insights master page — (v4.13) GROUPS registry (group → sub-groups → widgets, each widget with id, label, size, component) replacing the flat WIDGETS array; fold state in localStorage fargaze.insights.foldedGroups, read before any widget mounts; Fold all · Unfold all. CSS columns grid per sub-group. Widgets registered: Exercise v4.4, Bowel v4.9, Journeys v4.12"],
+  ["src/app/insights/_components/WidgetGroup.tsx","(v4.13) WidgetGroup (foldable section; children mounted only when open) and WidgetSubgroupLabel"],
+  ["src/app/insights/_components/JourneyMap.tsx","(v4.13) Google Maps places map for Journeys: one-time script loader, quiet / night styles, Polyline routes, one OverlayView for dots and labels, click selection, 50 km start view. Needs NEXT_PUBLIC_GOOGLE_MAPS_API_KEY"],
+  ["src/models/PlaceCoord.ts","(v4.13) place_coord model; unique index { userId, name }"],
+  ["src/lib/migration/placeCoord.ts","(v4.13) parseCoords, buildPlaceCoords (parse + validate the PlaceCoord sheet; blank Coords = listed, no point) and sheetNames. Pure"],
+  ["scripts/migrate-place-coord.ts","(v4.13) npm run migrate-place-coord — PlaceCoord sheet → place_coord, delete-all + re-insert; refuses on any problem"],
+  ["scripts/geocode-places.ts","(v4.13) OpenStreetMap search for names not yet in the sheet; near-home first; writes place-coords-new.csv and myfiles/geocode-cache.json. Read-only on the database and the sheet"],
+  ["scripts/check-place-names.ts","(v4.13) Read-only survey of From / To names: totals, coverage by minimum-uses threshold, names used 3+ times with zone / home / Place values, names used from 2+ homes"],
   ["src/app/insights/_widgets/BowelWidget.tsx","(v4.9) Bowel Movement widget (WBS #62). (v4.10) Summary/Trend ViewToggle, trend tab / grain / count state, and the fetch for either metric; the count resets on a grain switch. Header; Day score CssDailyChart with hoverFor; Per day / Gap / Duration HistBlocks; Quality and How it went pies with Other signs; Time of day. The root is an @container, so its rows respond to the widget’s width, not the screen’s. Quality colour families and display order live here. Draws only — every rule is in bowel.ts"],
   ["src/lib/insights/bowel.ts","(v4.9) computeBowelSummary (fetch) + buildBowelSummary (pure, all rules), scoreTableFrom; exports DAY_SCORE_START, BAD_DAY_BELOW, HOW_IT_WENT, TIME_GROUPS. (v4.10) computeBowelTrend (fetch) + buildBowelTrend (pure — one buildBowelSummary per bucket); exports QUALITY_ORDER, TREND_SIGN_TOP, TREND_SIGN_OTHER"],
   ["src/app/insights/_widgets/BowelTrendView.tsx","(v4.10) Bowel Trend view — eight tabs (Score, Per day, Gap, Duration, Quality, How it went, Other signs, Time of day) over CssTrendChart and CssStackedAreaChart. Holds the tab colour ramps; Quality and How it went colours repeat the Summary pies’. Draws only"],
@@ -2146,9 +2198,9 @@ C(table(["Path","Purpose"],[
   ["src/app/api/calendar/record/route.ts","(v4.11) One record for the detail pane"],
   ["src/app/api/calendar/search/route.ts","(v4.11) Calendar search"],
   ["src/models/CalendarSettings.ts","(v4.11) calendar_settings model"],
-  ["src/app/insights/_widgets/JourneysWidget.tsx","(v4.12) Journeys widget (WBS #63), Summary view: tab pills + All / Wkday / Wkend; Overview, Commute (TimeStrip), Getting home, Places"],
-  ["src/lib/insights/transport.ts","(v4.12) computeTransportSummary (fetch) + buildTransportSummary (pure, all rules): workplaces, first-commute rule, 퇴근 stop trips, getting-home groups, three day blocks, checks"],
-  ["src/lib/insights/transport-journeys.ts","(v4.12) legsFromDocs, canJoin, buildJourneys — the 30-minute joining rule; shared by the widget module and the check scripts"],
+  ["src/app/insights/_widgets/JourneysWidget.tsx","(v4.12) Journeys widget (WBS #63), Summary view: tab pills + All / Wkday / Wkend; Overview, Commute (TimeStrip), Getting home, Places. (v4.13) Places = JourneyMap + coverage line + MissingModal + NameBars lists at 4 : 6"],
+  ["src/lib/insights/transport.ts","(v4.12) computeTransportSummary (fetch) + buildTransportSummary (pure, all rules): workplaces, first-commute rule, 퇴근 stop trips, getting-home groups, three day blocks, checks. (v4.13) Fetches place_coord; sets each leg’s km by real names; speed check (MAX_KMH, DEFAULT_MAX_KMH 150, SPEED_MIN_KM 2); map with points and totals (MAP_PLACES 100, MAP_ROUTES 150, missing); checks places / placesWithoutPoint / tooFastLegs / tooFast"],
+  ["src/lib/insights/transport-journeys.ts","(v4.12) legsFromDocs, canJoin, buildJourneys — the 30-minute joining rule; shared by the widget module and the check scripts. (v4.13) Leg.km (null until set from place_coord)"],
   ["src/models/FavoritePlace.ts","(v4.12) favorite_place model; index { userId, label, from.at }"],
   ["src/lib/migration/favoritePlace.ts","(v4.12) buildFavoritePlaces (parse + validate the sheet) and resolveFavoritePlace(label, instant). Pure"],
   ["scripts/migrate-favorite-place.ts","(v4.12) npm run migrate-favorite-place — FavoritePlace sheet → favorite_place; refuses on any problem"],
@@ -2160,7 +2212,7 @@ C(table(["Path","Purpose"],[
 C(spacer());
 
 // ===== FOOTER =====
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.12 — 9 October 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.13 — 18 October 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 
 // ===== DOCUMENT ASSEMBLY =====
@@ -2197,6 +2249,6 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-Log-Data-Design-v4.12.docx", buffer);
-  console.log("Wrote FarGaze-Log-Data-Design-v4.12.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-Log-Data-Design-v4.13.docx", buffer);
+  console.log("Wrote FarGaze-Log-Data-Design-v4.13.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });

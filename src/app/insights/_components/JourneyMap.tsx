@@ -14,7 +14,9 @@
 //     zoom out to see them.
 //   • Scrolling the page never zooms the map ("cooperative": Ctrl + wheel zooms).
 //
-// Needs NEXT_PUBLIC_GOOGLE_MAPS_API_KEY (restricted to the site's domains).
+// The key comes from /api/maps-key (signed-in users only; env GOOGLE_MAPS_BROWSER_KEY),
+// so it is never baked into the public JavaScript files. It is still restricted in
+// Google Cloud to the site's addresses and to the Maps JavaScript API.
 // Dots and labels are one custom overlay (plain DOM), so no Map ID or deprecated
 // Marker class is needed; lines are ordinary Polylines.
 
@@ -75,7 +77,7 @@ export function JourneyMap({ places, routes, isDark, accent }: {
   isDark: boolean;
   accent: string;
 }) {
-  const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
+  const [key, setKey] = useState<string | null>(null);   // null = still asking
   const boxRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<G>(null);
   const gRef = useRef<G>(null);
@@ -99,6 +101,16 @@ export function JourneyMap({ places, routes, isDark, accent }: {
     }
     return [...m.values()].sort((p, q) => p.count - q.count);   // busiest drawn last (on top)
   }, [routes]);
+
+  // Ask the server for the key once
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/maps-key')
+      .then(r => (r.ok ? r.json() : { key: '' }))
+      .then((d: { key?: string }) => { if (!cancelled) setKey(d.key ?? ''); })
+      .catch(() => { if (!cancelled) setKey(''); });
+    return () => { cancelled = true; };
+  }, []);
 
   // Create the map once
   useEffect(() => {
@@ -171,10 +183,10 @@ export function JourneyMap({ places, routes, isDark, accent }: {
   const sel = selected ? pts.find(p => p.name === selected) : null;
   const selRoutes = selected ? lines.filter(l => l.ends.includes(selected)).length : 0;
 
-  if (!key) {
+  if (key === '') {
     return (
       <p className="text-[11px] text-stone-400 dark:text-zinc-500">
-        Map needs NEXT_PUBLIC_GOOGLE_MAPS_API_KEY in .env.local (then restart the dev server).
+        Map needs GOOGLE_MAPS_BROWSER_KEY in .env.local / Vercel (then restart the dev server).
       </p>
     );
   }

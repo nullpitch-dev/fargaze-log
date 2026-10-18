@@ -11,7 +11,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Service Concept & Work Breakdown Structure", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 3.12  |  9 October 2026", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 3.13  |  18 October 2026", size: 24 })], spacing: { after: 240 } }),
 );
 
 C(h1("Version History"));
@@ -47,6 +47,7 @@ C(table(["Version","Date","Headline"],[
   ["3.10","27 Sep 2026","#62 BOWEL MOVEMENT WIDGET COMPLETE — Trend view shipped. metric=bowel.trend on the shared grain × count window, anchored at min(period end, yesterday); buildBowelTrend runs the Summary builder once per bucket, so Month buckets equal the Summary (verified on July 2021 and January 2026). BowelTrendView.tsx: Score, Per day, Gap, Duration, Quality (all nine values), How it went, Other signs (% of movements, not normalised) and Time of day. Summary: × marks days with no movement; Time of day labels read 5:00~. Shared charts, all additions default-off: CssDailyChart markerFor; CssTrendChart zones, notes, rightSeries.dim; CssStackedAreaChart zeroIsValue. CssTrendChart now thins labels before shortening them (year shown on each new year) and its hover card shows the full label. npm run build passed. Mirrors Design Doc v4.10"],
   ["3.11","28 Sep 2026","#59 CALENDAR COMPLETE — PHASE 4 COMPLETE. A Google-style Calendar page (first in the menu, the home page) with Day, Week, Month, Year and Schedule views and Search. Timed records are shown as moments in one display zone (the device’s by default, switchable, not remembered) — Google’s rule; all-day records stay on their dates. Reading & study periods share one row with a show/hide switch. Filters (time zone, activity type, categories with a 13-colour palette, hidden activity names — default 정식 운동, 약식 운동) are saved to the new calendar_settings collection. Search reuses 상세 검색 with contains matching, newest first, 200 shown. New APIs /api/calendar, /options, /settings, /record, /search; Log index on duration for records over 31 days. Detail pane shared with Search via src/app/_components/LogDetailPanel.tsx; Search’s garbled conditions hint fixed. Mirrors Design Doc v4.11 (§14)"],
   ["3.12","9 Oct 2026","#63 JOURNEYS (이동) WIDGET — Summary COMPLETE; Trend, geocoding and the map not started. Phase 5 postponed by Hyoje until a few more widgets have tested whether the data supports analysis. Transport data surveyed and cleaned in the sheet (all checks at zero except confirmed intentional cases); consecutive legs joined into journeys (30-min rule); new favorite_place collection + FavoritePlace sheet + npm run migrate-favorite-place; metric=transport.summary; JourneysWidget with Overview, Commute, Getting home and Places. Global filter now opens on the month ending yesterday; todayStr uses the local date. Mirrors Design Doc v4.12 (§9.3.8, §6.10, §12.6)"],
+  ["3.13","18 Oct 2026","#63 JOURNEYS GEOCODING, DISTANCE AND MAP COMPLETE; Trend view remains. New PlaceCoord sheet + place_coord collection + npm run migrate-place-coord; scripts/geocode-places.ts searches OpenStreetMap (Kakao and Google results may not be kept) and writes a CSV to paste into the sheet; Hyoje corrected 252 points; distance known for 80% of journeys in the first month checked. Speed check drops impossible legs and lists them as a correction to-do. Places tab: Google Maps map, missing-places pop-up, 4 : 6 lists. #64 Insights widget groups (foldable, per-device fold state). Mirrors Design Doc v4.13 (§6.11, §9.2.1, §9.3.8, §12.7)"],
 ],[1100,1300,6960]));
 C(spacer());
 
@@ -100,11 +101,11 @@ C(table(["Phase","Status","Detail"],[
   ["1 — Base Infrastructure & Auth","\u2705 Complete","Subscription-architecture placeholder still pending"],
   ["2 — Data Structure Design","\u2705 Complete","Schema, supporting collections, Mongoose models"],
   ["3 — Migration Tool","\u2705 Complete","Delete-all + re-insert; incremental sync deferred to post-MVP"],
-  ["4 — Analytics & Search","\u2705 Complete","Done: search, cost dashboard, Interactions / Drinking / Diet / Weight / Exercise widgets (all with Summary and Trend), food + drink ingredient taxonomies. Done: Drinking rest-scoring redesign + Interactions and Drinking trend windows (11 Sep), Diet (12 Sep). Done: migration timezone fix + #53 Sleep rebuilt on night-assignment rules (13 Sep) — Sleep was the last widget still on the old 3/6/12 selector, so every widget is now on the shared window. Done: #62 Bowel Movement Summary (26 Sep) and Trend (27 Sep). Done: #59 Calendar with Search (27–28 Sep). Done after completion: #63 Journeys Summary (6–9 Oct)"],
+  ["4 — Analytics & Search","\u2705 Complete","Done: search, cost dashboard, Interactions / Drinking / Diet / Weight / Exercise widgets (all with Summary and Trend), food + drink ingredient taxonomies. Done: Drinking rest-scoring redesign + Interactions and Drinking trend windows (11 Sep), Diet (12 Sep). Done: migration timezone fix + #53 Sleep rebuilt on night-assignment rules (13 Sep) — Sleep was the last widget still on the old 3/6/12 selector, so every widget is now on the shared window. Done: #62 Bowel Movement Summary (26 Sep) and Trend (27 Sep). Done: #59 Calendar with Search (27–28 Sep). Done after completion: #63 Journeys Summary (6–9 Oct), geocoding + distance + map (9–18 Oct); #64 Insights widget groups (9 Oct)"],
   ["5 — Data Entry","\u2B1C Not started","Post-MVP"],
 ],[2900,1700,4760]));
 C(spacer());
-C(p([new TextRun({ text: "Current focus: ", bold: true }), new TextRun("Phase 5 (data entry) is postponed by Hyoje: a few more widgets come first, because only a widget shows whether the logged data is meaningful for analysis. #63 Journeys Summary shipped 9 Oct. Next: Hyoje’s choice — geocoding + distance + map for Journeys, the Journeys Trend view, or the next widget from the backlog (Place, Purchase, Income, Travel, Time spent by activity, Golf / Movies / Reading, Misc recurrence).")]));
+C(p([new TextRun({ text: "Current focus: ", bold: true }), new TextRun("Phase 5 (data entry) is postponed by Hyoje: a few more widgets come first, because only a widget shows whether the logged data is meaningful for analysis. #63 Journeys Summary shipped 9 Oct; geocoding, distance and the Places map 18 Oct. Next: the Journeys Trend view (agreed with Hyoje as the next task), then the next widget from the backlog, now organised by Insights group.")]));
 
 C(h1("5. Work Breakdown Structure"));
 C(p("\u2705 = Complete   \u2B1C = Pending   DESCOPED = out of MVP scope. Each line states current state, not how it evolved (see the changelog for history)."));
@@ -174,7 +175,8 @@ C(
   bullet("\u2705 58. Exercise widget — Summary complete (per-item box plots, all-time bests, daily charts in a modal); Trend view deferred — see sub-items"),
   bullet("\u2705 59. Calendar view — Day, Week, Month, Year and Schedule views plus Search, following Google Calendar (27–28 Sep) — see sub-items. Design Doc §14"),
   bullet("\u2705 62. Bowel Movement (배변) widget — Summary (26 Sep) and Trend (27 Sep) complete — see sub-items. Source columns BJ (량) / BK (질) / BL (특징) → bowel.amount / .quality / .characteristics. NOTE: #62 is also the number of the drink ingredient taxonomy item — the two are unrelated"),
-  bullet("\u2705 63. Journeys (이동) widget — Summary complete (9 Oct); Trend, geocoding and map pending — see sub-items. Design Doc §9.3.8"),
+  bullet("\u2705 63. Journeys (이동) widget — Summary (9 Oct) and geocoding + distance + Places map (18 Oct) complete; Trend view pending — see sub-items. Design Doc §9.3.8"),
+  bullet("\u2705 64. Insights widget groups — foldable groups (Health: Inputs / Outcomes, Work & Social, Places & Travel), fold state per device, folded groups not loaded (9 Oct). Design Doc §9.2.1"),
 );
 C(h3("Sub-items for #58 (Exercise Widget):"));
 C(p("Data preparation, the compute module, the API branch and the Summary view are all complete and in use. The Trend view is deferred and has no agreed design. Design Doc \u00a79.3.6 carries the full widget specification and the reasoning behind each decision."));
@@ -462,10 +464,18 @@ C(
   bullet("\u2705 metric=transport.summary with all / weekday / weekend blocks and a checks section"),
   bullet("\u2705 JourneysWidget: Overview (per-day figures, three pies with every category, Most often with), Commute (time strip by method combination), Getting home (box plots), Places (top lists)"),
 );
+C(bold("Done — geocoding, distance and map (9–18 Oct)"));
+C(
+  bullet("\u2705 Survey (scripts/check-place-names.ts): 1,801 names after favorite_place resolution; 3+ uses = 449 names, ~76% of legs; names used from 2+ homes are the same place, not chain branches (one name = one point)"),
+  bullet("\u2705 Source chosen: OpenStreetMap (Nominatim), because Kakao and Google terms forbid keeping results; trial run on 448 names, then scripts/geocode-places.ts (near-home search, name tidying, branch-name fallback, cache)"),
+  bullet("\u2705 PlaceCoord sheet + place_coord + npm run migrate-place-coord; homes, sites and personal places entered by hand; 252 points corrected by Hyoje"),
+  bullet("\u2705 Distances: straight line by real names; kmCoverage shown as ‘% known’ (80% in the month to 13 Oct); Distance added to the Share by switch"),
+  bullet("\u2705 Speed check: legs faster than their method allows get no distance; checks.tooFast lists the pairs (4 pairs over all history at first check)"),
+  bullet("\u2705 Places map on Google Maps (key restricted to log.fargaze.co + localhost, Maps JavaScript API only; billing account in KRW): dots by arrivals, lines by journeys, 5 labels, click to highlight, 50 km start view; missing-places pop-up with Copy names; 4 : 6 lists"),
+);
 C(bold("Pending"));
 C(
-  bullet("\u2B1C Geocoding: distinct names used 3+ times → coordinates; site codes by hand; then distance per day / per purpose / per method and the commute distance"),
-  bullet("\u2B1C Map: places as dots sized by arrivals, routes as lines thickened by count (free map library + OpenStreetMap tiles)"),
+  bullet("\u2B1C Ongoing: correct points and add missing names (Design Doc §12.7 routine) — no fixed end"),
   bullet("\u2B1C Trend view (not designed; getting-home time over the years is a candidate)"),
   bullet("\u2B1C Usage per car (내차 via favorite_place) — not a priority"),
 );
@@ -507,11 +517,11 @@ C(
   bullet("\u2B1C Per-series stroke width / opacity on CssTrendChart \u2014 the Amt(day) design called for max and min to be thinner as well as lighter, but a series carries only a colour. Lighter colours alone were used instead. (v3.10) The RIGHT-hand series can now be drawn faint with rightSeries.dim; left-hand series still carry only a colour"),
   bullet("\u2B1C Summary card does not read dryDaysAtEnd \u2014 a fully dry period therefore shows a blank average with nothing in its place. Rare in the data; wire it in when the widget is next open"),
   bullet("\u2B1C CssDailyChart x-axis labels are M/D with no year, so a multi-year period is hard to read (visible on the Bowel Day score). Also affects Diet and Exercise modals"),
-  bullet("\u2B1C MetricPieBlock and HintLabel live in SleepWidget.tsx and are imported by BowelWidget. Extract both to _components if a third widget needs them"),
+  bullet("\u2B1C MetricPieBlock and HintLabel live in SleepWidget.tsx and are now imported by Bowel AND Journeys — the third user arrived, so extraction to _components is due"),
   bullet("\u2B1C Calendar: correct four records that end before they start — 6ab7da3f5ef99b2c70d6c1eb and 6ab7da3f5ef99b2c70d6c1f4 (Dec 2019), 6ab7da445ef99b2c70d71fd8 (Jul 2021), and three in 2025 (ids from /api/calendar?from=2025-01-01&to=2025-12-31, diagnostics.endBeforeStartIds). Until then they draw as points"),
   bullet("\u2B1C Calendar: colour days by a measure in Month and Year (deferred 27 Sep); a 3-day phone view (Hyoje, later)"),
-  bullet("\u2B1C Journeys: geocoding, map, Trend view, usage per car (see #63)"),
-  bullet("\u2B1C Widget backlog: Place, Purchase, Income, Travel / business trips, Time spent by activity, Golf / Movies / Reading, Misc recurrence"),
+  bullet("\u2B1C Journeys: Trend view, usage per car (see #63)"),
+  bullet("\u2B1C Widget backlog by Insights group (Hyoje, 9 Oct): Work & Social — workplace analysis (meetings, 보고, working hours, weekend work); Places & Travel — Place, Travel & business trips; Hobbies & Interests — Reading (books per year, what), Study, Movies (how often, what), Golf (how often, score and quality); Finances — Interest, Real-estate tax, Income, Income tax; Everyday Life — Bath, Haircut, Nail trimming, Fuel, Purchases (how often, offline / online, average spend); Time Use — logged vs unlogged time and what logged time goes on"),
   bullet("\u2B1C Calendar search takes ~1.2 s for a broad all-years term (contains matching scans the collection). Add a text index only if it starts to feel slow"),
 );
 C(spacer());
@@ -590,7 +600,7 @@ C(
 );
 C(spacer());
 
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze — Service Concept & WBS v3.12 — 9 October 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze — Service Concept & WBS v3.13 — 18 October 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 const doc = new Document({
   styles: {
@@ -616,6 +626,6 @@ const doc = new Document({
   sections: [{ properties: { page: PAGE }, children }],
 });
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-WBS-v3.12.docx", buffer);
-  console.log("Wrote FarGaze-WBS-v3.12.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-WBS-v3.13.docx", buffer);
+  console.log("Wrote FarGaze-WBS-v3.13.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });
