@@ -1,7 +1,8 @@
 'use client';
 // src/app/insights/_widgets/JourneysWidget.tsx
 //
-// Journeys widget (이동) — Summary view.
+// Journeys widget (이동) — Summary view. The Trend view is JourneysTrendView.tsx;
+// the All / Wkday / Wkend choice is shared between the two.
 //
 // Header row: tab pills (left, Trend-view style) · All / Wkday / Wkend (right).
 // The day switch applies to every tab; the API sends all three blocks at once,
@@ -36,7 +37,13 @@ import { useIsDark } from '../_lib/hooks';
 import { buildParams } from '../_lib/date-helpers';
 import { JourneyMap, type MapPlace, type MapRoute } from '../_components/JourneyMap';
 import { ModalShell } from '../_components/ModalShell';
-import type { WidgetProps } from '../_lib/types';
+import type { WidgetProps, WidgetViewMode } from '../_lib/types';
+import type { TrendGrain } from '@/lib/insights/trend-window';
+import { DEFAULT_BUCKETS } from './WeightTrendView';
+import {
+  JourneysTrendView, JOURNEYS_SHORT_COUNT_TABS,
+  type JourneysTrend, type JourneysTrendTab,
+} from './JourneysTrendView';
 
 // ── Types (mirror src/lib/insights/transport.ts) ──────────────────────────────
 
@@ -259,11 +266,13 @@ function Overview({ b, isDark }: { b: Block; isDark: boolean }) {
                 legendDetail={detail(whom)} />
             </div>
             <div className="flex flex-col gap-1.5 min-w-0">
-              <Title>Most often with</Title>
+							<Title>Most often with</Title>
+              {/* Rows tighter than the block gap: a list, not separate blocks */}
+              <div className="flex flex-col gap-0.5">
               {people.map(p => {
                 const v = by === 'minutes' ? p.minutes : p.count;
                 return (
-                  <div key={p.name} className="flex items-center gap-2 text-[11px]">
+                  <div key={p.name} className="flex items-center gap-2 text-[11px] leading-tight">
                     <span className="w-24 shrink-0 truncate text-stone-600 dark:text-zinc-300">
                       {p.name} <span className="text-[10px] text-stone-400 dark:text-zinc-500">{p.category}</span>
                     </span>
@@ -277,6 +286,7 @@ function Overview({ b, isDark }: { b: Block; isDark: boolean }) {
                   </div>
                 );
               })}
+              </div>
             </div>
           </div>
         </div>
@@ -548,28 +558,65 @@ function Places({ b, isDark }: { b: Block; isDark: boolean }) {
 
 export function JourneysWidget({ globalFilter }: WidgetProps) {
   const isDark = useIsDark();
+  const [viewMode, setViewMode] = useState<WidgetViewMode>('summary');
   const [data,    setData]    = useState<Summary | null>(null);
+  const [trend,   setTrend]   = useState<JourneysTrend | null>(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState<string | null>(null);
-  const [days,    setDays]    = useState<DayKind>('all');
+  const [days,    setDays]    = useState<DayKind>('all');   // shared by Summary and Trend
   const [tab,     setTab]     = useState<Tab>('overview');
+
+  // Trend controls
+  const [trendTab,   setTrendTab]   = useState<JourneysTrendTab>('perDay');
+  const [grain,      setGrain]      = useState<TrendGrain>('month');
+  const [count,      setCount]      = useState<number>(DEFAULT_BUCKETS.month);
+  const [shortCount, setShortCount] = useState<number>(12);
+  const [measure,    setMeasure]    = useState<'count' | 'minutes' | 'km'>('count');
+  const [mixBy,      setMixBy]      = useState<'purpose' | 'method'>('purpose');
+  const [side,       setSide]       = useState<'out' | 'back'>('back');
+  const [homeGroup,  setHomeGroup]  = useState('all');
+  const trendBuckets = JOURNEYS_SHORT_COUNT_TABS.includes(trendTab) ? shortCount : count;
 
   useEffect(() => {
     setLoading(true);
     setError(null);
-    const url = `/api/insights/stats?${buildParams({ metric: 'transport.summary', mode: 'summary' }, globalFilter)}`;
+    const url = viewMode === 'summary'
+      ? `/api/insights/stats?${buildParams({ metric: 'transport.summary', mode: 'summary' }, globalFilter)}`
+      : `/api/insights/stats?${buildParams(
+          { metric: 'transport.trend', grain, buckets: String(trendBuckets) }, globalFilter)}`;
     fetch(url)
       .then(r => r.json())
-      .then(d => { setData(d.summary ?? null); setLoading(false); })
+      .then(d => {
+        if (d.error) setError(String(d.error));
+        // The trend payload carries its own grain and labels, so a grain switch
+        // never shows new labels against old data.
+        if (viewMode === 'summary') setData(d.summary ?? null);
+        else setTrend(d.buckets ? (d as JourneysTrend) : null);
+        setLoading(false);
+      })
       .catch(() => { setError('Failed to load data.'); setLoading(false); });
-  }, [globalFilter]);
+  }, [globalFilter, viewMode, grain, trendBuckets]);
 
   const b = data?.blocks[days];
   const hasData = !!b && b.overview.journeys > 0;
 
   return (
     <WidgetCard title="Journeys" floor={1} loading={loading} error={error}
-      action={<ViewToggle value="summary" onChange={() => {}} disabled />}>
+      action={<ViewToggle value={viewMode} onChange={setViewMode} />}>
+      {viewMode === 'trend' ? (
+        <JourneysTrendView
+          data={trend} isDark={isDark}
+          tab={trendTab} onTabChange={setTrendTab}
+          days={days} onDaysChange={setDays}
+          grain={grain} onGrainChange={g => { setGrain(g); setCount(DEFAULT_BUCKETS[g]); }}
+          count={count} onCountChange={setCount}
+          shortCount={shortCount} onShortCountChange={setShortCount}
+          measure={measure} onMeasureChange={setMeasure}
+          mixBy={mixBy} onMixByChange={setMixBy}
+          side={side} onSideChange={setSide}
+          homeGroup={homeGroup} onHomeGroupChange={setHomeGroup}
+        />
+      ) : (
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Pills value={tab} onChange={setTab}
@@ -595,6 +642,7 @@ export function JourneysWidget({ globalFilter }: WidgetProps) {
           <Places b={b!} isDark={isDark} />
         )}
       </div>
+      )}
     </WidgetCard>
   );
 }

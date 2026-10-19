@@ -204,12 +204,35 @@ interface CssTrendChartProps {
   // One extra dim line per bucket at the foot of the hover card (v4.10 — the
   // Bowel worst day). null or absent for a bucket shows nothing. Off by default.
   notes?:            (string | null)[];
+  // Break the lines at empty buckets instead of joining across them (v4.14 —
+  // Journeys, where months with no commutes are real gaps). Off by default,
+  // so every existing chart keeps joining as before.
+  breakOnNull?:      boolean;
+  // Order of the series in the hover card and legend, as indices into
+  // `series` (v4.14). The three-line charts draw Avg first so it sits on top,
+  // but list Max · Avg · Min so the card reads top to bottom like the lines.
+  // Default: drawing order, as before.
+  listOrder?:        number[];
+}
+
+/** One smooth path per run of consecutive values, or one path over all of them. */
+function linePath(values: (number | null)[], x: (i: number) => number, y: (v: number) => number, breakOnNull: boolean): string | null {
+  const runs: number[][] = [];
+  values.forEach((v, i) => {
+    if (v === null) { if (breakOnNull) runs.push([]); return; }
+    if (!runs.length) runs.push([]);
+    runs[runs.length - 1].push(i);
+  });
+  const parts = runs.map(r => smoothPath(r.map(i => ({ x: x(i), y: y(values[i] as number) })))).filter(Boolean);
+  return parts.length ? parts.join(' ') : null;
 }
 
 export function CssTrendChart({
   series, labels, formatY, isDark, yPadPct = 10, yAxis, rightSeries, formatYRight,
   xBand = false, maxXLabels, showValues = true, compressXLabels = true, zones, notes,
+  breakOnNull = false, listOrder,
 }: CssTrendChartProps) {
+  const listed = (listOrder ?? series.map((_, i) => i)).map(i => ({ s: series[i], si: i })).filter(x => x.s);
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
 
   const allVals = series.flatMap(s => s.values).filter((v): v is number => v !== null);
@@ -317,10 +340,7 @@ export function CssTrendChart({
           <svg className="absolute inset-0 w-full h-full overflow-visible"
             preserveAspectRatio="none" viewBox="0 0 100 100">
             {series.map((s, si) => {
-              const pts = s.values
-                .map((v, i) => v !== null ? { x: xPct(i), y: yPct(v) } : null)
-                .filter((p): p is { x: number; y: number } => p !== null);
-              const d = smoothPath(pts);
+              const d = linePath(s.values, xPct, yPct, breakOnNull);
               if (!d) return null;
               return (
                 <path key={si} d={d} fill="none" stroke={s.color}
@@ -329,10 +349,7 @@ export function CssTrendChart({
               );
             })}
             {hasRight && rightSeries && (() => {
-              const pts = rightSeries.values
-                .map((v, i) => v !== null ? { x: xPct(i), y: yPctR(v) } : null)
-                .filter((p): p is { x: number; y: number } => p !== null);
-              const d = smoothPath(pts);
+              const d = linePath(rightSeries.values, xPct, yPctR, breakOnNull);
               if (!d) return null;
               return (
                 <path d={d} fill="none" stroke={rightSeries.color}
@@ -430,7 +447,7 @@ export function CssTrendChart({
                     {/* Full label, year included — the axis may have shortened it */}
                     <div style={{ fontSize: 10, color: lc }}>{labels[i]}</div>
 
-                    {series.map((s, si) => {
+                    {listed.map(({ s, si }) => {
                       const v = s.values[i];
                       return (
                         <div key={si} className="flex items-center gap-1"
@@ -508,7 +525,7 @@ export function CssTrendChart({
       {(series.length > 1 || (hasRight && rightSeries?.label)) && (
         <div className="flex gap-3 flex-wrap"
           style={{ paddingLeft: Y_LABEL_W, paddingRight: hasRight ? Y_LABEL_WR : 0 }}>
-          {series.map((s, i) => s.label ? (
+          {listed.map(({ s, si: i }) => s.label ? (
             <span key={i} className="flex items-center gap-1 text-[10px]" style={{ color: lc }}>
               <span className="inline-block rounded-full" style={{ width: 8, height: 8, background: s.color }} />
               {s.label}
@@ -755,6 +772,12 @@ interface CssDualLineChartProps {
   maxXLabels?: number;
   /** print the clock times beside every dot. Default on, as before. */
   showValues?: boolean;
+  /** Names for the two lines and the duration (v4.14 — Journeys Commute:
+   *  Leave / Arrive / Takes). Default From / To / Duration, as before. */
+  names?: { from: string; to: string; duration: string };
+  /** One extra dim line per bucket at the foot of the hover card (v4.14 —
+   *  the number of commutes). null or absent shows nothing. */
+  notes?: (string | null)[];
 }
 
 /**
@@ -787,6 +810,7 @@ function durStr(mins: number): string {
 
 export function CssDualLineChart({
   buckets, isDark, maxXLabels, showValues = true,
+  names = { from: 'From', to: 'To', duration: 'Duration' }, notes,
 }: CssDualLineChartProps) {
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
 
@@ -1042,7 +1066,7 @@ export function CssDualLineChart({
                     <div className="flex items-center gap-1" style={{ fontSize: 10, color: lc, marginTop: 2 }}>
                       <span className="inline-block rounded-full"
                         style={{ width: 7, height: 7, background: fromColor }} />
-                      <span style={{ minWidth: 52 }}>From</span>
+                      <span style={{ minWidth: 52 }}>{names.from}</span>
                       <span style={{ color: vc, fontWeight: 600 }}>
                         {b.avgStartMins === null ? '—' : minsToClockStr(b.avgStartMins)}
                       </span>
@@ -1051,7 +1075,7 @@ export function CssDualLineChart({
                     <div className="flex items-center gap-1" style={{ fontSize: 10, color: lc, marginTop: 2 }}>
                       <span className="inline-block rounded-full"
                         style={{ width: 7, height: 7, background: toColor }} />
-                      <span style={{ minWidth: 52 }}>To</span>
+                      <span style={{ minWidth: 52 }}>{names.to}</span>
                       <span style={{ color: vc, fontWeight: 600 }}>
                         {b.avgEndMins === null ? '—' : minsToClockStr(b.avgEndMins, b.avgEndMins >= 1440)}
                       </span>
@@ -1062,11 +1086,14 @@ export function CssDualLineChart({
                         style={{ width: 7, height: 7,
                           background: isDark ? '#18181b' : '#ffffff',
                           border: `1.5px solid ${durColor}` }} />
-                      <span style={{ minWidth: 52 }}>Duration</span>
+                      <span style={{ minWidth: 52 }}>{names.duration}</span>
                       <span style={{ color: vc, fontWeight: 600 }}>
                         {durMins[i] === null ? '—' : durStr(durMins[i] as number)}
                       </span>
                     </div>
+                    {notes?.[i] && (
+                      <div style={{ fontSize: 10, color: lc, opacity: 0.8, marginTop: 2 }}>{notes[i]}</div>
+                    )}
                   </div>
                 </>
               )}
@@ -1110,7 +1137,7 @@ export function CssDualLineChart({
       {/* Legend */}
       <div className="flex gap-3 flex-wrap"
         style={{ paddingLeft: Y_LABEL_W, paddingRight: hasDur ? Y_LABEL_W : 0 }}>
-        {[['From', fromColor], ['To', toColor]].map(([label, color]) => (
+        {[[names.from, fromColor], [names.to, toColor]].map(([label, color]) => (
           <span key={label} className="flex items-center gap-1 text-[10px]" style={{ color: lc }}>
             <span className="inline-block rounded-full" style={{ width: 8, height: 8, background: color }} />
             {label}
@@ -1122,7 +1149,7 @@ export function CssDualLineChart({
               style={{ width: 8, height: 8,
                 background: isDark ? '#18181b' : '#ffffff',
                 border: `1.5px solid ${durColor}` }} />
-            Duration
+            {names.duration}
           </span>
         )}
       </div>

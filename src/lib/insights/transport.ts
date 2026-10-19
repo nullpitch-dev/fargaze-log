@@ -51,6 +51,12 @@
 // name (집 → 라클라스 집 …), then looked up in place_coord (the PlaceCoord sheet).
 // A leg has a distance only when both ends have a point; a journey only when
 // every leg has one. kmCoverage says how many journeys that is.
+//
+// Speed check: a leg whose straight line means travelling faster than its
+// method allows (도보 15 km/h, 기차 350, 비행기 1,100, any other 150) has NO
+// distance. Legs under 2 km are never flagged; durations count as at least
+// one minute. checks.tooFastLegs counts them; checks.tooFast lists the place
+// pairs over all history, most frequent first — the to-do list for the sheet.
 
 import Log from '@/models/Log';
 import FavoritePlace from '@/models/FavoritePlace';
@@ -66,6 +72,12 @@ export const WORKPLACE_MIN_COMMUTES = 3;
 export const STOP_MAX_HOURS = 6;           // workplace → stop → 집 must fit in this
 const EVENING_WRAP_HOUR = 6;
 const MAP_PLACES = 100;
+// Speed check: a leg faster than its method allows almost always has a wrong
+// point at one end, so it gets NO distance and is listed in checks.tooFast.
+export const MAX_KMH: Record<string, number> = { '도보': 15, '기차': 350, '비행기': 1100 };
+export const DEFAULT_MAX_KMH = 150;
+export const SPEED_MIN_KM = 2;             // shorter legs are never flagged
+const TOO_FAST_PAIRS = 30;
 const MAP_ROUTES = 150;
 
 export const RT_WORK = '근무 후 귀가';
@@ -81,7 +93,7 @@ const COMING_HOME_GROUPS = [
 ] as const;
 
 export type DayKind = 'all' | 'weekday' | 'weekend';
-const DAY_KINDS: DayKind[] = ['all', 'weekday', 'weekend'];
+export const DAY_KINDS: DayKind[] = ['all', 'weekday', 'weekend'];
 
 // ── Output types ──────────────────────────────────────────────────────────────
 
@@ -95,6 +107,7 @@ export interface CommuteFigures {
   avgArrive: ClockAvg | null;
   avgDurationMin: number | null;
   avgKm: number | null;
+  kmCoverage: number;                                    // share of trips with a distance, 0–1
 }
 
 export interface CommuteSide extends CommuteFigures {
@@ -118,7 +131,9 @@ export interface TransportBlock {
   withWhom: {
     alone: { count: number; minutes: number };
     byCategory: { key: string; count: number; minutes: number }[];   // journey's dominant category
-    people: { name: string; category: string; count: number; minutes: number }[];
+    // category = the most frequent one; categories = journeys per relation, so
+    // a Relation filter can re-rank (someone can be 업무 one day, 친목 another)
+    people: { name: string; category: string; count: number; minutes: number; categories: Record<string, number> }[];
   };
   commute: { out: CommuteSide; back: CommuteSide };
   comingHome: {
@@ -150,6 +165,8 @@ export interface TransportSummary {
     favoritePlaces: number;                    // rows in favorite_place (0 → names not resolved)
     places: number;                            // rows in place_coord (0 → no distances)
     placesWithoutPoint: { name: string; uses: number }[];   // top 100 ends in the period with no point
+    tooFastLegs: number;                       // legs dropped by the speed check, all time
+    tooFast: { from: string; to: string; legs: number; maxKmh: number }[];   // top 30 pairs, all time
   };
 }
 
@@ -185,9 +202,64 @@ export function buildTransportSummary(
   todayStr: string,
   placeCoords: Pick<PlaceCoordDoc, 'name' | 'lat' | 'lng'>[] = [],
 ): TransportSummary {
-  const yesterday = addDays(todayStr, -1);
-  const lastDay = endStr < yesterday ? endStr : yesterday;
+  const ctx = prepareTransport(docs, favorites, placeCoords);
+  const lastDay = lastDayOf(endStr, todayStr);
+  const cut = cutPeriod(ctx, startStr, lastDay, crossActivities);
+  const blocks = blocksFor(ctx, cut, startStr, lastDay, true);
 
+  const betweenWorkplaces = cut.journeys.filter(j => j.purpose === '출근' && !ctx.firstCommute.has(j)).length;
+
+  const missing = new Map<string, number>();
+  for (const l of cut.journeys.flatMap(j => j.legs)) {
+    for (const n of [ctx.named(l.from, l.startAt), ctx.named(l.to, l.endAt)]) {
+      if (!ctx.pointOf.has(n)) missing.set(n, (missing.get(n) ?? 0) + 1);
+    }
+  }
+
+  return {
+    period: { from: startStr, to: lastDay },
+    blocks,
+    checks: {
+      workplaces: [...ctx.commuteCounts].filter(([k]) => ctx.workplaces.has(k))
+        .sort((a, b) => b[1] - a[1]).map(([name, commutes]) => ({ name, commutes })),
+      betweenWorkplaces,
+      stopTripsMatched: ctx.backTrips.filter(t => t.parts.length === 2).length,
+      stopTripsUnmatched: ctx.unmatched,
+      favoritePlaces: favorites.length,
+      places: placeCoords.length,
+      placesWithoutPoint: [...missing].sort((a, b) => b[1] - a[1]).slice(0, 100)
+        .map(([name, uses]) => ({ name, uses })),
+      tooFastLegs: ctx.tooFastLegs,
+      tooFast: ctx.tooFast,
+    },
+  };
+}
+
+// ── Shared preparation (Summary and Trend) ───────────────────────────────────
+// Everything that needs all of history is done once here: legs, journeys,
+// names, distances, workplaces, 퇴근 trips and each day's first commute. A
+// period is then only a cut (cutPeriod) — the Trend makes one per bucket.
+
+export interface TransportContext {
+  journeys: Journey[];
+  flightLegs: Leg[];
+  backTrips: BackTrip[];
+  unmatched: TransportSummary['checks']['stopTripsUnmatched'];
+  firstCommute: Set<Journey>;
+  commuteCounts: Map<string, number>;
+  workplaces: Set<string>;
+  named: (label: string, atMs: number) => string;
+  pointOf: Map<string, { lat: number; lng: number }>;
+  homeNames: Set<string>;
+  tooFastLegs: number;
+  tooFast: TransportSummary['checks']['tooFast'];
+}
+
+export function prepareTransport(
+  docs: any[],
+  favorites: FavoritePlaceDoc[],
+  placeCoords: Pick<PlaceCoordDoc, 'name' | 'lat' | 'lng'>[] = [],
+): TransportContext {
   const allLegs = legsFromDocs(docs);
   const flightLegs = allLegs.filter(l => l.method === FLIGHT);
   const journeys = buildJourneys(allLegs.filter(l => l.method !== FLIGHT));
@@ -204,10 +276,26 @@ export function buildTransportSummary(
   // Distances: both ends by real name → place_coord. Set once on every leg (flights too).
   const pointOf = new Map(placeCoords.map(p => [p.name, { lat: p.lat, lng: p.lng }]));
   const homeNames = new Set(fav.filter(f => f.label === HOME).map(f => f.name));
+  const fast = new Map<string, { from: string; to: string; legs: number; maxKmh: number }>();
+  let tooFastLegs = 0;
   for (const l of allLegs) {
-    const a = pointOf.get(named(l.from, l.startAt)), b = pointOf.get(named(l.to, l.endAt));
+    const fromName = named(l.from, l.startAt), toName = named(l.to, l.endAt);
+    const a = pointOf.get(fromName), b = pointOf.get(toName);
     l.km = a && b ? haversineKm(a, b) : null;
+    if (l.km !== null && l.km >= SPEED_MIN_KM) {
+      const kmh = l.km / (Math.max(1, legMinutes(l)) / 60);
+      if (kmh > (MAX_KMH[l.method] ?? DEFAULT_MAX_KMH)) {
+        l.km = null;
+        tooFastLegs++;
+        const key = `${fromName}\u0000${toName}`;
+        const cur = fast.get(key) ?? { from: fromName, to: toName, legs: 0, maxKmh: 0 };
+        cur.legs++; cur.maxKmh = Math.max(cur.maxKmh, Math.round(kmh));
+        fast.set(key, cur);
+      }
+    }
   }
+  const tooFast = [...fast.values()]
+    .sort((x, y) => y.legs - x.legs || y.maxKmh - x.maxKmh).slice(0, TOO_FAST_PAIRS);
 
   // Workplaces (all-time)
   const commuteCounts = tally(journeys.filter(j => j.purpose === '출근').map(j => j.to));
@@ -235,12 +323,6 @@ export function buildTransportSummary(
     }
   });
 
-  const inPeriod = (day: string) => day >= startStr && day <= lastDay;
-  const crossOk = (j: Journey) => !crossActivities.length || crossActivities.includes(j.crossActivity);
-  const periodJourneys = journeys.filter(j => inPeriod(dayOf(j.startLocal)) && crossOk(j));
-  const periodBack = backTrips.filter(t => inPeriod(t.day) && crossOk(t.parts[t.parts.length - 1]));
-  const periodFlights = flightLegs.filter(l => inPeriod(dayOf(l.startLocal)));
-
   // First 출근 journey of each day (all-time; the period cut comes later)
   const firstCommute = new Set<Journey>();
   const seenDays = new Set<string>();
@@ -252,51 +334,52 @@ export function buildTransportSummary(
     if (!workplaces.has(j.from) && j.to !== HOME) firstCommute.add(j);
   }
 
+  return { journeys, flightLegs, backTrips, unmatched, firstCommute, commuteCounts, workplaces, named, pointOf, homeNames, tooFastLegs, tooFast };
+}
+
+/** The period runs to min(period end, yesterday): an unfinished today would lower every per-day figure. */
+export function lastDayOf(endStr: string, todayStr: string): string {
+  const yesterday = addDays(todayStr, -1);
+  return endStr < yesterday ? endStr : yesterday;
+}
+
+export interface PeriodCut { journeys: Journey[]; back: BackTrip[]; flights: Leg[] }
+
+export function cutPeriod(ctx: TransportContext, startStr: string, lastDay: string, crossActivities: string[]): PeriodCut {
+  const inPeriod = (day: string) => day >= startStr && day <= lastDay;
+  const crossOk = (j: Journey) => !crossActivities.length || crossActivities.includes(j.crossActivity);
+  return {
+    journeys: ctx.journeys.filter(j => inPeriod(dayOf(j.startLocal)) && crossOk(j)),
+    back: ctx.backTrips.filter(t => inPeriod(t.day) && crossOk(t.parts[t.parts.length - 1])),
+    flights: ctx.flightLegs.filter(l => inPeriod(dayOf(l.startLocal))),
+  };
+}
+
+export function blocksFor(
+  ctx: TransportContext, cut: PeriodCut, startStr: string, lastDay: string, forSummary: boolean,
+): Record<DayKind, TransportBlock> {
   const blocks = {} as Record<DayKind, TransportBlock>;
   for (const kind of DAY_KINDS) {
     const match = (day: string) => kind === 'all' || (kind === 'weekend') === isWeekend(day);
     blocks[kind] = buildBlock({
-      days: countDays(startStr, lastDay, kind),
-      journeys: periodJourneys.filter(j => match(dayOf(j.startLocal))),
-      back: periodBack.filter(t => match(t.day)),
-      flights: periodFlights.filter(l => match(dayOf(l.startLocal))),
-      firstCommute,
-      named,
-      pointOf,
-      homeNames,
+      days: startStr <= lastDay ? countDays(startStr, lastDay, kind) : 0,
+      journeys: cut.journeys.filter(j => match(dayOf(j.startLocal))),
+      back: cut.back.filter(t => match(t.day)),
+      flights: cut.flights.filter(l => match(dayOf(l.startLocal))),
+      firstCommute: ctx.firstCommute,
+      named: ctx.named,
+      pointOf: ctx.pointOf,
+      homeNames: ctx.homeNames,
+      forSummary,
     });
   }
-
-  const betweenWorkplaces = periodJourneys.filter(j => j.purpose === '출근' && !firstCommute.has(j)).length;
-
-  const missing = new Map<string, number>();
-  for (const l of periodJourneys.flatMap(j => j.legs)) {
-    for (const n of [named(l.from, l.startAt), named(l.to, l.endAt)]) {
-      if (!pointOf.has(n)) missing.set(n, (missing.get(n) ?? 0) + 1);
-    }
-  }
-
-  return {
-    period: { from: startStr, to: lastDay },
-    blocks,
-    checks: {
-      workplaces: [...commuteCounts].filter(([k]) => workplaces.has(k))
-        .sort((a, b) => b[1] - a[1]).map(([name, commutes]) => ({ name, commutes })),
-      betweenWorkplaces,
-      stopTripsMatched: backTrips.filter(t => t.parts.length === 2).length,
-      stopTripsUnmatched: unmatched,
-      favoritePlaces: favorites.length,
-      places: placeCoords.length,
-      placesWithoutPoint: [...missing].sort((a, b) => b[1] - a[1]).slice(0, 100)
-        .map(([name, uses]) => ({ name, uses })),
-    },
-  };
+  return blocks;
 }
 
 // ── One block (all days / weekdays / weekend) ────────────────────────────────
 
-interface Trip { parts: Journey[]; placeName: string; travelMin: number }
-interface BackTrip extends Trip { day: string }
+export interface Trip { parts: Journey[]; placeName: string; travelMin: number }
+export interface BackTrip extends Trip { day: string }
 
 /** Travel time only: the sum of every leg, with no waiting between legs. */
 function legsMinutes(parts: Journey[]): number {
@@ -312,6 +395,7 @@ function buildBlock(a: {
   named: (label: string, atMs: number) => string;
   pointOf: Map<string, { lat: number; lng: number }>;
   homeNames: Set<string>;
+  forSummary: boolean;         // false for Trend buckets: no map (costly, unused) and no top-15 cap on people
 }): TransportBlock {
   const { days, journeys } = a;
   const legs = journeys.flatMap(j => j.legs);
@@ -324,14 +408,15 @@ function buildBlock(a: {
   // With whom
   const alone = journeys.filter(j => !j.people.length);
   const catAgg = new Map<string, { count: number; minutes: number }>();
-  const personAgg = new Map<string, { category: string; count: number; minutes: number }>();
+  const personAgg = new Map<string, { count: number; minutes: number; categories: Record<string, number> }>();
   for (const j of journeys) {
     if (!j.people.length) continue;
     const dom = [...tally(j.people.map(p => p.category))].sort((x, y) => y[1] - x[1])[0][0];
     bump(catAgg, dom, j.durationMin);
     for (const p of j.people) {
-      const cur = personAgg.get(p.name) ?? { category: p.category, count: 0, minutes: 0 };
+      const cur = personAgg.get(p.name) ?? { count: 0, minutes: 0, categories: {} };
       cur.count++; cur.minutes += j.durationMin;
+      cur.categories[p.category] = (cur.categories[p.category] ?? 0) + 1;
       personAgg.set(p.name, cur);
     }
   }
@@ -342,8 +427,8 @@ function buildBlock(a: {
     .map(j => ({ parts: [j], placeName: a.named(j.to, j.endAt), travelMin: j.durationMin }));
 
   // Map
-  const arrivals = tally(journeys.map(j => a.named(j.to, j.endAt)));
-  const routes = tally(journeys.map(j => `${a.named(j.from, j.startAt)}\u0000${a.named(j.to, j.endAt)}`));
+  const arrivals = a.forSummary ? tally(journeys.map(j => a.named(j.to, j.endAt))) : new Map<string, number>();
+  const routes = a.forSummary ? tally(journeys.map(j => `${a.named(j.from, j.startAt)}\u0000${a.named(j.to, j.endAt)}`)) : new Map<string, number>();
 
   return {
     days,
@@ -361,8 +446,13 @@ function buildBlock(a: {
     withWhom: {
       alone: { count: alone.length, minutes: sum(alone.map(j => j.durationMin)) },
       byCategory: [...catAgg].map(([key, v]) => ({ key, ...v })).sort((x, y) => y.count - x.count),
-      people: [...personAgg].map(([name, v]) => ({ name, ...v }))
-        .sort((x, y) => y.count - x.count).slice(0, 15),
+      people: [...personAgg].map(([name, v]) => ({
+        name,
+        category: Object.entries(v.categories).sort((x, y) => y[1] - x[1])[0][0],
+        ...v,
+      }))
+        // Summary: top 15. Trend buckets: everyone, so a Relation filter re-ranks honestly.
+        .sort((x, y) => y.count - x.count).slice(0, a.forSummary ? 15 : undefined),
     },
     commute: {
       out: commuteSide(outTrips, false),
@@ -424,6 +514,7 @@ function commuteSide(trips: Trip[], evening: boolean): CommuteSide {
       avgArrive: clockAvg(list.map(t => clockMin(t.parts[t.parts.length - 1].endLocal, evening))),
       avgDurationMin: list.length ? Math.round(sum(list.map(t => t.travelMin)) / list.length) : null,
       avgKm: known.length ? round1(sum(known) / known.length) : null,
+      kmCoverage: list.length ? round2(known.length / list.length) : 0,
     };
   };
   const comboOf = (t: (typeof trips)[number]) => {

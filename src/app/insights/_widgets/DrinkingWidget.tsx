@@ -439,8 +439,9 @@ function DrinkingTrendChart({
         series={[
           { values: buckets.map(b => b.drinksBox?.avg ?? null), color: avgC, label: 'Avg' },
           { values: buckets.map(b => b.drinksBox?.max ?? null), color: maxC, label: 'Max' },
-          { values: buckets.map(b => b.drinksBox?.min ?? null), color: minC, label: 'Min' },
+				  { values: buckets.map(b => b.drinksBox?.min ?? null), color: minC, label: 'Min' },
         ]}
+        listOrder={[1, 0, 2]}
         labels={labels}
         formatY={v => String(Math.round(v * 10) / 10)}
         isDark={isDark}

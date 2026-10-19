@@ -204,8 +204,9 @@ export function DietTrendView({
         series={[
           { values: boxes.map(x => x?.avg ?? null), color: avgC, label: 'Avg' },
           { values: boxes.map(x => x?.max ?? null), color: maxC, label: 'Max' },
-          { values: boxes.map(x => x?.min ?? null), color: minC, label: 'Min' },
+				  { values: boxes.map(x => x?.min ?? null), color: minC, label: 'Min' },
         ]}
+        listOrder={[1, 0, 2]}
         labels={labels}
         formatY={cfg.formatY}
         isDark={isDark}

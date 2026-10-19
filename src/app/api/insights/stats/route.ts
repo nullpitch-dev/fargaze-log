@@ -20,6 +20,7 @@ import { computeExerciseTrend, computeExerciseItemTrend } from '@/lib/insights/e
 import type { ExerciseTrendGrain } from '@/lib/insights/exercise-trend';
 import { computeBowelSummary, computeBowelTrend } from '@/lib/insights/bowel';
 import { computeTransportSummary } from '@/lib/insights/transport';
+import { computeTransportTrend } from '@/lib/insights/transport-trend';
 
 // ── Main route ────────────────────────────────────────────────────────────────
 
@@ -386,6 +387,25 @@ export async function GET(req: NextRequest) {
     const { start, end } = buildDateRange(timeMode, timePeriod, dateFrom, dateTo);
     const summary = await computeTransportSummary(userId, start, end, crossActivities);
     return NextResponse.json({ summary });
+  }
+
+	// ── transport.trend ───────────────────────────────────────────────────────
+  // The shared grain × count window, anchored at min(end of the selected
+  // period, YESTERDAY) — the Summary's rule. Every bucket is a Journeys
+  // Summary over its own dates, for All / Weekday / Weekend at once.
+  if (metric === 'transport.trend') {
+    const grain = parseGrain(sp.get('grain'), 'month');
+    const bucketCount = parseInt(sp.get('buckets') ?? '24');
+    const safeCount = Math.min(Number.isFinite(bucketCount) ? Math.max(1, bucketCount) : 24, 400);
+
+    const { end: periodEnd } = buildDateRange(timeMode, timePeriod, dateFrom, dateTo);
+    const anchor = anchorFrom(periodEnd);
+    const yesterday = todayUTC();
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    const { start, end } = resolveWindow(grain, safeCount, anchor < yesterday ? anchor : yesterday);
+
+    const trend = await computeTransportTrend(userId, grain, start, end, crossActivities);
+    return NextResponse.json(trend);
   }
 
   // ── exercise.summary ──
