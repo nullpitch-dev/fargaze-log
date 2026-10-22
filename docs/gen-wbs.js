@@ -11,7 +11,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Service Concept & Work Breakdown Structure", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 3.14  |  19 October 2026", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 3.15  |  22 October 2026", size: 24 })], spacing: { after: 240 } }),
 );
 
 C(h1("Version History"));
@@ -49,6 +49,7 @@ C(table(["Version","Date","Headline"],[
   ["3.12","9 Oct 2026","#63 JOURNEYS (이동) WIDGET — Summary COMPLETE; Trend, geocoding and the map not started. Phase 5 postponed by Hyoje until a few more widgets have tested whether the data supports analysis. Transport data surveyed and cleaned in the sheet (all checks at zero except confirmed intentional cases); consecutive legs joined into journeys (30-min rule); new favorite_place collection + FavoritePlace sheet + npm run migrate-favorite-place; metric=transport.summary; JourneysWidget with Overview, Commute, Getting home and Places. Global filter now opens on the month ending yesterday; todayStr uses the local date. Mirrors Design Doc v4.12 (§9.3.8, §6.10, §12.6)"],
   ["3.13","18 Oct 2026","#63 JOURNEYS GEOCODING, DISTANCE AND MAP COMPLETE; Trend view remains. New PlaceCoord sheet + place_coord collection + npm run migrate-place-coord; scripts/geocode-places.ts searches OpenStreetMap (Kakao and Google results may not be kept) and writes a CSV to paste into the sheet; Hyoje corrected 252 points; distance known for 80% of journeys in the first month checked. Speed check drops impossible legs and lists them as a correction to-do. Places tab: Google Maps map, missing-places pop-up, 4 : 6 lists. #64 Insights widget groups (foldable, per-device fold state). Mirrors Design Doc v4.13 (§6.11, §9.2.1, §9.3.8, §12.7)"],
   ["3.14","19 Oct 2026","#63 JOURNEYS WIDGET COMPLETE — Trend view shipped. metric=transport.trend on the shared grain × count window (to yesterday); transport.ts split into a once-only preparation and a per-period cut, so every bucket is the Summary for its dates. Five tabs: Per day, Mix (Purpose / Method), Commute (Session band + distance), Getting home (Latest / Average / Earliest), People (rank flow + Relation filter). Speed check RESTORED — written for v3.13 but lost before the push; now flags 3 legs, all at 라비에벨. Three-line charts in Diet, Drinking and Journeys list Max · Avg · Min in the hover card and legend. Map key moved to server-only GOOGLE_MAPS_BROWSER_KEY behind /api/maps-key (18 Oct). Mirrors Design Doc v4.14 (§2.4, §9.2, §9.3.8, Appendix B)"],
+  ["3.15","22 Oct 2026","PHASE 5 (DATA ENTRY) STARTED by Hyoje. Plan agreed 19–20 Oct (Data Entry Plan document): master lists first, logs in the sheet while the app is built on a test database, Staging + edit feature + test sync, one flexible offline entry form, cutover on or before 1 Jan 2027. Step 1 DONE: nightly backups to Google Drive (GitHub Actions + rclone, 30 days) and a restore-to-test workflow; first restore matched all 12 collections. Atlas users backup-reader / test-restore; admin password rotated; public /privacy page for the published Google consent screen. Mirrors Design Doc v4.15 (§2.3, §2.4, §3.3, §12.8, §15, Appendix B)"],
 ],[1100,1300,6960]));
 C(spacer());
 
@@ -103,10 +104,10 @@ C(table(["Phase","Status","Detail"],[
   ["2 — Data Structure Design","\u2705 Complete","Schema, supporting collections, Mongoose models"],
   ["3 — Migration Tool","\u2705 Complete","Delete-all + re-insert; incremental sync deferred to post-MVP"],
   ["4 — Analytics & Search","\u2705 Complete","Done: search, cost dashboard, Interactions / Drinking / Diet / Weight / Exercise widgets (all with Summary and Trend), food + drink ingredient taxonomies. Done: Drinking rest-scoring redesign + Interactions and Drinking trend windows (11 Sep), Diet (12 Sep). Done: migration timezone fix + #53 Sleep rebuilt on night-assignment rules (13 Sep) — Sleep was the last widget still on the old 3/6/12 selector, so every widget is now on the shared window. Done: #62 Bowel Movement Summary (26 Sep) and Trend (27 Sep). Done: #59 Calendar with Search (27–28 Sep). Done after completion: #63 Journeys Summary (6–9 Oct), geocoding + distance + map (9–18 Oct), Trend (18–19 Oct); #64 Insights widget groups (9 Oct)"],
-  ["5 — Data Entry","\u2B1C Not started","Post-MVP"],
+  ["5 — Data Entry","In progress","Started 19 Oct 2026; plan in Design Doc §15 and the Data Entry Plan document. Done: nightly backups + rehearsed restore (22 Oct). Target cutover on or before 1 Jan 2027"],
 ],[2900,1700,4760]));
 C(spacer());
-C(p([new TextRun({ text: "Current focus: ", bold: true }), new TextRun("Phase 5 (data entry) is postponed by Hyoje: a few more widgets come first, because only a widget shows whether the logged data is meaningful for analysis. #63 Journeys is complete: Summary 9 Oct; geocoding, distance and the Places map 18 Oct; Trend 19 Oct. Next: the next widget from the backlog, organised by Insights group (§6.2), chosen with Hyoje.")]));
+C(p([new TextRun({ text: "Current focus: ", bold: true }), new TextRun("Phase 5 (data entry), started 19 Oct after #63 Journeys was completed. Backups are done (22 Oct). Next: the read-only survey of the sheet (master tabs and the columns that use them, typed vs formula columns, which columns each category uses), then the master lists move to the database with admin pages. New widgets wait until after cutover.")]));
 
 C(h1("5. Work Breakdown Structure"));
 C(p("\u2705 = Complete   \u2B1C = Pending   DESCOPED = out of MVP scope. Each line states current state, not how it evolved (see the changelog for history)."));
@@ -492,15 +493,22 @@ C(
 );
 C(note("Logging convention agreed: for 퇴근길 식사, log office → restaurant and restaurant → 집 both with purpose 귀가 and put 퇴근길 식사 후 귀가 on the last leg. 식음 is for 회식 and 친목. A meal after a late meeting is 퇴근길 식사 or 업무회식 as appropriate, not 근무 후 귀가."));
 
-C(h2("Phase 5 — Data Entry \u2B1C"));
+C(h2("Phase 5 — Data Entry (in progress)"));
+C(p("Plan: Design Doc §15 and the live Data Entry Plan document (https://claude.ai/code/artifact/1061a843-f14f-4b79-bef0-d34608dc3c1e). Target cutover on or before 1 Jan 2027."));
 C(
-  bullet("\u2B1C 1. Daily log entry form (web)"),
-  bullet("\u2B1C 2. Mobile-friendly entry UI"),
-  bullet("\u2B1C 3. Custom fields per user"),
-  bullet("\u2B1C 4. Quick entry (minimal tap/click)"),
-  bullet("\u2B1C 5. Push notification reminders"),
-  bullet("\u2B1C 6. Master collection management UI (activity_master, cost_master, reference_lists, ingredient_master)"),
+  bullet("\u2705 65. Nightly backups to Google Drive and a rehearsed restore into fargaze-log-test (22 Oct) — Design Doc §12.8"),
+  bullet("\u2B1C 66. Read-only survey: master tabs and the sheet columns that use them; typed vs formula columns; which columns each category uses"),
+  bullet("\u2B1C 67. Master lists out of the migration; one generic admin editor in production (replaces old item 6, master collection management UI)"),
+  bullet("\u2B1C 68. Staging tab and Staging migration, with the duplicate and year-tab checks"),
+  bullet("\u2B1C 69. Test database sync by period"),
+  bullet("\u2B1C 70. Edit feature with its change list — test database first, then production"),
+  bullet("\u2B1C 71. Entry app: one flexible form (field groups by category), offline-first PWA on Android, changeable start / end time zones, on the test database; comparison report against production (replaces old items 1, 2 and 4)"),
+  bullet("\u2B1C 72. Nightly export from the database to a spreadsheet, proven on test"),
+  bullet("\u2B1C 73. Year rollover: migration tab names from a setting; in early January merge 2026 into ~2025 → ~2026 and add a 2027 tab"),
+  bullet("\u2B1C 74. Cutover"),
+  bullet("DESCOPED from MVP: old item 3, custom fields per user (single user); old item 5, push reminders — after cutover"),
 );
+C(spacer());
 
 C(h1("6. Open Questions & Backlog"));
 C(h2("6.1 Open Questions"));
@@ -510,7 +518,7 @@ C(table(["#","Question","Status"],[
   ["3","Mobile — React Native or PWA?","Open"],
   ["4","AI provider for fact search / insight suggestions?","Open"],
   ["5","Data-retention policy?","Open"],
-  ["6","Master collections — user-editable via UI in Phase 5?","Open — Phase 5"],
+  ["6","Master collections — user-editable via UI in Phase 5?","Answered 19 Oct: yes — admin pages in production; the database becomes their truth (#67)"],
   ["7","Atlas Search index — dynamic mapping or explicit field mapping?","Open"],
   ["8","food.foods[].ingredients in the Atlas Search index, or analytics-only?","Open"],
 ],[700,5900,2760]));
@@ -611,7 +619,7 @@ C(
 );
 C(spacer());
 
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze — Service Concept & WBS v3.14 — 19 October 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze — Service Concept & WBS v3.15 — 22 October 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 const doc = new Document({
   styles: {
@@ -637,6 +645,6 @@ const doc = new Document({
   sections: [{ properties: { page: PAGE }, children }],
 });
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-WBS-v3.14.docx", buffer);
-  console.log("Wrote FarGaze-WBS-v3.14.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-WBS-v3.15.docx", buffer);
+  console.log("Wrote FarGaze-WBS-v3.15.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });

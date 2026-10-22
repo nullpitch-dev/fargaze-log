@@ -16,7 +16,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze Log", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Data Design & Requirements Document", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 4.14  |  19 October 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 4.15  |  22 October 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
 );
 C(p([new TextRun({ text: "Structure: ", bold: true }), new TextRun("Part I Foundations · Part II Data · Part III Features · Part IV Operations · Appendices. The body is the complete, always-current source of truth; the changelog below carries one line per version. Work status, open questions and the backlog live in the separate WBS, not here.")]));
 
@@ -60,6 +60,7 @@ C(table(
     ["4.12","9 Oct 2026","JOURNEYS WIDGET (이동, WBS #63) Summary shipped — new §9.3.8. Consecutive 이동 rows are joined into journeys (gap ≤ 30 min, To = next From, same purpose, never across 집); flights are reported on their own line; a journey belongs to its local start date with the 6 am rule. Four tabs: Overview (per-day figures, By purpose / By method / With whom pies, Most often with), Commute (출근 = the first commute of the day; 퇴근 includes 퇴근길 식사 / 볼일 with the stop’s time left out), Getting home (귀가 시간 box plots: All, From work, After work dinner, After dinner with friends; golf excluded from the two dinner groups), Places (top places and routes). New metric=transport.summary. New collection favorite_place (§6.10) resolves 집 / 회사 / 사이트 / 내차 to the real place by period; new procedure §12.6. Global filter now opens on Period = the month ending yesterday (§9.2.1), and todayStr uses the local date. MetricPieBlock gains an optional legendDetail. Distances and the map wait for geocoding"],
     ["4.13","18 Oct 2026","JOURNEYS DISTANCE AND MAP. New collection place_coord (§6.11) from a new PlaceCoord sheet: one point per From / To name, after 집 / 회사 / 사이트 / 내차 are resolved. Points come from OpenStreetMap (Nominatim) through scripts/geocode-places.ts, which writes a CSV to paste into the sheet, plus hand entry for homes, sites and personal places; npm run migrate-place-coord loads it (§12.7). Kakao and Google search results were rejected because their terms forbid keeping results. Distance = straight line between the two points; a leg whose straight line beats its method’s speed limit (도보 15, 기차 350, 비행기 1,100, others 150 km/h; legs under 2 km never flagged) is treated as having no distance and listed in checks.tooFast. The Places tab gains a Google Maps map (JourneyMap.tsx: dots sized by arrivals, lines by journeys, 5 permanent labels, click to highlight, start view = busiest place + 50 km), 4 : 6 top-10 lists and a pop-up of places without a point. New env vars NEXT_PUBLIC_GOOGLE_MAPS_API_KEY and NOMINATIM_EMAIL. INSIGHTS PAGE: widgets grouped into foldable sections (Health with Inputs / Outcomes, Work & Social, Places & Travel), fold state per device, folded groups not mounted (§9.2.1)"],
     ["4.14","19 Oct 2026","JOURNEYS TREND VIEW shipped — §9.3.8 Trend written; WBS #63 complete. New metric=transport.trend on the shared grain × count window, anchored at min(period end, YESTERDAY). transport.ts split into prepareTransport (everything that needs all of history, done ONCE: journeys, names, distances, speed check, workplaces, 퇴근 trips, first commutes) and a per-period cut; the Summary runs it once, the Trend once per bucket, so a Month bucket always equals the Summary for that month (checked on every month of a synthetic 2½-year history; Month × 120 builds in about 0.1 s). New transport-trend.ts and JourneysTrendView.tsx: five tabs — Per day, Mix (Purpose / Method), Commute (Sleep-Session band + distance), Getting home (Latest / Average / Earliest lines) and People (rank flow with the Relation filter). SPEED CHECK RESTORED: it was written for v4.13 but lost before the push, so v4.13 shipped without it; restored to the v4.13 rule, it flags 3 legs over all history, all at 라비에벨. Summary: commute sides gain kmCoverage; people carry journeys per relation and their category is now the most frequent one, not the first logged; Most often with rows tightened. Shared charts, all additions default-off: CssTrendChart breakOnNull and listOrder (Diet, Drinking and Journeys three-line charts now list Max · Avg · Min top to bottom, like the lines); CssDualLineChart names and notes. MAP KEY (changed 18 Oct after the v4.13 docs): GOOGLE_MAPS_BROWSER_KEY, server-only, served by GET /api/maps-key to signed-in users only, so it no longer appears in the public /_next/static files; NEXT_PUBLIC_GOOGLE_MAPS_API_KEY retired (§2.4, §9.3.8, Appendix B)"],
+    ["4.15","22 Oct 2026","PHASE 5 (DATA ENTRY) STARTED — new §15 records the plan agreed with Hyoje on 19–20 Oct (the live plan is the Data Entry Plan document): master lists move to the database first with admin pages; logs stay in the sheet while the app is built on a test database; a Staging tab and migration, an edit feature, and a disposable test database synced by period; cutover targeted on or before 1 Jan 2027 on any day, after which the app is the truth, the sheet is frozen and a nightly export writes the database to a spreadsheet. The entry app is ONE flexible form like a sheet row (category opens default field groups and sets required fields; any group on any record), offline-first on Android, with start and end time zones changeable per record. NIGHTLY BACKUPS shipped (§12.8): GitHub Actions mongodump → Google Drive via rclone at 02:00 UTC, 30 days kept, plus a restore-to-test workflow; first restore matched all 12 collections (46,038 log records). New Atlas users backup-reader (read only) and test-restore (readWrite on fargaze-log-test only); admin password rotated. Google Cloud: Desktop OAuth client for rclone (drive.file), consent screen published with Branding home page, privacy link and authorised domain fargaze.co; new public page /privacy (§3.3). Database size checked: 62 MB of data (39 MB stored), about 15% of the free tier. Year rollover agreed: in early January 2026 is merged into ~2025, renamed ~2026, and a 2027 tab added; the migration’s tab names move to a setting before then"],
   ],
   [1100, 1300, 6960]
 ));
@@ -132,6 +133,7 @@ C(table(["Layer","Technology","Notes"],[
   ["Charts","Custom CSS + SVG components","CSS-first; SVG only for curved line paths in trend charts"],
   ["Maps","Google Maps JavaScript API (v4.13)","Journeys Places map only; loaded by a script tag when the tab opens, with the key fetched from GET /api/maps-key (v4.14); no Map ID, plain style arrays; dots and labels drawn by one custom OverlayView"],
   ["Hosting","Vercel","Environment variables set in Vercel dashboard"],
+  ["Backups","GitHub Actions + rclone → Google Drive (v4.15)","Nightly mongodump of fargaze-log at 02:00 UTC, 30 days kept; restore-to-test workflow (§12.8)"],
 ],[2000,2800,4560]));
 C(spacer());
 
@@ -149,6 +151,9 @@ C(table(["Variable","Where","Purpose"],[
   ["ANTHROPIC_API_KEY","Vercel + .env.local","Anthropic API key (for future LLM features)"],
   ["GOOGLE_MAPS_BROWSER_KEY","Vercel + .env.local (server-only)","(v4.14) Browser key for the Journeys map, served by GET /api/maps-key to signed-in users only. It replaced NEXT_PUBLIC_GOOGLE_MAPS_API_KEY, which Next.js copied into the /_next/static files that the middleware leaves public, so anyone could read it without signing in. A Maps JavaScript key always reaches the browser that uses it, so Google’s restrictions remain the real protection: the websites http://localhost:3000/* and https://log.fargaze.co/* and the Maps JavaScript API only; Vercel preview URLs therefore show no map. Billing account (KRW) linked to the project; usage sits inside the free monthly allowance. The key shown in an earlier screenshot was rotated and the old one deleted (18 Oct)"],
   ["NOMINATIM_EMAIL",".env.local only","(v4.13) Contact address OpenStreetMap asks every Nominatim caller to send; read by scripts/geocode-places.ts"],
+  ["BACKUP_MONGODB_URI","GitHub Actions secret","(v4.15) Connection string of Atlas user backup-reader (built-in role Only read any database), used by backup.yml and to count production records in restore-test.yml. No database in the path: the workflow names it"],
+  ["RESTORE_MONGODB_URI","GitHub Actions secret","(v4.15) Connection string of Atlas user test-restore (specific privilege readWrite on fargaze-log-test only), so a restore can never write to production"],
+  ["RCLONE_CONFIG","GitHub Actions secret","(v4.15) The whole rclone.conf from WSL: remote gdrive, type drive, scope drive.file, with the Desktop OAuth client’s id and secret and Hyoje’s token. Holds Drive access to the files rclone created only"],
 ],[3000,2400,3960]));
 C(spacer());
 
@@ -174,6 +179,7 @@ C(table(
   [1800, 3000, 4560]
 ));
 C(spacer());
+C(p("(v4.15) One public path: /privacy is excluded in the middleware matcher ('/((?!_next/static|_next/image|favicon.ico|privacy).*)'), because the Google consent screen links to it and Google must open it without signing in. The page states that the app is single-user and that the backup tool sees only the files it creates."));
 C(note("Note: Even if someone bypasses the middleware (e.g. direct API call), they still hit the API 403 and receive no data. Even if they bypass that, MongoDB only returns documents matching their userId."));
 C(h2("3.4 Access for Other Users (Current)"));
 C(
@@ -1893,6 +1899,28 @@ C(bold("Ongoing correction routine"));
 C(p("Open /api/insights/stats?metric=transport.summary&timeMode=period&dateFrom=2019-01-01&dateTo=<yesterday> and read checks: tooFast (all time — one end of each pair is a wrong point, usually the less familiar one) and placesWithoutPoint (the busiest names with no point in the dates asked). The Places tab’s missing-places pop-up gives the same list for the current filter, with Copy names. Fix a few in the sheet, run the migration, and the ‘% known’ figure rises."));
 C(note("Rejected: Kakao Local API and Google Geocoding / Places as the source — their terms forbid storing results (Kakao staff, Aug 2026: real-time calls only, not even temporary storage). Naver’s local search returns at most five results with no location bias."));
 
+C(h2("12.8 Backups and Restore (v4.15)"));
+C(p("Atlas has no backups on the free tier, so two GitHub Actions workflows in the repository provide them. Both run on GitHub’s machines, so Hyoje’s PC need not be on; they use the official mongo:8.0 image for mongodump, mongorestore and mongosh, and rclone for Google Drive."));
+C(table(["Workflow","When","What it does"],[
+  [".github/workflows/backup.yml","Nightly at 02:00 UTC (03:00 BST); also Actions → Nightly backup → Run workflow","mongodump of the whole fargaze-log database into one gzipped archive, fargaze-log-YYYY-MM-DD.gz; uploads it to the Drive folder FarGaze Backups; deletes archives older than 30 days permanently (not to the Drive bin); writes the file size and the number kept to the run summary. A failed run emails Hyoje"],
+  [".github/workflows/restore-test.yml","By hand only: Actions → Restore backup to test → Run workflow, with a date or empty for the newest","Downloads the archive, restores it into fargaze-log-test with --nsFrom fargaze-log.* --nsTo fargaze-log-test.* --drop, and writes a table of record counts per collection, test beside production, to the run summary. Atlas Search indexes are not in a dump and are not restored"],
+],[2600,2400,4360]));
+C(spacer());
+C(bold("Why it is built this way"));
+C(
+  bullet("Google Drive through Hyoje’s own sign-in: a service account has no Drive storage of its own, and the shared-drive workaround needs a paid Workspace account"),
+  bullet("Own OAuth client: rclone’s shared Google client is being retired during 2026. A Desktop client named rclone backup lives in the fargaze-log Google Cloud project, with the drive.file scope only; the consent screen is published (an app left in Testing loses its grant after about a week), which needed Branding → home page https://log.fargaze.co, privacy link https://log.fargaze.co/privacy and authorised domain fargaze.co, and no logo"),
+  bullet("Least privilege: the backup user can only read; the restore user can only write to fargaze-log-test, so a wrong namespace is refused by Atlas"),
+  bullet("Secrets: BACKUP_MONGODB_URI, RESTORE_MONGODB_URI and RCLONE_CONFIG (§2.4). The repository is public but secrets never appear, even in logs; archives go only to Drive"),
+);
+C(bold("Things to know"));
+C(
+  bullet("GitHub switches scheduled workflows off in a public repository after 60 days without any repository activity; a push re-arms it"),
+  bullet("First run 22 Oct 2026: restore matched every collection — activity_master 245, alcohol_conversion 56, bowel_score 24, calendar_settings 1, cost_master 134, exchange_rate 3, favorite_place 14, ingredient_master 75, log 46,038, place_coord 342, reference_lists 12, timezone_master 18"),
+  bullet("Rehearse a restore after any change to the workflows or to the database users. If the Drive grant is ever revoked, rerun rclone config in WSL with the same client id and secret and replace the RCLONE_CONFIG secret"),
+  bullet("An empty database named test (4 kB) exists from an early script and is unrelated; the test database is fargaze-log-test"),
+);
+
 // ===== 13. GOOGLE CALENDAR SYNC =====
 C(h1("13. Google Calendar Sync"));
 C(p("A Google Apps Script pushes selected Active and Future rows into a Google Calendar. It predates the FarGaze Log project and is documented here from v4.3 because it reads and writes source-sheet columns by position, which makes it sensitive to any column insertion. It is independent of MongoDB \u2014 nothing in this section affects migration or the dashboards."));
@@ -2075,6 +2103,42 @@ C(spacer());
 C(h2("14.10 Sheet Anomalies Found"));
 C(p("Records whose end is before their start (drawn as points until corrected in the sheet): 6ab7da3f5ef99b2c70d6c1eb and 6ab7da3f5ef99b2c70d6c1f4 (December 2019), 6ab7da445ef99b2c70d71fd8 (July 2021), and three in 2025 whose ids are listed by /api/calendar?from=2025-01-01&to=2025-12-31 under diagnostics.endBeforeStartIds."));
 
+// ===== 15. DATA ENTRY (PHASE 5) =====
+C(h1("15. Data Entry (Phase 5, v4.15)"));
+C(p("Started 19 Oct 2026. The live plan, with its risk register and next steps, is the Data Entry Plan document (" + "https://claude.ai/code/artifact/1061a843-f14f-4b79-bef0-d34608dc3c1e" + "); this section records what was agreed and why. Target: cutover on or before 1 January 2027."));
+C(h2("15.1 Stages"));
+C(table(["Stage","Truth for logs","What happens"],[
+  ["1 · Master lists","Spreadsheet","Every supporting collection leaves the migration and is edited on admin pages in production (one generic table editor rather than ten pages). The database becomes their truth; the sheet’s master tabs are kept in step by hand, and the migration’s refusal of an unknown value is the reminder"],
+  ["2 · Building the app","Spreadsheet","Hyoje keeps entering in the sheet. Added: a Staging tab and Staging migration (records waiting for the server only; rows cleared by hand after a successful run; each record also stays in the year tab), an edit feature (changes mirrored in the sheet by hand, with a change list that must be ticked off before any full migration), a disposable test database synced from production by period, and the entry app writing only to the test database, compared with production after the same records are migrated"],
+  ["3 · App in production","Database","At cutover the app writes to production. The sheet is frozen; a nightly export writes the database to an export spreadsheet from day one, layout as close to the original as possible. Fallback when the app fails: Active sheet → Staging → server. No separate stabilising stage"],
+],[2000,1600,5760]));
+C(spacer());
+C(h2("15.2 Decisions"));
+C(
+  bullet("The app is independent: it never reads or writes the sheet. The sheet is Hyoje’s own tool (19 Oct)"),
+  bullet("One flexible entry form, like a sheet row: choosing a category opens its usual field groups and sets its required fields (대변 must have bowel data), any group can be added to any record, and no category has a page of its own. The category → field-group rules are data, seeded from a survey of which columns each category has used (20 Oct)"),
+  bullet("Offline-first installable web app (PWA) in the existing Next.js project; the phone is Android, so waiting entries upload in the background when a signal returns. Each entry gets its ID on the phone, so a retry never duplicates; airplane mode works the same way"),
+  bullet("Time zones: the phone’s zone is only the default; start and end zones are set separately per record (a flight can use departure and arrival zones; a future schedule the zone where it happens); the offset comes from the zone and the date"),
+  bullet("Cutover on any day, at a quiet moment so no record straddles it; records starting before it belong to the sheet"),
+  bullet("Year rollover: until 31 Dec daily records go in the 2026 tab. In early January 2026 is merged into ~2025, which is renamed ~2026 (archive, never for daily entry), and a 2027 tab is added; the migration reads its tab names from a setting, done before then. If the app is live by then, the sheet takes no daily records"),
+  bullet("Test database fargaze-log-test on the same cluster; production holds 62 MB of data (about 15% of the free tier), so a full-history copy fits"),
+  bullet("Backups first: shipped 22 Oct (§12.8)"),
+);
+C(h2("15.3 Order of work"));
+C(
+  bullet("1. Nightly backups and a rehearsed restore — done 22 Oct"),
+  bullet("2. Read-only survey: master tabs and the sheet columns that use them, typed vs formula columns, which columns each category uses"),
+  bullet("3. Master lists out of the migration; generic admin editor in production"),
+  bullet("4. Staging tab and migration, with the duplicate and year-tab checks"),
+  bullet("5. Test database sync by period"),
+  bullet("6. Edit feature with its change list, test then production"),
+  bullet("7. Entry app: offline, all field groups, on test; the comparison report"),
+  bullet("8. Nightly export to a spreadsheet, proven on test"),
+  bullet("9. Year rollover setting (before January)"),
+  bullet("10. Cutover"),
+);
+C(spacer());
+
 C(new Paragraph({ children: [new TextRun({ text: "Appendices", bold: true, size: 28 })], spacing: { before: 280, after: 140 } }));
 
 // ===== APPENDICES =====
@@ -2125,6 +2189,9 @@ C(table(["Path","Purpose"],[
   ["src/app/insights/page.tsx","Insights master page — (v4.13) GROUPS registry (group → sub-groups → widgets, each widget with id, label, size, component) replacing the flat WIDGETS array; fold state in localStorage fargaze.insights.foldedGroups, read before any widget mounts; Fold all · Unfold all. CSS columns grid per sub-group. Widgets registered: Exercise v4.4, Bowel v4.9, Journeys v4.12"],
   ["src/app/insights/_components/WidgetGroup.tsx","(v4.13) WidgetGroup (foldable section; children mounted only when open) and WidgetSubgroupLabel"],
   ["src/app/insights/_components/JourneyMap.tsx","(v4.13) Google Maps places map for Journeys: one-time script loader, quiet / night styles, Polyline routes, one OverlayView for dots and labels, click selection, 50 km start view. (v4.14) The key comes from GET /api/maps-key; without it the tab shows a one-line note"],
+  [".github/workflows/backup.yml","(v4.15) Nightly backup: mongodump → Google Drive (rclone), 30 days kept (§12.8)"],
+  [".github/workflows/restore-test.yml","(v4.15) Restore a backup into fargaze-log-test and compare record counts with production (§12.8)"],
+  ["src/app/privacy/page.tsx","(v4.15) Public privacy notice for the Google consent screen; excluded from the middleware matcher (§3.3)"],
   ["src/app/api/maps-key/route.ts","(v4.14) GET /api/maps-key — returns GOOGLE_MAPS_BROWSER_KEY to a signed-in user only (403 otherwise), Cache-Control private, no-store"],
   ["src/models/PlaceCoord.ts","(v4.13) place_coord model; unique index { userId, name }"],
   ["src/lib/migration/placeCoord.ts","(v4.13) parseCoords, buildPlaceCoords (parse + validate the PlaceCoord sheet; blank Coords = listed, no point) and sheetNames. Pure"],
@@ -2229,7 +2296,7 @@ C(table(["Path","Purpose"],[
 C(spacer());
 
 // ===== FOOTER =====
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.14 — 19 October 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.15 — 22 October 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 
 // ===== DOCUMENT ASSEMBLY =====
@@ -2266,6 +2333,6 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-Log-Data-Design-v4.14.docx", buffer);
-  console.log("Wrote FarGaze-Log-Data-Design-v4.14.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-Log-Data-Design-v4.15.docx", buffer);
+  console.log("Wrote FarGaze-Log-Data-Design-v4.15.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });
