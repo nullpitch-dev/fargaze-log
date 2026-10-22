@@ -1,0 +1,94 @@
+# .github/workflows/backup.yml
+# Nightly backup of the fargaze-log database to Google Drive.
+#
+#   1. mongodump the whole fargaze-log database (all collections, with their
+#      indexes) into ONE gzipped archive: fargaze-log-YYYY-MM-DD.gz
+#   2. upload it to the "FarGaze Backups" folder in Hyoje's Google Drive (rclone)
+#   3. delete backups older than 30 days from that folder, permanently (not to
+#      the Drive bin, which would still count against storage)
+#
+# Runs at 02:00 UTC (03:00 in British Summer Time, 02:00 in winter) and on
+# demand from the Actions tab ("Run workflow"). A failed run emails Hyoje.
+#
+# Secrets (repo Settings → Secrets and variables → Actions):
+#   BACKUP_MONGODB_URI  connection string of a READ-ONLY database user
+#   RCLONE_CONFIG       the whole rclone.conf with the "gdrive" remote
+#                       (scope drive.file: rclone sees only files it created)
+#
+# The archive never touches the repository, and GitHub masks secret values in
+# the logs. In a public repository GitHub switches scheduled workflows off
+# after 60 days without any repository activity.
+
+name: Nightly backup
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+env:
+  DRIVE_FOLDER: 'gdrive:FarGaze Backups'
+  KEEP_DAYS: '30'
+  MONGO_IMAGE: 'mongo:8.0'
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Install rclone
+        run: curl -fsSL https://rclone.org/install.sh | sudo bash
+
+      - name: Write the rclone config
+        env:
+          RCLONE_CONFIG_CONTENT: ${{ secrets.RCLONE_CONFIG }}
+        run: |
+          test -n "$RCLONE_CONFIG_CONTENT" || { echo "Secret RCLONE_CONFIG is empty"; exit 1; }
+          mkdir -p ~/.config/rclone
+          printf '%s\n' "$RCLONE_CONFIG_CONTENT" > ~/.config/rclone/rclone.conf
+          chmod 600 ~/.config/rclone/rclone.conf
+
+      - name: Dump the database
+        env:
+          MONGODB_URI: ${{ secrets.BACKUP_MONGODB_URI }}
+        run: |
+          test -n "$MONGODB_URI" || { echo "Secret BACKUP_MONGODB_URI is empty"; exit 1; }
+          FILE="fargaze-log-$(date -u +%Y-%m-%d).gz"
+          echo "FILE=$FILE" >> "$GITHUB_ENV"
+          mkdir -p out && chmod 777 out
+          docker run --rm -e MONGODB_URI -v "$PWD/out:/out" "$MONGO_IMAGE" \
+            sh -c "mongodump --uri=\"\$MONGODB_URI\" --db=fargaze-log --gzip --archive=/out/$FILE"
+          test -s "out/$FILE" || { echo "The archive is empty"; exit 1; }
+          ls -l "out/$FILE"
+
+      - name: Upload to Google Drive
+        run: |
+          rclone copy "out/$FILE" "$DRIVE_FOLDER"
+          rclone lsl "$DRIVE_FOLDER" --include "$FILE" | grep -q "$FILE" \
+            || { echo "Upload not found in Drive"; exit 1; }
+
+      - name: Delete backups older than ${{ env.KEEP_DAYS }} days
+        run: |
+          rclone delete "$DRIVE_FOLDER" --include "fargaze-log-*.gz" \
+            --min-age "${KEEP_DAYS}d" --drive-use-trash=false
+          echo "Backups now in Drive:"
+          rclone lsl "$DRIVE_FOLDER" --include "fargaze-log-*.gz" | sort -k4
+
+      - name: Summary
+        run: |
+          {
+            echo "### Backup $FILE"
+            echo
+            echo "| File | Size |"
+            echo "| --- | --- |"
+            echo "| $FILE | $(du -h "out/$FILE" | cut -f1) |"
+            echo
+            echo "Backups kept in Drive: $(rclone lsf "$DRIVE_FOLDER" --include 'fargaze-log-*.gz' | wc -l)"
+          } >> "$GITHUB_STEP_SUMMARY"

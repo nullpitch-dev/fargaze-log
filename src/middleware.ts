@@ -21,6 +21,7 @@ export default auth((req) => {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+		// /privacy is public: Google's OAuth consent screen links to it.
+    '/((?!_next/static|_next/image|favicon.ico|privacy).*)',
   ],
 };

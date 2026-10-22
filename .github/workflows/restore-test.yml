@@ -1,0 +1,115 @@
+# .github/workflows/restore-test.yml
+# Restore a backup into the TEST database, fargaze-log-test, then list the
+# record count of every collection beside production's.
+#
+# Started by hand only: Actions tab → "Restore backup to test" → Run workflow,
+# with a backup date (YYYY-MM-DD) or empty for the newest backup.
+#
+# It proves the backups can actually be restored, and it is the first way to
+# fill the test database. Collections in fargaze-log-test are DROPPED and
+# replaced. Production cannot be touched: the restore user may write only to
+# fargaze-log-test, so even a wrong namespace would be refused by Atlas.
+# Atlas Search indexes are not part of a dump and are not restored.
+#
+# Secrets:
+#   RESTORE_MONGODB_URI  user with readWrite on fargaze-log-test ONLY
+#   BACKUP_MONGODB_URI   the read-only user, to count production's records
+#   RCLONE_CONFIG        as in backup.yml
+
+name: Restore backup to test
+
+on:
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'Backup date (YYYY-MM-DD). Leave empty for the newest.'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: restore-test
+  cancel-in-progress: false
+
+env:
+  DRIVE_FOLDER: 'gdrive:FarGaze Backups'
+  MONGO_IMAGE: 'mongo:8.0'
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Install rclone
+        run: curl -fsSL https://rclone.org/install.sh | sudo bash
+
+      - name: Write the rclone config
+        env:
+          RCLONE_CONFIG_CONTENT: ${{ secrets.RCLONE_CONFIG }}
+        run: |
+          test -n "$RCLONE_CONFIG_CONTENT" || { echo "Secret RCLONE_CONFIG is empty"; exit 1; }
+          mkdir -p ~/.config/rclone
+          printf '%s\n' "$RCLONE_CONFIG_CONTENT" > ~/.config/rclone/rclone.conf
+          chmod 600 ~/.config/rclone/rclone.conf
+
+      - name: Pick the backup
+        env:
+          INPUT_DATE: ${{ inputs.date }}
+        run: |
+          if [ -n "$INPUT_DATE" ]; then
+            echo "$INPUT_DATE" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' \
+              || { echo "Date must look like 2026-10-21"; exit 1; }
+            FILE="fargaze-log-$INPUT_DATE.gz"
+          else
+            FILE=$(rclone lsf "$DRIVE_FOLDER" --include 'fargaze-log-*.gz' | sort | tail -n 1)
+          fi
+          test -n "$FILE" || { echo "No backup found in Drive"; exit 1; }
+          echo "FILE=$FILE" >> "$GITHUB_ENV"
+          echo "Using $FILE"
+
+      - name: Download it
+        run: |
+          mkdir -p in && chmod 777 in
+          rclone copy "$DRIVE_FOLDER/$FILE" in/
+          test -s "in/$FILE" || { echo "$FILE is not in Drive"; exit 1; }
+          ls -l "in/$FILE"
+
+      - name: Restore into fargaze-log-test
+        env:
+          MONGODB_URI: ${{ secrets.RESTORE_MONGODB_URI }}
+        run: |
+          test -n "$MONGODB_URI" || { echo "Secret RESTORE_MONGODB_URI is empty"; exit 1; }
+          docker run --rm -e MONGODB_URI -v "$PWD/in:/in" "$MONGO_IMAGE" \
+            sh -c "mongorestore --uri=\"\$MONGODB_URI\" --gzip --archive=/in/$FILE \
+                   --nsInclude='fargaze-log.*' \
+                   --nsFrom='fargaze-log.*' --nsTo='fargaze-log-test.*' \
+                   --drop"
+
+      - name: Compare record counts
+        env:
+          TEST_URI: ${{ secrets.RESTORE_MONGODB_URI }}
+          PROD_URI: ${{ secrets.BACKUP_MONGODB_URI }}
+        run: |
+          cat > count.js <<'JS'
+          const d = db.getSiblingDB(process.env.DB_NAME);
+          d.getCollectionNames().forEach(c => print(c + '\t' + d.getCollection(c).countDocuments()));
+          JS
+          count() {  # $1 = env var holding the URI, $2 = database name
+            docker run --rm -e "URI=${!1}" -e "DB_NAME=$2" -v "$PWD/count.js:/count.js:ro" "$MONGO_IMAGE" \
+              sh -c 'mongosh "$URI" --quiet --file /count.js' | LC_ALL=C sort -t "$(printf '\t')" -k1,1
+          }
+          count TEST_URI fargaze-log-test > test.tsv
+          count PROD_URI fargaze-log > prod.tsv
+          {
+            echo "### Restored $FILE into fargaze-log-test"
+            echo
+            echo "Production may have changed since the backup was taken, so a small difference in a busy collection is normal."
+            echo
+            echo "| Collection | Test (restored) | Production (now) |"
+            echo "| --- | ---: | ---: |"
+            LC_ALL=C join -t "$(printf '\t')" -a 1 -a 2 -e '—' -o 0,1.2,2.2 test.tsv prod.tsv \
+              | awk -F '\t' '{ printf "| %s | %s | %s |\n", $1, $2, $3 }'
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat test.tsv
