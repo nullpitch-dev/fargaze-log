@@ -16,7 +16,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze Log", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Data Design & Requirements Document", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 4.15  |  22 October 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 4.16  |  23 October 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
 );
 C(p([new TextRun({ text: "Structure: ", bold: true }), new TextRun("Part I Foundations · Part II Data · Part III Features · Part IV Operations · Appendices. The body is the complete, always-current source of truth; the changelog below carries one line per version. Work status, open questions and the backlog live in the separate WBS, not here.")]));
 
@@ -61,6 +61,7 @@ C(table(
     ["4.13","18 Oct 2026","JOURNEYS DISTANCE AND MAP. New collection place_coord (§6.11) from a new PlaceCoord sheet: one point per From / To name, after 집 / 회사 / 사이트 / 내차 are resolved. Points come from OpenStreetMap (Nominatim) through scripts/geocode-places.ts, which writes a CSV to paste into the sheet, plus hand entry for homes, sites and personal places; npm run migrate-place-coord loads it (§12.7). Kakao and Google search results were rejected because their terms forbid keeping results. Distance = straight line between the two points; a leg whose straight line beats its method’s speed limit (도보 15, 기차 350, 비행기 1,100, others 150 km/h; legs under 2 km never flagged) is treated as having no distance and listed in checks.tooFast. The Places tab gains a Google Maps map (JourneyMap.tsx: dots sized by arrivals, lines by journeys, 5 permanent labels, click to highlight, start view = busiest place + 50 km), 4 : 6 top-10 lists and a pop-up of places without a point. New env vars NEXT_PUBLIC_GOOGLE_MAPS_API_KEY and NOMINATIM_EMAIL. INSIGHTS PAGE: widgets grouped into foldable sections (Health with Inputs / Outcomes, Work & Social, Places & Travel), fold state per device, folded groups not mounted (§9.2.1)"],
     ["4.14","19 Oct 2026","JOURNEYS TREND VIEW shipped — §9.3.8 Trend written; WBS #63 complete. New metric=transport.trend on the shared grain × count window, anchored at min(period end, YESTERDAY). transport.ts split into prepareTransport (everything that needs all of history, done ONCE: journeys, names, distances, speed check, workplaces, 퇴근 trips, first commutes) and a per-period cut; the Summary runs it once, the Trend once per bucket, so a Month bucket always equals the Summary for that month (checked on every month of a synthetic 2½-year history; Month × 120 builds in about 0.1 s). New transport-trend.ts and JourneysTrendView.tsx: five tabs — Per day, Mix (Purpose / Method), Commute (Sleep-Session band + distance), Getting home (Latest / Average / Earliest lines) and People (rank flow with the Relation filter). SPEED CHECK RESTORED: it was written for v4.13 but lost before the push, so v4.13 shipped without it; restored to the v4.13 rule, it flags 3 legs over all history, all at 라비에벨. Summary: commute sides gain kmCoverage; people carry journeys per relation and their category is now the most frequent one, not the first logged; Most often with rows tightened. Shared charts, all additions default-off: CssTrendChart breakOnNull and listOrder (Diet, Drinking and Journeys three-line charts now list Max · Avg · Min top to bottom, like the lines); CssDualLineChart names and notes. MAP KEY (changed 18 Oct after the v4.13 docs): GOOGLE_MAPS_BROWSER_KEY, server-only, served by GET /api/maps-key to signed-in users only, so it no longer appears in the public /_next/static files; NEXT_PUBLIC_GOOGLE_MAPS_API_KEY retired (§2.4, §9.3.8, Appendix B)"],
     ["4.15","22 Oct 2026","PHASE 5 (DATA ENTRY) STARTED — new §15 records the plan agreed with Hyoje on 19–20 Oct (the live plan is the Data Entry Plan document): master lists move to the database first with admin pages; logs stay in the sheet while the app is built on a test database; a Staging tab and migration, an edit feature, and a disposable test database synced by period; cutover targeted on or before 1 Jan 2027 on any day, after which the app is the truth, the sheet is frozen and a nightly export writes the database to a spreadsheet. The entry app is ONE flexible form like a sheet row (category opens default field groups and sets required fields; any group on any record), offline-first on Android, with start and end time zones changeable per record. NIGHTLY BACKUPS shipped (§12.8): GitHub Actions mongodump → Google Drive via rclone at 02:00 UTC, 30 days kept, plus a restore-to-test workflow; first restore matched all 12 collections (46,038 log records). New Atlas users backup-reader (read only) and test-restore (readWrite on fargaze-log-test only); admin password rotated. Google Cloud: Desktop OAuth client for rclone (drive.file), consent screen published with Branding home page, privacy link and authorised domain fargaze.co; new public page /privacy (§3.3). Database size checked: 62 MB of data (39 MB stored), about 15% of the free tier. Year rollover agreed: in early January 2026 is merged into ~2025, renamed ~2026, and a 2027 tab added; the migration’s tab names move to a setting before then"],
+    ["4.16","23 Oct 2026","SHEET SURVEY (WBS #66) done — new scripts/survey-sheets.ts + src/lib/survey/sheetSurvey.ts, read-only. §10.1.5 gains the source of every column (typed, formula or either; the master tab each formula or dropdown reads; what the database stores). All 46,060 records pass the migration code, none refused, every year × category count matches the database. FULL RE-MIGRATION 23 Oct (~2025, 2026 and every master list, then the ingredient and drink fills and place_coord) — new §11.6 procedure; every master list in step with the sheet, IST stored as 5.5. Sheet facts corrected: the Active file is Active_2026Aug22 with Calendar, Happiness, FavoritePlace and PlaceCoord tabs (§4.1); records are pasted into the year tab as plain values (§4.3, §11.2); Activity P / Q / R are empty and the Bowel sheet is the only home of the bowel values (§4.1, §12.5); the migration reads cells as displayed, so accounting formats (brackets for negatives, ‘-’ for zero) lost values until changed to plain numbers (§11.6). §15: field-group rules are PER ACTIVITY with the category as fallback; activities are created only on the master page, and renaming, merging or deleting one applies to historical records; open (History) and future (Future) records must be covered by the entry feature; 심리 측정 (Happiness tab) recommended as one more field group with a one-off import, no sheet column insertion"],
   ],
   [1100, 1300, 6960]
 ));
@@ -199,20 +200,24 @@ C(
 C(new Paragraph({ children: [new TextRun({ text: "Part II · Data", bold: true, size: 28 })], spacing: { before: 280, after: 140 } }));
 
 C(h1("4. Source Data & Entry Types"));
-C(h2("4.1 File 1: Active_2026Mar05"));
+C(h2("4.1 File 1: Active_2026Aug22"));
 C(p("Contains current working data and all master/reference sheets."));
 C(table(
   ["Sheet", "Purpose", "Entry Types"],
   [
     ["Active","Current data entry — entries within last 7 days","Normal, Ongoing, All-day"],
-    ["Future","Future schedules and appointments","Future (known end), Future (unknown end), All-day"],
-    ["History","Ongoing items started >7 days ago, not yet closed","Ongoing (started >7 days ago, no end time)"],
+    ["Future","Future plans and appointments, not started yet. Not migrated; the entry feature must cover them (v4.16)","Future (known end), Future (unknown end), All-day"],
+    ["History","Open activities: started but not finished, e.g. books read in parallel over weeks. Not migrated; how the entry feature handles them is still to be designed (v4.16)","Ongoing (started >7 days ago, no end time)"],
     ["Cost","Master table for cost categories","Reference data"],
-    ["Activity","Master table for activities and reference lists. Columns P / Q / R list the allowed bowel amount / quality / characteristics values","Reference data"],
+    ["Activity","Master table for activities (A activity, B category) and reference lists (C–O; L is not loaded). (v4.16) Columns P / Q / R are empty: the bowel values live only in the Bowel sheet","Reference data"],
     ["TimeDiff","Timezone master and exchange rates","Reference data"],
     ["AlcoholConv","Alcohol unit conversion table (added v2.7)","Reference data — 54 rows (item × unit → drinks); 와인/ml added v3.1"],
     ["Ingredient","Food ingredient taxonomy (added v3.1) — level1 / level2 columns, header row 1","Reference data — 73 level2 values across 16 level1 groups (음료 and 당류 added v3.2)"],
-    ["Bowel","(added v4.9) Bowel value scores — three independent column pairs, value | score: A|B amount, C|D quality, E|F characteristics; header row 1","Reference data — 4 amounts, 9 qualities, 11 characteristics; loaded into bowel_score (§6.8)"],
+    ["Bowel","(added v4.9) Bowel value scores — three independent column pairs, value | score: A|B amount, C|D quality, E|F characteristics; header row 1. The only home of the bowel values (v4.16)","Reference data — 4 amounts, 9 qualities, 11 characteristics; loaded into bowel_score (§6.8)"],
+    ["FavoritePlace","(v4.12) Which real place 집 / 회사 / 사이트 / 내차 meant in each period (§12.6)","Reference data — loaded into favorite_place"],
+    ["PlaceCoord","(v4.13) One point per From / To name (§12.7)","Reference data — loaded into place_coord"],
+    ["Calendar","Helper sheet for the Google Calendar sync (§13.2): one ARRAYFORMULA + QUERY reading Active, Future and TimeDiff","Derived — never migrated"],
+    ["Happiness","(v4.16) 심리 측정 records (스트레스 인지, 행복감 인지, 피로도), logged here without adding columns to the entry layout; 260 formulas reading Activity and TimeDiff. Not migrated (§15)","Not yet in the database"],
   ],
   [1700, 3400, 4260]
 ));
@@ -232,12 +237,13 @@ C(
   bullet("Daily activities are entered in the Active sheet"),
   bullet("Future appointments are entered in the Future sheet"),
   bullet("When a future entry becomes today, it is moved to Active"),
-  bullet("When Active entries are older than 7 days, they are moved to the 2026 sheet"),
+  bullet("Completed Active entries are copied into the 2026 sheet and pasted as plain values: the 2026 tab holds no formulas and no dropdowns (checked v4.16)"),
   bullet("Ongoing items older than 7 days that are not yet closed stay in History"),
   bullet("At year end, 2026 data moves to ~2025 and the sheet is renamed ~2026"),
 );
 C(note("Important: Movements between sheets are purely organisational and do not require any MongoDB sync action — the MongoDB record stays unchanged regardless of which sheet the row is in."));
 C(note("Note: Active, History, and Future sheets are managed directly in Google Sheets and are NOT migrated to MongoDB. These will be brought into scope in Phase 5 when the data entry feature is built."));
+C(note("(v4.16) Header rows: the Active, Future and History sheets have TWO header rows (group, label) and records start on row 3; the year tabs have THREE (group, label, English key) and records start on row 4. The labels are worded differently between the two, but the columns line up. In the Active sheet the rows above the Preset row are the current records; the Preset row and the presets below it are templates."));
 
 
 C(h2("4.4 Entry Types by Sheet"));
@@ -286,6 +292,7 @@ C(
   bullet("Duration is #NUM — these are valid ongoing or open-ended entries"),
   bullet("End time is empty — these are valid future or ongoing entries"),
 );
+C(note("(v4.16) Two consequences found by the survey. A row with an empty category is Hyoje’s end-of-sheet marker (~2025 row 41344) and is meant to be skipped. An activity missing from the Activity sheet makes the category formula show #N/A, and the row is then skipped silently — not counted as an error. In the sheet that #N/A is the check that an activity exists; it is deliberate that column B has no dropdown."));
 
 
 
@@ -1620,6 +1627,31 @@ C(table(["Column","0-based Index","Field"],[
   ["CH","85","sync.eventId (was col 83)"],
 ],[2200,2200,4960]));
 C(note("Two numbering systems are in use and they differ by one. The index column above is 0-based, as used by rowToDocument.ts. Google Apps Script getRange() is 1-based, so CG is column number 85 and CH is column number 86. See Section 13 for the sync script that writes to those two columns."));
+C(bold("Source of each column (survey, v4.16)"));
+C(p("Read from the Active sheet’s current records and presets with scripts/survey-sheets.ts. The year tabs hold the same columns as plain values. The database stores every column below as a value except V–Z, so the nightly export (Phase 5) writes stored values and computes only the duration."));
+C(table(["Columns","In the Active sheet","Reads","Database"],[
+  ["A","Formula: category of the activity in B","Activity A:B","activity.category"],
+  ["B","Typed, no dropdown (an unknown activity shows #N/A in A)","—","activity.name"],
+  ["F","Typed, dropdown","Activity C (8 values)","activity.crossActivity (default 평시)"],
+  ["G","Formula: 타인 / 함께 / 혼자 from people method in BB","—","activity.relationship"],
+  ["H","Typed, no dropdown","—","start.timezone"],
+  ["L, S","Formula: weekday from the date","—","start / end.weekday"],
+  ["M, T","Typed, or a formula copying the start time or the previous end time","—","start / end.hour"],
+  ["N, U","Formula: offset of the zone in H / O","TimeDiff A:B","start / end.timezoneOffset (fractions kept: IST 5.5)"],
+  ["O–R","Formula copying the start zone and date; typed over when the end differs","—","end.timezone / year / month / day"],
+  ["V–Z","Formula: duration as d, h, m, s and a ‘1h 30m’ text","—","Not read; duration.totalSeconds is computed by the migration"],
+  ["AD, AE","Either one typed, the other a formula through the exchange rate","TimeDiff A:B (currencies)","cost.amountKRW, cost.amountForeign — both stored, so the server never needs the rates"],
+  ["AG","Typed, no dropdown","—","cost.categoryDetail"],
+  ["AH","Formula (sometimes typed): category of the detail in AG","Cost A:B","cost.category"],
+  ["AL","Typed, dropdown","Activity G","food.type"],
+  ["AM, AN, AO","Typed, dropdown (H / M / L)","Activity E — spiciness uses the nutrient-level list too","food.carbs / fat / spiciness"],
+  ["BB, BC","Typed, dropdown","Activity M, Activity N","people[].method / category"],
+  ["BG, BH, BI","Typed, dropdown","Activity I, J, K","transport.purpose / method / returnType"],
+  ["BO","Formula: weight × body-fat %","—","body.bodyFat"],
+  ["D","Typed; one fuel-economy formula (km/l) in a preset","—","activity.additionalInfo"],
+  ["All others","Typed","—","As in the table above"],
+],[1500,3300,2200,2360]));
+C(note("(v4.16) Each dropdown reads a FIXED range with one spare row (C2:C10 holds 8 values, for example), so adding a second new value needs the range widened. Columns with no dropdown — activity, time zones, cost detail, bowel values, alcohol items — are checked only by the migration (bowel, ingredients) or by the #N/A formula (activity). Future uses the same formulas as Active; some History rows keep older, wider dropdown ranges."));
 C(spacer());
 C(h3("10.1.6 Food Ingredient Parsing"));
 C(p("Food items in column AT may carry an inline ingredient list in parentheses, using the pipe (|) separator inside the parentheses. This is parsed at migration time by parseFoodIngredients() in transform.ts, which runs AFTER the comma-split and plus-split steps, on each individual food token."));
@@ -1785,10 +1817,10 @@ C(spacer());
 
 C(h1("11. Daily Data Routine"));
 C(h2("11.1 Overview"));
-C(p("This section documents the day-to-day workflow for keeping MongoDB in sync with the Google Sheets source, including ingredient population. The routine applies whenever source data changes — most commonly when yesterday's entries are moved from the Active sheet into the 2026 archive sheet."));
+C(p("This section documents the day-to-day workflow for keeping MongoDB in sync with the Google Sheets source, including ingredient population. The routine applies whenever source data changes — most commonly when yesterday's entries are copied from the Active sheet and pasted into the 2026 archive sheet as plain values."));
 C(h2("11.2 The Routine — Step by Step"));
 C(table(["Step","Command","What it does"],[
-  ["1. Drop in new data","(manual, in Google Sheets)","Move yesterday's completed entries from the Active sheet into the 2026 archive sheet. Use the parenthesis ingredient notation on food AND drink items, e.g. 밥(쌀)+계란(계란) and 라떼(커피|우유). Items without parentheses become [\"Not Defined\"] and are repaired in steps 3-4."],
+  ["1. Drop in new data","(manual, in Google Sheets)","Copy yesterday's completed entries from the Active sheet and paste them into the 2026 archive sheet as plain values. Use the parenthesis ingredient notation on food AND drink items, e.g. 밥(쌀)+계란(계란) and 라떼(커피|우유). Items without parentheses become [\"Not Defined\"] and are repaired in steps 3-4."],
   ["2. Migrate","npm run migrate","Deletes all 2026 documents (Log.deleteMany({ userId, 'start.year': 2026 })) and rebuilds them from the 2026 sheet. Foods with parenthesis notation get their ingredients directly from parseFoodIngredients; foods without get [\"Not Defined\"]."],
   ["3. Fill ingredients","npx tsx scripts/fill-historical-ingredients.ts","Repairs every food item whose ingredients are missing or [\"Not Defined\"] using the embedded REVIEWED_MAP + bestGuess fallback. Skips items that already have real ingredients (including today's properly-parenthesised rows)."],
   ["4. Fill drinks","npx tsx scripts/fill-historical-drinks.ts","Same as step 3 but for food.drinks[].ingredients, using the DRINK_MAP. Independent of the foods fill; order between them does not matter."],
@@ -1811,6 +1843,19 @@ C(h2("11.5 Cleaning Legacy Parentheses"));
 C(p("Old source rows that used descriptive (non-ingredient) parentheses — e.g. 소고기 국밥(국만), 짬뽕(국물만), 소고기 미역국(밥만), 아이스크림(와일드바디), 회(도다리 세꼬시와 광어) — will be rejected by parseFoodIngredients because the text in parentheses is not a valid level2 value. Run scripts/scan-bad-parens.ts to list every offending row, then fix them in the sheet (remove the descriptive parentheses, or convert to real ingredient notation), and re-migrate. After cleaning, reconcile should report gap = 0 and errors = 0."));
 
 
+
+C(h2("11.6 Full Re-migration (v4.16)"));
+C(p("Needed when cells in ~2025 or any master tab change. Last run 23 Oct 2026, after the survey's clean-up; a second survey then showed every master list in step and every year × category count matching."));
+C(
+  bullet("1. Run the backup workflow by hand (GitHub → Actions → backup → Run workflow) and wait for a green run"),
+  bullet("2. In scripts/migrate.ts uncomment the five master calls (cost, activity, reference lists, time zones, exchange rates) and the three lines of the ~2025 block. Leave migrateAlcoholConversion commented: that function lives in scripts/migrate-alcohol-conversion.ts, not in migrate.ts, so uncommented it would stop the run after the master lists and before any records"),
+  bullet("3. npm run migrate — Errors must be 0"),
+  bullet("4. npx tsx scripts/fill-historical-ingredients.ts, then npx tsx scripts/fill-historical-drinks.ts — re-inserting ~2025 resets every older food and drink without brackets to Not Defined (§11.3)"),
+  bullet("5. npm run migrate-place-coord (and the other master scripts of §12 if their tabs changed)"),
+  bullet("6. Comment the lines out again"),
+  bullet("7. npx tsx --tsconfig tsconfig.json scripts/survey-sheets.ts — the report's findings should list no master list out of step, no refused rows and no count differences"),
+);
+C(note("The migration reads every cell AS DISPLAYED (the Sheets API's formatted value). Accounting formats showed negatives in brackets and zeros as ‘-’, so those amounts were lost until the cells were changed to plain numbers (23 Oct). The same applies to decimals: an offset cell formatted with no decimals would store 6 for IST. Keep numeric cells in plain number formats."));
 
 C(h1("12. Master-Table Update Procedures"));
 C(p("FarGaze has three master tables seeded from the Active spreadsheet: the alcohol conversion table, the ingredient taxonomy and (v4.9) the bowel scores. This section is the canonical procedure for updating each."));
@@ -1872,7 +1917,7 @@ C(spacer());
 C(h2("12.5 Updating Bowel Scores (bowel_score, v4.9)"));
 C(p("bowel_score holds both the allowed bowel values and their scores (§6.8). To change a score or add a value:"));
 C(
-  num("Edit the Bowel sheet in the Active spreadsheet — value | score pairs in A|B (amount), C|D (quality), E|F (characteristics). A new value should also be added to the Activity sheet list (columns P / Q / R) so it can be picked when logging"),
+  num("Edit the Bowel sheet in the Active spreadsheet — value | score pairs in A|B (amount), C|D (quality), E|F (characteristics). The Bowel sheet is the only home of these values (v4.16); Activity P / Q / R are empty and there is no dropdown in the entry sheets"),
   num("Run npm run migrate-bowel — delete-all + re-insert. It refuses to touch the collection if any row has a value without a score or a score without a value, and prints the three lists with their scores for checking"),
   num("A score change needs nothing else: the widget reads bowel_score at query time. A NEW value must be loaded before the next npm run migrate, or every row using it is rejected"),
 );
@@ -2104,7 +2149,7 @@ C(h2("14.10 Sheet Anomalies Found"));
 C(p("Records whose end is before their start (drawn as points until corrected in the sheet): 6ab7da3f5ef99b2c70d6c1eb and 6ab7da3f5ef99b2c70d6c1f4 (December 2019), 6ab7da445ef99b2c70d71fd8 (July 2021), and three in 2025 whose ids are listed by /api/calendar?from=2025-01-01&to=2025-12-31 under diagnostics.endBeforeStartIds."));
 
 // ===== 15. DATA ENTRY (PHASE 5) =====
-C(h1("15. Data Entry (Phase 5, v4.15)"));
+C(h1("15. Data Entry (Phase 5, v4.15–v4.16)"));
 C(p("Started 19 Oct 2026. The live plan, with its risk register and next steps, is the Data Entry Plan document (" + "https://claude.ai/code/artifact/1061a843-f14f-4b79-bef0-d34608dc3c1e" + "); this section records what was agreed and why. Target: cutover on or before 1 January 2027."));
 C(h2("15.1 Stages"));
 C(table(["Stage","Truth for logs","What happens"],[
@@ -2116,18 +2161,22 @@ C(spacer());
 C(h2("15.2 Decisions"));
 C(
   bullet("The app is independent: it never reads or writes the sheet. The sheet is Hyoje’s own tool (19 Oct)"),
-  bullet("One flexible entry form, like a sheet row: choosing a category opens its usual field groups and sets its required fields (대변 must have bowel data), any group can be added to any record, and no category has a page of its own. The category → field-group rules are data, seeded from a survey of which columns each category has used (20 Oct)"),
+  bullet("One flexible entry form, like a sheet row (20 Oct): choosing an ACTIVITY opens its usual field groups and sets its required fields (대변 must have bowel data); any group can be added to any record, and no activity or category has a page of its own. The rules are per activity, with the category’s rules as the fallback for new or rarely used activities (23 Oct — a category is too coarse: 생리 holds 대변, 수면 and 대변 실패). They are data, seeded from the survey (§15.4) and edited on an admin page"),
   bullet("Offline-first installable web app (PWA) in the existing Next.js project; the phone is Android, so waiting entries upload in the background when a signal returns. Each entry gets its ID on the phone, so a retry never duplicates; airplane mode works the same way"),
   bullet("Time zones: the phone’s zone is only the default; start and end zones are set separately per record (a flight can use departure and arrival zones; a future schedule the zone where it happens); the offset comes from the zone and the date"),
   bullet("Cutover on any day, at a quiet moment so no record straddles it; records starting before it belong to the sheet"),
   bullet("Year rollover: until 31 Dec daily records go in the 2026 tab. In early January 2026 is merged into ~2025, which is renamed ~2026 (archive, never for daily entry), and a 2027 tab is added; the migration reads its tab names from a setting, done before then. If the app is live by then, the sheet takes no daily records"),
   bullet("Test database fargaze-log-test on the same cluster; production holds 62 MB of data (about 15% of the free tier), so a full-history copy fits"),
   bullet("Backups first: shipped 22 Oct (§12.8)"),
+  bullet("(23 Oct) The category → activity structure keeps changing, so the UI is flexible but the data precise: a record’s activity must exist in the activity list. A new activity is created only on the master admin page, never from the entry form. Renaming, merging or deleting an activity or category there is applied to the historical records too; before cutover the same change must also reach the sheet, or the next full migration undoes it"),
+  bullet("(23 Oct) Open activities (the History sheet) and future plans (the Future sheet) are not migrated today; the entry feature must cover both. How open activities are handled is still to be designed"),
+  bullet("(23 Oct, open) 심리 측정, logged in the Happiness tab: recommended as one more field group in the entry app before cutover, with a one-off import of the Happiness history; no column insertion in the sheet during the build (it would touch five tabs, the Calendar script’s write-back numbers (§13.5), the migration’s column map and the survey)"),
+  bullet("(23 Oct) Exchange rates: the sheet is correct. The server reads no rates today, because each record stores both amounts"),
 );
 C(h2("15.3 Order of work"));
 C(
   bullet("1. Nightly backups and a rehearsed restore — done 22 Oct"),
-  bullet("2. Read-only survey: master tabs and the sheet columns that use them, typed vs formula columns, which columns each category uses"),
+  bullet("2. Read-only survey: master tabs and the sheet columns that use them, typed vs formula columns, which columns each activity uses — done 23 Oct (§15.4)"),
   bullet("3. Master lists out of the migration; generic admin editor in production"),
   bullet("4. Staging tab and migration, with the duplicate and year-tab checks"),
   bullet("5. Test database sync by period"),
@@ -2137,6 +2186,16 @@ C(
   bullet("9. Year rollover setting (before January)"),
   bullet("10. Cutover"),
 );
+C(h2("15.4 Sheet Survey (23 Oct)"));
+C(p("scripts/survey-sheets.ts (read-only; run in WSL, ~20 s) writes myfiles/survey/survey-YYYY-MM-DD.md and .json. It reads the Active, Future and History sheets cell by cell (formulas, dropdowns, values), every tab’s formulas, the master tabs, both year tabs, and the database (find / aggregate only). Every year-tab row goes through the migration’s own row filter and rowToDocument, so the figures are what the database stores. The analysis is in src/lib/survey/sheetSurvey.ts (pure)."));
+C(table(["Part","Result on 23 Oct"],[
+  ["Tabs and dependencies","Active_2026Aug22: 13 tabs. The entry sheets read Activity (category formula, 10 dropdown columns), TimeDiff (offsets, exchange rates) and Cost (cost category). Calendar reads Active, Future and TimeDiff; Happiness reads Activity and TimeDiff (§4.1, §10.1.5)"],
+  ["Typed vs formula","See §10.1.5 — only V–Z (duration) are not stored and must be computed by the export"],
+  ["Migration","46,061 rows read, 46,060 records accepted (the other is the end-of-sheet marker); none refused; sheet and database counts match for every year × category"],
+  ["Master lists","After the full re-migration (§11.6) all 21 lists match the database: cost 136, activities 254, 12 reference lists, time zones 18, currencies 3, alcohol 56, ingredients 75, bowel 24, favourite places 14, place points 343"],
+  ["Cleaned in the sheet","Accounting formats (negatives in brackets, zeros as ‘-’) changed to plain numbers; a few typing slips (text in cost cells, purchase / food amounts without an item)"],
+  ["Field-group rules","Per activity (activities with 20+ records listed in the report’s §9b; all in the .json). Examples: 대변 → bowel, 수면 → sleep, 체중 → body, 식사 → foods, 음료 → drinks, 이동 → 이동, 라운드 → golf (all 100%); 음주 → alcohol 97%. Thresholds: required ≥ 98%, default ≥ 50%, on the last 12 months when the activity has 20+ records in them, otherwise on all years. Time, place, cross activity and relationship are filled for every record — the app should fill these itself rather than ask"],
+],[2200,7160]));
 C(spacer());
 
 C(new Paragraph({ children: [new TextRun({ text: "Appendices", bold: true, size: 28 })], spacing: { before: 280, after: 140 } }));
@@ -2192,6 +2251,8 @@ C(table(["Path","Purpose"],[
   [".github/workflows/backup.yml","(v4.15) Nightly backup: mongodump → Google Drive (rclone), 30 days kept (§12.8)"],
   [".github/workflows/restore-test.yml","(v4.15) Restore a backup into fargaze-log-test and compare record counts with production (§12.8)"],
   ["src/app/privacy/page.tsx","(v4.15) Public privacy notice for the Google consent screen; excluded from the middleware matcher (§3.3)"],
+  ["scripts/survey-sheets.ts","(v4.16) Read-only sheet survey (§15.4): writes myfiles/survey/survey-YYYY-MM-DD.md and .json"],
+  ["src/lib/survey/sheetSurvey.ts","(v4.16) The survey's analysis: cell kinds, formula shapes, dropdown and master-tab checks, field-group usage by category and activity, master-list comparison. Pure"],
   ["src/app/api/maps-key/route.ts","(v4.14) GET /api/maps-key — returns GOOGLE_MAPS_BROWSER_KEY to a signed-in user only (403 otherwise), Cache-Control private, no-store"],
   ["src/models/PlaceCoord.ts","(v4.13) place_coord model; unique index { userId, name }"],
   ["src/lib/migration/placeCoord.ts","(v4.13) parseCoords, buildPlaceCoords (parse + validate the PlaceCoord sheet; blank Coords = listed, no point) and sheetNames. Pure"],
@@ -2296,7 +2357,7 @@ C(table(["Path","Purpose"],[
 C(spacer());
 
 // ===== FOOTER =====
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.15 — 22 October 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.16 — 23 October 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 
 // ===== DOCUMENT ASSEMBLY =====
@@ -2333,6 +2394,6 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-Log-Data-Design-v4.15.docx", buffer);
-  console.log("Wrote FarGaze-Log-Data-Design-v4.15.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-Log-Data-Design-v4.16.docx", buffer);
+  console.log("Wrote FarGaze-Log-Data-Design-v4.16.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });

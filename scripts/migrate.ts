@@ -65,7 +65,7 @@ async function migrateSheet(
       docsToInsert.push(doc);
     } catch (error: any) {
       errors++;
-      console.error(`  ⚠️  Row ${i + 3}: ${error.message}`);
+			console.error(`  ⚠️  Row ${i + startRow}: ${error.message}`);
     }
   }
 
