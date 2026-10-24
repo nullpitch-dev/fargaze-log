@@ -119,7 +119,7 @@ export const DESIGN_TABS_ELSEWHERE: Record<string, string> = {
 };
 export const MIGRATION_TABS: Record<string, string> = {
   Cost: 'migrate.ts → cost_master (commented out)',
-  Activity: 'migrate.ts → activity_master + reference_lists (commented out)',
+	Activity: 'migrate.ts → activity_master (commented out); reference lists edited on admin pages',
   TimeDiff: 'migrate.ts → timezone_master + exchange_rate (commented out)',
   AlcoholConv: 'npm run migrate-alcohol → alcohol_conversion',
   Ingredient: 'npm run migrate-ingredient → ingredient_master',
@@ -136,15 +136,12 @@ export const DROPDOWN_EXPECTATIONS: DropdownExpectation[] = [
   { source: 'Activity', col: 'C', what: 'reference list activity.crossActivity', logCols: [5] },
   { source: 'Activity', col: 'D', what: 'reference list activity.relationship', logCols: [6] },
   { source: 'Activity', col: 'E', what: 'reference list nutrient_level', logCols: [38, 39] },
-  { source: 'Activity', col: 'F', what: 'reference list food.drinks.note', logCols: [44] },
   { source: 'Activity', col: 'G', what: 'reference list food.type', logCols: [37] },
-  { source: 'Activity', col: 'H', what: 'reference list food.foods.note', logCols: [48] },
   { source: 'Activity', col: 'I', what: 'reference list transport.purpose', logCols: [58] },
   { source: 'Activity', col: 'J', what: 'reference list transport.method', logCols: [59] },
   { source: 'Activity', col: 'K', what: 'reference list transport.returnType', logCols: [60] },
   { source: 'Activity', col: 'M', what: 'reference list people.method', logCols: [53] },
   { source: 'Activity', col: 'N', what: 'reference list people.category', logCols: [54] },
-  { source: 'Activity', col: 'O', what: 'reference list food.alcohols.item', logCols: [49] },
   { source: 'Activity', col: 'P', what: 'bowel amounts (design §4.1)', logCols: [61] },
   { source: 'Activity', col: 'Q', what: 'bowel qualities (design §4.1)', logCols: [62] },
   { source: 'Activity', col: 'R', what: 'bowel characteristics (design §4.1)', logCols: [63] },
@@ -152,20 +149,18 @@ export const DROPDOWN_EXPECTATIONS: DropdownExpectation[] = [
   { source: 'TimeDiff', col: 'A', what: 'time zone codes (timezone_master)', logCols: [7, 14] },
 ];
 
-// migrateReferenceLists in scripts/migrate.ts — same names, same Activity columns.
+// The reference lists the database holds (src/lib/admin/lists.ts) and the Activity
+// column each came from. F, H and O were retired on 24 Oct 2026.
 export const REFERENCE_LISTS: { name: string; col: number }[] = [
   { name: 'activity.crossActivity', col: 2 },
   { name: 'activity.relationship', col: 3 },
   { name: 'nutrient_level', col: 4 },
-  { name: 'food.drinks.note', col: 5 },
   { name: 'food.type', col: 6 },
-  { name: 'food.foods.note', col: 7 },
   { name: 'transport.purpose', col: 8 },
   { name: 'transport.method', col: 9 },
   { name: 'transport.returnType', col: 10 },
   { name: 'people.method', col: 12 },
   { name: 'people.category', col: 13 },
-  { name: 'food.alcohols.item', col: 14 },
 ];
 
 // ── CELLS ────────────────────────────────────────────────────────────────────

@@ -238,7 +238,7 @@ async function main() {
     ...REFERENCE_LISTS.map(l => diffKeys(
       `Activity ${colLetter(l.col)} → reference_lists ${l.name}`,
       SHEET_KEYS.referenceList(master.Activity, l.col),
-      (refDocs.find(d => d.listName === l.name)?.values ?? []).map((v: any) => String(v).trim()),
+			refDocs.filter(d => d.listName === l.name).sort((a, b) => a.order - b.order).map(d => String(d.value).trim()),
     )),
     diffKeys('TimeDiff (zones) → timezone_master', SHEET_KEYS.timezone(master.TimeDiff), DB_KEYS.timezone(await lean(TimezoneMaster))),
     diffKeys('TimeDiff (currencies) → exchange_rate', SHEET_KEYS.exchange(master.TimeDiff), DB_KEYS.exchange(await lean(ExchangeRate))),
@@ -256,7 +256,6 @@ async function main() {
     diffKeys('Bowel amounts: Activity P against Bowel A', actCol(15), bowelSheet(0)),
     diffKeys('Bowel qualities: Activity Q against Bowel C', actCol(16), bowelSheet(2)),
     diffKeys('Bowel characteristics: Activity R against Bowel E', actCol(17), bowelSheet(4)),
-    diffKeys('Alcohol items: Activity O against AlcoholConv A', actCol(14), master.AlcoholConv.map(r => (r[0] ?? '').toString().trim()).filter(Boolean)),
   ];
 
   await mongoose.disconnect();
@@ -413,7 +412,7 @@ async function main() {
     dropdowns.unexpected.forEach(u => say(`- ${u.letter} (${u.field ?? 'not read'}): ${esc(u.rule)}`));
     say();
   }
-  say('Activity column L is not loaded by `migrateReferenceLists` (it skips from K to M).');
+	say('Activity columns F, H, L and O are not reference lists in the database (F, H and O retired on 24 Oct 2026).');
   say();
 
   // 5. Master tabs

@@ -11,7 +11,6 @@ import { rowToDocument } from '../src/lib/migration/rowToDocument';
 import Log from '../src/models/Log';
 import CostMaster from '../src/models/CostMaster';
 import ActivityMaster from '../src/models/ActivityMaster';
-import ReferenceList from '../src/models/ReferenceList';
 import TimezoneMaster from '../src/models/TimezoneMaster';
 import ExchangeRate from '../src/models/ExchangeRate';
 import AlcoholConversion from '../src/models/AlcoholConversion';
@@ -123,38 +122,8 @@ async function migrateActivityMaster(spreadsheetId: string, userId: string) {
   console.log(`  ✅ Inserted: ${inserted}`);
 }
 
-async function migrateReferenceLists(spreadsheetId: string, userId: string) {
-  console.log('\n📋 Migrating: reference_lists');
-
-  const rows = await getSheetData(spreadsheetId, 'Activity', 2);
-
-  // Column indices for reference lists (0-based, columns C to N)
-  const lists = [
-    { name: 'activity.crossActivity', col: 2 },
-    { name: 'activity.relationship', col: 3 },
-    { name: 'nutrient_level', col: 4 },
-    { name: 'food.drinks.note', col: 5 },
-    { name: 'food.type', col: 6 },
-    { name: 'food.foods.note', col: 7 },
-    { name: 'transport.purpose', col: 8 },
-    { name: 'transport.method', col: 9 },
-    { name: 'transport.returnType', col: 10 },
-    { name: 'people.method', col: 12 },
-    { name: 'people.category', col: 13 },
-    { name: 'food.alcohols.item', col: 14 },
-  ];
-
-  await ReferenceList.deleteMany({ userId });
-
-  for (const list of lists) {
-    const values = rows
-      .map(row => row[list.col]?.toString().trim())
-      .filter(v => v && v !== '');
-    const unique = [...new Set(values)];
-    await ReferenceList.create({ userId, listName: list.name, values: unique });
-    console.log(`  ✅ ${list.name}: ${unique.length} values`);
-  }
-}
+// Reference lists are edited on the admin pages since 24 Oct 2026 (#67);
+// the loader that read them from the Activity tab was removed.
 
 async function migrateTimezoneMaster(spreadsheetId: string, userId: string) {
   console.log('\n📋 Migrating: timezone_master');
@@ -205,7 +174,6 @@ async function main() {
   await Log.syncIndexes();
   await CostMaster.syncIndexes();
   await ActivityMaster.syncIndexes();
-  await ReferenceList.syncIndexes();
   await TimezoneMaster.syncIndexes();
   await ExchangeRate.syncIndexes();
   await AlcoholConversion.syncIndexes();
@@ -227,7 +195,6 @@ async function main() {
   // ── RARELY NEEDED — uncomment when supporting collections change ──────────
   // await migrateCostMaster(process.env.SPREADSHEET_ID_ACTIVE!, userId);
   // await migrateActivityMaster(process.env.SPREADSHEET_ID_ACTIVE!, userId);
-  // await migrateReferenceLists(process.env.SPREADSHEET_ID_ACTIVE!, userId);
   // await migrateTimezoneMaster(process.env.SPREADSHEET_ID_ACTIVE!, userId);
   // await migrateExchangeRate(process.env.SPREADSHEET_ID_ACTIVE!, userId);
   // await migrateAlcoholConversion(process.env.SPREADSHEET_ID_ACTIVE!, userId);
