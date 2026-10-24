@@ -46,6 +46,18 @@ export interface UsageSpec {
   when?: Record<string, string>;
 }
 
+/** Where a list lives in the sheet, so each change can say what to repeat there. */
+export interface SheetPlace {
+  /** e.g. "Cost tab"; a function when it depends on the row (bowel_score) */
+  where: string | ((values: Record<string, unknown>) => string);
+  /** the list's columns in the sheet's left-to-right order */
+  order: string[];
+  /** reference lists: one column of the Activity tab */
+  column?: string;
+  /** the Active sheet dropdown(s) that read this list */
+  dropdown?: string;
+}
+
 export interface ListDef {
   slug: string;
   title: string;
@@ -57,32 +69,37 @@ export interface ListDef {
   sort: Record<string, 1 | -1>;
   usage?: UsageSpec[];
   recordsFollow?: boolean;
+  /** Columns that never change on an existing row here, used or not: lists without a
+   *  record count, whose names records refer to (place points, favourite places).
+   *  Renaming them must also change the records, so it waits for rename (step 3). */
+  fixedOnEdit?: string[];
   /** Shown under the title. */
   note?: string;
+  sheet: SheetPlace;
 }
 
 // ── Reference lists (one entry each) ─────────────────────────────────────────
 
-export interface ReferenceListName { listName: string; title: string; usage: UsageSpec[] }
+export interface ReferenceListName { listName: string; title: string; usage: UsageSpec[]; column: string; dropdown?: string }
 
 export const REFERENCE_LIST_NAMES: ReferenceListName[] = [
-  { listName: 'activity.crossActivity', title: 'Cross activity',
+  { listName: 'activity.crossActivity', column: 'C', dropdown: 'Active F', title: 'Cross activity',
     usage: [{ key: { value: 'activity.crossActivity' } }] },
-  { listName: 'activity.relationship', title: 'Relationship',
+  { listName: 'activity.relationship', column: 'D', title: 'Relationship',
     usage: [{ key: { value: 'activity.relationship' } }] },
-  { listName: 'nutrient_level', title: 'Nutrient level',
+  { listName: 'nutrient_level', column: 'E', dropdown: 'Active AM, AN and AO', title: 'Nutrient level',
     usage: [{ key: { value: 'food.carbs' } }, { key: { value: 'food.fat' } }, { key: { value: 'food.spiciness' } }] },
-  { listName: 'food.type', title: 'Food type',
+  { listName: 'food.type', column: 'G', dropdown: 'Active AL', title: 'Food type',
     usage: [{ key: { value: 'food.type' } }] },
-  { listName: 'transport.purpose', title: 'Transport purpose',
+  { listName: 'transport.purpose', column: 'I', dropdown: 'Active BG', title: 'Transport purpose',
     usage: [{ key: { value: 'transport.purpose' } }] },
-  { listName: 'transport.method', title: 'Transport method',
+  { listName: 'transport.method', column: 'J', dropdown: 'Active BH', title: 'Transport method',
     usage: [{ key: { value: 'transport.method' } }] },
-  { listName: 'transport.returnType', title: 'Return type',
+  { listName: 'transport.returnType', column: 'K', dropdown: 'Active BI', title: 'Return type',
     usage: [{ key: { value: 'transport.returnType' } }] },
-  { listName: 'people.method', title: 'People method',
+  { listName: 'people.method', column: 'M', dropdown: 'Active BB', title: 'People method',
     usage: [{ unwind: ['people'], key: { value: 'people.method' } }] },
-  { listName: 'people.category', title: 'People category',
+  { listName: 'people.category', column: 'N', dropdown: 'Active BC', title: 'People category',
     usage: [{ unwind: ['people'], key: { value: 'people.category' } }] },
 ];
 
@@ -99,6 +116,7 @@ const referenceDefs: ListDef[] = REFERENCE_LIST_NAMES.map(r => ({
   unique: ['value'],
   sort: { order: 1 },
   usage: r.usage,
+  sheet: { where: `Activity tab, column ${r.column}`, order: ['value'], column: r.column, dropdown: r.dropdown },
 }));
 
 // ── All lists ────────────────────────────────────────────────────────────────
@@ -118,6 +136,7 @@ export const LISTS: ListDef[] = [
     usage: [{ key: { name: 'activity.name', category: 'activity.category' } }],
     recordsFollow: true,
     note: 'An activity name is unique across all categories.',
+    sheet: { where: 'Activity tab', order: ['name', 'category'] },
   },
   {
     slug: 'cost',
@@ -132,6 +151,7 @@ export const LISTS: ListDef[] = [
     sort: { category: 1, categoryDetail: 1 },
     usage: [{ key: { categoryDetail: 'cost.categoryDetail', category: 'cost.category' } }],
     recordsFollow: true,
+    sheet: { where: 'Cost tab', order: ['categoryDetail', 'category'] },
   },
   ...referenceDefs,
   {
@@ -149,6 +169,7 @@ export const LISTS: ListDef[] = [
     unique: ['item', 'unit'],
     sort: { item: 1, unit: 1 },
     usage: [{ unwind: ['food.alcohols'], key: { item: 'food.alcohols.item', unit: 'food.alcohols.unit' } }],
+    sheet: { where: 'AlcoholConv tab', order: ['item', 'unit', 'unitTo50ml', 'alcoholRatio', 'drinks'] },
   },
   {
     slug: 'ingredient',
@@ -165,6 +186,7 @@ export const LISTS: ListDef[] = [
       { unwind: ['food.foods', 'food.foods.ingredients'], key: { level2: 'food.foods.ingredients' } },
       { unwind: ['food.drinks', 'food.drinks.ingredients'], key: { level2: 'food.drinks.ingredients' } },
     ],
+    sheet: { where: 'Ingredient tab', order: ['level1', 'level2'] },
   },
   {
     slug: 'bowel',
@@ -183,6 +205,10 @@ export const LISTS: ListDef[] = [
       { when: { field: 'quality' }, unwind: ['bowel.quality'], key: { value: 'bowel.quality' } },
       { when: { field: 'characteristics' }, unwind: ['bowel.characteristics'], key: { value: 'bowel.characteristics' } },
     ],
+    sheet: {
+      where: v => `Bowel tab, columns ${({ amount: 'A–B', quality: 'C–D', characteristics: 'E–F' } as Record<string, string>)[String(v.field)] ?? '?'} (${v.field})`,
+      order: ['value', 'score'],
+    },
   },
   {
     slug: 'timezone',
@@ -198,6 +224,7 @@ export const LISTS: ListDef[] = [
     unique: ['code'],
     sort: { offsetUTC: 1, code: 1 },
     usage: [{ key: { code: 'start.timezone' } }, { key: { code: 'end.timezone' } }],
+    sheet: { where: 'TimeDiff tab (time zones)', order: ['code', 'offsetUTC', 'ianaTimezone', 'city'] },
   },
   {
     slug: 'exchange',
@@ -211,6 +238,7 @@ export const LISTS: ListDef[] = [
     unique: ['currency'],
     sort: { currency: 1 },
     usage: [{ key: { currency: 'cost.currency' } }],
+    sheet: { where: 'TimeDiff tab (exchange rates)', order: ['currency', 'rateKRW'] },
   },
   {
     slug: 'favorite-place',
@@ -226,6 +254,8 @@ export const LISTS: ListDef[] = [
     unique: ['label', 'from'],
     sort: { label: 1, 'from.at': 1 },
     note: 'Which real place 집 / 회사 / 사이트 / 내차 meant between two moments. Both ends are inclusive; an empty end is open.',
+    sheet: { where: 'FavoritePlace tab', order: ['label', 'name', 'from', 'to'] },
+    fixedOnEdit: ['label', 'name'],
   },
   {
     slug: 'place-coord',
@@ -241,6 +271,8 @@ export const LISTS: ListDef[] = [
     unique: ['name'],
     sort: { name: 1 },
     note: 'One name = one point. Names are as logged after 집 / 회사 / 사이트 / 내차 are resolved.',
+    sheet: { where: 'PlaceCoord tab', order: ['name', 'coords', 'source', 'note'] },
+    fixedOnEdit: ['name'],
   },
 ];
 
@@ -276,4 +308,17 @@ export function toRow(def: ListDef, doc: any): RowOut {
 /** Joins the values of the given columns into one comparable key. */
 export function rowKey(values: Record<string, unknown>, cols: string[]): string {
   return cols.map(c => String(values[c] ?? '').trim()).join('\u0001');
+}
+
+// ── Columns that records point to ────────────────────────────────────────────
+
+/** Columns that records point to (plus bowel's field). On a row that records use,
+ *  these change only through rename / merge (step 3); every other column is free. */
+export function lockedColumns(def: ListDef): string[] {
+  const out = new Set<string>();
+  for (const u of def.usage ?? []) {
+    Object.keys(u.key).forEach(k => out.add(k));
+    Object.keys(u.when ?? {}).forEach(k => out.add(k));
+  }
+  return [...out];
 }
