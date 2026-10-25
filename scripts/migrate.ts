@@ -14,6 +14,7 @@ import ActivityMaster from '../src/models/ActivityMaster';
 import TimezoneMaster from '../src/models/TimezoneMaster';
 import ExchangeRate from '../src/models/ExchangeRate';
 import AlcoholConversion from '../src/models/AlcoholConversion';
+import MasterChange from '../src/models/MasterChange';
 
 // ── GOOGLE SHEETS ─────────────────────────────────────────────────────────────
 
@@ -179,7 +180,25 @@ async function main() {
   await AlcoholConversion.syncIndexes();
   console.log('✅ Indexes synced');
 
-  const userId = 'hyoje';
+	const userId = 'hyoje';
+
+  // Master lists are kept in the database and edited on /admin (#67). A change made
+  // there and not yet repeated in the sheet would be undone by reloading 2026 from
+  // the sheet, so nothing is deleted while any change is waiting. No override:
+  // repeat the change in the sheet and tick it on /admin (or Undo it there).
+  const waiting = await MasterChange.find({ userId, sheetDone: false })
+    .sort({ createdAt: 1 }).select('list kind before after createdAt').lean() as any[];
+  if (waiting.length) {
+    console.error(`\n⛔ Stopped: ${waiting.length} change(s) on /admin are not yet repeated in the sheet. Nothing was deleted.`);
+    for (const w of waiting) {
+      const v = (x: any) => (x ? Object.values(x).filter(y => y !== null && y !== '').map(y => (typeof y === 'object' ? JSON.stringify(y) : String(y))).join(' › ') : '');
+      console.error(`  - ${new Date(w.createdAt).toISOString().slice(0, 10)} ${w.list} ${w.kind}: ${[v(w.before), v(w.after)].filter(Boolean).join(' → ')}`);
+    }
+    console.error('Repeat each in the sheet and tick it on /admin, then run the migration again.');
+    await mongoose.disconnect();
+    process.exitCode = 1;
+    return;
+  }
 
   // Load level2 ingredient vocabulary from ingredient_master (single source of truth).
   // Run `npm run migrate-ingredient` first if this throws.

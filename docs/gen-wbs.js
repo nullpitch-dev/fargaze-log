@@ -11,7 +11,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Service Concept & Work Breakdown Structure", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 3.17  |  24 October 2026", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 3.18  |  25 October 2026", size: 24 })], spacing: { after: 240 } }),
 );
 
 C(h1("Version History"));
@@ -52,6 +52,7 @@ C(table(["Version","Date","Headline"],[
   ["3.15","22 Oct 2026","PHASE 5 (DATA ENTRY) STARTED by Hyoje. Plan agreed 19–20 Oct (Data Entry Plan document): master lists first, logs in the sheet while the app is built on a test database, Staging + edit feature + test sync, one flexible offline entry form, cutover on or before 1 Jan 2027. Step 1 DONE: nightly backups to Google Drive (GitHub Actions + rclone, 30 days) and a restore-to-test workflow; first restore matched all 12 collections. Atlas users backup-reader / test-restore; admin password rotated; public /privacy page for the published Google consent screen. Mirrors Design Doc v4.15 (§2.3, §2.4, §3.3, §12.8, §15, Appendix B)"],
   ["3.16","23 Oct 2026","#66 SHEET SURVEY COMPLETE (Design Doc §15.4). Read-only scripts/survey-sheets.ts; all 46,060 records pass the migration code, none refused, counts match. Full re-migration of ~2025, 2026 and every master list; all master lists in step. Field-group rules decided PER ACTIVITY (category as fallback). New scope: #67 — activities created only on the master page, and rename / merge / delete applied to historical records; #71 — open (History) and future (Future) records, and 심리 측정 as a field group with a one-off import of the Happiness tab (recommended, awaiting Hyoje)"],
   ["3.17","24 Oct 2026","#67 STEPS 1–2 OF 5 DONE (Design Doc §15.5, §6.3, §6.12). Admin pages /admin (gear icon) with one generic editor for 18 master lists: record counts, values missing from a list, add / edit / delete in place with server checks, change list with Mark repeated. reference_lists one document per value; three lists retired; activity names unique across categories. Data clean-up by one-off scripts (activity categories, cost categories, nutrient levels, a people method, historical-fill ingredient names; 휴대폰, 업무지인, SGD added). Lesson: master loaders and the survey never read row 1 — only the Cost tab had data there. Decided: the migration refuses unknown values and stops while any change is unticked (step 4); rename for activities and cost first; record offsets kept for good. Next: step 3, rename and merge"],
+  ["3.18","25 Oct 2026","#67.3 RENAME, MOVE AND MERGE DONE for activities and cost categories (Design Doc §15.5.4): preview with records, years and numbered sheet steps; list, records and Calendar settings changed in one transaction; Undo until the next migration (a merge only before it is ticked). Names the code looks for are locked. The migration’s pending-change gate brought forward from step 4. Rule agreed: admin features that change past records are tried on fargaze-log-test first. Tested by Hyoje on fargaze-log-test. New backlog item: move the code’s fixed activity names into a per-user setting before English demo data. Next: step 4"],
 ],[1100,1300,6960]));
 C(spacer());
 
@@ -109,7 +110,7 @@ C(table(["Phase","Status","Detail"],[
   ["5 — Data Entry","In progress","Started 19 Oct 2026; plan in Design Doc §15 and the Data Entry Plan document. Done: nightly backups + rehearsed restore (22 Oct), sheet survey (23 Oct); #67 in progress (24 Oct). Target cutover on or before 1 Jan 2027"],
 ],[2900,1700,4760]));
 C(spacer());
-C(p([new TextRun({ text: "Current focus: ", bold: true }), new TextRun("Phase 5 (data entry), started 19 Oct after #63 Journeys was completed. Backups are done (22 Oct) and the sheet survey is done (23 Oct). #67, the master lists in the database with one generic admin editor, is in progress: steps 1–2 of 5 done 24 Oct; next is step 3, rename and merge for activities and cost categories. New widgets wait until after cutover.")]));
+C(p([new TextRun({ text: "Current focus: ", bold: true }), new TextRun("Phase 5 (data entry), started 19 Oct after #63 Journeys was completed. Backups are done (22 Oct) and the sheet survey is done (23 Oct). #67, the master lists in the database with one generic admin editor, is in progress: steps 1–3 of 5 done 25 Oct; next is step 4, the migration refusing unknown values and the master loaders removed. New widgets wait until after cutover.")]));
 
 C(h1("5. Work Breakdown Structure"));
 C(p("\u2705 = Complete   \u2B1C = Pending   DESCOPED = out of MVP scope. Each line states current state, not how it evolved (see the changelog for history)."));
@@ -503,8 +504,8 @@ C(
   bullet("\u2B1C 67. Master lists out of the migration; one generic admin editor in production (replaces old item 6, master collection management UI). Activities are created only here; renaming, merging or deleting an activity or category is applied to historical records, and before cutover must also reach the sheet. IN PROGRESS — Design Doc §15.5:"),
   bullet("\u2705 67.1 List descriptions, change log (master_change), reference lists one document per value, read-only pages with record counts and missing values, Mark repeated (24 Oct)"),
   bullet("\u2705 67.2 Add / edit / delete in place with server checks and logged sheet steps; used and name columns locked (24 Oct)"),
-  bullet("\u2B1C 67.3 Rename and merge for activities and cost categories: preview, sheet steps, records changed, Undo until the next migration"),
-  bullet("\u2B1C 67.4 Migration refuses unknown values; pending-change gate; master loaders removed"),
+  bullet("\u2705 67.3 Rename, move and merge for activities and cost categories: preview, sheet steps, records and Calendar settings changed in one transaction, Undo until the next migration; code names locked; pending-change gate in the migration (25 Oct, tested on fargaze-log-test)"),
+  bullet("\u2B1C 67.4 Migration refuses unknown values; master loaders removed"),
   bullet("\u2B1C 67.5 Later: rename for ingredients, alcohol items, bowel values, people categories (친목 → 친구 clean-up) and place names"),
   bullet("\u2B1C 68. Staging tab and Staging migration, with the duplicate and year-tab checks"),
   bullet("\u2B1C 69. Test database sync by period"),
@@ -513,6 +514,7 @@ C(
   bullet("\u2B1C 72. Nightly export from the database to a spreadsheet, proven on test"),
   bullet("\u2B1C 73. Year rollover: migration tab names from a setting; in early January merge 2026 into ~2025 → ~2026 and add a 2027 tab"),
   bullet("\u2B1C 74. Cutover"),
+  bullet("\u2B1C Before English demo data: the activity and category names the code looks for (수면, 대변, 생리, 이동, 운동 …) move into a per-user setting read by the pages and the rename lock (agreed 25 Oct)"),
   bullet("DESCOPED from MVP: old item 3, custom fields per user (single user); old item 5, push reminders — after cutover"),
 );
 C(spacer());
@@ -626,7 +628,7 @@ C(
 );
 C(spacer());
 
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze — Service Concept & WBS v3.17 — 24 October 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze — Service Concept & WBS v3.18 — 25 October 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 const doc = new Document({
   styles: {
@@ -652,6 +654,6 @@ const doc = new Document({
   sections: [{ properties: { page: PAGE }, children }],
 });
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-WBS-v3.17.docx", buffer);
-  console.log("Wrote FarGaze-WBS-v3.17.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-WBS-v3.18.docx", buffer);
+  console.log("Wrote FarGaze-WBS-v3.18.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });

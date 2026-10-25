@@ -10,6 +10,7 @@ import { addRow } from '@/lib/admin/write';
 import TimezoneMaster from '@/models/TimezoneMaster';
 import { computeUsage } from '@/lib/admin/usage';
 import MasterChange from '@/models/MasterChange';
+import { undoBlocked, lockedNames } from '@/lib/admin/rename';
 
 export async function GET(req: Request, { params }: { params: Promise<{ list: string }> }) {
   const g = await requireUser();
@@ -51,12 +52,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ list: st
       usageCounted: usage.counted,
       locked: lockedColumns(def),
       fixedOnEdit: def.fixedOnEdit ?? [],
+      // Names the site's code looks for: shown locked, and refused by rename.ts too.
+      codeNames: lockedNames(def),
       zoneCodes: (zones as any[]).map(z => z.code),
     },
     rows: rows.map(r => ({ ...r, used: usage.counted ? usage.used[r._id] : null })),
     orphans: usage.orphans,
     since: since.toISOString().slice(0, 10),
-    changes,
+    // Undo is offered for renames and merges; the plan behind it stays on the server.
+    changes: (changes as any[]).map(({ extra, ...c }) => ({ ...c, title: extra?.title ?? null, canUndo: undoBlocked({ ...c, extra }) === null })),
   });
 }
 

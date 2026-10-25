@@ -20,7 +20,7 @@ import { type ListDef, type CellValue, toRow, lockedColumns } from './lists';
 
 export type WriteResult =
   | { ok: true; id: string }
-  | { ok: false; status: number; error: string; needsConfirm?: { column: string; label: string; value: string } };
+	| { ok: false; status: number; error: string; needsConfirm?: { column: string; label: string; value: string }; needsRename?: boolean };
 
 type Values = Record<string, CellValue>;
 
@@ -231,7 +231,13 @@ export async function editRow(def: ListDef, userId: string, id: string, raw: Rec
     return fail(409, `${labels} can't change here: records refer to it by name, and renaming comes later.`);
   }
 
-  const changedLocked = lockedColumns(def).filter(k => !same(before[k], p.values[k]));
+	const changedLocked = lockedColumns(def).filter(k => !same(before[k], p.values[k]));
+  // Activities and cost categories: a new name or category is a rename, move or
+  // merge, used or not (open and planned records in the sheet may use it), so it
+  // goes through the preview in rename.ts (#67 step 3).
+  if (changedLocked.length && def.recordsFollow) {
+    return { ok: false, status: 409, error: 'This is a rename, move or merge: preview it first.', needsRename: true };
+  }
   if (changedLocked.length) {
     const used = await rowUsage(def, userId, before as Record<string, unknown>);
     if (used) {

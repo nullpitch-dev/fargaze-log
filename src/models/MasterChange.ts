@@ -12,6 +12,7 @@ import { Schema, model, models } from 'mongoose';
 //   recordIds        records changed by a rename / merge, kept for Undo
 //   sheetSteps       what to repeat in the sheet, in plain words
 //   undoneAt         set when the change was undone (the undo is its own entry)
+//   extra            rename / merge: { title, plan, counts } — what Undo needs (#67 step 3)
 const MasterChangeSchema = new Schema(
   {
     userId:         { type: String, required: true },
@@ -26,7 +27,8 @@ const MasterChangeSchema = new Schema(
     sheetDone:      { type: Boolean, default: false },
     sheetDoneAt:    { type: Date, default: null },
     undoneAt:       { type: Date, default: null },
-    undoOf:         { type: Schema.Types.ObjectId, default: null },
+		undoOf:         { type: Schema.Types.ObjectId, default: null },
+    extra:          { type: Schema.Types.Mixed, default: null },
   },
   { timestamps: true, collection: 'master_change' }
 );

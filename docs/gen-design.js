@@ -16,7 +16,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze Log", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Data Design & Requirements Document", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 4.17  |  24 October 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 4.18  |  25 October 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
 );
 C(p([new TextRun({ text: "Structure: ", bold: true }), new TextRun("Part I Foundations · Part II Data · Part III Features · Part IV Operations · Appendices. The body is the complete, always-current source of truth; the changelog below carries one line per version. Work status, open questions and the backlog live in the separate WBS, not here.")]));
 
@@ -63,6 +63,7 @@ C(table(
     ["4.15","22 Oct 2026","PHASE 5 (DATA ENTRY) STARTED — new §15 records the plan agreed with Hyoje on 19–20 Oct (the live plan is the Data Entry Plan document): master lists move to the database first with admin pages; logs stay in the sheet while the app is built on a test database; a Staging tab and migration, an edit feature, and a disposable test database synced by period; cutover targeted on or before 1 Jan 2027 on any day, after which the app is the truth, the sheet is frozen and a nightly export writes the database to a spreadsheet. The entry app is ONE flexible form like a sheet row (category opens default field groups and sets required fields; any group on any record), offline-first on Android, with start and end time zones changeable per record. NIGHTLY BACKUPS shipped (§12.8): GitHub Actions mongodump → Google Drive via rclone at 02:00 UTC, 30 days kept, plus a restore-to-test workflow; first restore matched all 12 collections (46,038 log records). New Atlas users backup-reader (read only) and test-restore (readWrite on fargaze-log-test only); admin password rotated. Google Cloud: Desktop OAuth client for rclone (drive.file), consent screen published with Branding home page, privacy link and authorised domain fargaze.co; new public page /privacy (§3.3). Database size checked: 62 MB of data (39 MB stored), about 15% of the free tier. Year rollover agreed: in early January 2026 is merged into ~2025, renamed ~2026, and a 2027 tab added; the migration’s tab names move to a setting before then"],
     ["4.17","24 Oct 2026","MASTER LISTS MOVE TO THE DATABASE (WBS #67, steps 1–2 of 5). New admin pages at /admin (gear icon at the right of the menu): one generic table editor for all 18 lists (activities, cost categories, nine reference lists, alcohol conversion, ingredients, bowel scores, time zones, exchange rates, favourite places, place points), driven by src/lib/admin/lists.ts. Each list page shows how many records use each row, values used in records but missing from the list (the amber box), and the changes since a chosen date. Add / edit / delete in place with server checks; every change is logged in the new master_change collection (§6.12) with the sheet step to repeat by hand and a Mark repeated tick (§15.5). On a row records use, the columns records point to are locked until rename / merge (step 3); place-point names and favourite-place labels and names are always locked on existing rows. reference_lists changed to one document per value (§6.3); food.drinks.note, food.foods.note and food.alcohols.item retired (alcohol items live only in alcohol_conversion); migrateReferenceLists removed from migrate.ts. activity_master: an activity name is unique across categories (§6.2) — 시험 split into 시험(회사) / 시험(개인). DATA CLEAN-UP by one-off scripts: three ~2025 activity categories, one alcohol item, three cost categories, two nutrient levels, one people method; historical-fill ingredient names corrected (기타해산물 → 기타 해산물, 야채 육수 → 채소 육수, 춘장 → 짜장) in the records and in fill-historical-ingredients.ts; added 통신 › 휴대폰, 업무지인 and SGD (1,048). LESSON: every master loader and the 23 Oct survey read from row 2, so row 1 was never read; only the Cost tab had data there (휴대폰) and it now has a header. §11.6 changed: a full re-migration no longer reloads any master list — the database is their truth. Record offsets are kept for good (§15.2)"],
     ["4.16","23 Oct 2026","SHEET SURVEY (WBS #66) done — new scripts/survey-sheets.ts + src/lib/survey/sheetSurvey.ts, read-only. §10.1.5 gains the source of every column (typed, formula or either; the master tab each formula or dropdown reads; what the database stores). All 46,060 records pass the migration code, none refused, every year × category count matches the database. FULL RE-MIGRATION 23 Oct (~2025, 2026 and every master list, then the ingredient and drink fills and place_coord) — new §11.6 procedure; every master list in step with the sheet, IST stored as 5.5. Sheet facts corrected: the Active file is Active_2026Aug22 with Calendar, Happiness, FavoritePlace and PlaceCoord tabs (§4.1); records are pasted into the year tab as plain values (§4.3, §11.2); Activity P / Q / R are empty and the Bowel sheet is the only home of the bowel values (§4.1, §12.5); the migration reads cells as displayed, so accounting formats (brackets for negatives, ‘-’ for zero) lost values until changed to plain numbers (§11.6). §15: field-group rules are PER ACTIVITY with the category as fallback; activities are created only on the master page, and renaming, merging or deleting one applies to historical records; open (History) and future (Future) records must be covered by the entry feature; 심리 측정 (Happiness tab) recommended as one more field group with a one-off import, no sheet column insertion"],
+    ["4.18","25 Oct 2026","RENAME, MOVE AND MERGE (WBS #67 step 3) for activities and cost categories, with past records following (§15.5.4). Edit a row on /admin/activity or /admin/cost: a new name renames it, a new category moves it, the name of another row merges it into that row (that row’s values win; the old row is deleted); ‘Rename a category’ renames a whole category or merges it into an existing one. Every change is previewed first (records, years, 2026 vs earlier, warnings, numbered sheet steps with exact ranges and expected counts), then the list, the records and the Calendar settings change in one transaction. Undo until the next migration (records are matched by the IDs saved in master_change.recordIds); a merge only until it is ticked. Names the site’s code looks for (수면, 대변, 독서(기간), 공부(기간); categories 생리, 이동, 운동) are shown locked and refused. master_change gains extra { title, plan, counts }. The pending-change gate from step 4 is in migrate.ts already: the daily migration stops, deleting nothing, while any change is unticked. Rule agreed 25 Oct: any admin feature that changes past records is tried on fargaze-log-test first (§15.2). Tested on fargaze-log-test by Hyoje on 25 Oct"],
   ],
   [1100, 1300, 6960]
 ));
@@ -683,13 +684,14 @@ C(table(["Field","Type","Notes"],[
   ["rowId","String","The row changed (null if unknown)"],
   ["before / after","Mixed","The row’s values in column form before and after (null for add / delete)"],
   ["recordsChanged","Number","Records changed by a rename or merge"],
-  ["recordIds","ObjectId[]","Those records, kept for Undo (step 3)"],
+  ["recordIds","ObjectId[]","The records a rename or merge changed, matched by ID for Undo"],
   ["sheetSteps","String[]","What to repeat in the sheet, in plain words (tab, column, old and new values)"],
   ["sheetDone / sheetDoneAt","Boolean / Date","Ticked with Mark repeated on the list page; undo clears it"],
-  ["undoneAt / undoOf","Date / ObjectId","For Undo of a rename or merge (step 3)"],
+  ["undoneAt / undoOf","Date / ObjectId","undoneAt marks a change that was undone; the undo is its own entry, pointing back with undoOf"],
+  ["extra","Mixed","(v4.18) Rename / merge only: { title, plan, counts } — the preview’s title, what changed (row or category, from, to, the deleted row’s ID on a merge) and the record counts; what Undo and the reverse sheet steps need"],
   ["createdAt / updatedAt","Date","timestamps"],
 ],[2400,2000,4960]));
-C(note("Note: Indexes { userId, list, createdAt: -1 } and { userId, sheetDone }. A change with sheetDone false is a change to repeat; the migration will refuse to run while any exists (#67 step 4)."));
+C(note("Note: Indexes { userId, list, createdAt: -1 } and { userId, sheetDone }. A change with sheetDone false is a change to repeat; since v4.18 the daily migration stops, deleting nothing, while any exists."));
 C(spacer());
 
 C(h1("7. Search — Index, API & UI"));
@@ -2172,7 +2174,7 @@ C(h2("14.10 Sheet Anomalies Found"));
 C(p("Records whose end is before their start (drawn as points until corrected in the sheet): 6ab7da3f5ef99b2c70d6c1eb and 6ab7da3f5ef99b2c70d6c1f4 (December 2019), 6ab7da445ef99b2c70d71fd8 (July 2021), and three in 2025 whose ids are listed by /api/calendar?from=2025-01-01&to=2025-12-31 under diagnostics.endBeforeStartIds."));
 
 // ===== 15. DATA ENTRY (PHASE 5) =====
-C(h1("15. Data Entry (Phase 5, v4.15–v4.17)"));
+C(h1("15. Data Entry (Phase 5, v4.15–v4.18)"));
 C(p("Started 19 Oct 2026. The live plan, with its risk register and next steps, is the Data Entry Plan document (" + "https://claude.ai/code/artifact/1061a843-f14f-4b79-bef0-d34608dc3c1e" + "); this section records what was agreed and why. Target: cutover on or before 1 January 2027."));
 C(h2("15.1 Stages"));
 C(table(["Stage","Truth for logs","What happens"],[
@@ -2201,12 +2203,14 @@ C(
   bullet("(24 Oct) Rename, merge and move change past records for activities and cost categories first; ingredients, alcohol items, bowel values, people categories and place names follow later. Hyoje’s planned people-category clean-up: 친목 → 친구 (가족|친목 → 가족|친구), 업무친목 → 업무친구, 업무지인 → 업무친구"),
   bullet("(24 Oct) Reference lists for drink notes, food notes and alcohol items retired (§6.3)"),
   bullet("(24 Oct) Record time-zone offsets are kept for good: each is a fact about its moment (including summer time), the list’s offset is only the default for new entries, and recomputing from zone rules could drift"),
+  bullet("(25 Oct) Any admin feature that changes past records (rename, merge, later the edit feature) is tried on fargaze-log-test first, then used in production. Until the test sync (#69) exists, the test database is refreshed with the restore-to-test workflow and .env.local is pointed at it"),
+  bullet("(25 Oct) The names the site’s code looks for are locked for now. Before demo data in English, they move into a per-user setting (which activity means sleep, bowel, reading …) read by both the pages and the lock"),
 );
 C(h2("15.3 Order of work"));
 C(
   bullet("1. Nightly backups and a rehearsed restore — done 22 Oct"),
   bullet("2. Read-only survey: master tabs and the sheet columns that use them, typed vs formula columns, which columns each activity uses — done 23 Oct (§15.4)"),
-  bullet("3. Master lists out of the migration; generic admin editor in production — in progress: steps 1–2 of 5 done 24 Oct (§15.5)"),
+  bullet("3. Master lists out of the migration; generic admin editor in production — in progress: steps 1–3 of 5 done 25 Oct (§15.5)"),
   bullet("4. Staging tab and migration, with the duplicate and year-tab checks"),
   bullet("5. Test database sync by period"),
   bullet("6. Edit feature with its change list, test then production"),
@@ -2227,13 +2231,13 @@ C(table(["Part","Result on 23 Oct"],[
 ],[2200,7160]));
 C(spacer());
 
-C(h2("15.5 Master Lists in the Database (WBS #67, v4.17)"));
+C(h2("15.5 Master Lists in the Database (WBS #67, v4.17–4.18)"));
 C(p("Agreed 23–24 Oct 2026. The database is the truth for every master list; the sheet’s master tabs are kept in step by hand until cutover. One generic table editor serves all 18 lists; each list is described once in src/lib/admin/lists.ts (columns and types, unique columns, the record fields that use it, where it lives in the sheet, which columns lock)."));
 C(table(["Step","What","Status"],[
   ["1","List descriptions; change log (master_change, §6.12); reference lists one document per value; read-only pages /admin and /admin/<list> with record counts, missing values (amber box) and changes since a date; gear icon in the menu; Mark repeated tick","Done 24 Oct"],
   ["2","Add, edit and delete in place, with server checks and a logged sheet step","Done 24 Oct"],
-  ["3","Rename and merge for activities and cost categories: preview (records, years), the sheet steps (row in the master tab; whole-cell Find & Replace in the year tabs, Active, History and Future; for a category, column A of the year tabs too, which hold plain values), records changed in one operation, Undo until the next migration","Next"],
-  ["4","Migration refuses unknown values; pending-change gate; master loaders removed from the repo","To do"],
+  ["3","Rename and merge for activities and cost categories: preview (records, years), the sheet steps (row in the master tab; whole-cell Find & Replace in the year tabs, Active, History and Future; for a category, column A of the year tabs too, which hold plain values), records changed in one operation, Undo until the next migration","Done 25 Oct (§15.5.4)"],
+  ["4","Migration refuses unknown values; master loaders removed from the repo. The pending-change gate was brought forward into step 3","Next"],
   ["5","Design and WBS; Data Entry Plan","Each session"],
 ],[700,6860,1800]));
 C(spacer());
@@ -2241,7 +2245,7 @@ C(h3("15.5.1 Rules"));
 C(
   bullet("Every write checks the session, takes the user from the session, validates on the server and is logged (risk register #9)"),
   bullet("Edit happens in place in the table (Enter saves, Esc cancels); + Add opens an empty row at the top"),
-  bullet("On a row records use, the columns records point to are LOCKED (grey): activity and category, cost detail and category, ingredient, alcohol item and unit, currency, time-zone code, bowel field and value, each reference value. Changing them is rename / merge (step 3). Every other column stays editable"),
+  bullet("On a row records use, the columns records point to are LOCKED (grey): activity and category, cost detail and category, ingredient, alcohol item and unit, currency, time-zone code, bowel field and value, each reference value. Changing them is rename / merge (step 3). Every other column stays editable. On activities and cost categories these columns are open, because a change there IS a rename, move or merge and goes through its preview (§15.5.4)"),
   bullet("Place points (name) and favourite places (label, name) have no record count, so those columns are locked on EVERY existing row: records refer to them by name, and renaming must change the records too"),
   bullet("Delete only a row no record uses. Lists without a count (favourite places, place points) warn that Journeys will change. Never ‘rename’ by adding a row and deleting the old one"),
   bullet("A new category, group or label asks “Create a new … ?” first (confirmNew on the server)"),
@@ -2249,12 +2253,30 @@ C(
   bullet("Editing an alcohol conversion number or a bowel score changes past figures in Insights (they are computed from the lists). A time-zone offset or exchange rate does not: each record stores its own"),
 );
 C(h3("15.5.2 The Change List"));
-C(p("Each change shows on its list page with its sheet step in plain words, e.g. “Cost tab: add a row 휴대폰 | 통신”, “Activity tab, column N: add 업무지인. Check the dropdown in Active BC still covers the whole column.” (the Active dropdowns read a fixed range with one spare row). Mark repeated ticks it (undo unticks); unticked changes always show, however old. /admin shows the total to repeat per list. From step 4 the migration will not run while any change is unticked."));
+C(p("Each change shows on its list page with its sheet step in plain words, e.g. “Cost tab: add a row 휴대폰 | 통신”, “Activity tab, column N: add 업무지인. Check the dropdown in Active BC still covers the whole column.” (the Active dropdowns read a fixed range with one spare row). Mark repeated ticks it (undo unticks); unticked changes always show, however old. /admin shows the total to repeat per list. Since 25 Oct the migration will not run while any change is unticked: it lists them and stops before deleting anything; there is no override."));
 C(h3("15.5.3 Clean-up Done on 24 Oct"));
 C(
   bullet("prepare-master-admin.ts: activity names checked (three ~2025 records sat under a second category; fixed below), reference lists converted (71 values), unique-name index built"),
   bullet("One-off scripts, each with a dry run (delete them once applied; oneoff-fix-orphans.ts was still in the repo at v4.17): 시험 split (6 records); ~2025 fixes — 운동 › 나들이 → 육아, 비용 지불 › 주식 세금 납부 → 재테크, 낮잠 › 수면 → 생리, alcohol 기억 안남 → 소주; orphans — cost 2022-11-07 → 패션 › 기타 잡화, 2019-09-28 → 식음 › 음료, 2020-06-13 → 의료비/건강 › 치료, 2021-06-07 carbs l → L and fat h → H, 2022-02-04 people method 웹콜/대면 → 웹콜 (6) | 대면 (3); historical-fill ingredients 기타해산물 → 기타 해산물 (27), 야채 육수 → 채소 육수 (65), 춘장 → 짜장 (25); added 통신 › 휴대폰, people category 업무지인, SGD at 1,048 KRW. The same fixes were made in the sheet"),
   bullet("scripts/check-master-orphans.ts (read-only) lists, for every list, values used in records but missing from it, with years and dates; after the clean-up only 생활 › 선물 (2026-08-29, already fixed in the 2026 tab) remained, to clear with the next daily migration"),
+);
+C(h3("15.5.4 Rename, Move and Merge (step 3, 25 Oct)"));
+C(p("For activities and cost categories, past records follow. The code is src/lib/admin/rename.ts; routes POST /api/admin/lists/<slug>/rename (preview, or apply with the preview’s record count) and POST /api/admin/changes/<id>/undo."));
+C(table(["Change","How it is made","Records"],[
+  ["Rename","Edit the row, change its name","Every record with the old name takes the new name; the category of each record is left as it is"],
+  ["Move","Edit the row, change its category","Every record with that name takes the new category"],
+  ["Merge","Edit the row, type the name of another row","Records take the other row’s name and category; the old row is deleted"],
+  ["Rename a category","‘Rename a category’ button, new name","Every row and record of that category"],
+  ["Merge categories","Same button, the name of an existing category","Every row and record joins the existing category"],
+],[2000,3200,4160]));
+C(
+  bullet("Preview first: record count, years, 2026 vs earlier, warnings (new category, merge deletes a row, records with this name under another category, Calendar settings that follow) and the numbered sheet steps. Confirm sends the preview’s count; if the records changed meanwhile, it refuses and asks for a new preview"),
+  bullet("Records follow by the row’s unique column (activity name, cost detail), as a whole-cell Find & Replace does in the sheet, so the two stay the same"),
+  bullet("One transaction: the list, the records, the Calendar settings (category colour and hidden tick; hidden activity names) and the master_change entry, with the record IDs"),
+  bullet("Sheet steps: the master-tab row; Find & Replace with Match case and Match entire cell contents, one range at a time — archive 2026 and ~2025 from row 4 (expected counts given), Active, History and Future from row 3. A move can’t be done with Find & Replace: filter by the name, type the category in the visible cells with Ctrl+Enter, then check the filter list (a check catches hidden rows filled by mistake). Activity column A in the entry sheets is a formula, so only the archive tabs change there; cost category AH is typed everywhere"),
+  bullet("Undo: puts back the same records, matched by the saved IDs, and the list row (a merged row returns with its own ID). Refused when any of those records is gone or changed (a migration makes new IDs), when the old name is back in the list, or when the target row is gone. A merge can be undone only before it is ticked, because the sheet can’t tell its rows apart afterwards. Undone before the tick: nothing to do in the sheet; after: the reverse steps are listed"),
+  bullet("Locked: 수면, 대변, 독서(기간), 공부(기간) and the categories 생리, 이동, 운동, which the site’s code looks for by name (Sleep, Bowel, Insights stats, Transport, Journeys, Exercise, the Calendar’s reading row). Shown as 🔒 Locked and greyed out in the category list; the server refuses them too"),
+  bullet("Tested on fargaze-log-test (25 Oct): rename, undo, checks in Atlas. In the cloud: 23 checks with in-memory models"),
 );
 C(spacer());
 
@@ -2323,6 +2345,9 @@ C(table(["Path","Purpose"],[
   ["src/app/api/admin/lists/[list]/route.ts","(v4.17) GET one list (columns, rows + usage, orphans, changes, locked, fixedOnEdit, zoneCodes); POST adds a row"],
   ["src/app/api/admin/lists/[list]/[id]/route.ts","(v4.17) PATCH edits a row; DELETE deletes a row no record uses"],
   ["src/app/api/admin/changes/[id]/route.ts","(v4.17) PATCH { sheetDone } — ticks or unticks a change"],
+  ["src/app/api/admin/changes/[id]/undo/route.ts","(v4.18) POST — undoes a rename or merge (§15.5.4)"],
+  ["src/app/api/admin/lists/[list]/rename/route.ts","(v4.18) POST — previews, or with apply and the preview’s record count carries out, a rename, move or merge (§15.5.4)"],
+  ["src/lib/admin/rename.ts","(v4.18) Rename, move and merge for activities and cost categories: plan, record counts by year, sheet steps, the transaction, Calendar settings, Undo; names the code looks for are locked"],
   ["src/models/MasterChange.ts","(v4.17) master_change model (§6.12)"],
   ["src/models/ReferenceList.ts","(v4.17) One document per value; unique { userId, listName, value } (§6.3)"],
   ["src/models/ActivityMaster.ts","(v4.17) Unique index { userId, name } — a name is unique across categories"],
@@ -2432,7 +2457,7 @@ C(table(["Path","Purpose"],[
 C(spacer());
 
 // ===== FOOTER =====
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.17 — 24 October 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.18 — 25 October 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 
 // ===== DOCUMENT ASSEMBLY =====
@@ -2469,6 +2494,6 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-Log-Data-Design-v4.17.docx", buffer);
-  console.log("Wrote FarGaze-Log-Data-Design-v4.17.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-Log-Data-Design-v4.18.docx", buffer);
+  console.log("Wrote FarGaze-Log-Data-Design-v4.18.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });
