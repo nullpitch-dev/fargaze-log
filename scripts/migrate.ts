@@ -4,6 +4,9 @@
 //   npm run migrate -- --check       reads and checks only; writes nothing (safe on production)
 //   npm run migrate -- --full        also deletes ~2025 and re-inserts the '~2025' tab (§11.6)
 //
+// Day to day, new records go up with the Staging migration instead (npm run staging, #68);
+// this full run is for when a past record was changed in the sheet.
+//
 // Nothing is deleted unless every row passes (#67 step 4):
 //   1. a change on /admin not yet ticked as repeated in the sheet stops the run;
 //   2. every row is read and checked against the master lists in the database; one
@@ -16,11 +19,10 @@ import path from 'path';
 dotenv.config({ path: path.join(process.cwd(), '.env.local') });
 
 import mongoose from 'mongoose';
-import { google } from 'googleapis';
 import { loadValidLevel2, loadBowelVocabulary } from '../src/lib/migration/transform';
 import { loadMasterChecks, prepareSheet, refusalReport, type PreparedSheet } from '../src/lib/migration/checkRecords';
 import Log from '../src/models/Log';
-import MasterChange from '../src/models/MasterChange';
+import { getSheetData, waitingChanges } from '../src/lib/migration/sheet';
 
 const USER_ID = 'hyoje';
 const CHECK = process.argv.includes('--check');
@@ -35,33 +37,6 @@ const JOBS: Job[] = [
     clear: { 'start.year': 2026 }, label: '2026' },
 ];
 
-// ── GOOGLE SHEETS ─────────────────────────────────────────────────────────────
-
-async function getSheetData(spreadsheetId: string, sheetName: string, startRow: number): Promise<any[][]> {
-  const auth = new google.auth.GoogleAuth({
-    keyFile: path.join(process.cwd(), 'myfiles', process.env.GOOGLE_SERVICE_ACCOUNT_FILE!),
-    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
-  });
-  const client = await auth.getClient();
-  const sheets = google.sheets({ version: 'v4', auth: client as any });
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: `'${sheetName}'!A${startRow}:CI`,
-  });
-  return response.data.values || [];
-}
-
-// ── GATE 1: changes waiting to be repeated in the sheet ──────────────────────
-
-async function waitingChanges(): Promise<string[]> {
-  const waiting = await MasterChange.find({ userId: USER_ID, sheetDone: false })
-    .sort({ createdAt: 1 }).select('list kind before after createdAt').lean() as any[];
-  const v = (x: any) => (x ? Object.values(x).filter(y => y !== null && y !== '')
-    .map(y => (typeof y === 'object' ? JSON.stringify(y) : String(y))).join(' › ') : '');
-  return waiting.map(w =>
-    `  - ${new Date(w.createdAt).toISOString().slice(0, 10)} ${w.list} ${w.kind}: ${[v(w.before), v(w.after)].filter(Boolean).join(' → ')}`);
-}
-
 // ── MAIN ──────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -71,7 +46,7 @@ async function main() {
   console.log('✅ Connected to MongoDB:', mongoose.connection.db!.databaseName);
 
   // Gate 1. No override: repeat each change in the sheet and tick it on /admin (or Undo it).
-  const waiting = await waitingChanges();
+  const waiting = await waitingChanges(USER_ID);
   if (waiting.length) {
     console.error(`\n${CHECK ? '⚠️ ' : '⛔ Stopped:'} ${waiting.length} change(s) on /admin are not yet repeated in the sheet.${CHECK ? ' A real run would stop here.' : ' Nothing was deleted.'}`);
     waiting.forEach(w => console.error(w));

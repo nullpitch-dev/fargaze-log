@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "migrate": "tsx scripts/migrate.ts"
+		"migrate": "tsx scripts/migrate.ts",
+		"staging": "tsx scripts/migrate-staging.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

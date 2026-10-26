@@ -13,10 +13,13 @@
 //     category (in the entry sheets column A is a formula; #N/A = unknown name)
 //   - a row whose leading value is filled but whose partner is empty
 //     (a cost detail without a category, an alcohol item without a unit)
+//   - (v4.22) an alcohol unit or amount without its item: the columns are comma
+//     lists (AX item, AY amount, AZ unit) zipped by the items, so a unit or amount
+//     beyond the last item would be dropped quietly
 //   - any row the parser cannot read (unknown ingredient or bowel value as before)
 
 import { LISTS, toRow, rowKey, type ListDef, type UsageSpec } from '../admin/lists';
-import { createRowFilter } from './transform';
+import { createRowFilter, splitComma } from './transform';
 import { rowToDocument } from './rowToDocument';
 
 /** Values every record may hold although no list row has them. */
@@ -116,10 +119,31 @@ export interface PreparedSheet {
   total: number;
   skipped: number;
   docs: any[];
+  /** Sheet row number of each doc, in the same order (for reports). */
+  rowNos: number[];
   refused: Refused[];
 }
 
 const cell = (row: any[], i: number) => row[i]?.toString().trim() ?? '';
+
+// Alcohol columns: AX item, AY amount, AZ unit (rowToDocument C.ALCOHOL_*).
+const ALCOHOL = { item: 49, amount: 50, unit: 51 };
+
+/**
+ * An alcohol unit or amount with no item to belong to. Items, amounts and units are
+ * comma lists matched by position; more units (or amounts) than items means one has
+ * no item. (An item may hold several drinks joined by '+' and share one unit.)
+ */
+export function alcoholWithoutItem(row: any[]): string | null {
+  const items = splitComma(cell(row, ALCOHOL.item)).length;
+  const amounts = splitComma(cell(row, ALCOHOL.amount)).length;
+  const units = splitComma(cell(row, ALCOHOL.unit)).length;
+  const extra = [units > items ? `${units} unit${units === 1 ? '' : 's'} ('${cell(row, ALCOHOL.unit)}')` : '',
+    amounts > items ? `${amounts} amount${amounts === 1 ? '' : 's'} ('${cell(row, ALCOHOL.amount)}')` : '']
+    .filter(Boolean);
+  if (!extra.length) return null;
+  return `Alcohol has ${extra.join(' and ')} but ${items ? `only ${items} item${items === 1 ? '' : 's'}` : 'no item'} — a unit or amount without its item`;
+}
 
 /** Parses and checks every row; writes nothing. */
 export function prepareSheet(
@@ -127,6 +151,7 @@ export function prepareSheet(
 ): PreparedSheet {
   const shouldSkipRow = createRowFilter();
   const docs: any[] = [];
+  const rowNos: number[] = [];
   const refused: Refused[] = [];
   let skipped = 0;
   let afterPreset = false;
@@ -146,6 +171,12 @@ export function prepareSheet(
     }
     if (shouldSkipRow(row)) { skipped++; return; }
 
+    const orphan = alcoholWithoutItem(row);
+    if (orphan) {
+      refused.push({ row: rowNo, date, activity: `${category} › ${name}`, reason: orphan });
+      return;
+    }
+
     let doc: any;
     try {
       doc = rowToDocument(row, userId);
@@ -159,9 +190,10 @@ export function prepareSheet(
       return;
     }
     docs.push(doc);
+    rowNos.push(rowNo);
   });
 
-  return { sheet, total: rows.length, skipped, docs, refused };
+  return { sheet, total: rows.length, skipped, docs, rowNos, refused };
 }
 
 /** Groups refusals by reason, so one typo used 40 times is one line. */
