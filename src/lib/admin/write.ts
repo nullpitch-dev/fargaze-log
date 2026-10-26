@@ -16,6 +16,7 @@ import type { Types } from 'mongoose';
 import Log from '@/models/Log';
 import MasterChange from '@/models/MasterChange';
 import TimezoneMaster from '@/models/TimezoneMaster';
+import FavoritePlace from '@/models/FavoritePlace';
 import { type ListDef, type CellValue, toRow, lockedColumns } from './lists';
 
 export type WriteResult =
@@ -265,6 +266,12 @@ export async function deleteRow(def: ListDef, userId: string, id: string): Promi
 
   const used = await rowUsage(def, userId, before as Record<string, unknown>);
   if (used) return fail(409, `Can't delete: ${records(used)} this row.`);
+  // Place points: 집 / 회사 … resolve to it in a favourite-place period, with or
+  // without records yet; deleting it would leave that period without a point.
+  if (def.viaFavorites) {
+    const fav = await FavoritePlace.find({ userId, name: before.name }).select('label').lean() as any[];
+    if (fav.length) return fail(409, `Can't delete: it is the place for ${[...new Set(fav.map(f => f.label))].join(', ')} in ${fav.length === 1 ? 'a favourite-place period' : `${fav.length} favourite-place periods`}. Change those periods first.`);
+  }
 
   await model.deleteOne({ _id: existing._id });
   await MasterChange.create({

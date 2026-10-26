@@ -26,7 +26,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ list: st
     ? new Date(sinceParam + 'T00:00:00Z')
     : new Date(Date.now() - 30 * 86400_000);
 
-  const docs = await def.model().find({ userId, ...(def.filter ?? {}) }).sort(def.sort).lean();
+  // Case doesn't matter in the order (cardfactory before Courtyard); Korean keeps its
+  // own order, after Latin letters, as before. strength 2 = letters and accents only.
+  const docs = await def.model().find({ userId, ...(def.filter ?? {}) })
+    .sort(def.sort).collation({ locale: 'en', strength: 2 }).lean();
   const rows = (docs as any[]).map(d => toRow(def, d));
 
   const needsZones = def.columns.some(c => c.type === 'zoneTime');
@@ -55,8 +58,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ list: st
       // Names the site's code looks for: shown locked, and refused by rename.ts too.
       codeNames: lockedNames(def),
       zoneCodes: (zones as any[]).map(z => z.code),
+      indexBy: def.indexBy ?? null,
+      viaFavorites: !!def.viaFavorites,
     },
-    rows: rows.map(r => ({ ...r, used: usage.counted ? usage.used[r._id] : null })),
+    rows: rows.map(r => ({ ...r, used: usage.counted ? usage.used[r._id] : null, usedBy: usage.breakdown[r._id] ?? null })),
     orphans: usage.orphans,
     since: since.toISOString().slice(0, 10),
     // Undo is offered for renames and merges; the plan behind it stays on the server.

@@ -12,7 +12,11 @@
 //             to rows whose columns have these values (bowel_score keeps three
 //             vocabularies in one collection).
 //   recordsFollow  rename / merge / move are applied to past records too
-//             (Hyoje, 23–24 Oct: activity and cost first; other lists later).
+//             (Hyoje, 23–24 Oct: activity and cost first; 26 Oct: place points;
+//             other lists later).
+//   refuseUnknown  false = a value in records that the list lacks is normal (place
+//             names without a point): no missing-values box, and the migration
+//             does not refuse it. Default true.
 //
 // The reference lists are one collection with one document per value; each list
 // is its own entry here, narrowed with `filter`.
@@ -38,12 +42,20 @@ export interface ColumnDef {
   required?: boolean;
   /** Offer the values already in this column; a new value asks for confirmation. */
   pickExisting?: boolean;
+  /** Shown narrow: long text is cut with … and shown whole on hover. */
+  narrow?: boolean;
+  /** Left out of the page's search box. */
+  noSearch?: boolean;
 }
 
 export interface UsageSpec {
   key: Record<string, string>;
   unwind?: string[];
   when?: Record<string, string>;
+  /** Names this spec in a row's breakdown of records (Place · From · To). */
+  label?: string;
+  /** viaFavorites lists: the record's moment that resolves 집 / 회사 … (start or end). */
+  at?: 'start' | 'end';
 }
 
 /** Where a list lives in the sheet, so each change can say what to repeat there. */
@@ -69,12 +81,19 @@ export interface ListDef {
   sort: Record<string, 1 | -1>;
   usage?: UsageSpec[];
   recordsFollow?: boolean;
+  /** false: values missing from the list are normal; not shown, not refused. */
+  refuseUnknown?: boolean;
+  /** Records that say 집 / 회사 / 사이트 / 내차 count for the place that label meant
+   *  then (favourite places), as Journeys reads them; a place a period names can't be deleted. */
+  viaFavorites?: boolean;
   /** Columns that never change on an existing row here, used or not: lists without a
    *  record count, whose names records refer to (place points, favourite places).
    *  Renaming them must also change the records, so it waits for rename (step 3). */
   fixedOnEdit?: string[];
   /** Shown under the title. */
   note?: string;
+  /** The column the alphabet bar sorts into ㄱ–ㅎ, A–Z and # (long lists). */
+  indexBy?: string;
   sheet: SheetPlace;
 }
 
@@ -265,14 +284,27 @@ export const LISTS: ListDef[] = [
     columns: [
       { key: 'name', label: 'Place', type: 'text', required: true },
       { key: 'coords', label: 'Point', type: 'coords', required: true },
-      { key: 'source', label: 'Source', type: 'text' },
-      { key: 'note', label: 'Note', type: 'text' },
+      { key: 'note', label: 'Note', type: 'text', narrow: true, noSearch: true },
     ],
     unique: ['name'],
     sort: { name: 1 },
     note: 'One name = one point. Names are as logged after 집 / 회사 / 사이트 / 내차 are resolved.',
+    indexBy: 'name',
+    // Records counted where the name is written, and (viaFavorites) where 집 / 회사 …
+    // meant it at that moment: Place and From at the record's start, To at its end,
+    // as Journeys reads them. A rename changes only the written names; the
+    // favourite-place periods follow, so the labels keep pointing at it (renamePlace.ts).
+    usage: [
+      { key: { name: 'location.activity' }, label: 'Place', at: 'start' },
+      { key: { name: 'transport.from' }, label: 'From', at: 'start' },
+      { key: { name: 'transport.to' }, label: 'To', at: 'end' },
+    ],
+    recordsFollow: true,
+    refuseUnknown: false,
+    viaFavorites: true,
+    // Source is no longer kept (26 Oct): old values stay in the database, unseen and
+    // untouched. It stays in the order so sheet steps leave the tab's column C empty.
     sheet: { where: 'PlaceCoord tab', order: ['name', 'coords', 'source', 'note'] },
-    fixedOnEdit: ['name'],
   },
 ];
 

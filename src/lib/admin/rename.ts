@@ -1,5 +1,6 @@
 // Rename, move and merge for the lists whose records follow (#67 step 3):
-// activities and cost categories.
+// activities and cost categories. Place points (26 Oct) have their own rules in
+// renamePlace.ts; the three entry points below hand them over.
 //
 // Agreed with Hyoje (23–24 Oct 2026):
 //   - A row's name or category is changed here, never by adding a row and deleting
@@ -24,6 +25,7 @@ import MasterChange from '@/models/MasterChange';
 import CalendarSettings from '@/models/CalendarSettings';
 import { colorKeyFor } from '@/app/calendar/_lib/calendar-colors';
 import { type ListDef, toRow } from './lists';
+import { PLACE_SLUG, previewPlaceRename, applyPlaceRename, undoPlaceChange, type PlacePreview } from './renamePlace';
 
 // ── What follows, per list ───────────────────────────────────────────────────
 
@@ -241,7 +243,14 @@ export function stepsFor(f: Follow, p: Plan, c: Counts, masterRows: number): str
 
 // ── Preview ──────────────────────────────────────────────────────────────────
 
-export async function previewRename(def: ListDef, userId: string, req: RenameRequest): Promise<{ ok: true; preview: Preview } | Fail> {
+export async function previewRename(def: ListDef, userId: string, req: RenameRequest): Promise<{ ok: true; preview: Preview | PlacePreview } | Fail> {
+  if (def.slug === PLACE_SLUG) {
+    return req.mode === 'row' ? previewPlaceRename(def, userId, req.id, req.values) : fail(400, 'Place points have no categories.');
+  }
+  return previewListRename(def, userId, req);
+}
+
+async function previewListRename(def: ListDef, userId: string, req: RenameRequest): Promise<{ ok: true; preview: Preview } | Fail> {
   const f = followFor(def);
   if (!f) return fail(400, 'Renaming is not available for this list yet.');
   const p = await makePlan(def, f, userId, req);
@@ -311,7 +320,10 @@ async function calendarChange(userId: string, p: Plan, write: boolean, session?:
 
 export async function applyRename(def: ListDef, userId: string, req: RenameRequest, expectRecords: number):
   Promise<{ ok: true; changeId: string; recordsChanged: number } | Fail> {
-  const pv = await previewRename(def, userId, req);
+  if (def.slug === PLACE_SLUG) {
+    return req.mode === 'row' ? applyPlaceRename(def, userId, req.id, req.values, expectRecords) : fail(400, 'Place points have no categories.');
+  }
+  const pv = await previewListRename(def, userId, req);
   if (!pv.ok) return pv;
   const { plan: p, counts } = pv.preview;
   if (counts.total !== expectRecords) {
@@ -392,6 +404,7 @@ export async function undoChange(userId: string, changeId: string, defOf: (slug:
   const blocked = undoBlocked(ch);
   if (blocked) return fail(409, blocked);
   const def = defOf(ch.list);
+  if (def?.slug === PLACE_SLUG) return undoPlaceChange(def, userId, ch);
   const f = def && followFor(def);
   if (!def || !f) return fail(400, 'Unknown list.');
   const model = def.model();

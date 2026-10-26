@@ -21,6 +21,7 @@
 // Marker class is needed; lines are ordinary Polylines.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { loadGoogleMaps } from '@/app/_components/google-maps';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type G = any;
@@ -33,24 +34,7 @@ const START_KM = 50;
 const DOT_MIN = 6, DOT_MAX = 28;          // px diameter
 const LINE_MIN = 1, LINE_MAX = 8;         // px width
 
-// ── Loading the API once per page ─────────────────────────────────────────────
-
-let loader: Promise<G> | null = null;
-
-function loadGoogleMaps(key: string): Promise<G> {
-  if (loader) return loader;
-  loader = new Promise((resolve, reject) => {
-    const w = window as any;
-    if (w.google?.maps?.importLibrary) { resolve(w.google); return; }
-    w.__fargazeMapsReady = () => resolve(w.google);
-    const s = document.createElement('script');
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&loading=async&callback=__fargazeMapsReady`;
-    s.async = true;
-    s.onerror = () => { loader = null; reject(new Error('Google Maps failed to load')); };
-    document.head.appendChild(s);
-  });
-  return loader;
-}
+// ── Loading the API: src/app/_components/google-maps.ts (shared with the admin point picker)
 
 // ── Map styles (no Map ID, so plain style arrays work) ────────────────────────
 

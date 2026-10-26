@@ -4,16 +4,18 @@
 // row, values used in records but missing from the list, add / edit / delete in
 // place (step 2), rename / move / merge with a preview and Undo for activities and
 // cost categories (step 3), and the changes made since a chosen date with their
-// sheet ticks.
+// sheet ticks. Long lists (indexBy) get an alphabet bar: ㄱ–ㅎ, A–Z and #.
+// A point column (place points) gets a Map column and 📍 Here (PointPicker).
 
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { PointPicker, locate, type LatLng, type Located } from '../_components/PointPicker';
 
 type ColumnType = 'text' | 'number' | 'zoneTime' | 'coords';
-interface Column { key: string; label: string; type: ColumnType; required?: boolean; pickExisting?: boolean }
+interface Column { key: string; label: string; type: ColumnType; required?: boolean; pickExisting?: boolean; narrow?: boolean; noSearch?: boolean }
 type Cell = string | number | null | { timezone: string; local: string } | { lat: number; lng: number };
-interface Row { _id: string; values: Record<string, Cell>; updatedAt: string | null; used: number | null }
+interface Row { _id: string; values: Record<string, Cell>; updatedAt: string | null; used: number | null; usedBy?: Record<string, number> | null }
 interface Orphan { values: Record<string, string>; records: number }
 interface Change {
   _id: string;
@@ -38,7 +40,7 @@ interface RenamePreview {
 }
 type RenameBody = { mode: 'row'; id: string; values: Record<string, unknown> } | { mode: 'category'; from: string; to: string };
 interface ListResponse {
-  list: { slug: string; title: string; group: string; note: string | null; columns: Column[]; recordsFollow: boolean; usageCounted: boolean; locked: string[]; fixedOnEdit: string[]; zoneCodes: string[]; codeNames: { key: Record<string, string>; cat: Record<string, string> } };
+  list: { slug: string; title: string; group: string; note: string | null; columns: Column[]; recordsFollow: boolean; usageCounted: boolean; locked: string[]; fixedOnEdit: string[]; zoneCodes: string[]; codeNames: { key: Record<string, string>; cat: Record<string, string> }; indexBy: string | null; viaFavorites: boolean };
   rows: Row[];
   orphans: Orphan[];
   since: string;
@@ -71,6 +73,26 @@ function valuesText(v: Record<string, unknown> | null, columns: Column[]): strin
     .filter(x => x !== null && x !== undefined && x !== '')
     .map(x => (typeof x === 'object' ? JSON.stringify(x) : String(x)))
     .join(' › ');
+}
+
+// ── Alphabet bar ─────────────────────────────────────────────────────────────
+
+const HANGUL = ['ㄱ', 'ㄴ', 'ㄷ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅅ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
+const LATIN = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+// The 19 initial consonants of a Hangul syllable, doubled ones under their single form.
+const INITIALS = ['ㄱ', 'ㄱ', 'ㄴ', 'ㄷ', 'ㄷ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅂ', 'ㅅ', 'ㅅ', 'ㅇ', 'ㅈ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
+const DOUBLED: Record<string, string> = { 'ㄲ': 'ㄱ', 'ㄸ': 'ㄷ', 'ㅃ': 'ㅂ', 'ㅆ': 'ㅅ', 'ㅉ': 'ㅈ' };
+
+/** ㄱ–ㅎ for Korean (까치 → ㄱ), A–Z for Latin letters (accents dropped), # for the rest. */
+function indexLetter(text: string): string {
+  const ch = text.trim().normalize('NFC').charAt(0);
+  if (!ch) return '#';
+  const code = ch.charCodeAt(0);
+  if (code >= 0xac00 && code <= 0xd7a3) return INITIALS[Math.floor((code - 0xac00) / 588)];
+  if (HANGUL.includes(ch)) return ch;
+  if (DOUBLED[ch]) return DOUBLED[ch];
+  const latin = ch.normalize('NFD').charAt(0).toUpperCase();
+  return latin >= 'A' && latin <= 'Z' ? latin : '#';
 }
 
 // ── Editing ──────────────────────────────────────────────────────────────────
@@ -131,6 +153,7 @@ export default function AdminListPage() {
   const [data, setData] = useState<ListResponse | null>(null);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
+  const [letter, setLetter] = useState<string | null>(null);   // alphabet bar; null = All
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 } | null>(null);
   const [reload, setReload] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
@@ -140,6 +163,46 @@ export default function AdminListPage() {
   const [notice, setNotice] = useState('');
   const [preview, setPreview] = useState<{ body: RenameBody; data: RenamePreview } | null>(null);
   const [catForm, setCatForm] = useState<{ from: string; to: string } | null>(null);
+  // The map pop-up: for a saved row (Apply saves it) or for the row being edited (Apply fills the box).
+  const [picker, setPicker] = useState<
+    | { mode: 'row'; row: Row; key: string; start: LatLng | null }
+    | { mode: 'draft'; key: string; start: LatLng | null; here: Located | null }
+    | null
+  >(null);
+  const [locatingKey, setLocatingKey] = useState<string | null>(null);
+
+  const pointOf = (c: Cell): LatLng | null => (c && typeof c === 'object' && 'lat' in c ? { lat: c.lat, lng: c.lng } : null);
+  const draftPoint = (text: string): LatLng | null => {
+    const m = text.trim().match(/^(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)$/);
+    return m ? { lat: Number(m[1]), lng: Number(m[2]) } : null;
+  };
+
+  // Apply on a saved row: the same edit as typing the point and pressing Save.
+  async function saveRowPoint(row: Row, key: string, p: LatLng) {
+    setRowError(''); setNotice('');
+    const values = { ...toDraft(data!.list.columns, row), [key]: `${p.lat}, ${p.lng}` };
+    const r = await fetch(`/api/admin/lists/${encodeURIComponent(slug)}/${row._id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ values, confirmNew: false }),
+    });
+    const b = await r.json().catch(() => ({}));
+    setPicker(null);
+    if (!r.ok) { setRowError(b.error ?? `HTTP ${r.status}`); return; }
+    setNotice(`Point saved for ${rowLabel(data!.list.columns.filter(c => !c.narrow), row)}. Repeat it in the sheet, then tick it below.`);
+    setReload(n => n + 1);
+  }
+
+  // 📍 in the row being edited: find the device, then open the map there to check.
+  async function hereInDraft(key: string) {
+    setLocatingKey(key); setRowError('');
+    try {
+      const p = await locate();
+      setPicker({ mode: 'draft', key, start: editing ? draftPoint(String(editing.draft[key] ?? '')) : null, here: p });
+    } catch (e) {
+      setRowError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLocatingKey(null);
+    }
+  }
 
   const startEdit = (row: Row | null) => {
     setRowError(''); setNotice('');
@@ -272,13 +335,17 @@ export default function AdminListPage() {
   }, [slug, since, reload]);
 
   const columns = data?.list.columns ?? [];
+  // Place points rename and merge like activities but have no category (26 Oct).
+  const hasCategory = columns.some(c => c.key === 'category');
 
   const rows = useMemo(() => {
     if (!data) return [];
     const q = query.trim().toLowerCase();
+    const ix = data.list.indexBy;
     let out = q
-      ? data.rows.filter(r => columns.some(c => cellText(r.values[c.key], c.type).toLowerCase().includes(q)))
+      ? data.rows.filter(r => columns.some(c => !c.noSearch && cellText(r.values[c.key], c.type).toLowerCase().includes(q)))
       : data.rows;
+    if (ix && letter) out = out.filter(r => indexLetter(String(r.values[ix] ?? '')) === letter);
     if (sort) {
       const col = columns.find(c => c.key === sort.key);
       out = [...out].sort((a, b) => {
@@ -289,7 +356,15 @@ export default function AdminListPage() {
       });
     }
     return out;
-  }, [data, query, sort, columns]);
+  }, [data, query, letter, sort, columns]);
+
+  // Rows per letter (whole list, not the search), for the alphabet bar.
+  const letterCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    const ix = data?.list.indexBy;
+    if (ix) for (const r of data!.rows) { const l = indexLetter(String(r.values[ix] ?? '')); m.set(l, (m.get(l) ?? 0) + 1); }
+    return m;
+  }, [data]);
 
   // Categories with how many rows each, for "Rename a category".
   const categories = useMemo(() => {
@@ -316,7 +391,7 @@ export default function AdminListPage() {
           const title = !locked ? undefined
             : fixedHere(c.key) ? 'Records refer to this by name; renaming comes later'
             : `${used.toLocaleString()} record${used === 1 ? '' : 's'} use this value; renaming comes later`;
-          return (
+          const cell = (
             <td key={c.key} className="px-2 py-1.5 align-top">
               {c.type === 'zoneTime' ? (
                 <div className="flex gap-1">
@@ -339,6 +414,24 @@ export default function AdminListPage() {
                 />
               )}
             </td>
+          );
+          return c.type !== 'coords' ? cell : (
+            <Fragment key={c.key}>
+              {cell}
+              <td className="px-2 py-1.5 align-top whitespace-nowrap">
+                <button
+                  onClick={() => hereInDraft(c.key)}
+                  disabled={locked || !!preview || locatingKey !== null}
+                  title="Use where this phone or browser is now"
+                  className="px-1.5 py-1 rounded border border-stone-300 dark:border-zinc-600 text-xs hover:bg-stone-100 dark:hover:bg-zinc-700 disabled:opacity-40"
+                >{locatingKey === c.key ? '…' : '📍'}</button>
+                <button
+                  onClick={() => setPicker({ mode: 'draft', key: c.key, start: draftPoint(String(v ?? '')), here: null })}
+                  disabled={locked || !!preview}
+                  className={`${linkBtn} ml-2 underline`}
+                >Map</button>
+              </td>
+            </Fragment>
           );
         })}
         {data.list.usageCounted && (
@@ -373,7 +466,7 @@ export default function AdminListPage() {
           </div>
           {data.list.note && <p className="text-sm text-stone-500 dark:text-zinc-400 mb-1">{data.list.note}</p>}
           {data.list.recordsFollow && (
-            <p className="text-xs text-stone-500 dark:text-zinc-400 mb-1">Renaming, merging or moving a row here changes past records too, after a preview. Undo works until the next migration.</p>
+            <p className="text-xs text-stone-500 dark:text-zinc-400 mb-1">{hasCategory ? 'Renaming, merging or moving' : 'Renaming or merging'} a row here changes past records too, after a preview. Undo works until the next migration.</p>
           )}
 
           {data.orphans.length > 0 && (
@@ -397,8 +490,8 @@ export default function AdminListPage() {
               placeholder="Search"
               className="flex-1 max-w-sm bg-white dark:bg-zinc-900 border border-stone-300 dark:border-zinc-600 rounded-lg px-3 py-2 text-stone-900 dark:text-zinc-50 placeholder-stone-400 focus:outline-none focus:border-stone-400 text-sm shadow-sm"
             />
-            {query && <span className="text-xs text-stone-500 dark:text-zinc-400">{rows.length} of {data.rows.length}</span>}
-            {data.list.recordsFollow && (
+            {(query || letter) && <span className="text-xs text-stone-500 dark:text-zinc-400">{rows.length} of {data.rows.length}</span>}
+            {data.list.recordsFollow && hasCategory && (
               <button
                 onClick={() => { setRowError(''); setNotice(''); setCatForm({ from: '', to: '' }); }}
                 disabled={!!editing || !!catForm || !!preview}
@@ -408,9 +501,35 @@ export default function AdminListPage() {
             <button
               onClick={() => startEdit(null)}
               disabled={!!editing || !!catForm || !!preview}
-              className={`${data.list.recordsFollow ? '' : 'ml-auto '}px-3 py-2 bg-stone-800 dark:bg-zinc-700 text-white rounded-lg text-sm font-medium hover:bg-stone-900 dark:hover:bg-zinc-600 transition-colors disabled:opacity-40`}
+              className={`${data.list.recordsFollow && hasCategory ? '' : 'ml-auto '}px-3 py-2 bg-stone-800 dark:bg-zinc-700 text-white rounded-lg text-sm font-medium hover:bg-stone-900 dark:hover:bg-zinc-600 transition-colors disabled:opacity-40`}
             >+ Add</button>
           </div>
+          {data.list.indexBy && (
+            <div className="mb-3 space-y-1" role="group" aria-label="Show names starting with">
+              {[['All', ...HANGUL], [...LATIN, '#']].map((line, li) => (
+                <div key={li} className="flex flex-wrap gap-1">
+                  {line.map(l => {
+                    const n = l === 'All' ? data.rows.length : letterCounts.get(l) ?? 0;
+                    const on = l === 'All' ? letter === null : letter === l;
+                    return (
+                      <button
+                        key={l}
+                        onClick={() => setLetter(l === 'All' || on ? null : l)}
+                        disabled={n === 0}
+                        aria-pressed={on}
+                        title={`${n.toLocaleString()} name${n === 1 ? '' : 's'}`}
+                        className={`h-7 ${l === 'All' ? 'px-2.5' : 'min-w-7 px-1'} rounded text-xs transition-colors disabled:opacity-25 disabled:cursor-default ${
+                          on
+                            ? 'bg-stone-800 dark:bg-zinc-200 text-white dark:text-zinc-900 font-semibold'
+                            : 'bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-700 text-stone-700 dark:text-zinc-200 hover:bg-stone-100 dark:hover:bg-zinc-800'
+                        }`}
+                      >{l}</button>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          )}
           {catForm && (
             <div className="mb-3 px-4 py-3 border border-stone-200 dark:border-zinc-700 rounded-lg bg-stone-50 dark:bg-zinc-800 flex flex-wrap gap-2 items-center text-sm">
               <span className="text-stone-600 dark:text-zinc-300">Rename the category</span>
@@ -470,7 +589,9 @@ export default function AdminListPage() {
           )}
           {editing && editing.id !== 'new' && !preview && data.list.recordsFollow && (
             <p className="mb-2 text-xs text-stone-500 dark:text-zinc-400">
-              A new name renames this row, a new category moves it, and the name of another row merges it into that row. Past records follow; you'll see a preview first.
+              {hasCategory
+                ? <>A new name renames this row, a new category moves it, and the name of another row merges it into that row. Past records follow; you&apos;ll see a preview first.</>
+                : <>A new name renames this row, and the name of another row merges it into that row. Past records follow; you&apos;ll see a preview first. Change the name on its own, then the other columns.</>}
             </p>
           )}
           {editing && editing.id !== 'new' && !data.list.recordsFollow && (data.list.fixedOnEdit.length > 0 || ((data.rows.find(r => r._id === editing.id)?.used ?? 0) > 0 && data.list.locked.length > 0)) && (
@@ -498,9 +619,12 @@ export default function AdminListPage() {
               <thead>
                 <tr className="border-b border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800 text-xs text-stone-500 dark:text-zinc-400">
                   {columns.map(c => (
-                    <th key={c.key} onClick={() => clickSort(c.key)} className={`${th} ${c.type === 'number' ? 'text-right' : ''}`}>
-                      {c.label} <span className="text-[8px]">{arrow(c.key)}</span>
-                    </th>
+                    <Fragment key={c.key}>
+                      <th onClick={() => clickSort(c.key)} className={`${th} ${c.type === 'number' ? 'text-right' : ''} ${c.narrow ? 'w-40' : ''}`}>
+                        {c.label} <span className="text-[8px]">{arrow(c.key)}</span>
+                      </th>
+                      {c.type === 'coords' && <th className="text-left font-medium px-3 py-2 w-20">Map</th>}
+                    </Fragment>
                   ))}
                   {data.list.usageCounted && (
                     <th onClick={() => clickSort('__used')} className={`${th} text-right w-24`}>
@@ -515,12 +639,27 @@ export default function AdminListPage() {
                 {rows.map(r => editing?.id === r._id ? editorRow(r) : (
                   <tr key={r._id} className="border-b last:border-0 border-stone-100 dark:border-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-800/60">
                     {columns.map(c => (
-                      <td key={c.key} className={`px-3 py-1.5 ${c.type === 'number' || c.type === 'coords' ? 'font-mono text-xs' : ''} ${c.type === 'number' ? 'text-right' : ''} text-stone-800 dark:text-zinc-100`}>
-                        {cellText(r.values[c.key], c.type) || <span className="text-stone-300 dark:text-zinc-600">—</span>}
-                      </td>
+                      <Fragment key={c.key}>
+                        <td title={c.narrow ? cellText(r.values[c.key], c.type) || undefined : undefined} className={`px-3 py-1.5 ${c.type === 'number' || c.type === 'coords' ? 'font-mono text-xs' : ''} ${c.type === 'number' ? 'text-right' : ''} ${c.narrow ? 'max-w-40 truncate text-xs' : ''} text-stone-800 dark:text-zinc-100`}>
+                          {cellText(r.values[c.key], c.type) || <span className="text-stone-300 dark:text-zinc-600">—</span>}
+                        </td>
+                        {c.type === 'coords' && (
+                          <td className="px-3 py-1.5">
+                            <button
+                              onClick={() => { setRowError(''); setNotice(''); setPicker({ mode: 'row', row: r, key: c.key, start: pointOf(r.values[c.key]) }); }}
+                              disabled={!!editing || !!catForm || !!preview}
+                              title="Check the point on the map and move it"
+                              className={`${linkBtn} underline`}
+                            >Map</button>
+                          </td>
+                        )}
+                      </Fragment>
                     ))}
                     {data.list.usageCounted && (
-                      <td className={`px-3 py-1.5 text-right font-mono text-xs ${r.used ? 'text-stone-600 dark:text-zinc-300' : 'text-stone-300 dark:text-zinc-600'}`}>
+                      <td
+                        title={r.usedBy && r.used ? Object.entries(r.usedBy).map(([k, x]) => `${k} ${x.toLocaleString()}`).join(' · ') + (data.list.viaFavorites ? ' (집 / 회사 / 사이트 / 내차 included)' : '') : undefined}
+                        className={`px-3 py-1.5 text-right font-mono text-xs ${r.used ? 'text-stone-600 dark:text-zinc-300' : 'text-stone-300 dark:text-zinc-600'} ${r.usedBy && r.used ? 'cursor-help' : ''}`}
+                      >
                         {(r.used ?? 0).toLocaleString()}
                       </td>
                     )}
@@ -538,13 +677,26 @@ export default function AdminListPage() {
                   </tr>
                 ))}
                 {rows.length === 0 && editing?.id !== 'new' && (
-                  <tr><td colSpan={columns.length + 2} className="px-3 py-4 text-center text-sm text-stone-500 dark:text-zinc-400">No rows.</td></tr>
+                  <tr><td colSpan={columns.length + columns.filter(c => c.type === 'coords').length + 2} className="px-3 py-4 text-center text-sm text-stone-500 dark:text-zinc-400">No rows.</td></tr>
                 )}
               </tbody>
             </table>
           </div>
           {!data.list.usageCounted && (
             <p className="mt-2 text-xs text-stone-500 dark:text-zinc-400">Records are not counted for this list.</p>
+          )}
+
+          {picker && (
+            <PointPicker
+              title={picker.mode === 'row' ? rowLabel(data.list.columns.filter(c => !c.narrow), picker.row) : (editing && String(editing.draft[data.list.indexBy ?? 'name'] ?? '')) || 'New point'}
+              start={picker.start}
+              here={picker.mode === 'draft' ? picker.here : null}
+              applyLabel={picker.mode === 'row' ? 'Apply this point' : 'Use this point'}
+              onApply={p => (picker.mode === 'row'
+                ? saveRowPoint(picker.row, picker.key, p)
+                : (setCell(picker.key, `${p.lat}, ${p.lng}`), setPicker(null)))}
+              onClose={() => setPicker(null)}
+            />
           )}
 
           <section className="mt-8">

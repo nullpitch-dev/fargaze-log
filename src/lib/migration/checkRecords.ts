@@ -37,7 +37,8 @@ export interface MasterCheck {
 export async function loadMasterChecks(userId: string): Promise<MasterCheck[]> {
   const out: MasterCheck[] = [];
   for (const def of LISTS) {
-    if (!def.usage?.length) continue;
+    // refuseUnknown false (place points): names without a point are normal.
+    if (!def.usage?.length || def.refuseUnknown === false) continue;
     const docs = await def.model().find({ userId, ...(def.filter ?? {}) }).lean();
     const rows = (docs as any[]).map(d => toRow(def, d));
     if (!rows.length) {

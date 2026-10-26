@@ -67,7 +67,7 @@ async function main() {
   let total = 0;
 
   for (const def of LISTS) {
-    if (!def.usage?.length) continue;
+    if (!def.usage?.length || def.refuseUnknown === false) continue;   // place points: names without a point are normal
     const hits = await orphansFor(def);
     if (!hits.length) continue;
     total += hits.length;
