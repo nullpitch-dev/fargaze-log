@@ -30,6 +30,7 @@ import {
 } from '../src/lib/migration/staging';
 import { missingIngredients, describeMissing } from '../src/lib/records/ingredients';
 import Log from '../src/models/Log';
+import { getArchiveUntil } from '../src/lib/archiveYear';
 
 const USER_ID = 'hyoje';
 const CHECK = process.argv.includes('--check');
@@ -109,8 +110,10 @@ async function main() {
       'use the edit feature (later) or a full migration (npm run migrate).']);
   }
 
-  // Warning only: each record must also be in its year tab.
-  const tabs = [...new Set(items.map(x => yearTabFor(x.doc)).filter((t): t is string => !!t))];
+  // Warning only: each record must also be in its year tab (the archive tab '~N' for
+  // N and earlier, #73).
+  const archiveUntil = await getArchiveUntil(USER_ID);
+  const tabs = [...new Set(items.map(x => yearTabFor(x.doc, archiveUntil)).filter((t): t is string => !!t))];
   const tabKeys = new Map<string, Set<string>>();
   for (const tab of tabs) {
     try {
@@ -121,7 +124,7 @@ async function main() {
       console.error(`  Could not read '${tab}': ${e.message}`);
     }
   }
-  const missing = missingFromYearTab(items, tabKeys);
+  const missing = missingFromYearTab(items, tabKeys, archiveUntil);
   if (missing.length) {
     const sent = problems.length ? 'Not a reason to stop on its own' : CHECK ? 'A real run would still send' : 'Still sent';
     console.warn(`\n⚠️  ${missing.length} Staging record${missing.length === 1 ? ' has' : 's have'} no match in the year tab. ${sent}, but the next full migration would drop ${missing.length === 1 ? 'it' : 'them'}.`);

@@ -7,8 +7,10 @@
 #   3. delete backups older than 30 days from that folder, permanently (not to
 #      the Drive bin, which would still count against storage)
 #
-# Runs at 02:00 UTC (03:00 in British Summer Time, 02:00 in winter) and on
-# demand from the Actions tab ("Run workflow"). A failed run emails Hyoje.
+# Runs at 02:23 UTC (03:23 in British Summer Time, 02:23 in winter) and on
+# demand from the Actions tab ("Run workflow"). Not on the hour: GitHub often
+# delays or drops scheduled runs at minute 0, and a dropped run sends no email.
+# A failed run emails Hyoje.
 #
 # Secrets (repo Settings → Secrets and variables → Actions):
 #   BACKUP_MONGODB_URI  connection string of a READ-ONLY database user

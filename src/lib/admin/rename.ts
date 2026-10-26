@@ -24,6 +24,8 @@ import Log from '@/models/Log';
 import MasterChange from '@/models/MasterChange';
 import CalendarSettings from '@/models/CalendarSettings';
 import { colorKeyFor } from '@/app/calendar/_lib/calendar-colors';
+import { getArchiveUntil } from '@/lib/archiveYear';
+import { countsByTab, savedByTab, type TabCount } from '@/lib/yearTabs';
 import { type ListDef, toRow } from './lists';
 import { PLACE_SLUG, previewPlaceRename, applyPlaceRename, undoPlaceChange, type PlacePreview } from './renamePlace';
 
@@ -86,7 +88,9 @@ export type Plan =
     }
   | { mode: 'category'; action: 'rename' | 'merge'; from: string; to: string; rowIds: string[] };
 
-export interface Counts { total: number; y2026: number; older: number; first: number | null; last: number | null; otherCat: number }
+/** byTab: records per Archive-file tab, newest year tab first, the archive last (#73).
+ *  Counts saved before #73 have y2026 / older instead (savedByTab reads both). */
+export interface Counts { total: number; byTab: TabCount[]; first: number | null; last: number | null; otherCat: number }
 
 export interface Preview {
   title: string;
@@ -170,10 +174,10 @@ async function countRecords(f: Follow, userId: string, p: Plan): Promise<Counts>
   ]) as { _id: number | null; n: number; other: number }[];
   const years = byYear.map(y => y._id).filter((y): y is number => typeof y === 'number');
   const sum = (pred: (y: number | null) => boolean) => byYear.filter(y => pred(y._id)).reduce((a, y) => a + y.n, 0);
+  const archiveUntil = await getArchiveUntil(userId);
   return {
     total: sum(() => true),
-    y2026: sum(y => y === 2026),
-    older: sum(y => y !== 2026),
+    byTab: countsByTab(byYear.map(y => ({ year: typeof y._id === 'number' ? y._id : null, n: y.n })), archiveUntil, new Date().getFullYear()),
     first: years.length ? Math.min(...years) : null,
     last: years.length ? Math.max(...years) : null,
     otherCat: byYear.reduce((a, y) => a + y.other, 0),
@@ -201,9 +205,10 @@ const rowsOf = (x: number) => (x === 0 ? 'expect none' : `expect ${plural(x, 'ro
 
 /** One Find & Replace over the record column in every tab that holds records. */
 function replaceInRecords(col: string, from: string, to: string, c: Counts, entryTabs: boolean): string[] {
+  const tabs = savedByTab(c);
   const out = [
-    `Find and replace ${from} → ${to} in column ${col}. Tick “Match case” and “Match entire cell contents”, leave “Also search within formulas” off, choose “Specific range” and do each range in turn. Sheets says how many it replaced; the 2026 tab can show more if rows were added since the last migration.`,
-    `   Archive file: ${range('2026', col, 4)} (${expect(c.y2026)}), ${range('~2025', col, 4)} (${expect(c.older)}).`,
+    `Find and replace ${from} → ${to} in column ${col}. Tick “Match case” and “Match entire cell contents”, leave “Also search within formulas” off, choose “Specific range” and do each range in turn. Sheets says how many it replaced; the ${tabs[0].tab} tab can show more if rows were added since the last migration.`,
+    `   Archive file: ${tabs.map(t => `${range(t.tab, col, 4)} (${expect(t.n)})`).join(', ')}.`,
   ];
   if (entryTabs) out.push(`   Active file: ${ENTRY_TABS.map(t => range(t, col, 3)).join(', ')} (any number, including none).`);
   return out;
@@ -213,8 +218,9 @@ function replaceInRecords(col: string, from: string, to: string, c: Counts, entr
 function fillCategory(f: Follow, key: string, cat: string, c: Counts): string[] {
   const { keyLetter: k, catLetter: a } = f.sheet;
   const how = `filter column ${k} to ${key}, select column ${a} in the rows it shows, type ${cat} and press Ctrl+Enter, then remove the filter`;
+  const [first, ...rest] = savedByTab(c);
   const out = [
-    `Archive file, tab 2026: ${how} (${rowsOf(c.y2026)}). Tab ~2025: the same (${rowsOf(c.older)}).`,
+    `Archive file, tab ${first.tab}: ${how} (${rowsOf(first.n)}).${rest.map(t => ` Tab ${t.tab}: the same (${rowsOf(t.n)}).`).join('')}`,
   ];
   out.push(f.sheet.catIsFormulaInEntry
     ? `Active, History and Future: nothing to do in column ${a} (a formula reads the ${f.sheet.tab} tab).`

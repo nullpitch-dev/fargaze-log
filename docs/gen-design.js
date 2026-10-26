@@ -16,7 +16,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze Log", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Data Design & Requirements Document", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 4.22  |  26 October 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 4.23  |  26 October 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
 );
 C(p([new TextRun({ text: "Structure: ", bold: true }), new TextRun("Part I Foundations · Part II Data · Part III Features · Part IV Operations · Appendices. The body is the complete, always-current source of truth; the changelog below carries one line per version. Work status, open questions and the backlog live in the separate WBS, not here.")]));
 
@@ -67,6 +67,7 @@ C(table(
     ["4.19","25 Oct 2026","THE MIGRATION REFUSES UNKNOWN VALUES; MASTER LOADERS REMOVED (WBS #67 step 4). scripts/migrate.ts now reads and checks EVERY row before deleting anything; one refused row stops the run and nothing is deleted. A value is refused when its master list in the database does not have it — the same rule as the admin pages’ missing-values box, from the usage specs in lists.ts, so every list with records is covered: activity + category, cost detail + category, reference values, alcohol item + unit, ingredients, bowel values, time-zone codes and currencies. Also refused: an activity name whose category is empty or an error such as #N/A (skipped silently before), a leading value with an empty partner (a cost detail with no category, an alcohol item with no unit), and any row the parser cannot read. The report groups refusals by reason with the sheet rows. New options: --check reads and checks only (safe on production) and --full replaces uncommenting the ~2025 block. New module src/lib/migration/checkRecords.ts. Removed (git keeps them): migrate-alcohol-conversion, -ingredient, -bowel-score, -favorite-place, -place-coord and their npm scripts, and migrateCostMaster / ActivityMaster / TimezoneMaster / ExchangeRate from migrate.ts. §11 and §12 rewritten for the admin pages"],
     ["4.20","26 Oct 2026","ADMIN USABILITY AND PLACE POINTS (§15.5.5–15.5.7). The gear icon opens a menu: All master lists plus shortcuts, pinned with ☆ / ★ on /admin and kept per user in a new collection admin_settings (§6.13; starter: Activities, Cost categories, Place points, Ingredients). The menu bar fits narrow screens (under 520 px, e.g. the Fold 6 outer screen): the FARGAZE word is hidden and the links sit closer, which also removes the empty strip that appeared on every page there. Every list sorts with case ignored (collation en, strength 2). Place points: alphabet bar (ㄱ–ㅎ, A–Z, #), Source column hidden (values kept), Note narrow and not searched; a Records column counting Place (location.activity), From and To, with 집 / 회사 / 사이트 / 내차 resolved through favourite places as Journeys does; rename and merge with past records and favourite-place periods following, Undo as for activities (src/lib/admin/renamePlace.ts); a place a favourite-place period names can’t be deleted. Map column and 📍 Here: check and move a point on Google Maps (shared loader src/app/_components/google-maps.ts; PointPicker). Usage counts no longer collect record IDs where they need not (Atlas free tier: 100 MB per $group, allowDiskUse ignored). Tested on fargaze-log-test by Hyoje on 26 Oct"],
     ["4.22","26 Oct 2026","THE STAGING MIGRATION (WBS #68, new §11.7). A Staging tab in the Archive file (left of 2026, same layout, records from row 4) holds only records waiting for the server. npm run staging (and --check, which writes nothing) only ADDS records and never edits: it stops while a change on /admin is unticked; checks every Staging row with the daily migration’s checks (prepareSheet); and stops, writing nothing, when a food or drink has no ingredients (written without brackets; Hyoje, 26 Oct: the fill scripts run only with a full migration, so Staging needs them typed — a shared, database-free rule in src/lib/records/ingredients.ts that the entry app will use too), or a record (activity + title + start + end; an all-day record by its dates — the title because one Amazon order is several 구매 records at the same time, Hyoje 26 Oct) is in Staging twice or is already in the database (Hyoje, 26 Oct: Staging is an upload tool; a change to a record goes through the edit feature or a full migration). A Staging record with no match in its year tab is a warning only. Everything is inserted in one transaction; the report says which rows to clear. Shared sheet reading and the change gate moved into src/lib/migration/sheet.ts; prepareSheet now returns each record’s row number, and (both migrations) refuses an alcohol unit or amount without its item — more units or amounts than items in AX–AZ, which the parser would drop quietly (Hyoje, 26 Oct). §11.1, §11.2 and §15.3 updated: day to day, new records go up by Staging and the full migration is for past changes"],
+    ["4.23","26 Oct 2026","YEAR TABS AND THE ROLLOVER (WBS #73, new §11.8), brought forward by Hyoje so the one hard deadline is safe. Both migrations take the Archive file’s tab names from the sheet (the one archive tab ~N, a 4-digit tab per later year) and check them against N, stored as admin_settings.archiveUntil (§6.13; absent = 2025). The daily migration rebuilds every year tab, --full adds the archive, each tab clearing only its own years; a record in the wrong tab is now refused (before, a 2025 row in the 2026 tab was added again on every daily run). npm run migrate -- --full --rollover, after the January merge, moves N on only if the run succeeds; a half-done merge, a missing year tab or two archive tabs stop the run. The /admin rename steps name the tabs from N with a count per tab. TEST DATABASE (WBS #69) REDUCED: no sync script — local dev reads fargaze-log-test from .env.development.local (scripts still read .env.local, production), and test is refreshed by restore-test.yml (§2.4, §15.2). Nightly backup moved to 02:23 UTC (§12.8)"],
     ["4.21","26 Oct 2026","DAILY STRIPS FOR DIET AND DRINKING; ONE RULE FOR FUTURE DAYS; MONTHS IN THE CALENDAR (§9.3.3, §9.3.4, §9.3.9). Diet: the Spicy days strip is replaced by Daily diet · carbs — each day coloured by its carbs index (below 4 blue, 4–8 amber, over 8 red), tooltip listing every food- or drink-bearing record of the day (time, meal type, items, 🌶 on a meal rated H, servings in 인분 or a drink-only record’s shared amount), opening upwards; diet.summary gains days. Drinking: a Daily drinking strip under the drinks row (below 4 blue, 4–10 amber, over 10 red), tooltip with the day’s total and each record’s items as logged and drinks; drinking.summary gains rangeStart, rangeEnd and days. Shared colours and band rule in src/app/insights/_lib/day-bands.ts. Strips and calendars in Diet, Drinking, Exercise and Sleep now cover the whole period and draw days from today on as future days (faint, no border, ‘not yet’; futureFrom = localToday()); exercise.summary gains rangeStart / rangeEnd. The calendar pop-up marks months: ‘Oct 1’ in bold on each 1st and on the first day shown, and a stepped line along each month boundary. Checked by Hyoje on 26 Oct"],
   ],
   [1100, 1300, 6960]
@@ -140,13 +141,14 @@ C(table(["Layer","Technology","Notes"],[
   ["Charts","Custom CSS + SVG components","CSS-first; SVG only for curved line paths in trend charts"],
   ["Maps","Google Maps JavaScript API (v4.13)","Journeys Places map only; loaded by a script tag when the tab opens, with the key fetched from GET /api/maps-key (v4.14); no Map ID, plain style arrays; dots and labels drawn by one custom OverlayView"],
   ["Hosting","Vercel","Environment variables set in Vercel dashboard"],
-  ["Backups","GitHub Actions + rclone → Google Drive (v4.15)","Nightly mongodump of fargaze-log at 02:00 UTC, 30 days kept; restore-to-test workflow (§12.8)"],
+  ["Backups","GitHub Actions + rclone → Google Drive (v4.15)","Nightly mongodump of fargaze-log at 02:23 UTC (v4.23), 30 days kept; restore-to-test workflow (§12.8)"],
 ],[2000,2800,4560]));
 C(spacer());
 
 C(h2("2.4 Environment Variables"));
 C(table(["Variable","Where","Purpose"],[
   ["MONGODB_URI","Vercel + .env.local","MongoDB Atlas connection string"],
+  ["MONGODB_URI (local dev)",".env.development.local","(v4.23) fargaze-log-test, through the test-restore user (readWrite on fargaze-log-test only). next dev reads this file before .env.local, so localhost shows test data; the scripts read only .env.local and stay on production. Optional: a Preview-scoped MONGODB_URI on Vercel for previews"],
   ["GOOGLE_CLIENT_ID","Vercel + .env.local","Google OAuth client ID"],
   ["GOOGLE_CLIENT_SECRET","Vercel + .env.local","Google OAuth client secret"],
   ["NEXTAUTH_SECRET","Vercel + .env.local","Auth.js session encryption key"],
@@ -703,6 +705,7 @@ C(p("One document per user for the admin pages, so the phone and the desktop agr
 C(table(["Field","Type","Notes"],[
   ["userId","String","Owner; unique index { userId }"],
   ["pins","String[]","Slugs of the lists shown as shortcuts in the gear menu, kept in /admin order. Absent until the first pin or unpin: the API then supplies the starter list (activity, cost, place-coord, ingredient)"],
+  ["archiveUntil","Number","(v4.23) N: the last year in the Archive file’s archive tab ~N; later years have a tab each (§11.8). Absent = 2025. Set only by npm run migrate -- --full --rollover; read by both migrations and by the /admin rename steps (src/lib/archiveYear.ts)"],
   ["createdAt / updatedAt","Date","timestamps"],
 ],[2400,2000,4960]));
 C(p("Model src/models/AdminSettings.ts; logic src/lib/admin/pins.ts; GET / PUT /api/admin/pins. GET /api/admin/lists also returns pinned per list."));
@@ -1922,8 +1925,28 @@ C(
   bullet("The same record twice in Staging. Two records are the same when activity name, title, start and end are the same (the title because several purchases from one order share the activity and time, e.g. 구매 - 건강 · 유산균 구매 and 구매 - 생활 · 정수기 필터 구매 at 8:10 — not a duplicate): the wall-clock datetimes, or for an all-day record (no hour, so no datetime) its local start and end dates"),
   bullet("A Staging record already in the database. One query by activity names and start times (all-day records by date) finds every possible match. So a second run with uncleared rows stops; nothing is ever duplicated"),
 );
-C(p("Warning only (the record is still sent): a Staging record with no match in its year tab (2026; ~2025 for older years; a later year’s own tab, which until the rollover setting (WBS #73) may not exist). The next full migration rebuilds the year from that tab and would drop the record, so copy the row into the year tab."));
+C(p("Warning only (the record is still sent): a Staging record with no match in its year tab (2026; ~2025 for older years; a later year’s own tab; (v4.23) N and earlier go in the archive tab ~N, §11.8). The next full migration rebuilds the year from that tab and would drop the record, so copy the row into the year tab."));
 C(note("Code: src/lib/migration/staging.ts holds the checks as plain functions (recordKey, describe, duplicatesWithin, alreadyThere, existingQuery, yearTabFor, missingFromYearTab); src/lib/migration/sheet.ts the sheet reading and the change gate, shared with scripts/migrate.ts. Tested 26 Oct against a fake sheet and an in-memory database (check, send, second run, foods and drinks without ingredients, empty Staging, twice in Staging, missing from 2026, missing 2027 tab, refused + already there together, unticked change, failed write); then by Hyoje on 26 Oct: --check on production, a real run on fargaze-log-test, then production; the full check (npm run migrate -- --full --check) passed with every row, 41,340 + 4,781, after the alcohol rule was added."));
+
+C(h2("11.8 Year Tabs and the Rollover (v4.23, WBS #73)"));
+C(p("The Archive file holds one archive tab, ~N, with every record that starts in year N or earlier, and one tab per later year, named by the year (2026, 2027 …). N is stored in the database (admin_settings.archiveUntil, §6.13; absent means 2025), so the app, which never reads the sheet, knows the tab names too. The scripts read the tab names from the Archive file and check them against N; any other tab (Staging …) is ignored, and a name must match exactly (‘2026 copy’ is ignored too)."));
+C(table(["Command","Reads","Rebuilds"],[
+  ["npm run migrate","Every year tab","Each year tab’s own year: deletes records starting in 2026, re-inserts the 2026 tab; from 1 Jan also 2027"],
+  ["npm run migrate -- --full","The archive tab and every year tab","The archive: records starting in N or earlier; then each year tab"],
+  ["npm run migrate -- --full --rollover","As --full, with the archive one year on (~N+1)","As --full; then, only if the run succeeds, N becomes N+1"],
+],[3000,2600,3760]));
+C(spacer());
+C(p("The run stops, deleting nothing, when the tabs and N disagree: no archive tab or more than one; the archive tab is ~N+1 without --rollover (with a hint to run it); --rollover while the archive is still ~N (nothing to roll over); a year tab at or below the archive year (a half-done merge: the old year tab not yet deleted); a missing year between the archive and the newest year tab; --rollover without --full. Every check runs in --check too, and --check --rollover says what N would become."));
+C(p("Wrong tab: a year tab holds only records starting in its own year, the archive only N and earlier. Any other record is refused, with the tab it belongs in, like any refused row (one stops the run). Before v4.23 a record in the wrong tab was silently doubled: the daily run cleared only 2026 records but re-inserted the whole 2026 tab, so a 2025 row there was added again on every run."));
+C(bold("The January routine"));
+C(
+  num("1 Jan: add a tab 2027 with the same header rows 1–3. Daily: paste into 2027 and Staging (Staging finds each record’s year tab from N)"),
+  num("A quiet day in early January: back up by hand (Actions → Nightly backup → Run workflow). Copy the 2026 tab’s records (row 4 down) as plain values to the end of ~2025; rename ~2025 to ~2026; delete the 2026 tab"),
+  num("npm run migrate -- --full --check --rollover: the same counts as before the merge, and ‘A real run would then set the archive year to 2026’"),
+  num("npm run migrate -- --full --rollover. Done when it reports ‘Archive year set to 2026’ and the counts match"),
+);
+C(note("Optional rehearsal in December: a copy of the Archive file, with its ID in SPREADSHEET_ID_ARCHIVE and the test database in MONGODB_URI. Code: src/lib/yearTabs.ts (planTabs, clearFilter, wrongTab, tabForYear, countsByTab, savedByTab — pure), src/lib/archiveYear.ts (get / set N), listTabs in src/lib/migration/sheet.ts. Counts saved in master_change before v4.23 (y2026 / older) still give their sheet steps on Undo. Tested 26 Oct against a fake Archive file and an in-memory database: 32 checks (today’s layout, wrong tab both ways, the January overlap, half-done merge, missing hint, rollover check and run, after the rollover, broken layouts, Staging before and after)."));
+C(spacer());
 
 C(h1("12. Master-Table Update Procedures"));
 C(p("(v4.19) Every master list is changed on the admin pages (/admin, §15.5); the database is the truth and no list is loaded from the sheet. The loaders described in earlier versions (npm run migrate-alcohol, -ingredient, -bowel, -favorite-place, -place-coord, and the commented master calls in migrate.ts) were removed in #67 step 4; git keeps them. The sheet’s master tabs are kept in step by hand: each change on /admin shows its sheet step, and ‘Mark repeated’ ticks it. The migration stops while any change is unticked."));
@@ -1995,7 +2018,7 @@ C(note("Rejected: Kakao Local API and Google Geocoding / Places as the source �
 C(h2("12.8 Backups and Restore (v4.15)"));
 C(p("Atlas has no backups on the free tier, so two GitHub Actions workflows in the repository provide them. Both run on GitHub’s machines, so Hyoje’s PC need not be on; they use the official mongo:8.0 image for mongodump, mongorestore and mongosh, and rclone for Google Drive."));
 C(table(["Workflow","When","What it does"],[
-  [".github/workflows/backup.yml","Nightly at 02:00 UTC (03:00 BST); also Actions → Nightly backup → Run workflow","mongodump of the whole fargaze-log database into one gzipped archive, fargaze-log-YYYY-MM-DD.gz; uploads it to the Drive folder FarGaze Backups; deletes archives older than 30 days permanently (not to the Drive bin); writes the file size and the number kept to the run summary. A failed run emails Hyoje"],
+  [".github/workflows/backup.yml","Nightly at 02:23 UTC ((v4.23) not on the hour: GitHub delays or drops scheduled runs at minute 0, silently — the 26 Oct run was lost that way); also Actions → Nightly backup → Run workflow","mongodump of the whole fargaze-log database into one gzipped archive, fargaze-log-YYYY-MM-DD.gz; uploads it to the Drive folder FarGaze Backups; deletes archives older than 30 days permanently (not to the Drive bin); writes the file size and the number kept to the run summary. A failed run emails Hyoje"],
   [".github/workflows/restore-test.yml","By hand only: Actions → Restore backup to test → Run workflow, with a date or empty for the newest","Downloads the archive, restores it into fargaze-log-test with --nsFrom fargaze-log.* --nsTo fargaze-log-test.* --drop, and writes a table of record counts per collection, test beside production, to the run summary. Atlas Search indexes are not in a dump and are not restored"],
 ],[2600,2400,4360]));
 C(spacer());
@@ -2202,7 +2225,7 @@ C(p("Started 19 Oct 2026. The live plan, with its risk register and next steps, 
 C(h2("15.1 Stages"));
 C(table(["Stage","Truth for logs","What happens"],[
   ["1 · Master lists","Spreadsheet","Every supporting collection leaves the migration and is edited on admin pages in production (one generic table editor rather than ten pages). The database becomes their truth; the sheet’s master tabs are kept in step by hand, and the migration’s refusal of an unknown value is the reminder"],
-  ["2 · Building the app","Spreadsheet","Hyoje keeps entering in the sheet. Added: a Staging tab and Staging migration (records waiting for the server only; rows cleared by hand after a successful run; each record also stays in the year tab), an edit feature (changes mirrored in the sheet by hand, with a change list that must be ticked off before any full migration), a disposable test database synced from production by period, and the entry app writing only to the test database, compared with production after the same records are migrated"],
+  ["2 · Building the app","Spreadsheet","Hyoje keeps entering in the sheet. Added: a Staging tab and Staging migration (records waiting for the server only; rows cleared by hand after a successful run; each record also stays in the year tab), an edit feature (changes mirrored in the sheet by hand, with a change list that must be ticked off before any full migration), a disposable test database ((v4.23) refreshed from the nightly backup by restore-test.yml; local dev reads it), and the entry app writing only to the test database, compared with production after the same records are migrated"],
   ["3 · App in production","Database","At cutover the app writes to production. The sheet is frozen; a nightly export writes the database to an export spreadsheet from day one, layout as close to the original as possible. Fallback when the app fails: Active sheet → Staging → server. No separate stabilising stage"],
 ],[2000,1600,5760]));
 C(spacer());
@@ -2213,7 +2236,7 @@ C(
   bullet("Offline-first installable web app (PWA) in the existing Next.js project; the phone is Android, so waiting entries upload in the background when a signal returns. Each entry gets its ID on the phone, so a retry never duplicates; airplane mode works the same way"),
   bullet("Time zones: the phone’s zone is only the default; start and end zones are set separately per record (a flight can use departure and arrival zones; a future schedule the zone where it happens); the offset comes from the zone and the date"),
   bullet("Cutover on any day, at a quiet moment so no record straddles it; records starting before it belong to the sheet"),
-  bullet("Year rollover: until 31 Dec daily records go in the 2026 tab. In early January 2026 is merged into ~2025, which is renamed ~2026 (archive, never for daily entry), and a 2027 tab is added; the migration reads its tab names from a setting, done before then. If the app is live by then, the sheet takes no daily records"),
+  bullet("Year rollover: until 31 Dec daily records go in the 2026 tab. In early January 2026 is merged into ~2025, which is renamed ~2026 (archive, never for daily entry), and a 2027 tab is added; the migration reads its tab names from a setting, done before then. If the app is live by then, the sheet takes no daily records. (v4.23) Built 26 Oct, brought forward: the tab names come from the Archive file, checked against the stored archive year; npm run migrate -- --full --rollover after the merge (§11.8)"),
   bullet("Test database fargaze-log-test on the same cluster; production holds 62 MB of data (about 15% of the free tier), so a full-history copy fits"),
   bullet("Backups first: shipped 22 Oct (§12.8)"),
   bullet("(23 Oct) The category → activity structure keeps changing, so the UI is flexible but the data precise: a record’s activity must exist in the activity list. A new activity is created only on the master admin page, never from the entry form. Renaming, merging or deleting an activity or category there is applied to the historical records too; before cutover the same change must also reach the sheet, or the next full migration undoes it"),
@@ -2226,7 +2249,7 @@ C(
   bullet("(24 Oct) Rename, merge and move change past records for activities and cost categories first; ingredients, alcohol items, bowel values, people categories and place names follow later. Hyoje’s planned people-category clean-up: 친목 → 친구 (가족|친목 → 가족|친구), 업무친목 → 업무친구, 업무지인 → 업무친구"),
   bullet("(24 Oct) Reference lists for drink notes, food notes and alcohol items retired (§6.3)"),
   bullet("(24 Oct) Record time-zone offsets are kept for good: each is a fact about its moment (including summer time), the list’s offset is only the default for new entries, and recomputing from zone rules could drift"),
-  bullet("(25 Oct) Any admin feature that changes past records (rename, merge, later the edit feature) is tried on fargaze-log-test first, then used in production. Until the test sync (#69) exists, the test database is refreshed with the restore-to-test workflow and .env.local is pointed at it"),
+  bullet("(25 Oct) Any admin feature that changes past records (rename, merge, later the edit feature) is tried on fargaze-log-test first, then used in production. Until the test sync (#69) exists, the test database is refreshed with the restore-to-test workflow and .env.local is pointed at it. (v4.23, 26 Oct) #69 reduced by Hyoje: the sync was only a way to check test data, and the pages already show it — local dev (next dev) reads fargaze-log-test from .env.development.local, the scripts still read .env.local (production), and test is refreshed by restore-test.yml. So ‘test first’ is: restore → npm run dev → test; no switching"),
   bullet("(25 Oct) The names the site’s code looks for are locked for now. Before demo data in English, they move into a per-user setting (which activity means sleep, bowel, reading …) read by both the pages and the lock"),
 );
 C(h2("15.3 Order of work"));
@@ -2235,11 +2258,11 @@ C(
   bullet("2. Read-only survey: master tabs and the sheet columns that use them, typed vs formula columns, which columns each activity uses — done 23 Oct (§15.4)"),
   bullet("3. Master lists out of the migration; generic admin editor in production — steps 1–4 and 6 done 25–26 Oct; step 5 (rename for the other lists) later (§15.5)"),
   bullet("4. Staging tab and migration, with the duplicate and year-tab checks — done 26 Oct, tested on fargaze-log-test, then production (§11.7)"),
-  bullet("5. Test database sync by period"),
+  bullet("5. Test database — (v4.23) reduced 26 Oct: local dev on fargaze-log-test via .env.development.local, refreshed by restore-test.yml; no sync script. Done"),
   bullet("6. Edit feature with its change list, test then production"),
   bullet("7. Entry app: offline, all field groups, on test; the comparison report"),
   bullet("8. Nightly export to a spreadsheet, proven on test"),
-  bullet("9. Year rollover setting (before January)"),
+  bullet("9. Year rollover setting (before January) — brought forward and built 26 Oct, right after 5 (§11.8)"),
   bullet("10. Cutover"),
 );
 C(h2("15.4 Sheet Survey (23 Oct)"));
@@ -2341,7 +2364,7 @@ C(h3("A.1 Key Architecture Decisions"));
 C(
   bullet("Auth: Google OAuth → EMAIL_TO_USER_ID map → userId in JWT cookie. Three-layer security: middleware + API 403 + MongoDB userId filter."),
   bullet("Schema: duration.totalSeconds only (no d/h/m/s). Computed from start/end UTC timestamps using timezoneOffset."),
-  bullet("Migration: delete-all + re-insert strategy (no unique index). Daily run on 2026 sheet only; (v4.19) full re-migration with --full; every row checked before anything is deleted."),
+  bullet("Migration: delete-all + re-insert strategy (no unique index). Daily run on the year tabs only ((v4.23) every year tab, §11.8); (v4.19) full re-migration with --full; every row checked before anything is deleted."),
   bullet("Ingredients: food.foods[].ingredients (v3.1) and food.drinks[].ingredients (v3.2) populated from level2 taxonomy. Source of truth is ingredient_master (seeded from the Ingredient sheet). parseFoodIngredients validates foods and drinks against the loaded vocabulary; the historical-fill scripts repair anything the parentheses do not cover. food.alcohols[] has no ingredients."),
   bullet("Search: Atlas Search primary, regex fallback when Atlas returns 0 results. searchMode field in response indicates which was used. Field conditions support scoped exact-phrase matching via parseQuery (v3.6); result-table sorting is client-side (v3.6)."),
   bullet("Spending page layout: category order, detail order, collapsed state persisted in localStorage under key \"fargaze-cost-layout\"."),
@@ -2467,11 +2490,13 @@ C(table(["Path","Purpose"],[
   ["src/lib/migration/transform.ts","Transformation utilities; v3.1 adds parseFoodIngredients(), loadValidLevel2(), resetValidLevel2(), IngredientValidationError; v4.9 adds parsePlusList(), loadBowelVocabulary(), parseBowelValue(), parseBowelList(), BowelValidationError and imports BowelScore"],
   ["src/app/search/page.tsx","Search UI — (v4.11) LogEntry and DetailPanel now imported from src/app/_components/LogDetailPanel.tsx; garbled conditions hint fixed; food.spiciness added v3.0; mixed phrase/token query hint (v3.1); client-side tri-state sortable result columns (v3.6)"],
   ["src/app/api/search/route.ts","GET /api/search — Atlas Search primary + regex fallback; parseQuery mixed phrase/token (v3.1); per-field exact-phrase conditions mirrored across the Atlas and regex condition loops (v3.6)"],
-  ["scripts/migrate.ts","(v4.19) Daily migration: stops while a change on /admin is unticked; reads and checks every row (checkRecords.ts) and stops, deleting nothing, if any is refused; then deletes 2026 and re-inserts the 2026 tab. --check reads and checks only; --full adds ~2025. Fetch range A:CI. No master list is loaded (loaders removed v4.19)"],
+  ["scripts/migrate.ts","(v4.19) Daily migration: stops while a change on /admin is unticked; reads and checks every row (checkRecords.ts) and stops, deleting nothing, if any is refused; then deletes and re-inserts each year tab. --check reads and checks only; --full adds the archive tab. (v4.23) Tabs from the Archive file checked against the stored archive year; a record in the wrong tab is refused; --full --rollover (§11.8). Fetch range A:CI. No master list is loaded (loaders removed v4.19)"],
+  ["src/lib/yearTabs.ts","(v4.23) Year tabs, pure: tabForYear, planTabs (tab names against the archive year), clearFilter, wrongTab, countsByTab and savedByTab (the /admin sheet steps) (§11.8)"],
+  ["src/lib/archiveYear.ts","(v4.23) getArchiveUntil / setArchiveUntil: admin_settings.archiveUntil, default 2025"],
   ["src/lib/migration/checkRecords.ts","(v4.19) loadMasterChecks (every list with usage specs, from the database), unknownValues (a record against them, as $unwind reads it), prepareSheet (parse + check every row; (v4.22) also returns rowNos and refuses an alcohol unit or amount without its item (alcoholWithoutItem); writes nothing), refusalReport (grouped by reason). Not Defined is always allowed for ingredients"],
   ["scripts/migrate-staging.ts","(v4.22) Staging migration (§11.7): npm run staging [-- --check]. Adds the Staging tab’s records; stops on an unticked change, a refused row, a food or drink without ingredients, a record twice in Staging or one already in the database; warns about a record missing from its year tab; inserts in one transaction"],
   ["src/lib/migration/staging.ts","(v4.22) The Staging checks as plain functions: recordKey (activity + title + start + end; all-day by date), describe, duplicatesWithin, alreadyThere, existingQuery, KEY_FIELDS, yearTabFor, missingFromYearTab"],
-  ["src/lib/migration/sheet.ts","(v4.22) getSheetData and waitingChanges, shared by both migrations"],
+  ["src/lib/migration/sheet.ts","(v4.22) getSheetData and waitingChanges, shared by both migrations; (v4.23) listTabs, the Archive file’s tab names"],
   ["src/lib/records/ingredients.ts","(v4.22) missingIngredients(record) — foods and drinks with no real ingredient (empty or Not Defined); describeMissing. Pure: used by the Staging migration, meant for the entry app (#71)"],
       ["scripts/fill-historical-ingredients.ts","(v4.17) Names corrected to the Ingredient tab: 기타 해산물, 채소 육수, 짜장. Fills food.foods[].ingredients on existing rows from embedded REVIEWED_MAP (1,156 entries) + bestGuess fallback; modes: --dry-run, --export-worklist, default write; treats [\"Not Defined\"] as refillable (NEW v3.1)"],
   ["scripts/inspect-ingredients.ts","Survey: docs with foods, items with/without ingredients, Not Defined count, top level2 distribution, samples (NEW v3.1)"],
@@ -2516,7 +2541,7 @@ C(table(["Path","Purpose"],[
 C(spacer());
 
 // ===== FOOTER =====
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.22 — 26 October 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.23 — 26 October 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 
 // ===== DOCUMENT ASSEMBLY =====
@@ -2553,6 +2578,6 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-Log-Data-Design-v4.22.docx", buffer);
-  console.log("Wrote FarGaze-Log-Data-Design-v4.22.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-Log-Data-Design-v4.23.docx", buffer);
+  console.log("Wrote FarGaze-Log-Data-Design-v4.23.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });

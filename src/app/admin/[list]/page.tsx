@@ -33,7 +33,7 @@ interface Change {
 }
 interface RenamePreview {
   title: string;
-  counts: { total: number; y2026: number; older: number; first: number | null; last: number | null };
+  counts: { total: number; byTab: { tab: string; n: number }[]; first: number | null; last: number | null };
   rows: number;
   warnings: string[];
   sheetSteps: string[];
@@ -568,7 +568,7 @@ export default function AdminListPage() {
               <p className="mt-1 text-stone-700 dark:text-zinc-200">
                 {preview.data.counts.total === 0
                   ? 'No record uses it: only the list and the sheet change.'
-                  : <>{recs(preview.data.counts.total)} ({preview.data.counts.first === preview.data.counts.last ? preview.data.counts.first : `${preview.data.counts.first}–${preview.data.counts.last}`}) will change: {preview.data.counts.y2026.toLocaleString()} in 2026, {preview.data.counts.older.toLocaleString()} in earlier years.</>}
+                  : <>{recs(preview.data.counts.total)} ({preview.data.counts.first === preview.data.counts.last ? preview.data.counts.first : `${preview.data.counts.first}–${preview.data.counts.last}`}) will change: {preview.data.counts.byTab.filter(t => t.n).map(t => `${t.n.toLocaleString()} in ${t.tab}`).join(', ')}.</>}
               </p>
               {preview.data.warnings.length > 0 && (
                 <ul className="mt-1 text-amber-800 dark:text-amber-300">

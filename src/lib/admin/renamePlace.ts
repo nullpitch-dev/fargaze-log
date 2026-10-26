@@ -17,6 +17,8 @@ import mongoose from 'mongoose';
 import Log from '@/models/Log';
 import MasterChange from '@/models/MasterChange';
 import FavoritePlace from '@/models/FavoritePlace';
+import { getArchiveUntil } from '@/lib/archiveYear';
+import { countsByTab, savedByTab, type TabCount } from '@/lib/yearTabs';
 import { type ListDef, toRow } from './lists';
 import { parseCoordsText } from './write';
 
@@ -41,11 +43,16 @@ export interface PlacePlan {
   fromDoc: { lat: number; lng: number; note: string; source: string };
 }
 
+/** byTab: records per Archive-file tab, newest year tab first, the archive last (#73);
+ *  byField the same per column. Counts saved before #73 have y2026 / older instead. */
 export interface PlaceCounts {
-  total: number; y2026: number; older: number; first: number | null; last: number | null;
-  byField: Record<FieldKey, { y2026: number; older: number }>;
+  total: number; byTab: TabCount[]; first: number | null; last: number | null;
+  byField: Record<FieldKey, { byTab: TabCount[] }>;
   favorites: number;
 }
+
+/** Counts saved before #73 had { y2026, older } per field. */
+const fieldTabs = (c: PlaceCounts, key: FieldKey): TabCount[] => savedByTab((c.byField as any)[key] ?? {});
 
 type Fail = { ok: false; status: number; error: string };
 const fail = (status: number, error: string): Fail => ({ ok: false, status, error });
@@ -99,16 +106,20 @@ async function countRecords(userId: string, name: string): Promise<PlaceCounts> 
   const years = byYear.map(y => y._id).filter((y): y is number => typeof y === 'number');
   const sum = (pred: (y: number | null) => boolean) => byYear.filter(y => pred(y._id)).reduce((a, y) => a + y.n, 0);
 
+  const archiveUntil = await getArchiveUntil(userId);
+  const thisYear = new Date().getFullYear();
+  const asYears = (g: { _id: unknown; n: number }[]) => g.map(y => ({ year: typeof y._id === 'number' ? y._id : null, n: y.n }));
+
   const byField = {} as PlaceCounts['byField'];
   for (const f of FIELDS) {
     const g = await Log.aggregate([
       { $match: { userId, [f.path]: name } },
-      { $group: { _id: { $eq: ['$start.year', 2026] }, n: { $sum: 1 } } },
-    ]) as { _id: boolean; n: number }[];
-    byField[f.key] = { y2026: g.find(x => x._id)?.n ?? 0, older: g.find(x => !x._id)?.n ?? 0 };
+      { $group: { _id: '$start.year', n: { $sum: 1 } } },
+    ]) as { _id: number | null; n: number }[];
+    byField[f.key] = { byTab: countsByTab(asYears(g), archiveUntil, thisYear) };
   }
   return {
-    total: sum(() => true), y2026: sum(y => y === 2026), older: sum(y => y !== 2026),
+    total: sum(() => true), byTab: countsByTab(asYears(byYear), archiveUntil, thisYear),
     first: years.length ? Math.min(...years) : null, last: years.length ? Math.max(...years) : null,
     byField,
     favorites: await FavoritePlace.countDocuments({ userId, name }),
@@ -133,9 +144,11 @@ export function placeSteps(p: Pick<PlacePlan, 'action' | 'from' | 'to'>, c: Plac
   if (c.favorites) {
     steps.push(`FavoritePlace tab: find and replace ${from.key} → ${to.key} in column B (range ${range('FavoritePlace', 'B', 2)}, “Match case” and “Match entire cell contents”; ${expect(c.favorites)}).`);
   }
-  steps.push(`Find and replace ${from.key} → ${to.key} in columns AA (place), BE (from) and BF (to), one range at a time. Tick “Match case” and “Match entire cell contents”, leave “Also search within formulas” off and choose “Specific range”. Sheets says how many it replaced; the 2026 tab can show more if rows were added since the last migration.`);
-  for (const [tab, key] of [['2026', 'y2026'], ['~2025', 'older']] as const) {
-    steps.push(`   Archive file, tab ${tab}: ${FIELDS.map(f => `${range(tab, f.col, 4)} (${expect(c.byField[f.key][key])})`).join(', ')}.`);
+  const tabs = savedByTab(c).map(t => t.tab);
+  const inTab = (key: FieldKey, tab: string) => fieldTabs(c, key).find(t => t.tab === tab)?.n ?? 0;
+  steps.push(`Find and replace ${from.key} → ${to.key} in columns AA (place), BE (from) and BF (to), one range at a time. Tick “Match case” and “Match entire cell contents”, leave “Also search within formulas” off and choose “Specific range”. Sheets says how many it replaced; the ${tabs[0]} tab can show more if rows were added since the last migration.`);
+  for (const tab of tabs) {
+    steps.push(`   Archive file, tab ${tab}: ${FIELDS.map(f => `${range(tab, f.col, 4)} (${expect(inTab(f.key, tab))})`).join(', ')}.`);
   }
   steps.push(`   Active file, tabs Active, History and Future: columns AA, BE and BF from row 3 in each, e.g. ${FIELDS.map(f => range('Active', f.col, 3)).join(', ')} (any number, including none).`);
   return steps;
@@ -154,7 +167,7 @@ export async function previewPlaceRename(def: ListDef, userId: string, id: strin
   const counts = await countRecords(userId, p.from.key);
 
   const warnings: string[] = [];
-  const parts = FIELDS.map(f => [f.label, counts.byField[f.key].y2026 + counts.byField[f.key].older] as const).filter(([, x]) => x);
+  const parts = FIELDS.map(f => [f.label, fieldTabs(counts, f.key).reduce((a, t) => a + t.n, 0)] as const).filter(([, x]) => x);
   if (parts.length > 1) warnings.push(`Where it is written: ${parts.map(([l, x]) => `${l} ${n(x)}`).join(' · ')} (a record can have it in more than one place).`);
   if (p.action === 'merge') {
     const target = await def.model().findOne({ _id: p.targetId, userId }).lean() as any;

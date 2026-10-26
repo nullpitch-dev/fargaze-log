@@ -11,6 +11,8 @@
 //   - a Staging record missing from its year tab  → a warning; it is still sent
 // A change to a record already sent is made in the edit feature or by a full migration.
 
+import { tabForYear, DEFAULT_ARCHIVE_UNTIL } from '../yearTabs';
+
 export interface Located { row: number; doc: any }
 
 const iso = (d: unknown) => (d instanceof Date && !isNaN(d.getTime()) ? d.toISOString().slice(0, 16) : '');
@@ -70,23 +72,21 @@ export function existingQuery(userId: string, docs: any[]): Record<string, unkno
 }
 
 /**
- * The year tab a record belongs to. Until the rollover setting exists (#73), the
- * archive tab is '~2025' and every later year has its own tab.
+ * The year tab a record belongs to: the archive tab '~N' for N and earlier, otherwise
+ * the year's own tab (#73; N is the stored archive year).
  */
-export function yearTabFor(doc: any, firstYearTab = 2026, archiveTab = '~2025'): string | null {
-  const y = Number(doc?.start?.year);
-  if (!Number.isFinite(y) || !y) return null;
-  return y < firstYearTab ? archiveTab : String(y);
+export function yearTabFor(doc: any, archiveUntil = DEFAULT_ARCHIVE_UNTIL): string | null {
+  return tabForYear(doc?.start?.year, archiveUntil);
 }
 
 /**
  * Staging records with no match in their year tab. `tabKeys` holds the keys read from
  * each tab; a tab that could not be read is absent, and its records are listed too.
  */
-export function missingFromYearTab(items: Located[], tabKeys: Map<string, Set<string>>): { it: Located; tab: string | null; why: string }[] {
+export function missingFromYearTab(items: Located[], tabKeys: Map<string, Set<string>>, archiveUntil = DEFAULT_ARCHIVE_UNTIL): { it: Located; tab: string | null; why: string }[] {
   const out: { it: Located; tab: string | null; why: string }[] = [];
   for (const it of items) {
-    const tab = yearTabFor(it.doc);
+    const tab = yearTabFor(it.doc, archiveUntil);
     if (!tab) { out.push({ it, tab, why: 'no start year' }); continue; }
     const keys = tabKeys.get(tab);
     if (!keys) { out.push({ it, tab, why: `the tab '${tab}' could not be read` }); continue; }
