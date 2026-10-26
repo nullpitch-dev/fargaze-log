@@ -16,7 +16,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze Log", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Data Design & Requirements Document", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 4.19  |  25 October 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 4.20  |  26 October 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
 );
 C(p([new TextRun({ text: "Structure: ", bold: true }), new TextRun("Part I Foundations · Part II Data · Part III Features · Part IV Operations · Appendices. The body is the complete, always-current source of truth; the changelog below carries one line per version. Work status, open questions and the backlog live in the separate WBS, not here.")]));
 
@@ -65,6 +65,7 @@ C(table(
     ["4.16","23 Oct 2026","SHEET SURVEY (WBS #66) done — new scripts/survey-sheets.ts + src/lib/survey/sheetSurvey.ts, read-only. §10.1.5 gains the source of every column (typed, formula or either; the master tab each formula or dropdown reads; what the database stores). All 46,060 records pass the migration code, none refused, every year × category count matches the database. FULL RE-MIGRATION 23 Oct (~2025, 2026 and every master list, then the ingredient and drink fills and place_coord) — new §11.6 procedure; every master list in step with the sheet, IST stored as 5.5. Sheet facts corrected: the Active file is Active_2026Aug22 with Calendar, Happiness, FavoritePlace and PlaceCoord tabs (§4.1); records are pasted into the year tab as plain values (§4.3, §11.2); Activity P / Q / R are empty and the Bowel sheet is the only home of the bowel values (§4.1, §12.5); the migration reads cells as displayed, so accounting formats (brackets for negatives, ‘-’ for zero) lost values until changed to plain numbers (§11.6). §15: field-group rules are PER ACTIVITY with the category as fallback; activities are created only on the master page, and renaming, merging or deleting one applies to historical records; open (History) and future (Future) records must be covered by the entry feature; 심리 측정 (Happiness tab) recommended as one more field group with a one-off import, no sheet column insertion"],
     ["4.18","25 Oct 2026","RENAME, MOVE AND MERGE (WBS #67 step 3) for activities and cost categories, with past records following (§15.5.4). Edit a row on /admin/activity or /admin/cost: a new name renames it, a new category moves it, the name of another row merges it into that row (that row’s values win; the old row is deleted); ‘Rename a category’ renames a whole category or merges it into an existing one. Every change is previewed first (records, years, 2026 vs earlier, warnings, numbered sheet steps with exact ranges and expected counts), then the list, the records and the Calendar settings change in one transaction. Undo until the next migration (records are matched by the IDs saved in master_change.recordIds); a merge only until it is ticked. Names the site’s code looks for (수면, 대변, 독서(기간), 공부(기간); categories 생리, 이동, 운동) are shown locked and refused. master_change gains extra { title, plan, counts }. The pending-change gate from step 4 is in migrate.ts already: the daily migration stops, deleting nothing, while any change is unticked. Rule agreed 25 Oct: any admin feature that changes past records is tried on fargaze-log-test first (§15.2). Tested on fargaze-log-test by Hyoje on 25 Oct"],
     ["4.19","25 Oct 2026","THE MIGRATION REFUSES UNKNOWN VALUES; MASTER LOADERS REMOVED (WBS #67 step 4). scripts/migrate.ts now reads and checks EVERY row before deleting anything; one refused row stops the run and nothing is deleted. A value is refused when its master list in the database does not have it — the same rule as the admin pages’ missing-values box, from the usage specs in lists.ts, so every list with records is covered: activity + category, cost detail + category, reference values, alcohol item + unit, ingredients, bowel values, time-zone codes and currencies. Also refused: an activity name whose category is empty or an error such as #N/A (skipped silently before), a leading value with an empty partner (a cost detail with no category, an alcohol item with no unit), and any row the parser cannot read. The report groups refusals by reason with the sheet rows. New options: --check reads and checks only (safe on production) and --full replaces uncommenting the ~2025 block. New module src/lib/migration/checkRecords.ts. Removed (git keeps them): migrate-alcohol-conversion, -ingredient, -bowel-score, -favorite-place, -place-coord and their npm scripts, and migrateCostMaster / ActivityMaster / TimezoneMaster / ExchangeRate from migrate.ts. §11 and §12 rewritten for the admin pages"],
+    ["4.20","26 Oct 2026","ADMIN USABILITY AND PLACE POINTS (§15.5.5–15.5.7). The gear icon opens a menu: All master lists plus shortcuts, pinned with ☆ / ★ on /admin and kept per user in a new collection admin_settings (§6.13; starter: Activities, Cost categories, Place points, Ingredients). The menu bar fits narrow screens (under 520 px, e.g. the Fold 6 outer screen): the FARGAZE word is hidden and the links sit closer, which also removes the empty strip that appeared on every page there. Every list sorts with case ignored (collation en, strength 2). Place points: alphabet bar (ㄱ–ㅎ, A–Z, #), Source column hidden (values kept), Note narrow and not searched; a Records column counting Place (location.activity), From and To, with 집 / 회사 / 사이트 / 내차 resolved through favourite places as Journeys does; rename and merge with past records and favourite-place periods following, Undo as for activities (src/lib/admin/renamePlace.ts); a place a favourite-place period names can’t be deleted. Map column and 📍 Here: check and move a point on Google Maps (shared loader src/app/_components/google-maps.ts; PointPicker). Usage counts no longer collect record IDs where they need not (Atlas free tier: 100 MB per $group, allowDiskUse ignored). Tested on fargaze-log-test by Hyoje on 26 Oct"],
   ],
   [1100, 1300, 6960]
 ));
@@ -670,7 +671,7 @@ C(table(["Field","Type","Notes"],[
   ["userId","String","Required"],
   ["name","String","Exactly as logged (after resolution). Unique per user"],
   ["lat / lng","Number","WGS84 degrees"],
-  ["source","String","manual (blank in the sheet) or osm"],
+  ["source","String","manual (blank in the sheet) or osm. (v4.20) No longer shown or edited on /admin; old values are kept"],
   ["note","String","Free text — the matched OpenStreetMap address for osm rows"],
 ],[2000,2400,4960]));
 C(p("Source: Active file > PlaceCoord sheet (§12.7). A sheet row with a blank Coords cell is a name that has been looked at and has no point yet: it is not loaded, and the geocoding script never searches it again. Model src/models/PlaceCoord.ts (unique index { userId, name }); parsing in src/lib/migration/placeCoord.ts. Why a sheet and OpenStreetMap: Kakao’s Local API and Google’s Places / Geocoding terms do not allow results to be kept in your own database; OpenStreetMap data may be kept with attribution, and the sheet keeps hand corrections permanent."));
@@ -693,6 +694,16 @@ C(table(["Field","Type","Notes"],[
   ["createdAt / updatedAt","Date","timestamps"],
 ],[2400,2000,4960]));
 C(note("Note: Indexes { userId, list, createdAt: -1 } and { userId, sheetDone }. A change with sheetDone false is a change to repeat; since v4.18 the daily migration stops, deleting nothing, while any exists."));
+C(spacer());
+
+C(h2("6.13 admin_settings (added v4.20)"));
+C(p("One document per user for the admin pages, so the phone and the desktop agree."));
+C(table(["Field","Type","Notes"],[
+  ["userId","String","Owner; unique index { userId }"],
+  ["pins","String[]","Slugs of the lists shown as shortcuts in the gear menu, kept in /admin order. Absent until the first pin or unpin: the API then supplies the starter list (activity, cost, place-coord, ingredient)"],
+  ["createdAt / updatedAt","Date","timestamps"],
+],[2400,2000,4960]));
+C(p("Model src/models/AdminSettings.ts; logic src/lib/admin/pins.ts; GET / PUT /api/admin/pins. GET /api/admin/lists also returns pinned per list."));
 C(spacer());
 
 C(h1("7. Search — Index, API & UI"));
@@ -1933,10 +1944,11 @@ C(h2("12.5 Bowel Scores (bowel_score, v4.9)"));
 C(p("bowel_score holds both the allowed bowel values and their scores (§6.8). Change a score or add a value on /admin/bowel. A score change needs nothing else: the widget reads bowel_score at query time. A NEW value must be added before a sheet row uses it, or the migration refuses that row."));
 
 C(h2("12.6 Favourite Places (favorite_place, v4.12)"));
-C(p("favorite_place (§6.10) tells the Journeys widget which real place 집 / 회사 / 사이트 / 내차 meant in each period. To add a move, a new job or a new car: on /admin/favorite-place close the previous period (its To) and add the new one. The server refuses a zone that is not in the time-zone list, a half-filled boundary, From not before To, and an overlap with another period of the same label. Label and place name are fixed on existing rows until #67.5. Nothing else: the log is not touched, and the widget resolves names at read time."));
+C(p("favorite_place (§6.10) tells the Journeys widget which real place 집 / 회사 / 사이트 / 내차 meant in each period. To add a move, a new job or a new car: on /admin/favorite-place close the previous period (its To) and add the new one. The server refuses a zone that is not in the time-zone list, a half-filled boundary, From not before To, and an overlap with another period of the same label. Label and place name are fixed on existing rows until #67.5; (v4.20) renaming or merging a place on /admin/place-coord renames its periods too. Nothing else: the log is not touched, and the widget resolves names at read time."));
 
 C(h2("12.7 Place Points and Geocoding (place_coord, v4.13)"));
 C(p("place_coord (§6.11) holds a point for each From / To name. Points are added and corrected on /admin/place-coord (a point as ‘37.27011, 127.04782’, as Google Maps or OpenStreetMap copies it); the PlaceCoord tab is kept in step by hand (A Name · B Coords · C Source · D Note). The geocoding script still reads the TAB to know which names already have a row, so keep it in step."));
+C(p("(v4.20) The easiest way to check or fix a point is the Map column on /admin/place-coord: Google Maps at street level with Satellite; drag the pin or tap the map, then Apply this point. When adding a place on the spot, 📍 Here uses the phone’s position and opens the map to check it (§15.5.7). Column C (Source) is left empty in new rows."));
 C(bold("Finding points for new names"));
 C(
   num("Run npx tsx --tsconfig tsconfig.json scripts/geocode-places.ts > geocode-places.txt (optional argument: minimum uses, default 3). It reads the sheet and the log, skips every name already in the sheet, and asks OpenStreetMap (Nominatim, ~1 s per question; answers cached in myfiles/geocode-cache.json, so a re-run never asks twice). Read-only on the database and the sheet. Needs NOMINATIM_EMAIL"),
@@ -2153,7 +2165,7 @@ C(h2("14.10 Sheet Anomalies Found"));
 C(p("Records whose end is before their start (drawn as points until corrected in the sheet): 6ab7da3f5ef99b2c70d6c1eb and 6ab7da3f5ef99b2c70d6c1f4 (December 2019), 6ab7da445ef99b2c70d71fd8 (July 2021), and three in 2025 whose ids are listed by /api/calendar?from=2025-01-01&to=2025-12-31 under diagnostics.endBeforeStartIds."));
 
 // ===== 15. DATA ENTRY (PHASE 5) =====
-C(h1("15. Data Entry (Phase 5, v4.15–v4.19)"));
+C(h1("15. Data Entry (Phase 5, v4.15–v4.20)"));
 C(p("Started 19 Oct 2026. The live plan, with its risk register and next steps, is the Data Entry Plan document (" + "https://claude.ai/code/artifact/1061a843-f14f-4b79-bef0-d34608dc3c1e" + "); this section records what was agreed and why. Target: cutover on or before 1 January 2027."));
 C(h2("15.1 Stages"));
 C(table(["Stage","Truth for logs","What happens"],[
@@ -2210,13 +2222,14 @@ C(table(["Part","Result on 23 Oct"],[
 ],[2200,7160]));
 C(spacer());
 
-C(h2("15.5 Master Lists in the Database (WBS #67, v4.17–4.19)"));
+C(h2("15.5 Master Lists in the Database (WBS #67, v4.17–4.20)"));
 C(p("Agreed 23–24 Oct 2026. The database is the truth for every master list; the sheet’s master tabs are kept in step by hand until cutover. One generic table editor serves all 18 lists; each list is described once in src/lib/admin/lists.ts (columns and types, unique columns, the record fields that use it, where it lives in the sheet, which columns lock)."));
 C(table(["Step","What","Status"],[
   ["1","List descriptions; change log (master_change, §6.12); reference lists one document per value; read-only pages /admin and /admin/<list> with record counts, missing values (amber box) and changes since a date; gear icon in the menu; Mark repeated tick","Done 24 Oct"],
   ["2","Add, edit and delete in place, with server checks and a logged sheet step","Done 24 Oct"],
   ["3","Rename and merge for activities and cost categories: preview (records, years), the sheet steps (row in the master tab; whole-cell Find & Replace in the year tabs, Active, History and Future; for a category, column A of the year tabs too, which hold plain values), records changed in one operation, Undo until the next migration","Done 25 Oct (§15.5.4)"],
   ["4","Migration refuses unknown values (every row checked before anything is deleted; --check and --full); master loaders removed from the repo. The pending-change gate was brought forward into step 3. §11.2, §11.6, §12","Done 25 Oct"],
+  ["4+","(26 Oct, beyond the plan) Gear menu with pinned shortcuts; narrow-screen menu bar; case-insensitive order; Place points: alphabet bar, records counted, rename and merge, Map and 📍 Here. §15.5.5–15.5.7","Done 26 Oct"],
   ["5","Design and WBS; Data Entry Plan","Each session"],
 ],[700,6860,1800]));
 C(spacer());
@@ -2225,8 +2238,8 @@ C(
   bullet("Every write checks the session, takes the user from the session, validates on the server and is logged (risk register #9)"),
   bullet("Edit happens in place in the table (Enter saves, Esc cancels); + Add opens an empty row at the top"),
   bullet("On a row records use, the columns records point to are LOCKED (grey): activity and category, cost detail and category, ingredient, alcohol item and unit, currency, time-zone code, bowel field and value, each reference value. Changing them is rename / merge (step 3). Every other column stays editable. On activities and cost categories these columns are open, because a change there IS a rename, move or merge and goes through its preview (§15.5.4)"),
-  bullet("Place points (name) and favourite places (label, name) have no record count, so those columns are locked on EVERY existing row: records refer to them by name, and renaming must change the records too"),
-  bullet("Delete only a row no record uses. Lists without a count (favourite places, place points) warn that Journeys will change. Never ‘rename’ by adding a row and deleting the old one"),
+  bullet("Favourite places (label, name) have no record count, so those columns are locked on EVERY existing row: records refer to them by name. (v4.20) Place points count records and rename like activities (§15.5.6)"),
+  bullet("Delete only a row no record uses. Favourite places (no count) warn that Journeys will change; (v4.20) a place point that a favourite-place period names can’t be deleted. Never ‘rename’ by adding a row and deleting the old one"),
   bullet("A new category, group or label asks “Create a new … ?” first (confirmNew on the server)"),
   bullet("Server refusals: required value empty; a number column not a number; a duplicate (an activity name says which category holds it); a locked column changed on a used row; favourite places — zone not in the time-zone list, time not YYYY-MM-DD HH:mm, half-filled boundary, From not before To, overlap with another period of the same label; place points — not “lat, lng” or out of range"),
   bullet("Editing an alcohol conversion number or a bowel score changes past figures in Insights (they are computed from the lists). A time-zone offset or exchange rate does not: each record stores its own"),
@@ -2256,6 +2269,33 @@ C(
   bullet("Undo: puts back the same records, matched by the saved IDs, and the list row (a merged row returns with its own ID). Refused when any of those records is gone or changed (a migration makes new IDs), when the old name is back in the list, or when the target row is gone. A merge can be undone only before it is ticked, because the sheet can’t tell its rows apart afterwards. Undone before the tick: nothing to do in the sheet; after: the reverse steps are listed"),
   bullet("Locked: 수면, 대변, 독서(기간), 공부(기간) and the categories 생리, 이동, 운동, which the site’s code looks for by name (Sleep, Bowel, Insights stats, Transport, Journeys, Exercise, the Calendar’s reading row). Shown as 🔒 Locked and greyed out in the category list; the server refuses them too"),
   bullet("Tested on fargaze-log-test (25 Oct): rename, undo, checks in Atlas. In the cloud: 23 checks with in-memory models"),
+);
+
+C(h3("15.5.5 Gear Menu, Narrow Screens and Order (26 Oct)"));
+C(
+  bullet("The gear icon opens a small menu: All master lists, then the pinned lists. Each list on /admin has ☆ / ★ in front; tapping it pins or unpins at once (put back if the server refuses). Pins are kept per user in admin_settings (§6.13), so phone and desktop show the same menu; shortcuts follow /admin order. Esc, a tap outside, or moving to another page closes the menu"),
+  bullet("Narrow screens (under 520 px, e.g. the Galaxy Z Fold 6 outer screen, about 344 px): the menu bar hides the FARGAZE word and puts the links closer, so it fits. It used to be wider than the screen, which made the browser zoom the whole page out and left an empty strip on the right of every page. Wider screens are unchanged"),
+  bullet("Every list sorts with case ignored and accents kept (collation { locale: ‘en’, strength: 2 } in GET /api/admin/lists/<slug>): cardfactory before Courtyard; Latin before Korean, as before"),
+);
+
+C(h3("15.5.6 Place Points: Records, Rename and Merge (26 Oct)"));
+C(
+  bullet("Alphabet bar above the table for lists with indexBy (place points): All · ㄱ–ㅎ, then A–Z · #. Korean by first consonant (까치산 → ㄱ), Latin with accents dropped (Éclair → E), anything else #. Empty letters are greyed; it works with the search box. Source is no longer shown (values kept; sheet steps leave column C empty); Note is narrow (cut with …, whole on hover) and not searched (noSearch)"),
+  bullet("Records column: records with the name in Place (location.activity, sheet AA), From (transport.from, BE) or To (transport.to, BF), each counted once; hover shows Place · From · To. viaFavorites: a record that says 집 / 회사 / 사이트 / 내차 counts for the place that label meant then — Place and From at the record’s start, To at its end, as Journeys resolves them (true instant = datetime − offset; all-day records have none and keep the label). The resolution is a $switch over the favourite-place periods inside the aggregation"),
+  bullet("refuseUnknown: false — names in records without a point are normal (and 집 … are labels), so there is no amber box and the migration does not refuse them (checkRecords.ts and check-master-orphans.ts skip the list)"),
+  bullet("Rename and merge as for activities (src/lib/admin/renamePlace.ts; rename.ts hands place points over): a new name renames (the point stays); the name of another row merges (that row’s point and note win; the distance between the two points is shown). The name changes on its own: a change that also moves the point or edits the note is refused. Records follow where the name is written; favourite-place periods that name it are renamed in the same transaction, so records that say 집 follow with them (they are not in the preview’s count). Sheet steps: PlaceCoord row; FavoritePlace column B when needed; Find & Replace in AA, BE and BF — archive 2026 and ~2025 from row 4 with expected counts per column, Active, History and Future from row 3"),
+  bullet("Undo: record IDs kept per field and the favourite-place IDs (master_change.extra { fieldIds, favIds }); a merged row comes back with its own ID, point, note and source. Same limits as activities: until the next migration, a merge only before it is ticked"),
+  bullet("Delete: refused when records use the place, and (write.ts) when a favourite-place period names it, even with no records yet"),
+  bullet("Counting (usage.ts, v4.20): Atlas’s free tier caps a $group at 100 MB and ignores allowDiskUse, and collecting record IDs per name broke on place points. Lists whose specs open no arrays now count instead — one spec by value; several single-column specs (place points, time zones, nutrient levels) in one pass that takes each record’s values as a set. Lists that open arrays (ingredients, alcohol, bowel, people) keep record IDs. Checked against a brute-force count on fake data with mingo, including the favourite-place resolution"),
+  bullet("Tested on fargaze-log-test by Hyoje (26 Oct): counts, delete refused, merge, Atlas, Undo, rename. In the cloud: 30 checks with in-memory models"),
+);
+
+C(h3("15.5.7 Map and 📍 Here (26 Oct)"));
+C(
+  bullet("A list with a point column gets a Map column after it. Map opens a pop-up (src/app/admin/_components/PointPicker.tsx) with Google Maps at street level, Map / Satellite, the point as a pin: drag it or tap the map. It shows the new point (6 decimals) and how far it moved. Apply this point saves it as an ordinary edit (PATCH, logged with its sheet step); it stays disabled until the pin has moved"),
+  bullet("In the row being edited or added: 📍 asks the device for its position (Geolocation API, high accuracy, 15 s; needs https or localhost and the user’s permission) and opens the map there with ±accuracy (a note above ±50 m); Use this point puts it in the Point box, and Save saves as usual. Map there works the same; an empty point starts on Weybridge. The pop-up has its own 📍 Here"),
+  bullet("Google Maps, not OpenStreetMap: Hyoje found OpenStreetMap’s quality poor. A pin the user places is the user’s own data, so it is kept as is (Google’s terms concern its geocoding results and copying its map data). No OpenStreetMap round trip: it would move the point to the nearest mapped object"),
+  bullet("The pin is Google’s classic Marker: AdvancedMarkerElement needs a Map ID. It logs a deprecation notice in the console; it is still supported. The loader moved from JourneyMap.tsx to src/app/_components/google-maps.ts, shared by both maps; the key still comes from /api/maps-key"),
 );
 C(spacer());
 
@@ -2308,15 +2348,22 @@ C(h1("Appendix B — Directory Map"));
 C(table(["Path","Purpose"],[
   ["src/app/insights/page.tsx","Insights master page — (v4.13) GROUPS registry (group → sub-groups → widgets, each widget with id, label, size, component) replacing the flat WIDGETS array; fold state in localStorage fargaze.insights.foldedGroups, read before any widget mounts; Fold all · Unfold all. CSS columns grid per sub-group. Widgets registered: Exercise v4.4, Bowel v4.9, Journeys v4.12"],
   ["src/app/insights/_components/WidgetGroup.tsx","(v4.13) WidgetGroup (foldable section; children mounted only when open) and WidgetSubgroupLabel"],
-  ["src/app/insights/_components/JourneyMap.tsx","(v4.13) Google Maps places map for Journeys: one-time script loader, quiet / night styles, Polyline routes, one OverlayView for dots and labels, click selection, 50 km start view. (v4.14) The key comes from GET /api/maps-key; without it the tab shows a one-line note"],
+  ["src/app/insights/_components/JourneyMap.tsx","(v4.13) Google Maps places map for Journeys: one-time script loader, quiet / night styles, Polyline routes, one OverlayView for dots and labels, click selection, 50 km start view. (v4.14) The key comes from GET /api/maps-key; without it the tab shows a one-line note (v4.20) The script loader moved to src/app/_components/google-maps.ts"],
   [".github/workflows/backup.yml","(v4.15) Nightly backup: mongodump → Google Drive (rclone), 30 days kept (§12.8)"],
   [".github/workflows/restore-test.yml","(v4.15) Restore a backup into fargaze-log-test and compare record counts with production (§12.8)"],
   ["src/app/privacy/page.tsx","(v4.15) Public privacy notice for the Google consent screen; excluded from the middleware matcher (§3.3)"],
   ["scripts/survey-sheets.ts","(v4.16) Read-only sheet survey (§15.4): writes myfiles/survey/survey-YYYY-MM-DD.md and .json"],
   ["src/lib/survey/sheetSurvey.ts","(v4.16) The survey's analysis: cell kinds, formula shapes, dropdown and master-tab checks, field-group usage by category and activity, master-list comparison. Pure"],
   ["src/lib/admin/lists.ts","(v4.17) The 18 admin list descriptions: columns and types, unique columns, usage specs (record fields per column), sheet place (tab, column, dropdown), recordsFollow, fixedOnEdit; toRow, rowKey, lockedColumns; REFERENCE_LIST_NAMES, RETIRED_REFERENCE_LISTS"],
-  ["src/lib/admin/usage.ts","(v4.17) computeUsage: records per row (distinct records across specs) and values used in records but missing from the list"],
-  ["src/lib/admin/write.ts","(v4.17) addRow / editRow / deleteRow: parseInput (text, number, coords, zone + local time → true instant), locked and fixed columns, duplicates, favourite-place periods, confirmNew, rowUsage, sheetSteps, master_change logging"],
+  ["src/lib/admin/renamePlace.ts","(v4.20) Rename and merge for place points: plan (name only), counts per field and year, favourite places following, sheet steps for AA / BE / BF, transaction, Undo by IDs per field"],
+  ["src/lib/admin/pins.ts","(v4.20) Gear-menu pins: STARTER_PINS, getPins, setPinned (kept in /admin order)"],
+  ["src/app/api/admin/pins/route.ts","(v4.20) GET the shortcuts; PUT { slug, pinned } to pin or unpin one list"],
+  ["src/models/AdminSettings.ts","(v4.20) admin_settings: { userId, pins } (§6.13)"],
+  ["src/app/admin/_components/PointPicker.tsx","(v4.20) Map pop-up: draggable pin, tap to move, 📍 Here (locate), Map / Satellite, Apply this point"],
+  ["src/app/_components/google-maps.ts","(v4.20) loadGoogleMaps and getMapsKey, shared by JourneyMap and PointPicker"],
+  ["src/app/NavBar.tsx","(v4.20) Gear button opens the menu (All master lists + pins); under 520 px the FARGAZE word is hidden and the links sit closer"],
+  ["src/lib/admin/usage.ts","(v4.17) computeUsage: records per row (distinct records across specs) and values used in records but missing from the list (v4.20) Counts without record IDs where the specs open no arrays (one pass across Place / From / To and similar), breakdown per labelled spec, favourite-place labels resolved for viaFavorites lists, no orphans when refuseUnknown is false"],
+  ["src/lib/admin/write.ts","(v4.17) addRow / editRow / deleteRow: parseInput (text, number, coords, zone + local time → true instant), locked and fixed columns, duplicates, favourite-place periods, confirmNew, rowUsage, sheetSteps, master_change logging (v4.20) deleteRow refuses a place point that a favourite-place period names"],
   ["src/lib/admin/guard.ts","(v4.17) requireUser — session check for every admin route; connects the database"],
   ["src/app/admin/page.tsx","(v4.17) /admin — lists by group with rows, last change and how many changes to repeat; banner when any"],
   ["src/app/admin/[list]/page.tsx","(v4.17) /admin/<list> — search, sort, record counts, amber missing-values box, in-place add / edit / delete, changes since a date with Mark repeated / undo"],
@@ -2326,7 +2373,7 @@ C(table(["Path","Purpose"],[
   ["src/app/api/admin/changes/[id]/route.ts","(v4.17) PATCH { sheetDone } — ticks or unticks a change"],
   ["src/app/api/admin/changes/[id]/undo/route.ts","(v4.18) POST — undoes a rename or merge (§15.5.4)"],
   ["src/app/api/admin/lists/[list]/rename/route.ts","(v4.18) POST — previews, or with apply and the preview’s record count carries out, a rename, move or merge (§15.5.4)"],
-  ["src/lib/admin/rename.ts","(v4.18) Rename, move and merge for activities and cost categories: plan, record counts by year, sheet steps, the transaction, Calendar settings, Undo; names the code looks for are locked"],
+  ["src/lib/admin/rename.ts","(v4.18) Rename, move and merge for activities and cost categories: plan, record counts by year, sheet steps, the transaction, Calendar settings, Undo; names the code looks for are locked (v4.20) Hands place points to renamePlace.ts in preview, apply and undo"],
   ["src/models/MasterChange.ts","(v4.17) master_change model (§6.12)"],
   ["src/models/ReferenceList.ts","(v4.17) One document per value; unique { userId, listName, value } (§6.3)"],
   ["src/models/ActivityMaster.ts","(v4.17) Unique index { userId, name } — a name is unique across categories"],
@@ -2432,7 +2479,7 @@ C(table(["Path","Purpose"],[
 C(spacer());
 
 // ===== FOOTER =====
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.19 — 25 October 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.20 — 26 October 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 
 // ===== DOCUMENT ASSEMBLY =====
@@ -2469,6 +2516,6 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-Log-Data-Design-v4.19.docx", buffer);
-  console.log("Wrote FarGaze-Log-Data-Design-v4.19.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-Log-Data-Design-v4.20.docx", buffer);
+  console.log("Wrote FarGaze-Log-Data-Design-v4.20.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });
