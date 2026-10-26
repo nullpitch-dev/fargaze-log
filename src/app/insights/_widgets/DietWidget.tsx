@@ -82,6 +82,9 @@ function boxStats(values: number[]): Omit<BoxPlotBucket, 'label'> | null {
 
 const fmtNum = (v: number) => (Math.round(v * 10) / 10).toString();
 
+// A day can list many items; past this width the lines wrap (26 Oct).
+const DAILY_TIP_WIDTH = 'min(300px, 62vw)';
+
 const SERVING_ZONES: CssDailyZone[] = [
   { from: 0, to: 3,    color: 'rgba(34,197,94,0.13)'  },  // 소식  — green
   { from: 3, to: 6,    color: 'rgba(59,130,246,0.13)' },  // 적당  — light blue
@@ -232,7 +235,8 @@ function SummaryView({ data, isDark }: { data: DietSummary; isDark: boolean }) {
     }
     for (const e of entries) {
       const what = [...e.foods, ...e.drinks].join(' · ');
-      const amount = e.servings !== null ? ` (${fmt1(e.servings)} 인분)` : e.drinkAmount ? ` (${e.drinkAmount})` : '';
+      // \u00a0 keeps an amount on one line when the tooltip wraps
+      const amount = e.servings !== null ? ` (${fmt1(e.servings)}\u00a0인분)` : e.drinkAmount ? ` (${e.drinkAmount.replace(' ', '\u00a0')})` : '';
       rows.push({
         label: [e.time, e.type].filter(Boolean).join(' '),
         value: `${what}${e.spicy === 'H' ? ' 🌶' : ''}${amount}`,
@@ -312,7 +316,7 @@ function SummaryView({ data, isDark }: { data: DietSummary; isDark: boolean }) {
           </span>
         </div>
         <HeatStrip rangeStart={data.rangeStart} rangeEnd={data.rangeEnd} futureFrom={localToday()} isDark={isDark}
-          fillFor={dailyFill} tooltipFor={dailyTip}
+          fillFor={dailyFill} tooltipFor={dailyTip} tooltipMaxWidth={DAILY_TIP_WIDTH}
           // Above: a busy day has many lines, and the card clips anything below its last row.
           tooltipPlacement="above" />
       </div>
@@ -327,7 +331,7 @@ function SummaryView({ data, isDark }: { data: DietSummary; isDark: boolean }) {
         <ModalShell title={modal === 'daily' ? 'Daily diet · carbs' : metrics[modal].title} onClose={() => setModal(null)}>
           {modal === 'daily' ? (
             <CalendarHeatmap rangeStart={data.rangeStart} rangeEnd={data.rangeEnd} futureFrom={localToday()} isDark={isDark}
-              fillFor={dailyFill} tooltipFor={dailyTip} legend={dailyLegend} />
+              fillFor={dailyFill} tooltipFor={dailyTip} legend={dailyLegend} tooltipMaxWidth={DAILY_TIP_WIDTH} />
           ) : (
             <CssDailyChart
               values={metrics[modal].values} labels={metrics[modal].labels}

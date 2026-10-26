@@ -60,13 +60,15 @@ export type TooltipFor = (date: string) =>
 // ── HeatStrip — one compact row ────────────────────────────────────────────────
 
 export function HeatStrip({
-  rangeStart, rangeEnd, isDark, fillFor, height = 18, tooltipFor, tooltipPlacement = 'below', futureFrom,
+  rangeStart, rangeEnd, isDark, fillFor, height = 18, tooltipFor, tooltipPlacement = 'below', futureFrom, tooltipMaxWidth,
 }: {
   rangeStart: string; rangeEnd: string; isDark: boolean; fillFor: FillFor;
   height?: number;
   tooltipFor?: TooltipFor;
   /** Days from this date on are drawn as future days (faint, "not yet"). */
   futureFrom?: string;
+  /** Cap the tooltip's width; long lines wrap (ChartHoverCard maxWidth). */
+  tooltipMaxWidth?: number | string;
   /** 'above' for a strip near the bottom of a widget — WidgetCard clips. */
   tooltipPlacement?: 'below' | 'above';
 }) {
@@ -113,6 +115,7 @@ export function HeatStrip({
             isDark={isDark}
             flip={hoverIdx > days.length * 0.6}
             placement={tooltipPlacement}
+            maxWidth={tooltipMaxWidth}
           />
         </div>
       )}
@@ -132,9 +135,11 @@ export interface CalendarHeatmapProps {
   tooltipFor?: TooltipFor;
   /** Days from this date on are drawn as future days (faint, no border, "not yet"). */
   futureFrom?: string;
+  /** Cap the tooltip's width; long lines wrap (ChartHoverCard maxWidth). */
+  tooltipMaxWidth?: number | string;
 }
 
-export function CalendarHeatmap({ rangeStart, rangeEnd, isDark, fillFor, legend, cellHeight = 24, tooltipFor, futureFrom }: CalendarHeatmapProps) {
+export function CalendarHeatmap({ rangeStart, rangeEnd, isDark, fillFor, legend, cellHeight = 24, tooltipFor, futureFrom, tooltipMaxWidth }: CalendarHeatmapProps) {
   const [hoverDate, setHoverDate] = useState<string | null>(null);
 
   const start = parseDate(rangeStart);
@@ -216,6 +221,7 @@ export function CalendarHeatmap({ rangeStart, rangeEnd, isDark, fillFor, legend,
                     // Below for the early weeks, above once the grid is deep
                     // enough that a card at the foot would leave the modal.
                     placement={wi >= weeks.length - 2 ? 'above' : 'below'}
+                    maxWidth={tooltipMaxWidth}
                   />
                 )}
               </div>

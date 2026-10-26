@@ -50,7 +50,7 @@ export interface HoverRow {
 }
 
 export function ChartHoverCard({
-  title, rows, isDark, flip = false, offset = 4, placement = 'below', note,
+  title, rows, isDark, flip = false, offset = 4, placement = 'below', note, maxWidth,
 }: {
   title?: string;
   rows: HoverRow[];
@@ -66,6 +66,12 @@ export function ChartHoverCard({
   placement?: 'below' | 'above';
   /** small dim line under the rows, e.g. the threshold a band stands for */
   note?: string;
+  /**
+   * (26 Oct 2026) Cap the card's width and let long values wrap under themselves
+   * (the label stays on the left). Off by default: cards stay on one line.
+   * e.g. 'min(300px, 62vw)' for the daily strips' lists of items.
+   */
+  maxWidth?: number | string;
 }) {
   const lc = labelColor(isDark);
   const vc = valueColor(isDark);
@@ -79,11 +85,14 @@ export function ChartHoverCard({
         background: isDark ? '#27272a' : '#ffffff',
         border: `1px solid ${isDark ? '#3f3f46' : '#e7e5e4'}`,
         boxShadow: '0 2px 8px rgba(0,0,0,0.12)', zIndex: 30,
+        // max-content, not auto: the card hangs from a zero-width anchor, so an
+        // auto width would shrink to one word per line once wrapping is allowed.
+        ...(maxWidth !== undefined ? { width: 'max-content', maxWidth, whiteSpace: 'normal' as const } : {}),
       }}>
       {title && <div style={{ fontSize: 10, color: lc }}>{title}</div>}
 
       {rows.map((r, i) => (
-        <div key={i} className="flex items-center gap-1"
+        <div key={i} className={`flex gap-1 ${maxWidth !== undefined ? 'items-start' : 'items-center'}`}
           style={{ fontSize: 10, color: lc, marginTop: title || i ? 2 : 0 }}>
           {r.color && (
             <span className="inline-block rounded-full shrink-0"
@@ -93,8 +102,8 @@ export function ChartHoverCard({
                 border: r.hollow ? `1.5px solid ${r.color}` : undefined,
               }} />
           )}
-          {r.label && <span style={{ minWidth: 52 }}>{r.label}</span>}
-          <span style={{ color: r.dim ? lc : vc, fontWeight: r.dim ? 400 : 600 }}>
+          {r.label && <span style={{ minWidth: 52, flexShrink: 0, whiteSpace: 'nowrap' }}>{r.label}</span>}
+          <span style={{ color: r.dim ? lc : vc, fontWeight: r.dim ? 400 : 600, minWidth: 0, wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>
             {r.value}
           </span>
         </div>

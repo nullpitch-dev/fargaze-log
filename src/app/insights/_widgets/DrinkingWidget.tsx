@@ -194,6 +194,9 @@ function TotalDrinksCard({ total, isDark }: { total: number; isDark: boolean }) 
 // without drinking stays empty. Tooltip: the day's total, then each record's
 // time, what was drunk as logged, and its drinks. Tap → the calendar, same tooltip.
 
+// A day can list many items; past this width the lines wrap (26 Oct).
+const DAILY_TIP_WIDTH = 'min(300px, 62vw)';
+
 function DailyDrinking({ data, isDark }: { data: DrinkingSummary; isDark: boolean }) {
   const [open, setOpen] = useState(false);
   const BAND = bandFill(isDark);
@@ -208,7 +211,7 @@ function DailyDrinking({ data, isDark }: { data: DrinkingSummary; isDark: boolea
     const rows: HoverRow[] = [{ label: 'Drinks', value: `${fmt1(d.total)} (${BAND_WORD[b]})`, color: BAND[b] }];
     for (const e of d.entries) {
       const what = e.items.map(i => `${i.item} ${i.amount}${i.unit}`.trim()).join(' · ');
-      rows.push({ label: e.time ?? '', value: `${what} (${fmt1(e.drinks)} drinks)` });
+      rows.push({ label: e.time ?? '', value: `${what} (${fmt1(e.drinks)}\u00a0drinks)` });   // \u00a0: one line when wrapped
     }
     return { title: date, rows };
   };
@@ -230,12 +233,12 @@ function DailyDrinking({ data, isDark }: { data: DrinkingSummary; isDark: boolea
             ({high} red, {mid} amber out of {Object.keys(days).length} drinking days)
           </span>
         </div>
-        <HeatStrip rangeStart={data.rangeStart} rangeEnd={data.rangeEnd} futureFrom={localToday()} isDark={isDark} fillFor={fill} tooltipFor={tip} />
+        <HeatStrip rangeStart={data.rangeStart} rangeEnd={data.rangeEnd} futureFrom={localToday()} isDark={isDark} fillFor={fill} tooltipFor={tip} tooltipMaxWidth={DAILY_TIP_WIDTH} />
       </div>
       {open && (
         <ModalShell title="Daily drinking" onClose={() => setOpen(false)}>
           <CalendarHeatmap rangeStart={data.rangeStart} rangeEnd={data.rangeEnd} futureFrom={localToday()} isDark={isDark}
-            fillFor={fill} tooltipFor={tip} legend={legend} />
+            fillFor={fill} tooltipFor={tip} legend={legend} tooltipMaxWidth={DAILY_TIP_WIDTH} />
         </ModalShell>
       )}
     </>
