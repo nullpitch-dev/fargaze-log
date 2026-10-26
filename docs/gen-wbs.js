@@ -11,7 +11,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Service Concept & Work Breakdown Structure", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 3.20  |  26 October 2026", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 3.21  |  26 October 2026", size: 24 })], spacing: { after: 240 } }),
 );
 
 C(h1("Version History"));
@@ -55,6 +55,7 @@ C(table(["Version","Date","Headline"],[
   ["3.18","25 Oct 2026","#67.3 RENAME, MOVE AND MERGE DONE for activities and cost categories (Design Doc §15.5.4): preview with records, years and numbered sheet steps; list, records and Calendar settings changed in one transaction; Undo until the next migration (a merge only before it is ticked). Names the code looks for are locked. The migration’s pending-change gate brought forward from step 4. Rule agreed: admin features that change past records are tried on fargaze-log-test first. Tested by Hyoje on fargaze-log-test. New backlog item: move the code’s fixed activity names into a per-user setting before English demo data. Next: step 4"],
   ["3.19","25 Oct 2026","#67.4 DONE (Design Doc §11.2, §11.6, §12): the migration reads and checks every row before deleting anything and stops on any value its master list does not have — every list with records, the same rule as the admin pages’ missing-values box; also an activity with an empty or #N/A category and a value with an empty partner. --check (writes nothing, safe on production) and --full (replaces uncommenting ~2025). Master loaders and their npm scripts removed; §12 rewritten for /admin. First real run on fargaze-log-test. Next: #67.5 later; #68 Staging tab"],
   ["3.20","26 Oct 2026","#67.6 ADMIN USABILITY AND PLACE POINTS DONE (Design Doc §15.5.5–15.5.7, §6.13): gear menu with shortcuts pinned on /admin (admin_settings); menu bar fits the Fold 6 outer screen, removing the empty strip on every page; lists sort with case ignored. Place points: alphabet bar, Source hidden, Note narrow and not searched, a Records column (Place / From / To with 집 / 회사 … resolved as Journeys does), rename and merge with records and favourite places following, delete refused when a period names the place, Map pop-up on Google Maps and 📍 Here. Usage counting rebuilt for the Atlas free-tier 100 MB $group limit. Tested by Hyoje on fargaze-log-test. Place names leave #67.5. Next: #68 Staging tab"],
+  ["3.21","26 Oct 2026","WIDGET DAILY STRIPS (Design Doc §9.3.3, §9.3.4, §9.3.9), a quick improvement before #68: Diet’s Spicy days strip replaced by Daily diet · carbs (carbs-index bands, per-record tooltip with 인분 and 🌶); Drinking gains a Daily drinking strip (drinks bands, per-record tooltip). Strips and calendars in Diet, Drinking, Exercise and Sleep cover the whole period with future days marked; the calendar pop-up marks months (bold ‘Oct 1’, stepped boundary line). Checked by Hyoje. Next: #68 Staging tab"],
 ],[1100,1300,6960]));
 C(spacer());
 
@@ -377,6 +378,7 @@ C(
   bullet("\u2705 (v3.6) API: metric=drinking.trend \u2014 Weight-style grain \u00d7 count window via trend-window.ts; findPriorDrinkDate + fetchWindowDrinkingDays replace the all-time scans; three bounded queries per request (four with a cross-activity filter) in place of three per bucket"),
   bullet("\u2705 (v3.6) Summary shares the new scoring, which removed its all-time scan as well \u2014 the v3.5 deferral is cleared"),
   bullet("\u2705 (v3.6) Widget controls \u2014 grain \u00d7 count Segmented pairs importing WeightTrendView's option lists, a separate People count (3/6/12), the resolved-range line formatted from the SERVER-echoed grain, and the Period-mode disable removed"),
+  bullet("\u2705 (v3.21, 26 Oct) Daily drinking strip under the drinks row — below 4 blue, 4–10 amber, over 10 red; tooltip with each record’s items and drinks; calendar pop-up. drinking.summary returns days and the whole period"),
   bullet("\u2705 (v3.6) Chart conversions \u2014 Amt(day) box plot \u2192 three lines; Type / Occasion / Relation \u2192 stacked areas; Rest \u2192 stacked area with a right-axis rest line, solid where a dry run ended and dashed through the dry-stretch markers; Session \u2192 right-axis duration line, arrows and captions dropped"),
 );
 C(h3("Sub-items for WBS #60 (Food Ingredient Taxonomy):"));
@@ -423,6 +425,8 @@ C(
   bullet("\u2705 (v3.7) CORRECTED — an absent food.spiciness value was read as L, so the whole stretch predating the field rendered as a full band of not-spicy. Only explicitly recorded days count now, and a bucket with none totals zero and draws as a gap"),
   bullet("\u2705 (v3.7) Widget controls — grain × count Segmented pairs importing the WeightTrendView option lists, a separate short count (3/6/12) for Composition and People, the resolved-range line formatted from the SERVER-echoed grain, and the Period-mode disable removed"),
   bullet("\u2705 (v3.7) Chart conversions — the four box plots → three lines each (Avg/Max/Min); Spicy → zero-based stacked area in the scale own band order; Relation → stacked area keeping the 100% mix; Composition and People unchanged on the short count"),
+  bullet("\u2705 (v3.21, 26 Oct) Spicy days strip replaced by Daily diet · carbs — carbs index below 4 blue, 4–8 amber, over 8 red; tooltip lists each record with 인분 and 🌶; calendar pop-up. diet.summary returns days"),
+  bullet("\u2705 (v3.21, 26 Oct) Shared strips: whole period with future days (‘not yet’) in Diet, Drinking, Exercise and Sleep; calendar pop-up marks months"),
   bullet("\u2705 (v3.7) DietTrendView.tsx rewritten; the trend tab, grain, count, short count and server-echoed grain now live in DietWidget, because the widget is what fetches and has to know which count list the active tab wants"),
 );
 
@@ -631,7 +635,7 @@ C(
 );
 C(spacer());
 
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze — Service Concept & WBS v3.20 — 26 October 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze — Service Concept & WBS v3.21 — 26 October 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 const doc = new Document({
   styles: {
@@ -657,6 +661,6 @@ const doc = new Document({
   sections: [{ properties: { page: PAGE }, children }],
 });
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-WBS-v3.20.docx", buffer);
-  console.log("Wrote FarGaze-WBS-v3.20.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-WBS-v3.21.docx", buffer);
+  console.log("Wrote FarGaze-WBS-v3.21.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });
