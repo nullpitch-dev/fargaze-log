@@ -304,9 +304,9 @@ export function createRowFilter() {
 //   밥()                            → { item: '밥', ingredients: ['Not Defined'] }   (empty parens)
 //
 // Validation: ingredients are checked against the level2 vocabulary, which is
-// loaded ONCE from the ingredient_master collection (single source of truth —
-// the Ingredient sheet). If any ingredient is not valid, throw — the migration
-// caller skips the entire row and logs the offending value (Part 4.6).
+// loaded ONCE from the ingredient_master collection (single source of truth,
+// edited on /admin/ingredient). If any ingredient is not valid, throw — the
+// migration refuses the row and stops before deleting anything (#67 step 4).
 // ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -331,7 +331,7 @@ export async function loadValidLevel2(userId: string, force = false): Promise<Se
     throw new Error(
       'loadValidLevel2: ingredient_master is empty for userId "' +
         userId +
-        '". Run `npm run migrate-ingredient` first.'
+        '". Is MONGODB_URI the right database? The list is kept on /admin/ingredient.'
     );
   }
 
@@ -404,9 +404,9 @@ export function parseFoodIngredients(raw: string): { item: string; ingredients: 
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Bowel vocabulary — allowed values come from the bowel_score collection
-// (Active file > Bowel sheet, loaded by `npm run migrate-bowel`).
-// Same pattern as ingredients: a value not in the sheet throws, the row is
-// reported as an error in the migration summary and is not inserted.
+// (edited on /admin/bowel since #67; the database is the truth).
+// Same pattern as ingredients: an unknown value throws, and the migration
+// refuses the row (and so the whole run, #67 step 4).
 // ─────────────────────────────────────────────────────────────────────────────
 
 type BowelField = 'amount' | 'quality' | 'characteristics';
@@ -428,7 +428,7 @@ export async function loadBowelVocabulary(userId: string, force = false) {
     throw new Error(
       'loadBowelVocabulary: bowel_score is empty or incomplete for userId "' +
         userId +
-        '". Run `npm run migrate-bowel` first.'
+        '". Is MONGODB_URI the right database? The list is kept on /admin/bowel.'
     );
   }
 

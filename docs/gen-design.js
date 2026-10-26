@@ -16,7 +16,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze Log", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Data Design & Requirements Document", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 4.18  |  25 October 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 4.19  |  25 October 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
 );
 C(p([new TextRun({ text: "Structure: ", bold: true }), new TextRun("Part I Foundations · Part II Data · Part III Features · Part IV Operations · Appendices. The body is the complete, always-current source of truth; the changelog below carries one line per version. Work status, open questions and the backlog live in the separate WBS, not here.")]));
 
@@ -64,6 +64,7 @@ C(table(
     ["4.17","24 Oct 2026","MASTER LISTS MOVE TO THE DATABASE (WBS #67, steps 1–2 of 5). New admin pages at /admin (gear icon at the right of the menu): one generic table editor for all 18 lists (activities, cost categories, nine reference lists, alcohol conversion, ingredients, bowel scores, time zones, exchange rates, favourite places, place points), driven by src/lib/admin/lists.ts. Each list page shows how many records use each row, values used in records but missing from the list (the amber box), and the changes since a chosen date. Add / edit / delete in place with server checks; every change is logged in the new master_change collection (§6.12) with the sheet step to repeat by hand and a Mark repeated tick (§15.5). On a row records use, the columns records point to are locked until rename / merge (step 3); place-point names and favourite-place labels and names are always locked on existing rows. reference_lists changed to one document per value (§6.3); food.drinks.note, food.foods.note and food.alcohols.item retired (alcohol items live only in alcohol_conversion); migrateReferenceLists removed from migrate.ts. activity_master: an activity name is unique across categories (§6.2) — 시험 split into 시험(회사) / 시험(개인). DATA CLEAN-UP by one-off scripts: three ~2025 activity categories, one alcohol item, three cost categories, two nutrient levels, one people method; historical-fill ingredient names corrected (기타해산물 → 기타 해산물, 야채 육수 → 채소 육수, 춘장 → 짜장) in the records and in fill-historical-ingredients.ts; added 통신 › 휴대폰, 업무지인 and SGD (1,048). LESSON: every master loader and the 23 Oct survey read from row 2, so row 1 was never read; only the Cost tab had data there (휴대폰) and it now has a header. §11.6 changed: a full re-migration no longer reloads any master list — the database is their truth. Record offsets are kept for good (§15.2)"],
     ["4.16","23 Oct 2026","SHEET SURVEY (WBS #66) done — new scripts/survey-sheets.ts + src/lib/survey/sheetSurvey.ts, read-only. §10.1.5 gains the source of every column (typed, formula or either; the master tab each formula or dropdown reads; what the database stores). All 46,060 records pass the migration code, none refused, every year × category count matches the database. FULL RE-MIGRATION 23 Oct (~2025, 2026 and every master list, then the ingredient and drink fills and place_coord) — new §11.6 procedure; every master list in step with the sheet, IST stored as 5.5. Sheet facts corrected: the Active file is Active_2026Aug22 with Calendar, Happiness, FavoritePlace and PlaceCoord tabs (§4.1); records are pasted into the year tab as plain values (§4.3, §11.2); Activity P / Q / R are empty and the Bowel sheet is the only home of the bowel values (§4.1, §12.5); the migration reads cells as displayed, so accounting formats (brackets for negatives, ‘-’ for zero) lost values until changed to plain numbers (§11.6). §15: field-group rules are PER ACTIVITY with the category as fallback; activities are created only on the master page, and renaming, merging or deleting one applies to historical records; open (History) and future (Future) records must be covered by the entry feature; 심리 측정 (Happiness tab) recommended as one more field group with a one-off import, no sheet column insertion"],
     ["4.18","25 Oct 2026","RENAME, MOVE AND MERGE (WBS #67 step 3) for activities and cost categories, with past records following (§15.5.4). Edit a row on /admin/activity or /admin/cost: a new name renames it, a new category moves it, the name of another row merges it into that row (that row’s values win; the old row is deleted); ‘Rename a category’ renames a whole category or merges it into an existing one. Every change is previewed first (records, years, 2026 vs earlier, warnings, numbered sheet steps with exact ranges and expected counts), then the list, the records and the Calendar settings change in one transaction. Undo until the next migration (records are matched by the IDs saved in master_change.recordIds); a merge only until it is ticked. Names the site’s code looks for (수면, 대변, 독서(기간), 공부(기간); categories 생리, 이동, 운동) are shown locked and refused. master_change gains extra { title, plan, counts }. The pending-change gate from step 4 is in migrate.ts already: the daily migration stops, deleting nothing, while any change is unticked. Rule agreed 25 Oct: any admin feature that changes past records is tried on fargaze-log-test first (§15.2). Tested on fargaze-log-test by Hyoje on 25 Oct"],
+    ["4.19","25 Oct 2026","THE MIGRATION REFUSES UNKNOWN VALUES; MASTER LOADERS REMOVED (WBS #67 step 4). scripts/migrate.ts now reads and checks EVERY row before deleting anything; one refused row stops the run and nothing is deleted. A value is refused when its master list in the database does not have it — the same rule as the admin pages’ missing-values box, from the usage specs in lists.ts, so every list with records is covered: activity + category, cost detail + category, reference values, alcohol item + unit, ingredients, bowel values, time-zone codes and currencies. Also refused: an activity name whose category is empty or an error such as #N/A (skipped silently before), a leading value with an empty partner (a cost detail with no category, an alcohol item with no unit), and any row the parser cannot read. The report groups refusals by reason with the sheet rows. New options: --check reads and checks only (safe on production) and --full replaces uncommenting the ~2025 block. New module src/lib/migration/checkRecords.ts. Removed (git keeps them): migrate-alcohol-conversion, -ingredient, -bowel-score, -favorite-place, -place-coord and their npm scripts, and migrateCostMaster / ActivityMaster / TimezoneMaster / ExchangeRate from migrate.ts. §11 and §12 rewritten for the admin pages"],
   ],
   [1100, 1300, 6960]
 ));
@@ -560,7 +561,7 @@ C(table(["Field","Type","Notes"],[
   ["city","String","Representative city"],
 ],[2400,2000,4960]));
 C(spacer());
-C(note("This collection does NOT feed migration. Each log record\u2019s timezoneOffset comes from column N of the log sheet directly; the migration never looks anything up. timezone_master is a reference copy of the TimeDiff tab, refreshed only when migrateTimezoneMaster is uncommented in migrate.ts \u2014 so it can lag the sheet. It did exactly that after the v4.8 IST correction. The collection name is timezone_master, singular."));
+C(note("This collection does NOT feed migration. Each log record\u2019s timezoneOffset comes from column N of the log sheet directly; the migration never looks anything up. timezone_master was a reference copy of the TimeDiff tab; (v4.17) it is now edited on /admin/timezone and (v4.19) the migration refuses a record whose zone code is not in it. It lagged the sheet after the v4.8 IST correction. The collection name is timezone_master, singular."));
 C(spacer());
 C(h2("6.5 exchange_rate"));
 C(table(["Field","Type","Notes"],[
@@ -581,7 +582,7 @@ C(table(["Field","Type","Notes"],[
 ],[2200,1600,5560]));
 C(spacer());
 C(note("Note: 1 drink = 1 소주잔 equivalent (50ml at ~20% ABV). The drinks field on each alcohol entry = amount × convMap[item][unit].drinks."));
-C(p("Migration: npm run migrate-alcohol reads the AlcoholConv sheet from Active_2026Mar05."));
+C(p("Seeded from the AlcoholConv sheet by npm run migrate-alcohol until v4.19; since 24 Oct 2026 edited on /admin/alcohol (§15.5). The loader was removed in v4.19."));
 C(p("Model: src/models/AlcoholConversion.ts. Unique index on { userId, item, unit }."));
 C(h2("6.7 ingredient_master"));
 C(p("A dedicated collection storing the two-level ingredient taxonomy for both food and drinks. One document per level2 value (73 documents as of v3.2). It is the single source of truth for the level2 vocabulary used by parseFoodIngredients() validation (for foods and drinks) and by the historical-fill scripts."));
@@ -592,7 +593,7 @@ C(table(["Field","Type","Notes"],[
 ],[2200,1600,5560]));
 C(spacer());
 C(p("Model: src/models/IngredientMaster.ts (collection ingredient_master). Unique index on { userId, level2 }."));
-C(p("Migration: npm run migrate-ingredient reads the Ingredient sheet (level1 / level2 columns, header row 1) from Active_2026Mar05 and does delete-all + re-insert for the user."));
+C(p("Seeded from the Ingredient sheet by npm run migrate-ingredient until v4.19; since 24 Oct 2026 edited on /admin/ingredient (§15.5). The loader was removed in v4.19."));
 C(bold("Taxonomy structure (73 level2 values across 16 level1 groups; v3.2 adds 음료 and 당류)"));
 C(table(["level1","level2 values"],[
   ["곡류","기타 곡류, 메밀, 밀, 보리쌀, 쌀, 옥수수, 전분, 찹쌀, 콩류, 청국장 (콩류 and 청국장 moved here in v3.1)"],
@@ -630,7 +631,7 @@ C(table(["Field","Type","Notes"],[
   ["value","String","The Korean value exactly as written in the source sheets"],
   ["score","Number","Hyoje’s own rough weighting; expected to be refined against real data"],
 ],[2000,1400,5960]));
-C(p("Unique index { userId, field, value }. Collection name bowel_score. Model src/models/BowelScore.ts. Seeded from the Bowel sheet (range Bowel!A2:F) by scripts/migrate-bowel-score.ts, delete-all + re-insert."));
+C(p("Unique index { userId, field, value }. Collection name bowel_score. Model src/models/BowelScore.ts. Seeded from the Bowel sheet (range Bowel!A2:F) by scripts/migrate-bowel-score.ts until v4.19; since 24 Oct 2026 edited on /admin/bowel (§15.5)."));
 C(bold("Scores as of v4.9"));
 C(table(["Field","Value → score"],[
   ["amount","보통 0 · 많음 0 · 적음 −1 · 아주 적음 −2"],
@@ -1594,7 +1595,7 @@ C(
   bullet("Null/empty strings: parseString() returns null for empty, #N/A, or #-prefixed values"),
   bullet("timezoneOffset: parseNumber, NEVER parseInteger \u2014 half-hour and quarter-hour zones are real (IST 5.5, Nepal 5.75). Corrected v4.8."),
   bullet("datetime: built with Date.UTC so the value is the naive local wall clock, independent of where the migration runs. new Date(y,m,d,...) reads the machine\u2019s zone and was the v4.8 bug \u2014 see \u00a75.3."),
-  bullet("(v4.9) bowel: amount via parseBowelValue, quality and characteristics via parseBowelList — parsePlusList splits on ‘+’, trims and drops empties, returning undefined for an empty cell so nothing is stored. Every value must exist in bowel_score for its field; loadBowelVocabulary(userId) is awaited once at migration start next to loadValidLevel2, and an unknown value throws BowelValidationError (field, value, raw cell). As with ingredients, the row is reported in the Errors count and NOT inserted."),
+  bullet("(v4.9) bowel: amount via parseBowelValue, quality and characteristics via parseBowelList — parsePlusList splits on ‘+’, trims and drops empties, returning undefined for an empty cell so nothing is stored. Every value must exist in bowel_score for its field; loadBowelVocabulary(userId) is awaited once at migration start next to loadValidLevel2, and an unknown value throws BowelValidationError (field, value, raw cell). As with ingredients, the row is refused, and (v4.19) one refused row stops the whole migration before anything is deleted (§11.2)."),
 );
 C(h3("10.1.5 Google Sheets Column Layout"));
 C(p("Two insertions shape the current layout. In v3.0 a new column AO (spiciness) was inserted between AN (fat) and the previous AO (drink item), shifting every column after it by one. In v4.3 two new columns BU (부하) and BV (방식) were inserted after BT (운동단위), shifting every column after them by two. The total is now 86 columns. The migration script fetch range is A:CI — A:CH would be exact, and A:CI keeps one spare column."));
@@ -1690,7 +1691,7 @@ C(p("A composite cell such as \"밥(쌀)+계란(계란)+스팸(가공육)+꼬리
 C(bold("Validation and row-skip rule"));
 C(p("Each ingredient inside the parentheses is validated against the level2 vocabulary loaded from ingredient_master (see Section 6.7). If any value is not a valid level2 term, parseFoodIngredients() throws IngredientValidationError. The per-row try/catch in migrate.ts catches it, skips the entire row, and logs the offending value and row number. The user then corrects the source row (or adds the missing taxonomy term) and re-migrates."));
 C(bold("Vocabulary loading — single source of truth"));
-C(p("VALID_LEVEL2 is NOT hard-coded. loadValidLevel2(userId) is awaited once at migration start (after Mongo connection and index sync, before any sheet is migrated). It reads all level2 values from ingredient_master and caches them, plus the \"Not Defined\" sentinel. parseFoodIngredients() is synchronous and reads this cache; it throws if called before the vocabulary is loaded (fail-fast). Because the vocabulary comes from the Ingredient sheet via ingredient_master, adding or renaming a level2 value requires only: edit the Ingredient sheet → npm run migrate-ingredient → re-run migration. No code change."));
+C(p("VALID_LEVEL2 is NOT hard-coded. loadValidLevel2(userId) is awaited once at migration start (after Mongo connection and index sync, before any sheet is migrated). It reads all level2 values from ingredient_master and caches them, plus the \"Not Defined\" sentinel. parseFoodIngredients() is synchronous and reads this cache; it throws if called before the vocabulary is loaded (fail-fast). Because the vocabulary comes from ingredient_master, adding a level2 value requires only: add it on /admin/ingredient (and the Ingredient tab) → re-run the migration. No code change. (v4.19) A refused row now stops the whole run (§11.2)."));
 C(bold("Scope"));
 C(p("As of v3.1 this parsing applied only to food.foods[]. As of v3.2 the same parser is also applied to food.drinks[] (see Section 6.7). food.alcohols[] is the only food sub-array that is NOT parsed for ingredients."));
 
@@ -1727,7 +1728,7 @@ C(
   bullet("Active/History/Future sheets are managed separately in Google Sheets until Phase 5"),
 );
 C(h3("10.2.2 Supporting Collections"));
-C(p("(v4.17) Since 24 Oct 2026 the DATABASE is the truth for every supporting collection: they are edited on the admin pages (§15.5) and must NOT be reloaded from the sheet, which would undo those changes. migrateReferenceLists was removed from migrate.ts; the other loaders described below stay in the repo until #67 step 4 removes them. History:"));
+C(p("(v4.17) Since 24 Oct 2026 the DATABASE is the truth for every supporting collection: they are edited on the admin pages (§15.5) and must NOT be reloaded from the sheet, which would undo those changes. migrateReferenceLists was removed from migrate.ts in v4.17 and (v4.19, #67 step 4) every other loader too; git keeps them. History:"));
 C(p("Supporting collections (cost_master, activity_master, reference_lists, timezone_master, exchange_rate) use a delete-all + re-insert strategy per collection. activity_master uses a unique index on userId + name + category. alcohol_conversion is seeded via npm run migrate-alcohol from the AlcoholConv sheet. ingredient_master (added v3.1) is seeded via npm run migrate-ingredient from the Ingredient sheet. See Sections 15 and 16 for the daily routine and master-table update procedures."));
 C(h3("10.2.3 Incremental Sync — Deferred to Post-MVP"));
 C(p("The DB_Status/DB_ID column approach designed in v1.1 has been deferred to post-MVP. It will be implemented after the Phase 5 data entry feature is complete."));
@@ -1737,7 +1738,8 @@ C(table(["Sheet","File","Priority"],[
   ["2026","Full Archive_2026Mar06","2 — current year archive"],
 ],[2400,3400,3560]));
 C(note("Note: Active, History, and Future sheets are NOT migrated. They are managed in Google Sheets until Phase 5."));
-C(h3("10.2.5 Supporting Collections to Migrate"));
+C(h3("10.2.5 Supporting Collections to Migrate (until v4.19)"));
+C(p("Historical: where each list was first loaded from. None is loaded from the sheet any more (§15.5)."));
 C(
   bullet("cost_master — from Cost sheet in Active_2026Mar05"),
   bullet("activity_master — from Activity sheet in Active_2026Mar05"),
@@ -1845,14 +1847,14 @@ C(p("This section documents the day-to-day workflow for keeping MongoDB in sync 
 C(h2("11.2 The Routine — Step by Step"));
 C(table(["Step","Command","What it does"],[
   ["1. Drop in new data","(manual, in Google Sheets)","Copy yesterday's completed entries from the Active sheet and paste them into the 2026 archive sheet as plain values. Use the parenthesis ingredient notation on food AND drink items, e.g. 밥(쌀)+계란(계란) and 라떼(커피|우유). Items without parentheses become [\"Not Defined\"] and are repaired in steps 3-4."],
-  ["2. Migrate","npm run migrate","Deletes all 2026 documents (Log.deleteMany({ userId, 'start.year': 2026 })) and rebuilds them from the 2026 sheet. Foods with parenthesis notation get their ingredients directly from parseFoodIngredients; foods without get [\"Not Defined\"]."],
+  ["2. Migrate","npm run migrate (npm run migrate -- --check first if unsure)","(v4.19) Reads and checks every row first; one refused row stops the run with nothing deleted (§11.2 note). Then deletes all 2026 documents (Log.deleteMany({ userId, 'start.year': 2026 })) and rebuilds them from the 2026 sheet. Foods with parenthesis notation get their ingredients directly from parseFoodIngredients; foods without get [\"Not Defined\"]."],
   ["3. Fill ingredients","npx tsx scripts/fill-historical-ingredients.ts","Repairs every food item whose ingredients are missing or [\"Not Defined\"] using the embedded REVIEWED_MAP + bestGuess fallback. Skips items that already have real ingredients (including today's properly-parenthesised rows)."],
   ["4. Fill drinks","npx tsx scripts/fill-historical-drinks.ts","Same as step 3 but for food.drinks[].ingredients, using the DRINK_MAP. Independent of the foods fill; order between them does not matter."],
   ["5. Inspect","npx tsx scripts/inspect-ingredients.ts + inspect-drinks.ts","Surveys both foods and drinks: items with ingredients vs Not Defined, top level2 distribution, samples."],
   ["6. Reconcile","npx tsx scripts/reconcile-foods.ts","Re-reads the source sheets with the live parser and compares against MongoDB. Reports source-vs-DB gap and any per-row parse errors. Target: gap = 0, errors = 0."],
 ],[1700,2900,4760]));
 C(spacer());
-C(note("(v4.9) Check the migration summary’s Errors count after step 2. A bowel value missing from the Bowel sheet — a typo, or a new value not yet added — now rejects its whole row, which stays out of MongoDB until the sheet is fixed. Run npm run migrate-bowel first whenever the Bowel sheet itself changed (§12.5)."));
+C(note("(v4.19) The migration refuses before it deletes. It first stops if any change on /admin is not yet ticked as repeated in the sheet. Then it reads every row and checks each value against its master list in the database: activity + category, cost detail + category, reference values, alcohol item + unit, ingredients, bowel values, time-zone codes and currencies — the same rule as the admin pages’ missing-values box (src/lib/migration/checkRecords.ts, from the usage specs in lists.ts). An activity name with an empty or #N/A category, a cost detail without a category and an alcohol item without a unit are refused too. One refused row stops the run and nothing is deleted; the report lists each reason once with its sheet rows and dates. Fix the cell in the sheet, or add the value on /admin, and run it again. npm run migrate -- --check does everything except write, so it is safe on production at any time."));
 C(h2("11.3 Why migrate then fill?"));
 C(p("The main migrate rebuilds 2026 from the sheet, where ingredients can only come from parentheses. Older rows without parentheses would become [\"Not Defined\"]. The fill script then tops these up from the reviewed map. Running both in sequence guarantees that both new-style (parenthesised) and old-style (parenthesis-less) rows end up with correct ingredients."));
 C(note("Note (Case A — no stale ingredients): Because the user always runs migrate after any source change, every 2026 document is deleted and rebuilt each time. Old ingredient values can never linger from a previous state — there is no scenario where the sheet says one thing and MongoDB shows a stale ingredient from a deleted item."));
@@ -1868,44 +1870,32 @@ C(p("Old source rows that used descriptive (non-ingredient) parentheses — e.g.
 
 
 
-C(h2("11.6 Full Re-migration (v4.16, changed v4.17)"));
-C(p("Needed when cells in ~2025 change. Last full run 23 Oct 2026. (v4.17) From 24 Oct the master lists are NOT part of it: the database is their truth (§15.5), so a sheet reload would undo admin changes. Small ~2025 fixes are better applied to the database by a one-off script with a dry run (as on 24 Oct), with the same fix made in the sheet."));
+C(h2("11.6 Full Re-migration (v4.16, changed v4.17 and v4.19)"));
+C(p("Needed when cells in ~2025 change. Last full run 23 Oct 2026. The master lists are NOT part of it: the database is their truth (§15.5), and (v4.19) no loader is left. Small ~2025 fixes are better applied to the database by a one-off script with a dry run (as on 24 Oct), with the same fix made in the sheet."));
 C(
   bullet("1. Run the backup workflow by hand (GitHub → Actions → backup → Run workflow) and wait for a green run. On /admin no change may show ‘to repeat’"),
-  bullet("2. In scripts/migrate.ts uncomment the three lines of the ~2025 block ONLY. Leave every master call commented (and migrateAlcoholConversion, which is not defined in migrate.ts)"),
-  bullet("3. npm run migrate — Errors must be 0"),
+  bullet("2. npm run migrate -- --full --check — reads ~2025 and 2026 and checks every row; writes nothing. Fix every refused row (or add the value on /admin) until it passes"),
+  bullet("3. npm run migrate -- --full — deletes and re-inserts both; it stops before deleting anything if a row is refused"),
   bullet("4. npx tsx scripts/fill-historical-ingredients.ts, then npx tsx scripts/fill-historical-drinks.ts — re-inserting ~2025 resets every older food and drink without brackets to Not Defined (§11.3)"),
-  bullet("5. Do not run the master scripts of §12 — the database holds the lists"),
-  bullet("6. Comment the lines out again"),
-  bullet("7. npx tsx --tsconfig tsconfig.json scripts/survey-sheets.ts — the report's findings should list no refused rows and no count differences; then scripts/check-master-orphans.ts should print None ✅"),
+  bullet("5. npx tsx --tsconfig tsconfig.json scripts/survey-sheets.ts — the report's findings should list no refused rows and no count differences; then scripts/check-master-orphans.ts should print None ✅"),
 );
+C(note("(v4.19) --full replaces uncommenting the ~2025 block, so nothing has to be commented out again afterwards. ~2025 row 41344 (empty category) is the end-of-sheet marker: if it holds an activity name, the check refuses it, and the marker needs a look."));
 C(note("The migration reads every cell AS DISPLAYED (the Sheets API's formatted value). Accounting formats showed negatives in brackets and zeros as ‘-’, so those amounts were lost until the cells were changed to plain numbers (23 Oct). The same applies to decimals: an offset cell formatted with no decimals would store 6 for IST. Keep numeric cells in plain number formats."));
 
 C(h1("12. Master-Table Update Procedures"));
-C(note("(v4.17) SUPERSEDED for every list: since 24 Oct 2026 master lists are edited on the admin pages (/admin, §15.5) and the database is their truth. The sheet procedures below describe the loaders, which must no longer be run; they stay here until #67 step 4 removes the loaders. §12.3 (the fill script’s map), §12.7’s geocoding and §12.8 (backups) still apply."));
-C(p("FarGaze has three master tables seeded from the Active spreadsheet: the alcohol conversion table, the ingredient taxonomy and (v4.9) the bowel scores. This section is the canonical procedure for updating each."));
-C(h2("12.1 Updating the Alcohol Conversion Table (alcohol_conversion)"));
-C(p("The alcohol_conversion collection maps each (item, unit) pair to a drinks value (see Section 6.6). To add or change a conversion:"));
+C(p("(v4.19) Every master list is changed on the admin pages (/admin, §15.5); the database is the truth and no list is loaded from the sheet. The loaders described in earlier versions (npm run migrate-alcohol, -ingredient, -bowel, -favorite-place, -place-coord, and the commented master calls in migrate.ts) were removed in #67 step 4; git keeps them. The sheet’s master tabs are kept in step by hand: each change on /admin shows its sheet step, and ‘Mark repeated’ ticks it. The migration stops while any change is unticked."));
+C(h2("12.1 Changing Any Master List"));
 C(
-  num("Open the AlcoholConv sheet in the Active_2026Mar05 spreadsheet (range AlcoholConv!A2:E)"),
-  num("Add or edit a row: item, unit, unitTo50ml, alcoholRatio. The drinks value is unitTo50ml × alcoholRatio. Example added in v3.1: 와인 / ml."),
-  num("If precision matters, increase the decimal places shown in the sheet cell before migrating — the migration reads the displayed value"),
-  num("Run npm run migrate-alcohol — this does delete-all + re-insert for the alcohol_conversion collection"),
-  num("Verify the collection document count in MongoDB Atlas (54 documents as of v3.1)"),
+  num("Open /admin (the gear icon) and the list"),
+  num("Add, edit or delete the row. A row records use has its record columns locked; activities and cost categories change them through rename, move or merge (§15.5.4), which changes the past records too"),
+  num("Repeat the change in the sheet as the change list says, then tick ‘Mark repeated’"),
+  num("A value must be in its list BEFORE a sheet row uses it: the migration refuses any value its list does not have, and stops (§11.2)"),
 );
-C(note("Note: 1 drink = 1 소주잔 = 50ml soju equivalent. The drinks field on each alcohol log entry = amount × convMap[item][unit].drinks. Changing a conversion does NOT require re-migrating the log collection — the drinking widget reads alcohol_conversion at query time."));
-C(h2("12.2 Updating the Ingredient Taxonomy (ingredient_master)"));
-C(note("Note (v3.2): the same ingredient_master taxonomy now serves both foods and drinks. Adding a drink value (e.g. a new tea under 음료) follows exactly the same procedure below. After any taxonomy change, re-run migrate, then both fill-historical-ingredients.ts and fill-historical-drinks.ts."));
-C(p("The ingredient_master collection holds the level1/level2 taxonomy and is the single source of truth for the level2 vocabulary used by parseFoodIngredients validation (see Section 6.7). To add, rename, or regroup an ingredient class:"));
-C(
-  num("Open the Ingredient sheet in the Active_2026Mar05 spreadsheet (columns level1 / level2, header row 1)"),
-  num("Add a new row (new level1+level2), rename a level2 value, or move a level2 to a different level1 group"),
-  num("Run npm run migrate-ingredient — this does delete-all + re-insert for ingredient_master, refreshing the level2 vocabulary"),
-  num("Re-run the main migration (npm run migrate) so that parseFoodIngredients validates against the updated vocabulary; otherwise new-data rows using a renamed value would be rejected"),
-  num("Run the fill script and reconcile per Section 11 to repair and verify"),
-);
-C(bold("Important sequencing rule"));
-C(p("The main migrate (npm run migrate) calls loadValidLevel2() at startup, which reads ingredient_master. If ingredient_master is empty (migrate-ingredient never run) or stale (renames not re-seeded), migration will reject rows using the new/renamed values. Therefore: always run migrate-ingredient at least once before relying on migrate, and re-run it after any change to the Ingredient sheet. Run migrate-ingredient once; re-run only when the Ingredient sheet changes."));
+C(note("Alcohol conversion: 1 drink = 1 소주잔 = 50 ml soju equivalent; drinks = unitTo50ml × alcoholRatio. Changing a number changes past Insights figures at once (the widget reads alcohol_conversion at query time); no migration is needed. The same holds for bowel scores, favourite places and place points."));
+C(h2("12.2 The Ingredient Taxonomy (ingredient_master)"));
+C(p("ingredient_master holds the level1 / level2 taxonomy for foods and drinks and is the single source of truth for the level2 vocabulary that parseFoodIngredients checks (§6.7). Add a value or move it to another group on /admin/ingredient. Renaming a level2 value that records use waits for #67.5 (the name is locked until then)."));
+C(bold("Order matters"));
+C(p("Add the new level2 value on /admin first, then use it in the sheet, then run the migration — otherwise the migration refuses the row. After the migration, run both fill scripts (§11.2 steps 3–4)."));
 C(bold("Taxonomy renames performed in v3.1"));
 C(table(["Old level2","New level2","level1"],[
   ["생선 육수","해물 육수","육수"],
@@ -1939,34 +1929,23 @@ C(spacer());
 
 
 
-C(h2("12.5 Updating Bowel Scores (bowel_score, v4.9)"));
-C(p("bowel_score holds both the allowed bowel values and their scores (§6.8). To change a score or add a value:"));
-C(
-  num("Edit the Bowel sheet in the Active spreadsheet — value | score pairs in A|B (amount), C|D (quality), E|F (characteristics). The Bowel sheet is the only home of these values (v4.16); Activity P / Q / R are empty and there is no dropdown in the entry sheets"),
-  num("Run npm run migrate-bowel — delete-all + re-insert. It refuses to touch the collection if any row has a value without a score or a score without a value, and prints the three lists with their scores for checking"),
-  num("A score change needs nothing else: the widget reads bowel_score at query time. A NEW value must be loaded before the next npm run migrate, or every row using it is rejected"),
-);
+C(h2("12.5 Bowel Scores (bowel_score, v4.9)"));
+C(p("bowel_score holds both the allowed bowel values and their scores (§6.8). Change a score or add a value on /admin/bowel. A score change needs nothing else: the widget reads bowel_score at query time. A NEW value must be added before a sheet row uses it, or the migration refuses that row."));
 
-C(h2("12.6 Updating Favourite Places (favorite_place, v4.12)"));
-C(p("favorite_place (§6.10) tells the Journeys widget which real place 집 / 회사 / 사이트 / 내차 meant in each period. To add a move, a new job or a new car:"));
-C(
-  num("Edit the FavoritePlace sheet in the Active spreadsheet. Columns A–H: label · name · from_timezone · from_date · from_time · to_timezone · to_date · to_time. Dates YYYY-MM-DD, times H:mm. Leave all three of a side blank for an open end; close the previous period when a new one starts"),
-  num("Run npm run migrate-favorite-place — delete-all + re-insert. It reads offsets from timezone_master, so every code must exist in the TimeDiff sheet. It refuses to touch the collection if any row is half-filled, has an unknown zone or an impossible date, ends before it starts, or overlaps another period of the same label, and prints each row’s start and end in UTC for checking"),
-  num("Nothing else: the log is not touched, and the widget resolves names at read time"),
-);
+C(h2("12.6 Favourite Places (favorite_place, v4.12)"));
+C(p("favorite_place (§6.10) tells the Journeys widget which real place 집 / 회사 / 사이트 / 내차 meant in each period. To add a move, a new job or a new car: on /admin/favorite-place close the previous period (its To) and add the new one. The server refuses a zone that is not in the time-zone list, a half-filled boundary, From not before To, and an overlap with another period of the same label. Label and place name are fixed on existing rows until #67.5. Nothing else: the log is not touched, and the widget resolves names at read time."));
 
 C(h2("12.7 Place Points and Geocoding (place_coord, v4.13)"));
-C(p("place_coord (§6.11) holds a point for each From / To name. The PlaceCoord tab in the Active spreadsheet is the source: A Name · B Coords (‘37.27011, 127.04782’ as Google Maps or OpenStreetMap copies it) · C Source (blank = manual, osm) · D Note; columns E onward (Uses, Status, Map) are for reading only and are ignored."));
+C(p("place_coord (§6.11) holds a point for each From / To name. Points are added and corrected on /admin/place-coord (a point as ‘37.27011, 127.04782’, as Google Maps or OpenStreetMap copies it); the PlaceCoord tab is kept in step by hand (A Name · B Coords · C Source · D Note). The geocoding script still reads the TAB to know which names already have a row, so keep it in step."));
 C(bold("Finding points for new names"));
 C(
   num("Run npx tsx --tsconfig tsconfig.json scripts/geocode-places.ts > geocode-places.txt (optional argument: minimum uses, default 3). It reads the sheet and the log, skips every name already in the sheet, and asks OpenStreetMap (Nominatim, ~1 s per question; answers cached in myfiles/geocode-cache.json, so a re-run never asks twice). Read-only on the database and the sheet. Needs NOMINATIM_EMAIL"),
   num("How it searches: the name is tidied for searching only (‘(T2)’ and ‘8번출구’ dropped; outside Korea ‘X 역’ → ‘X station’, ‘공항’ → ‘Airport’); it looks within ~40 km of the home in use when the name was mostly used and takes the match nearest home, then the whole country; then without the branch name (‘… 강남점’) or the last word. Homes, site codes, offices, ‘… 집 / 댁’ and personal places go straight to ‘by hand’"),
-  num("It writes place-coords-new.csv in the sheet’s columns, worst first: by hand → not found → check (a dropped branch name, a district or road match, or > 50 km from home) → found. Import it into the PlaceCoord tab (File → Import → Upload, Append to current sheet, Comma, ‘Convert text to numbers…’ UNTICKED) and delete the CSV’s own header row"),
+  num("It writes place-coords-new.csv in the sheet’s columns, worst first: by hand → not found → check (a dropped branch name, a district or road match, or > 50 km from home) → found. Import it into the PlaceCoord tab (File → Import → Upload, Append to current sheet, Comma, ‘Convert text to numbers…’ UNTICKED) and delete the CSV’s own header row. (v4.19) The tab no longer reaches the database: add each point worth keeping on /admin/place-coord too. A bulk import on /admin is not built"),
   num("Fix what is worth fixing. A wrong point: replace it, or CLEAR the Coords cell and keep the row — deleting the row makes the next search find the same wrong answer. Korean places: Google Maps hides coordinates for Korea, so use openstreetmap.org (right-click → Show address puts the numbers in the search box); UK places: Google Maps’ right-click menu shows them"),
-  num("Run npm run migrate-place-coord — delete-all + re-insert of the rows that have a point; it refuses to touch the collection if a Coords cell is not ‘lat, lng’ or a name appears twice. No restart needed after the first load"),
 );
 C(bold("Ongoing correction routine"));
-C(p("Open /api/insights/stats?metric=transport.summary&timeMode=period&dateFrom=2019-01-01&dateTo=<yesterday> and read checks: tooFast (all time — one end of each pair is a wrong point, usually the less familiar one) and placesWithoutPoint (the busiest names with no point in the dates asked). The Places tab’s missing-places pop-up gives the same list for the current filter, with Copy names. Fix a few in the sheet, run the migration, and the ‘% known’ figure rises."));
+C(p("Open /api/insights/stats?metric=transport.summary&timeMode=period&dateFrom=2019-01-01&dateTo=<yesterday> and read checks: tooFast (all time — one end of each pair is a wrong point, usually the less familiar one) and placesWithoutPoint (the busiest names with no point in the dates asked). The Places tab’s missing-places pop-up gives the same list for the current filter, with Copy names. (v4.19) Fix a few on /admin/place-coord (and in the tab), and the ‘% known’ figure rises at once."));
 C(note("Rejected: Kakao Local API and Google Geocoding / Places as the source — their terms forbid storing results (Kakao staff, Aug 2026: real-time calls only, not even temporary storage). Naver’s local search returns at most five results with no location bias."));
 
 C(h2("12.8 Backups and Restore (v4.15)"));
@@ -2174,7 +2153,7 @@ C(h2("14.10 Sheet Anomalies Found"));
 C(p("Records whose end is before their start (drawn as points until corrected in the sheet): 6ab7da3f5ef99b2c70d6c1eb and 6ab7da3f5ef99b2c70d6c1f4 (December 2019), 6ab7da445ef99b2c70d71fd8 (July 2021), and three in 2025 whose ids are listed by /api/calendar?from=2025-01-01&to=2025-12-31 under diagnostics.endBeforeStartIds."));
 
 // ===== 15. DATA ENTRY (PHASE 5) =====
-C(h1("15. Data Entry (Phase 5, v4.15–v4.18)"));
+C(h1("15. Data Entry (Phase 5, v4.15–v4.19)"));
 C(p("Started 19 Oct 2026. The live plan, with its risk register and next steps, is the Data Entry Plan document (" + "https://claude.ai/code/artifact/1061a843-f14f-4b79-bef0-d34608dc3c1e" + "); this section records what was agreed and why. Target: cutover on or before 1 January 2027."));
 C(h2("15.1 Stages"));
 C(table(["Stage","Truth for logs","What happens"],[
@@ -2197,7 +2176,7 @@ C(
   bullet("(23 Oct) Open activities (the History sheet) and future plans (the Future sheet) are not migrated today; the entry feature must cover both. How open activities are handled is still to be designed"),
   bullet("(23 Oct, open) 심리 측정, logged in the Happiness tab: recommended as one more field group in the entry app before cutover, with a one-off import of the Happiness history; no column insertion in the sheet during the build (it would touch five tabs, the Calendar script’s write-back numbers (§13.5), the migration’s column map and the survey)"),
   bullet("(23 Oct) Exchange rates: the sheet is correct. The server reads no rates today, because each record stores both amounts"),
-  bullet("(24 Oct) The migration will REFUSE, and report, any record whose value is not in the database’s list — activity + category, cost detail + category, alcohol item + unit, reference values — not only ingredients and bowel values as today (#67 step 4). Tighter, mandatory integrity replaces the sheet’s loose checks"),
+  bullet("(24 Oct) The migration will REFUSE, and report, any record whose value is not in the database’s list — activity + category, cost detail + category, alcohol item + unit, reference values — not only ingredients and bowel values as before (#67 step 4, done 25 Oct: also time-zone codes and currencies, every list with records). One refused row stops the whole run before anything is deleted. Tighter, mandatory integrity replaces the sheet’s loose checks"),
   bullet("(24 Oct) A change not yet ticked as repeated in the sheet BLOCKS every migration run, including the daily one; no override (#67 step 4)"),
   bullet("(24 Oct) An activity name is unique across all categories (§6.2)"),
   bullet("(24 Oct) Rename, merge and move change past records for activities and cost categories first; ingredients, alcohol items, bowel values, people categories and place names follow later. Hyoje’s planned people-category clean-up: 친목 → 친구 (가족|친목 → 가족|친구), 업무친목 → 업무친구, 업무지인 → 업무친구"),
@@ -2231,13 +2210,13 @@ C(table(["Part","Result on 23 Oct"],[
 ],[2200,7160]));
 C(spacer());
 
-C(h2("15.5 Master Lists in the Database (WBS #67, v4.17–4.18)"));
+C(h2("15.5 Master Lists in the Database (WBS #67, v4.17–4.19)"));
 C(p("Agreed 23–24 Oct 2026. The database is the truth for every master list; the sheet’s master tabs are kept in step by hand until cutover. One generic table editor serves all 18 lists; each list is described once in src/lib/admin/lists.ts (columns and types, unique columns, the record fields that use it, where it lives in the sheet, which columns lock)."));
 C(table(["Step","What","Status"],[
   ["1","List descriptions; change log (master_change, §6.12); reference lists one document per value; read-only pages /admin and /admin/<list> with record counts, missing values (amber box) and changes since a date; gear icon in the menu; Mark repeated tick","Done 24 Oct"],
   ["2","Add, edit and delete in place, with server checks and a logged sheet step","Done 24 Oct"],
   ["3","Rename and merge for activities and cost categories: preview (records, years), the sheet steps (row in the master tab; whole-cell Find & Replace in the year tabs, Active, History and Future; for a category, column A of the year tabs too, which hold plain values), records changed in one operation, Undo until the next migration","Done 25 Oct (§15.5.4)"],
-  ["4","Migration refuses unknown values; master loaders removed from the repo. The pending-change gate was brought forward into step 3","Next"],
+  ["4","Migration refuses unknown values (every row checked before anything is deleted; --check and --full); master loaders removed from the repo. The pending-change gate was brought forward into step 3. §11.2, §11.6, §12","Done 25 Oct"],
   ["5","Design and WBS; Data Entry Plan","Each session"],
 ],[700,6860,1800]));
 C(spacer());
@@ -2290,7 +2269,7 @@ C(h3("A.1 Key Architecture Decisions"));
 C(
   bullet("Auth: Google OAuth → EMAIL_TO_USER_ID map → userId in JWT cookie. Three-layer security: middleware + API 403 + MongoDB userId filter."),
   bullet("Schema: duration.totalSeconds only (no d/h/m/s). Computed from start/end UTC timestamps using timezoneOffset."),
-  bullet("Migration: delete-all + re-insert strategy (no unique index). Daily run on 2026 sheet only; full re-migration by uncommenting ~2025 block."),
+  bullet("Migration: delete-all + re-insert strategy (no unique index). Daily run on 2026 sheet only; (v4.19) full re-migration with --full; every row checked before anything is deleted."),
   bullet("Ingredients: food.foods[].ingredients (v3.1) and food.drinks[].ingredients (v3.2) populated from level2 taxonomy. Source of truth is ingredient_master (seeded from the Ingredient sheet). parseFoodIngredients validates foods and drinks against the loaded vocabulary; the historical-fill scripts repair anything the parentheses do not cover. food.alcohols[] has no ingredients."),
   bullet("Search: Atlas Search primary, regex fallback when Atlas returns 0 results. searchMode field in response indicates which was used. Field conditions support scoped exact-phrase matching via parseQuery (v3.6); result-table sorting is client-side (v3.6)."),
   bullet("Spending page layout: category order, detail order, collapsed state persisted in localStorage under key \"fargaze-cost-layout\"."),
@@ -2356,15 +2335,13 @@ C(table(["Path","Purpose"],[
   ["src/app/api/maps-key/route.ts","(v4.14) GET /api/maps-key — returns GOOGLE_MAPS_BROWSER_KEY to a signed-in user only (403 otherwise), Cache-Control private, no-store"],
   ["src/models/PlaceCoord.ts","(v4.13) place_coord model; unique index { userId, name }"],
   ["src/lib/migration/placeCoord.ts","(v4.13) parseCoords, buildPlaceCoords (parse + validate the PlaceCoord sheet; blank Coords = listed, no point) and sheetNames. Pure"],
-  ["scripts/migrate-place-coord.ts","(v4.13) npm run migrate-place-coord — PlaceCoord sheet → place_coord, delete-all + re-insert; refuses on any problem"],
-  ["scripts/geocode-places.ts","(v4.13) OpenStreetMap search for names not yet in the sheet; near-home first; writes place-coords-new.csv and myfiles/geocode-cache.json. Read-only on the database and the sheet"],
+    ["scripts/geocode-places.ts","(v4.13) OpenStreetMap search for names not yet in the sheet; near-home first; writes place-coords-new.csv and myfiles/geocode-cache.json. Read-only on the database and the sheet"],
   ["scripts/check-place-names.ts","(v4.13) Read-only survey of From / To names: totals, coverage by minimum-uses threshold, names used 3+ times with zone / home / Place values, names used from 2+ homes"],
   ["src/app/insights/_widgets/BowelWidget.tsx","(v4.9) Bowel Movement widget (WBS #62). (v4.10) Summary/Trend ViewToggle, trend tab / grain / count state, and the fetch for either metric; the count resets on a grain switch. Header; Day score CssDailyChart with hoverFor; Per day / Gap / Duration HistBlocks; Quality and How it went pies with Other signs; Time of day. The root is an @container, so its rows respond to the widget’s width, not the screen’s. Quality colour families and display order live here. Draws only — every rule is in bowel.ts"],
   ["src/lib/insights/bowel.ts","(v4.9) computeBowelSummary (fetch) + buildBowelSummary (pure, all rules), scoreTableFrom; exports DAY_SCORE_START, BAD_DAY_BELOW, HOW_IT_WENT, TIME_GROUPS. (v4.10) computeBowelTrend (fetch) + buildBowelTrend (pure — one buildBowelSummary per bucket); exports QUALITY_ORDER, TREND_SIGN_TOP, TREND_SIGN_OTHER"],
   ["src/app/insights/_widgets/BowelTrendView.tsx","(v4.10) Bowel Trend view — eight tabs (Score, Per day, Gap, Duration, Quality, How it went, Other signs, Time of day) over CssTrendChart and CssStackedAreaChart. Holds the tab colour ramps; Quality and How it went colours repeat the Summary pies’. Draws only"],
   ["src/models/BowelScore.ts","(v4.9) Mongoose model for bowel_score; unique index { userId, field, value }"],
-  ["scripts/migrate-bowel-score.ts","(v4.9) npm run migrate-bowel — Bowel sheet → bowel_score, delete-all + re-insert; refuses incomplete rows"],
-  ["scripts/check-bowel-coverage.js","(v4.9) Read-only: per-field coverage by year, stored shape (array vs text) and any value not in the Activity sheet lists"],
+    ["scripts/check-bowel-coverage.js","(v4.9) Read-only: per-field coverage by year, stored shape (array vs text) and any value not in the Activity sheet lists"],
   ["scripts/export-bowel.js","(v4.9) Read-only: writes every movement (date, hour, amount, quality, characteristics, minutes) to bowel-export.json, for testing scoring rules offline"],
   ["src/app/insights/_widgets/SleepWidget.tsx","(rebuilt v4.8) Sleep widget (WBS #53) \u2014 shell owning both views and their fetches, and the trend tab / grain / count / dataGrain state. Summary: four metric columns (heading, figure, pie, legend) over four day-aligned HeatStrips."],
   ["src/app/insights/_widgets/SleepTrendView.tsx","(v4.8) Sleep Trend view \u2014 Session (CssDualLineChart band + right-axis duration line) and Quality (percent stacked area, ordinal band order). Grain \u00d7 count controls on Weight\u2019s options and defaults, resolved-range line formatted from the SERVER-echoed grain."],
@@ -2410,10 +2387,9 @@ C(table(["Path","Purpose"],[
   ["src/lib/migration/transform.ts","Transformation utilities; v3.1 adds parseFoodIngredients(), loadValidLevel2(), resetValidLevel2(), IngredientValidationError; v4.9 adds parsePlusList(), loadBowelVocabulary(), parseBowelValue(), parseBowelList(), BowelValidationError and imports BowelScore"],
   ["src/app/search/page.tsx","Search UI — (v4.11) LogEntry and DetailPanel now imported from src/app/_components/LogDetailPanel.tsx; garbled conditions hint fixed; food.spiciness added v3.0; mixed phrase/token query hint (v3.1); client-side tri-state sortable result columns (v3.6)"],
   ["src/app/api/search/route.ts","GET /api/search — Atlas Search primary + regex fallback; parseQuery mixed phrase/token (v3.1); per-field exact-phrase conditions mirrored across the Atlas and regex condition loops (v3.6)"],
-  ["scripts/migrate.ts","Daily migration runner; calls loadValidLevel2 and (v4.9) loadBowelVocabulary at start; uncomment ~2025 block for full re-migration, and re-comment it afterwards; fetch range A:CI from v4.3 (was A:CG). (v4.17) migrateReferenceLists removed; the other master calls must stay commented (§11.6)"],
-  ["scripts/migrate-alcohol-conversion.ts","One-time migration: reads AlcoholConv sheet → inserts into alcohol_conversion"],
-  ["scripts/migrate-ingredient.ts","Seeds ingredient_master from the Ingredient sheet (NEW v3.1); run once, re-run only when the Ingredient sheet changes"],
-  ["scripts/fill-historical-ingredients.ts","(v4.17) Names corrected to the Ingredient tab: 기타 해산물, 채소 육수, 짜장. Fills food.foods[].ingredients on existing rows from embedded REVIEWED_MAP (1,156 entries) + bestGuess fallback; modes: --dry-run, --export-worklist, default write; treats [\"Not Defined\"] as refillable (NEW v3.1)"],
+  ["scripts/migrate.ts","(v4.19) Daily migration: stops while a change on /admin is unticked; reads and checks every row (checkRecords.ts) and stops, deleting nothing, if any is refused; then deletes 2026 and re-inserts the 2026 tab. --check reads and checks only; --full adds ~2025. Fetch range A:CI. No master list is loaded (loaders removed v4.19)"],
+  ["src/lib/migration/checkRecords.ts","(v4.19) loadMasterChecks (every list with usage specs, from the database), unknownValues (a record against them, as $unwind reads it), prepareSheet (parse + check every row; writes nothing), refusalReport (grouped by reason). Not Defined is always allowed for ingredients"],
+      ["scripts/fill-historical-ingredients.ts","(v4.17) Names corrected to the Ingredient tab: 기타 해산물, 채소 육수, 짜장. Fills food.foods[].ingredients on existing rows from embedded REVIEWED_MAP (1,156 entries) + bestGuess fallback; modes: --dry-run, --export-worklist, default write; treats [\"Not Defined\"] as refillable (NEW v3.1)"],
   ["scripts/inspect-ingredients.ts","Survey: docs with foods, items with/without ingredients, Not Defined count, top level2 distribution, samples (NEW v3.1)"],
   ["scripts/reconcile-foods.ts","Re-parses sheets with the live parser and compares against MongoDB; reports gap and per-row errors (NEW v3.1)"],
   ["scripts/scan-bad-parens.ts","Lists every source row whose FOOD or DRINK token has parentheses the parser rejects (NEW v3.1; extended to the drink column v3.2)"],
@@ -2448,8 +2424,7 @@ C(table(["Path","Purpose"],[
   ["src/lib/insights/transport-journeys.ts","(v4.12) legsFromDocs, canJoin, buildJourneys — the 30-minute joining rule; shared by the widget module and the check scripts. (v4.13) Leg.km (null until set from place_coord)"],
   ["src/models/FavoritePlace.ts","(v4.12) favorite_place model; index { userId, label, from.at }"],
   ["src/lib/migration/favoritePlace.ts","(v4.12) buildFavoritePlaces (parse + validate the sheet) and resolveFavoritePlace(label, instant). Pure"],
-  ["scripts/migrate-favorite-place.ts","(v4.12) npm run migrate-favorite-place — FavoritePlace sheet → favorite_place; refuses on any problem"],
-  ["scripts/check-transport-data.ts","(v4.12) Read-only survey of 이동 rows: fill rates by year, value lists, place names, routes, gaps between legs"],
+    ["scripts/check-transport-data.ts","(v4.12) Read-only survey of 이동 rows: fill rates by year, value lists, place names, routes, gaps between legs"],
   ["scripts/check-transport-cleanup.ts","(v4.12) Read-only: rows to fix, spelling-variant candidates, a journeys preview and companions"],
   ["src/app/_components/LogDetailPanel.tsx","(v4.11) The record detail pane, LogEntry type and formatters, moved out of search/page.tsx; portal at z-60; used by Search and Calendar"],
   ["src/app/NavBar.tsx, src/app/page.tsx","(v4.11) Menu order Calendar · Insights · Search · Spending; the home page redirects to /calendar. (v4.17) Gear icon at the right end opens /admin"],
@@ -2457,7 +2432,7 @@ C(table(["Path","Purpose"],[
 C(spacer());
 
 // ===== FOOTER =====
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.18 — 25 October 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.19 — 25 October 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 
 // ===== DOCUMENT ASSEMBLY =====
@@ -2494,6 +2469,6 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-Log-Data-Design-v4.18.docx", buffer);
-  console.log("Wrote FarGaze-Log-Data-Design-v4.18.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-Log-Data-Design-v4.19.docx", buffer);
+  console.log("Wrote FarGaze-Log-Data-Design-v4.19.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });

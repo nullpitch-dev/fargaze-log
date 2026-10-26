@@ -156,7 +156,7 @@ export function rowToDocument(row: any[], userId: string): any {
     get(row, C.DRINK_NOTE)
   ).map(d => {
     // Extract parenthesised ingredients (level2) from the item name.
-    // Throws IngredientValidationError on an unknown level2 → row is skipped.
+    // Throws IngredientValidationError on an unknown level2 → row is refused.
     // The drink note tag (커피/차) is preserved separately.
     const { item, ingredients } = parseFoodIngredients(d.item);
     return { ...d, item, ingredients };
@@ -169,7 +169,7 @@ export function rowToDocument(row: any[], userId: string): any {
     get(row, C.FOOD_NOTE)
   ).map(f => {
     // Extract parenthesised ingredients (level2) from the item name.
-    // Throws IngredientValidationError on an unknown level2 → row is skipped.
+    // Throws IngredientValidationError on an unknown level2 → row is refused.
     const { item, ingredients } = parseFoodIngredients(f.item);
     return { ...f, item, ingredients };
   });
