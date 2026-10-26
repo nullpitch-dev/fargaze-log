@@ -1,8 +1,11 @@
 // Staging migration (#68, Design §11.7): the checks, as plain functions.
 //
 // Staging uploads new records only; it never edits. A record is "the same" when its
-// activity name, start and end are all the same (activity names are unique across
-// categories, so the category adds nothing). Agreed with Hyoje on 26 Oct:
+// activity name, title, start and end are all the same (activity names are unique
+// across categories, so the category adds nothing). The title is part of it because
+// several purchases often share one activity and time, e.g. an Amazon order logged as
+// 구매 - 생활 · 정수기 필터 구매 and 구매 - 건강 · 유산균 구매 at 8:10 (Hyoje, 26 Oct).
+// Agreed with Hyoje on 26 Oct:
 //   - the same record twice in Staging            → the whole run stops
 //   - a Staging record already in the database    → the whole run stops
 //   - a Staging record missing from its year tab  → a warning; it is still sent
@@ -21,23 +24,25 @@ function point(p: any): string {
   return iso(p?.datetime) || (p?.year ? `${p.year}-${pad(p.month)}-${pad(p.day)}` : '');
 }
 
-/** Activity + start + end: what makes two records the same. */
+/** Activity + title + start + end: what makes two records the same. */
 export function recordKey(doc: any): string {
-  return [String(doc?.activity?.name ?? '').trim(), point(doc?.start), point(doc?.end)].join('|');
+  return [String(doc?.activity?.name ?? '').trim(), String(doc?.activity?.title ?? '').trim(),
+    point(doc?.start), point(doc?.end)].join('|');
 }
 
 /** "2026-10-25 19:00 → 19:40 · 식사 › 저녁" — wall-clock times as stored. */
 export function describe(doc: any): string {
   const s = point(doc?.start).replace('T', ' ') || '(no start)';
   const e = point(doc?.end).replace('T', ' ');
-  const cat = `${doc?.activity?.category ?? ''} › ${doc?.activity?.name ?? ''}`;
+  const title = String(doc?.activity?.title ?? '').trim();
+  const cat = `${doc?.activity?.category ?? ''} › ${doc?.activity?.name ?? ''}${title ? ` · ${title}` : ''}`;
   if (s.length === 10 && e === s) return `${s} (all day) · ${cat}`;
   const end = !e ? '(no end)' : e.length > 10 && e.slice(0, 10) === s.slice(0, 10) ? e.slice(11) : e;
   return `${s} → ${end} · ${cat}`;
 }
 
 /** Fields the database must return for recordKey. */
-export const KEY_FIELDS = 'activity.name start.datetime start.year start.month start.day end.datetime end.year end.month end.day';
+export const KEY_FIELDS = 'activity.name activity.title start.datetime start.year start.month start.day end.datetime end.year end.month end.day';
 
 /** Keys that appear more than once in Staging, with their rows. */
 export function duplicatesWithin(items: Located[]): Located[][] {

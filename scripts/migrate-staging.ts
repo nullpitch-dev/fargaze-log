@@ -9,7 +9,7 @@
 //   2. every Staging row passes the same checks as the daily migration;
 //   3. a food or drink without ingredients (written without brackets) stops the run:
 //      the fill scripts run only with a full migration, so Staging needs them typed;
-//   4. the same record (activity + start + end) twice in Staging stops the run;
+//   4. the same record (activity + title + start + end) twice in Staging stops the run;
 //   5. a Staging record already in the database stops the run.
 // A Staging record missing from its year tab is a warning only: it is still sent, but
 // the next full migration would drop it, so copy the row into the year tab.
@@ -93,7 +93,7 @@ async function main() {
   // 4. The same record twice in Staging.
   const twice = duplicatesWithin(items);
   if (twice.length) {
-    stop(`${twice.length} record${twice.length === 1 ? ' is' : 's are'} in Staging more than once (same activity, start and end).`, [
+    stop(`${twice.length} record${twice.length === 1 ? ' is' : 's are'} in Staging more than once (same activity, title, start and end).`, [
       ...twice.map(g => `  ✗ ${describe(g[0].doc)} — rows ${g.map(x => x.row).join(', ')}`),
       'Delete the extra rows from Staging, then run again.']);
   }
