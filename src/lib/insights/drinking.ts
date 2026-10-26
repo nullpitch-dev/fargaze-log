@@ -264,6 +264,10 @@ export async function computeDrinkingSummary(
  
   // Accumulate drinks per assigned date
   const drinksByDate = new Map<string, number>();
+  // (26 Oct) Daily drinking strip: each day's records for its tooltip — what was
+  // drunk as logged, and that record's drinks (unknown item × unit counts 0 there,
+  // as in the totals).
+  const dayEntries = new Map<string, { time: string | null; items: { item: string; amount: string; unit: string }[]; drinks: number; sortMins: number }[]>();
  
   for (const doc of docs) {
     if (!(doc as any).start?.datetime) continue;
@@ -286,6 +290,26 @@ export async function computeDrinkingSummary(
     }
  
     drinksByDate.set(dateStr, (drinksByDate.get(dateStr) ?? 0) + sessionDrinks);
+
+    const hour: string | null = (doc as any).start?.hour ?? null;
+    let sortMins = hourStrToDecimal(hour) ?? 0;
+    if (sortMins < SLEEP_THRESHOLD_HOUR) sortMins += 24;
+    const list = dayEntries.get(dateStr) ?? [];
+    list.push({
+      time: hour,
+      items: alcohols.filter(a => a?.item).map(a => ({ item: String(a.item), amount: String(a.amount ?? ''), unit: String(a.unit ?? '') })),
+      drinks: Math.round(sessionDrinks * 100) / 100,
+      sortMins,
+    });
+    dayEntries.set(dateStr, list);
+  }
+  const days: Record<string, { total: number; entries: { time: string | null; items: { item: string; amount: string; unit: string }[]; drinks: number; sortMins: number }[] }> = {};
+  for (const [date, list] of dayEntries) {
+    list.sort((x, y) => x.sortMins - y.sortMins);
+    days[date] = {
+      total: Math.round((drinksByDate.get(date) ?? 0) * 100) / 100,
+      entries: list,
+    };
   }
  
   // Total drinks for the period
@@ -445,6 +469,10 @@ export async function computeDrinkingSummary(
     occasions,
     drinks:    drinksStats,
     drinkType,
+    // The whole period: the strip shows days from today on as future days.
+    rangeStart: rawStart,
+    rangeEnd:   rawEnd,
+    days,
     companions: {
       alone:          aloneCount,
       total:          docs.length,

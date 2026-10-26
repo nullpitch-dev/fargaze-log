@@ -9,7 +9,7 @@ import { buildParams } from '../_lib/date-helpers';
 import {
   ChartHoverCard, minsToClockStr, type HoverRow,
 } from '../_components/charts/css-chart-components';
-import { HeatStrip } from '../_components/charts/CalendarHeatmap';
+import { HeatStrip, localToday } from '../_components/charts/CalendarHeatmap';
 import { WidgetCard, ViewToggle } from '../_components/WidgetCard';
 import { SleepTrendView, type SleepTrendBucket, type SleepTrendTab } from './SleepTrendView';
 import { DEFAULT_BUCKETS } from './WeightTrendView';
@@ -357,6 +357,7 @@ function SleepSummaryView({ data, isDark }: { data: any; isDark: boolean }) {
             <HeatStrip
               rangeStart={data.rangeStart}
               rangeEnd={data.rangeEnd}
+              futureFrom={localToday()}
               isDark={isDark}
               fillFor={s.fill}
               height={14}

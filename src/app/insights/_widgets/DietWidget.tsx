@@ -10,7 +10,7 @@ import { buildParams } from '../_lib/date-helpers';
 import { categoryColors, autoColorMap } from '../_lib/chart-colors';
 import type { WidgetProps, WidgetViewMode } from '../_lib/types';
 import { Treemap, type TreemapDatum } from '../_components/charts/Treemap';
-import { CalendarHeatmap, HeatStrip } from '../_components/charts/CalendarHeatmap';
+import { CalendarHeatmap, HeatStrip, localToday } from '../_components/charts/CalendarHeatmap';
 import {
   CssDailyChart, CssVerticalBoxPlotChart, minsToClockStr,
   type CssDailyZone, type BoxPlotBucket, type HoverRow,
@@ -22,10 +22,15 @@ import {
 import { DEFAULT_BUCKETS } from './WeightTrendView';
 import type { TrendGrain } from '@/lib/insights/trend-window';
 import { Title, BarSection } from '../_components/charts/bars';
+import { bandFill, bandOf, BAND_WORD, fmt1 } from '../_lib/day-bands';
 
 // ── Types (mirrors diet.summary API contract) ─────────────────────────────────
 
 interface IngCount  { level2: string; level1: string; count: number; }
+interface DayEntry {
+  time: string | null; type: string | null; foods: string[]; drinks: string[];
+  servings: number | null; drinkAmount: string | null; spicy: 'H' | 'M' | 'L' | null;
+}
 interface ItemCount { item: string; count: number; }
 
 interface DietSummary {
@@ -48,10 +53,12 @@ interface DietSummary {
     topPeople:      { name: string; dominantCategory: string; total: number }[];
   };
 	averages: { finishEatingMins: number | null; finishCaffeineMins: number | null; servings: number | null; carbsIndex: number | null };
+  /** (26 Oct) each day's records, for the Daily diet strip's tooltip */
+  days?:            Record<string, DayEntry[]>;
 }
 
 type DailyMetric = 'finish' | 'caffeine' | 'servings' | 'carbs';
-type ModalKind   = DailyMetric | 'spicy';
+type ModalKind   = DailyMetric | 'daily';
 type SideTab     = 'food' | 'drink';
 type ViewTab     = 'ingredients' | 'items';
 
@@ -205,31 +212,40 @@ function SummaryView({ data, isDark }: { data: DietSummary; isDark: boolean }) {
     },
   };
 
-  // Spiciness
-  const spMap = useMemo(() => new Map(data.spiciness.map(s => [s.date, s.level])), [data]);
-  const SPICE_FILL: Record<'H' | 'M' | 'L', string> = {
-    H: isDark ? '#f87171' : '#ef4444',  // red
-    M: isDark ? '#fbbf24' : '#f59e0b',  // amber
-    L: isDark ? '#60a5fa' : '#3b82f6',  // blue
+  // Daily diet strip (26 Oct): each day coloured by its carbs index — below 4
+  // blue, 4–8 amber, over 8 red; a day with no food stays empty. The tooltip
+  // lists every record of the day (food and non-alcoholic drinks) with its
+  // servings, 🌶 on a meal rated spicy (H). Replaces the Spicy days strip.
+  const BAND = bandFill(isDark);
+  const carbMap = useMemo(() => new Map(data.carbsIndex.map(c => [c.date, c.value])), [data]);
+  const dailyFill = (date: string) => {
+    const v = carbMap.get(date);
+    return v === undefined ? null : BAND[bandOf(v, 4, 8)];
   };
-  const spicyFill = (date: string) => { const lvl = spMap.get(date); return lvl ? SPICE_FILL[lvl] : null; };
-
-  // An absent level means the day was never RATED, not that it was mild — the
-  // v4.7 correction. The card says so rather than leaving the cell silent.
-  const SPICE_LABEL: Record<'H' | 'M' | 'L', string> = {
-    H: 'Spicy (H)', M: 'Mild (M)', L: 'Not spicy',
-  };
-  const spicyTip = (date: string) => {
-    const lvl = spMap.get(date);
-    const rows: HoverRow[] = lvl
-      ? [{ label: 'Spiciness', value: SPICE_LABEL[lvl], color: SPICE_FILL[lvl] }]
-      : [{ value: 'not recorded', dim: true }];
+  const dailyTip = (date: string) => {
+    const v = carbMap.get(date);
+    const entries = data.days?.[date] ?? [];
+    const rows: HoverRow[] = [];
+    if (v !== undefined) {
+      const b = bandOf(v, 4, 8);
+      rows.push({ label: 'Carbs index', value: `${fmt1(v)} (${BAND_WORD[b]})`, color: BAND[b] });
+    }
+    for (const e of entries) {
+      const what = [...e.foods, ...e.drinks].join(' · ');
+      const amount = e.servings !== null ? ` (${fmt1(e.servings)} 인분)` : e.drinkAmount ? ` (${e.drinkAmount})` : '';
+      rows.push({
+        label: [e.time, e.type].filter(Boolean).join(' '),
+        value: `${what}${e.spicy === 'H' ? ' 🌶' : ''}${amount}`,
+        dim: e.servings === null,
+      });
+    }
+    if (!rows.length) rows.push({ value: 'nothing recorded', dim: true });
     return { title: date, rows };
   };
-  const spStats = useMemo(() => {
-    let h = 0, m = 0;
-    data.spiciness.forEach(s => { if (s.level === 'H') h++; else if (s.level === 'M') m++; });
-    return { h, m, total: data.spiciness.length };
+  const dailyStats = useMemo(() => {
+    let high = 0, mid = 0;
+    data.carbsIndex.forEach(c => { const b = bandOf(c.value, 4, 8); if (b === 'high') high++; else if (b === 'mid') mid++; });
+    return { high, mid, total: data.carbsIndex.length };
   }, [data]);
 
   // Active treemap (one at a time)
@@ -244,10 +260,10 @@ function SummaryView({ data, isDark }: { data: DietSummary; isDark: boolean }) {
   const legendGroups = allGroups.filter(g => activeIng.some(d => d.level1 === g));
   const sectionTitle = `${isFood ? 'What I ate' : 'What I drank'} — ${view}`;
 
-  const spicyLegend = [
-    { color: SPICE_FILL.H, label: 'Spicy (H)' },
-    { color: SPICE_FILL.M, label: 'Mild (M)' },
-    { color: SPICE_FILL.L, label: 'Not spicy' },
+  const dailyLegend = [
+    { color: BAND.low,  label: 'Carbs below 4' },
+    { color: BAND.mid,  label: '4–8' },
+    { color: BAND.high, label: 'Over 8' },
   ];
 
   return (
@@ -286,17 +302,19 @@ function SummaryView({ data, isDark }: { data: DietSummary; isDark: boolean }) {
         {isIng && <GroupLegend groups={legendGroups} colorMap={groupColor} />}
       </div>
 
-      {/* ── Spicy days — compact strip next to the treemap (tap → modal) ── */}
-      <div role="button" tabIndex={0} onClick={() => setModal('spicy')}
+      {/* ── Daily diet — carbs per day (tap → calendar) ── */}
+      <div role="button" tabIndex={0} onClick={() => setModal('daily')}
         className="flex flex-col gap-1 rounded-lg p-1 -mx-1 cursor-pointer hover:bg-stone-50 dark:hover:bg-zinc-800 transition-colors">
         <div className="flex items-baseline gap-1.5 flex-wrap">
-          <span className="text-[10px] font-medium text-stone-400 dark:text-zinc-500 uppercase tracking-wide">Spicy days</span>
+          <span className="text-[10px] font-medium text-stone-400 dark:text-zinc-500 uppercase tracking-wide">Daily diet · carbs</span>
           <span className="text-[10px] text-stone-400 dark:text-zinc-500">
-            ({spStats.h} H and {spStats.m} M out of {spStats.total} days)
+            ({dailyStats.high} red, {dailyStats.mid} amber out of {dailyStats.total} days)
           </span>
         </div>
-        <HeatStrip rangeStart={data.rangeStart} rangeEnd={data.rangeEnd} isDark={isDark}
-          fillFor={spicyFill} tooltipFor={spicyTip} />
+        <HeatStrip rangeStart={data.rangeStart} rangeEnd={data.rangeEnd} futureFrom={localToday()} isDark={isDark}
+          fillFor={dailyFill} tooltipFor={dailyTip}
+          // Above: a busy day has many lines, and the card clips anything below its last row.
+          tooltipPlacement="above" />
       </div>
 
       {/* ── With whom I eat (toggleable) ── */}
@@ -306,10 +324,10 @@ function SummaryView({ data, isDark }: { data: DietSummary; isDark: boolean }) {
 
       {/* ── Modals ── */}
       {modal && (
-        <ModalShell title={modal === 'spicy' ? 'Spicy days' : metrics[modal].title} onClose={() => setModal(null)}>
-          {modal === 'spicy' ? (
-            <CalendarHeatmap rangeStart={data.rangeStart} rangeEnd={data.rangeEnd} isDark={isDark}
-              fillFor={spicyFill} tooltipFor={spicyTip} legend={spicyLegend} />
+        <ModalShell title={modal === 'daily' ? 'Daily diet · carbs' : metrics[modal].title} onClose={() => setModal(null)}>
+          {modal === 'daily' ? (
+            <CalendarHeatmap rangeStart={data.rangeStart} rangeEnd={data.rangeEnd} futureFrom={localToday()} isDark={isDark}
+              fillFor={dailyFill} tooltipFor={dailyTip} legend={dailyLegend} />
           ) : (
             <CssDailyChart
               values={metrics[modal].values} labels={metrics[modal].labels}

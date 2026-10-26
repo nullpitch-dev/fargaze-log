@@ -25,6 +25,10 @@ import { MultiSelectDropdown } from '../_components/MultiSelectDropdown';
 import { useLiveFilter } from '../_lib/useLiveFilter';
 import { BarSection } from '../_components/charts/bars';
 import { autoColorMap } from '../_lib/chart-colors';
+import { ModalShell } from '../_components/ModalShell';
+import { CalendarHeatmap, HeatStrip, localToday } from '../_components/charts/CalendarHeatmap';
+import type { HoverRow } from '../_components/charts/css-chart-components';
+import { bandFill, bandOf, BAND_WORD, fmt1 } from '../_lib/day-bands';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -40,6 +44,11 @@ interface DrinksStats {
   n:     number;
 }
 
+interface DrinkDay {
+  total:   number;
+  entries: { time: string | null; items: { item: string; amount: string; unit: string }[]; drinks: number }[];
+}
+
 interface DrinkingSummary {
   daysInPeriod:       number;
   drinkingDays:       number;
@@ -52,6 +61,10 @@ interface DrinkingSummary {
   occasions:          Record<string, number>;
   drinks:             DrinksStats | null;
   drinkType:          Record<string, number>;
+  /** (26 Oct) Daily drinking strip: the period's days and each drinking day's records */
+  rangeStart?:        string;
+  rangeEnd?:          string;
+  days?:              Record<string, DrinkDay>;
   companions: {
     alone:          number;
     total:          number;
@@ -176,6 +189,59 @@ function TotalDrinksCard({ total, isDark }: { total: number; isDark: boolean }) 
   );
 }
 
+// ── Daily drinking strip (26 Oct) ────────────────────────────────────────────
+// Each day coloured by its drinks: below 4 blue, 4–10 amber, over 10 red; a day
+// without drinking stays empty. Tooltip: the day's total, then each record's
+// time, what was drunk as logged, and its drinks. Tap → the calendar, same tooltip.
+
+function DailyDrinking({ data, isDark }: { data: DrinkingSummary; isDark: boolean }) {
+  const [open, setOpen] = useState(false);
+  const BAND = bandFill(isDark);
+  const days = data.days ?? {};
+  if (!data.rangeStart || !data.rangeEnd) return null;
+
+  const fill = (date: string) => (days[date] ? BAND[bandOf(days[date].total, 4, 10)] : null);
+  const tip = (date: string) => {
+    const d = days[date];
+    if (!d) return { title: date, rows: [{ value: 'no drinking', dim: true }] as HoverRow[] };
+    const b = bandOf(d.total, 4, 10);
+    const rows: HoverRow[] = [{ label: 'Drinks', value: `${fmt1(d.total)} (${BAND_WORD[b]})`, color: BAND[b] }];
+    for (const e of d.entries) {
+      const what = e.items.map(i => `${i.item} ${i.amount}${i.unit}`.trim()).join(' · ');
+      rows.push({ label: e.time ?? '', value: `${what} (${fmt1(e.drinks)} drinks)` });
+    }
+    return { title: date, rows };
+  };
+  let high = 0, mid = 0;
+  for (const d of Object.values(days)) { const b = bandOf(d.total, 4, 10); if (b === 'high') high++; else if (b === 'mid') mid++; }
+  const legend = [
+    { color: BAND.low,  label: 'Below 4 drinks' },
+    { color: BAND.mid,  label: '4–10' },
+    { color: BAND.high, label: 'Over 10' },
+  ];
+
+  return (
+    <>
+      <div role="button" tabIndex={0} onClick={() => setOpen(true)}
+        className="flex flex-col gap-1 rounded-lg p-1 -mx-1 cursor-pointer hover:bg-stone-50 dark:hover:bg-zinc-800 transition-colors">
+        <div className="flex items-baseline gap-1.5 flex-wrap">
+          <span className="text-[10px] font-medium text-stone-400 dark:text-zinc-500 uppercase tracking-wide">Daily drinking</span>
+          <span className="text-[10px] text-stone-400 dark:text-zinc-500">
+            ({high} red, {mid} amber out of {Object.keys(days).length} drinking days)
+          </span>
+        </div>
+        <HeatStrip rangeStart={data.rangeStart} rangeEnd={data.rangeEnd} futureFrom={localToday()} isDark={isDark} fillFor={fill} tooltipFor={tip} />
+      </div>
+      {open && (
+        <ModalShell title="Daily drinking" onClose={() => setOpen(false)}>
+          <CalendarHeatmap rangeStart={data.rangeStart} rangeEnd={data.rangeEnd} futureFrom={localToday()} isDark={isDark}
+            fillFor={fill} tooltipFor={tip} legend={legend} />
+        </ModalShell>
+      )}
+    </>
+  );
+}
+
 // ── Stats tab ─────────────────────────────────────────────────────────────────
 
 function StatsTab({ data, isDark }: { data: DrinkingSummary; isDark: boolean }) {
@@ -243,6 +309,9 @@ function StatsTab({ data, isDark }: { data: DrinkingSummary; isDark: boolean }) 
         )}
 
       </div>
+
+      {/* ── Daily drinking strip (26 Oct) ── */}
+      <DailyDrinking data={data} isDark={isDark} />
 
       <div className="border-t border-stone-100 dark:border-zinc-800" />
 

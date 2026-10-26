@@ -19,7 +19,7 @@ import { ModalShell } from '../_components/ModalShell';
 import { useIsDark } from '../_lib/hooks';
 import { buildParams } from '../_lib/date-helpers';
 import type { WidgetProps, WidgetViewMode } from '../_lib/types';
-import { CalendarHeatmap, HeatStrip } from '../_components/charts/CalendarHeatmap';
+import { CalendarHeatmap, HeatStrip, localToday } from '../_components/charts/CalendarHeatmap';
 import {
   CssDailyChart, CssVerticalBoxPlotChart,
   type BoxPlotBucket, type HoverRow,
@@ -47,6 +47,9 @@ interface ItemSummary {
 
 interface ExerciseSummary {
   dates: string[];
+  /** (26 Oct) the whole period; older answers lack it, so dates is the fallback */
+  rangeStart?: string;
+  rangeEnd?: string;
   exerciseDays: number;
   periodDays: number;
   daysPerWeek: number;
@@ -171,8 +174,9 @@ function PeriodRow({ data, isDark, onOpen }: {
       </div>
       <div className="flex-1 min-w-0">
         <HeatStrip
-          rangeStart={data.dates[0]}
-          rangeEnd={data.dates[data.dates.length - 1]}
+          rangeStart={data.rangeStart ?? data.dates[0]}
+          rangeEnd={data.rangeEnd ?? data.dates[data.dates.length - 1]}
+          futureFrom={localToday()}
           isDark={isDark}
           fillFor={fill}
           tooltipFor={tip}
@@ -312,8 +316,9 @@ export function ExerciseWidget({ globalFilter }: WidgetProps) {
       {hasData && modal?.kind === 'calendar' && (
         <ModalShell title="Exercise days" onClose={() => setModal(null)}>
           <CalendarHeatmap
-            rangeStart={data!.dates[0]}
-            rangeEnd={data!.dates[data!.dates.length - 1]}
+            rangeStart={data!.rangeStart ?? data!.dates[0]}
+            rangeEnd={data!.rangeEnd ?? data!.dates[data!.dates.length - 1]}
+            futureFrom={localToday()}
             isDark={isDark}
             fillFor={(d: string) => (data!.dayCounts[d] ? accent : null)}
             tooltipFor={makeDayTooltip(data!, accent)}

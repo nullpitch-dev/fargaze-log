@@ -176,6 +176,58 @@ function accumulateDietRecord(acc: DietAccum, d: any, dateStr: string): void {
   }
 }
 
+// ── Day lists for the Daily diet strip (summary only) ──────────────────────
+// One entry per food- or drink-bearing record, for the strip's tooltip: what was
+// eaten or drunk (no alcohol, same scope as the widget), the record's servings
+// and whether it was rated spicy. Sorted by clock time within the diet day, a
+// pre-6 am record (not breakfast) after the evening as on the strip.
+
+export interface DietDayEntry {
+  time:     string | null;            // HH:mm as logged
+  type:     string | null;            // 아침 / 점심 / 저녁 / …
+  foods:    string[];
+  drinks:   string[];
+  servings: number | null;            // sum of food amounts (인분); null when no food
+  drinkAmount: string | null;         // drink-only record: "1 잔" when the drinks share a unit
+  spicy:    'H' | 'M' | 'L' | null;
+  sortMins: number;
+}
+
+function dayEntryOf(d: any): DietDayEntry | null {
+  const foods:  string[] = (d.food?.foods  ?? []).map((f: any) => f?.item).filter(Boolean);
+  const drinks: string[] = (d.food?.drinks ?? []).map((x: any) => x?.item).filter(Boolean);
+  if (!foods.length && !drinks.length) return null;
+
+  let servings: number | null = null;
+  if (foods.length) {
+    let s = 0;
+    for (const f of d.food.foods ?? []) { const a = parseFloat(String(f?.amount ?? '')); if (!isNaN(a)) s += a; }
+    servings = Math.round(s * 100) / 100;
+  }
+
+  let drinkAmount: string | null = null;
+  if (!foods.length) {
+    const ds = (d.food?.drinks ?? []).filter((x: any) => x?.item);
+    const units = new Set(ds.map((x: any) => String(x?.unit ?? '').trim()));
+    const amts = ds.map((x: any) => parseFloat(String(x?.amount ?? '')));
+    if (units.size === 1 && !units.has('') && amts.every((a: number) => !isNaN(a))) {
+      const sum = Math.round(amts.reduce((t: number, a: number) => t + a, 0) * 100) / 100;
+      drinkAmount = `${sum} ${[...units][0]}`;
+    }
+  }
+
+  let mins = hourStringToMinutes(d.start?.hour) ?? 0;
+  if (!isBreakfastRecord(d) && mins < SLEEP_THRESHOLD_HOUR * 60) mins += 1440;
+  const sp = d.food?.spiciness;
+  return {
+    time: d.start?.hour ?? null,
+    type: d.food?.type ?? null,
+    foods, drinks, servings, drinkAmount,
+    spicy: sp === 'H' || sp === 'M' || sp === 'L' ? sp : null,
+    sortMins: mins,
+  };
+}
+
 // ── Shared query shape ───────────────────────────────────────────────────────
 // Food- or drink-bearing records only.
 
@@ -225,6 +277,7 @@ async function collectDiet(
   periodStart: Date,
   periodEnd: Date,
   crossActivities: string[],
+  withDays = false,
 ) {
   const ingredientDocs = await IngredientMaster.find({ userId }).lean();
   const level1Map = new Map<string, string>();
@@ -253,21 +306,27 @@ async function collectDiet(
   const docs = await Log.find(dietFilter(userId, from, to, crossActivities)).lean();
 
   const acc = newDietAccum();
+  const days: Record<string, DietDayEntry[]> = {};
   for (const doc of docs) {
     const d: any = doc;
     const dateStr = assignDietDate(d);
     if (!dateStr || !periodDates.has(dateStr)) continue;
     accumulateDietRecord(acc, d, dateStr);
+    if (withDays) {
+      const e = dayEntryOf(d);
+      if (e) (days[dateStr] ??= []).push(e);
+    }
   }
+  for (const list of Object.values(days)) list.sort((x, y) => x.sortMins - y.sortMins);
 
-  return { level1Map, daysInPeriod, rawStart, rawEnd, ...acc };
+  return { level1Map, daysInPeriod, rawStart, rawEnd, days, ...acc };
 }
 
 // ── Summary ──────────────────────────────────────────────────────────────────
 export async function computeDietSummary(
   userId: string, periodStart: Date, periodEnd: Date, crossActivities: string[],
 ): Promise<any> {
-  const a = await collectDiet(userId, periodStart, periodEnd, crossActivities);
+  const a = await collectDiet(userId, periodStart, periodEnd, crossActivities, true);
 
   const sortByDate = <T extends [string, any]>(entries: T[]) =>
     entries.sort((x, y) => (x[0] < y[0] ? -1 : 1));
@@ -323,6 +382,8 @@ export async function computeDietSummary(
     drankItems:       toItemArr(a.drinkItemCount),
     companions: { alone: a.aloneCount, total: a.companionTotal, byRelationType: a.byRelationType, topPeople },
     averages,
+    // (26 Oct) Daily diet strip: each day's records, for its tooltip
+    days: a.days,
   };
 }
 

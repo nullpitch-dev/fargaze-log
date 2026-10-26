@@ -69,6 +69,9 @@ export interface ExerciseSummary {
   dates:        string[];                 // every day in the period, ascending
   exerciseDays: number;
   periodDays:   number;                   // capped at today
+  /** (26 Oct) the whole period, for the strip and calendar: days after today show as future */
+  rangeStart:   string;
+  rangeEnd:     string;
   daysPerWeek:  number;
   dayCounts:    Record<string, number>;   // date → record count, for HeatStrip
   items:        ExerciseItemSummary[];    // sorted by days desc
@@ -320,5 +323,5 @@ export async function computeExerciseSummary(
     b.days - a.days || b.total - a.total || a.item.localeCompare(b.item),
   );
 
-  return { dates, exerciseDays, periodDays, daysPerWeek, dayCounts, items };
+  return { dates, exerciseDays, periodDays, daysPerWeek, dayCounts, items, rangeStart: startStr, rangeEnd: rawEnd };
 }

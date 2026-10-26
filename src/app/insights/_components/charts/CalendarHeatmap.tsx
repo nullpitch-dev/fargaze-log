@@ -11,6 +11,16 @@
 // Supply tooltipFor(date); it returns null for a day with nothing to say.
 // Without it both components fall back to the native title attribute showing
 // the date alone, which is what every existing call site still gets.
+//
+// FUTURE DAYS (26 Oct 2026): pass futureFrom (usually localToday()) and every day
+// from it on is drawn much fainter, without a border, and says "not yet" — so a
+// month strip can cover the whole month without future days looking like days
+// with nothing recorded. Today counts as future: its data arrives with the next
+// day's migration. Without futureFrom nothing changes.
+//
+// MONTHS (26 Oct 2026): the calendar marks each month — the 1st of a month (and
+// the range's first day) reads "Oct 1" in bold, and a line follows the boundary
+// between two months, stepping where the month starts mid-week.
 
 import React, { useState } from 'react';
 import { ChartHoverCard, type HoverRow } from './css-chart-components';
@@ -22,6 +32,17 @@ function parseDate(s: string): Date {
   return new Date(Date.UTC(y, m - 1, d));
 }
 function toStr(dt: Date): string { return dt.toISOString().slice(0, 10); }
+
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** Today on the viewer's own calendar, YYYY-MM-DD (the log's days are local days). */
+export function localToday(): string {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+}
+
+const NOT_YET = (date: string): { title?: string; rows: HoverRow[]; note?: string } =>
+  ({ title: date, rows: [{ value: 'not yet', dim: true }] });
 function mondayIndex(dt: Date): number { return (dt.getUTCDay() + 6) % 7; } // Mon=0 … Sun=6
 
 function textOn(hex: string): string {
@@ -39,11 +60,13 @@ export type TooltipFor = (date: string) =>
 // ── HeatStrip — one compact row ────────────────────────────────────────────────
 
 export function HeatStrip({
-  rangeStart, rangeEnd, isDark, fillFor, height = 18, tooltipFor, tooltipPlacement = 'below',
+  rangeStart, rangeEnd, isDark, fillFor, height = 18, tooltipFor, tooltipPlacement = 'below', futureFrom,
 }: {
   rangeStart: string; rangeEnd: string; isDark: boolean; fillFor: FillFor;
   height?: number;
   tooltipFor?: TooltipFor;
+  /** Days from this date on are drawn as future days (faint, "not yet"). */
+  futureFrom?: string;
   /** 'above' for a strip near the bottom of a widget — WidgetCard clips. */
   tooltipPlacement?: 'below' | 'above';
 }) {
@@ -51,18 +74,22 @@ export function HeatStrip({
 
   const start = parseDate(rangeStart);
   const end   = parseDate(rangeEnd);
-  const days: { date: string; fill: string | null }[] = [];
+  const days: { date: string; fill: string | null; future: boolean }[] = [];
   const cur = new Date(start);
   while (cur <= end) {
     const ds = toStr(cur);
-    days.push({ date: ds, fill: fillFor(ds) });
+    const future = !!futureFrom && ds >= futureFrom;
+    days.push({ date: ds, fill: future ? null : fillFor(ds), future });
     cur.setUTCDate(cur.getUTCDate() + 1);
   }
-  const emptyBg = isDark ? '#27272a' : '#e7e5e4';  // zinc-800 / stone-200
+  const emptyBg  = isDark ? '#27272a' : '#e7e5e4';  // zinc-800 / stone-200
+  const futureBg = isDark ? '#1f1f23' : '#f5f5f4';  // a step above the card / stone-100
 
   // The card must escape the strip's overflow clip, so the clip stays on an
   // inner element and the card is positioned against this outer wrapper.
-  const hovered = hoverIdx !== null && tooltipFor ? tooltipFor(days[hoverIdx].date) : null;
+  const hovered = hoverIdx !== null && tooltipFor
+    ? (days[hoverIdx].future ? NOT_YET(days[hoverIdx].date) : tooltipFor(days[hoverIdx].date))
+    : null;
 
   return (
     <div className="relative w-full" onMouseLeave={() => setHoverIdx(null)}>
@@ -71,7 +98,7 @@ export function HeatStrip({
           <div key={d.date}
             title={tooltipFor ? undefined : d.date}
             className="flex-1"
-            style={{ background: d.fill ?? emptyBg, minWidth: 0, cursor: tooltipFor ? 'pointer' : undefined }}
+            style={{ background: d.fill ?? (d.future ? futureBg : emptyBg), minWidth: 0, cursor: tooltipFor ? 'pointer' : undefined }}
             onMouseEnter={tooltipFor ? () => setHoverIdx(i) : undefined} />
         ))}
       </div>
@@ -103,9 +130,11 @@ export interface CalendarHeatmapProps {
   legend?:     { color: string; label: string }[];
   cellHeight?: number;
   tooltipFor?: TooltipFor;
+  /** Days from this date on are drawn as future days (faint, no border, "not yet"). */
+  futureFrom?: string;
 }
 
-export function CalendarHeatmap({ rangeStart, rangeEnd, isDark, fillFor, legend, cellHeight = 24, tooltipFor }: CalendarHeatmapProps) {
+export function CalendarHeatmap({ rangeStart, rangeEnd, isDark, fillFor, legend, cellHeight = 24, tooltipFor, futureFrom }: CalendarHeatmapProps) {
   const [hoverDate, setHoverDate] = useState<string | null>(null);
 
   const start = parseDate(rangeStart);
@@ -114,14 +143,15 @@ export function CalendarHeatmap({ rangeStart, rangeEnd, isDark, fillFor, legend,
   const gridStart = new Date(start); gridStart.setUTCDate(gridStart.getUTCDate() - mondayIndex(start));
   const gridEnd   = new Date(end);   gridEnd.setUTCDate(gridEnd.getUTCDate() + (6 - mondayIndex(end)));
 
-  const weeks: { date: string; day: number; inRange: boolean; fill: string | null }[][] = [];
+  const weeks: { date: string; day: number; month: number; inRange: boolean; future: boolean; fill: string | null }[][] = [];
   const cur = new Date(gridStart);
   while (cur <= gridEnd) {
     const week = [];
     for (let i = 0; i < 7; i++) {
       const inRange = cur >= start && cur <= end;
       const ds = toStr(cur);
-      week.push({ date: ds, day: cur.getUTCDate(), inRange, fill: inRange ? fillFor(ds) : null });
+      const future = inRange && !!futureFrom && ds >= futureFrom;
+      week.push({ date: ds, day: cur.getUTCDate(), month: cur.getUTCMonth(), inRange, future, fill: inRange && !future ? fillFor(ds) : null });
       cur.setUTCDate(cur.getUTCDate() + 1);
     }
     weeks.push(week);
@@ -131,6 +161,8 @@ export function CalendarHeatmap({ rangeStart, rangeEnd, isDark, fillFor, legend,
   const emptyBdr = isDark ? '#3f3f46' : '#e7e5e4';
   const numText  = isDark ? '#a1a1aa' : '#78716c';
   const dimText  = isDark ? '#3f3f46' : '#d6d3d1';
+  const futureBg = isDark ? '#1f1f23' : '#fafaf9';
+  const monthLine = isDark ? '#71717a' : '#a8a29e';   // zinc-500 / stone-400
 
   return (
     <div className="flex flex-col gap-1 select-none" onMouseLeave={() => setHoverDate(null)}>
@@ -142,23 +174,36 @@ export function CalendarHeatmap({ rangeStart, rangeEnd, isDark, fillFor, legend,
         <div key={wi} className="grid grid-cols-7 gap-1">
           {week.map((cell, di) => {
             const hasFill = cell.inRange && cell.fill;
-            const bg      = !cell.inRange ? 'transparent' : (cell.fill ?? emptyBg);
-            const tcol    = hasFill ? textOn(cell.fill as string) : (cell.inRange ? numText : dimText);
+            const bg      = !cell.inRange ? 'transparent' : cell.future ? futureBg : (cell.fill ?? emptyBg);
+            const tcol    = hasFill ? textOn(cell.fill as string) : (cell.inRange && !cell.future ? numText : dimText);
             const hover   = tooltipFor && cell.inRange && hoverDate === cell.date
-              ? tooltipFor(cell.date)
+              ? (cell.future ? NOT_YET(cell.date) : tooltipFor(cell.date))
               : null;
+            // Month boundary: a line in the gap above when the cell above is in
+            // another month, and on the left of a month's 1st when the day before
+            // sits in the same row. Both cells must be in the range.
+            const above = weeks[wi - 1]?.[di];
+            const left  = week[di - 1];
+            const lineTop  = cell.inRange && !!above?.inRange && above.month !== cell.month;
+            const lineLeft = cell.inRange && !!left?.inRange && left.month !== cell.month;
+            const label = cell.inRange && (cell.day === 1 || cell.date === rangeStart) ? `${MON[cell.month]} ${cell.day}` : String(cell.day);
+            const bold  = label.includes(' ');
             return (
               <div key={cell.date}
                 title={tooltipFor ? undefined : cell.date}
                 className="relative rounded-sm flex items-start justify-end"
                 style={{
                   height: cellHeight, background: bg, opacity: cell.inRange ? 1 : 0.45,
-                  border: cell.inRange && !cell.fill ? `1px solid ${emptyBdr}` : 'none',
+                  border: cell.inRange && !cell.fill && !cell.future ? `1px solid ${emptyBdr}` : 'none',
                   cursor: tooltipFor && cell.inRange ? 'pointer' : undefined,
                   zIndex: hover ? 20 : undefined,
                 }}
                 onMouseEnter={tooltipFor && cell.inRange ? () => setHoverDate(cell.date) : undefined}>
-                <span className="text-[8px] leading-none p-0.5" style={{ color: tcol }}>{cell.day}</span>
+                {/* the bars sit in the 4 px gap and reach 2 px past each end, so
+                    neighbouring cells' bars join into one stepped line */}
+                {lineTop && <i aria-hidden className="absolute pointer-events-none" style={{ left: -2, right: -2, top: -3, height: 2, background: monthLine }} />}
+                {lineLeft && <i aria-hidden className="absolute pointer-events-none" style={{ top: -2, bottom: -2, left: -3, width: 2, background: monthLine }} />}
+                <span className={`leading-none p-0.5 whitespace-nowrap ${bold ? 'text-[9px] font-bold' : 'text-[8px]'}`} style={{ color: tcol }}>{label}</span>
                 {hover && (
                   <ChartHoverCard
                     title={hover.title ?? cell.date}
