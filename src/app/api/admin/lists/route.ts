@@ -1,17 +1,19 @@
 // GET /api/admin/lists — every master list with its row count and last change,
-// and the number of changes not yet repeated in the sheet (#67).
+// whether it is pinned to the gear menu, and the number of changes not yet
+// repeated in the sheet (#67).
 
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/admin/guard';
 import { LISTS } from '@/lib/admin/lists';
 import MasterChange from '@/models/MasterChange';
+import { getPins } from '@/lib/admin/pins';
 
 export async function GET() {
   const g = await requireUser();
   if (g.denied) return g.denied;
   const { userId } = g;
 
-  const [last, pending] = await Promise.all([
+  const [last, pending, pins] = await Promise.all([
     MasterChange.aggregate([
       { $match: { userId } },
       { $group: { _id: '$list', at: { $max: '$createdAt' } } },
@@ -20,6 +22,7 @@ export async function GET() {
       { $match: { userId, sheetDone: false } },
       { $group: { _id: '$list', n: { $sum: 1 } } },
     ]),
+    getPins(userId),
   ]);
   const lastBy = new Map(last.map((d: any) => [d._id, d.at]));
   const pendingBy = new Map(pending.map((d: any) => [d._id, d.n]));
@@ -31,6 +34,7 @@ export async function GET() {
     rows: await def.model().countDocuments({ userId, ...(def.filter ?? {}) }),
     lastChange: lastBy.get(def.slug) ?? null,
     pendingSheet: pendingBy.get(def.slug) ?? 0,
+    pinned: pins.includes(def.slug),
   })));
 
   const pendingSheet = lists.reduce((a, l) => a + l.pendingSheet, 0);

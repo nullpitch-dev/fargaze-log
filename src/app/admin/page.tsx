@@ -1,6 +1,7 @@
 'use client';
 
 // /admin — every master list with its row count, last change and sheet status (#67).
+// ☆ / ★ pins a list to the gear menu (saved per user, so phone and desktop agree).
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -12,6 +13,7 @@ interface ListSummary {
   rows: number;
   lastChange: string | null;
   pendingSheet: number;
+  pinned: boolean;
 }
 
 const fmtDate = (iso: string | null) => (iso ? iso.slice(0, 10) : '—');
@@ -20,6 +22,25 @@ export default function AdminHome() {
   const [lists, setLists] = useState<ListSummary[] | null>(null);
   const [pending, setPending] = useState(0);
   const [error, setError] = useState('');
+  const [pinError, setPinError] = useState('');
+
+  // Ticks at once; puts it back if the server refuses.
+  async function togglePin(slug: string, pinned: boolean) {
+    setPinError('');
+    const flip = (to: boolean) => setLists(ls => ls && ls.map(l => (l.slug === slug ? { ...l, pinned: to } : l)));
+    flip(pinned);
+    try {
+      const r = await fetch('/api/admin/pins', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug, pinned }),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => null))?.error ?? `HTTP ${r.status}`);
+    } catch (e) {
+      flip(!pinned);
+      setPinError(e instanceof Error ? e.message : String(e));
+    }
+  }
 
   useEffect(() => {
     fetch('/api/admin/lists')
@@ -49,6 +70,12 @@ export default function AdminHome() {
         </div>
       )}
 
+      {pinError && (
+        <div className="mb-6 px-4 py-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm">
+          Could not change the shortcut: {pinError}
+        </div>
+      )}
+
       {!lists && !error && <p className="text-sm text-stone-500 dark:text-zinc-400">Loading…</p>}
 
       {groups.map(g => (
@@ -58,7 +85,8 @@ export default function AdminHome() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800 text-xs text-stone-500 dark:text-zinc-400">
-                  <th className="text-left font-medium px-4 py-2">List</th>
+                  <th className="w-10" aria-label="Shortcut in the gear menu" title="Shortcut in the gear menu" />
+                  <th className="text-left font-medium pr-4 py-2">List</th>
                   <th className="text-right font-medium px-4 py-2 w-20">Rows</th>
                   <th className="text-right font-medium px-4 py-2 w-32">Last change</th>
                   <th className="text-right font-medium px-4 py-2 w-28">Sheet</th>
@@ -67,7 +95,23 @@ export default function AdminHome() {
               <tbody>
                 {lists!.filter(l => l.group === g).map(l => (
                   <tr key={l.slug} className="border-b last:border-0 border-stone-100 dark:border-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-800/60">
-                    <td className="px-4 py-2">
+                    <td className="pl-2 py-1 text-center">
+                      <button
+                        type="button"
+                        onClick={() => togglePin(l.slug, !l.pinned)}
+                        aria-pressed={l.pinned}
+                        aria-label={l.pinned ? `Unpin ${l.title} from the gear menu` : `Pin ${l.title} to the gear menu`}
+                        title={l.pinned ? 'In the gear menu — tap to remove' : 'Add to the gear menu'}
+                        className={`w-8 h-8 text-base leading-none rounded-md transition-colors ${
+                          l.pinned
+                            ? 'text-amber-500 dark:text-amber-400 hover:text-amber-600'
+                            : 'text-stone-300 dark:text-zinc-600 hover:text-stone-500 dark:hover:text-zinc-400'
+                        }`}
+                      >
+                        {l.pinned ? '★' : '☆'}
+                      </button>
+                    </td>
+                    <td className="pr-4 py-2">
                       <Link href={`/admin/${l.slug}`} className="text-stone-800 dark:text-zinc-100 hover:underline">{l.title}</Link>
                     </td>
                     <td className="px-4 py-2 text-right font-mono text-xs text-stone-600 dark:text-zinc-300">{l.rows.toLocaleString()}</td>
