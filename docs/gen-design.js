@@ -16,7 +16,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze Log", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Data Design & Requirements Document", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 4.23  |  26 October 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 4.24  |  27 October 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
 );
 C(p([new TextRun({ text: "Structure: ", bold: true }), new TextRun("Part I Foundations · Part II Data · Part III Features · Part IV Operations · Appendices. The body is the complete, always-current source of truth; the changelog below carries one line per version. Work status, open questions and the backlog live in the separate WBS, not here.")]));
 
@@ -68,6 +68,7 @@ C(table(
     ["4.20","26 Oct 2026","ADMIN USABILITY AND PLACE POINTS (§15.5.5–15.5.7). The gear icon opens a menu: All master lists plus shortcuts, pinned with ☆ / ★ on /admin and kept per user in a new collection admin_settings (§6.13; starter: Activities, Cost categories, Place points, Ingredients). The menu bar fits narrow screens (under 520 px, e.g. the Fold 6 outer screen): the FARGAZE word is hidden and the links sit closer, which also removes the empty strip that appeared on every page there. Every list sorts with case ignored (collation en, strength 2). Place points: alphabet bar (ㄱ–ㅎ, A–Z, #), Source column hidden (values kept), Note narrow and not searched; a Records column counting Place (location.activity), From and To, with 집 / 회사 / 사이트 / 내차 resolved through favourite places as Journeys does; rename and merge with past records and favourite-place periods following, Undo as for activities (src/lib/admin/renamePlace.ts); a place a favourite-place period names can’t be deleted. Map column and 📍 Here: check and move a point on Google Maps (shared loader src/app/_components/google-maps.ts; PointPicker). Usage counts no longer collect record IDs where they need not (Atlas free tier: 100 MB per $group, allowDiskUse ignored). Tested on fargaze-log-test by Hyoje on 26 Oct"],
     ["4.22","26 Oct 2026","THE STAGING MIGRATION (WBS #68, new §11.7). A Staging tab in the Archive file (left of 2026, same layout, records from row 4) holds only records waiting for the server. npm run staging (and --check, which writes nothing) only ADDS records and never edits: it stops while a change on /admin is unticked; checks every Staging row with the daily migration’s checks (prepareSheet); and stops, writing nothing, when a food or drink has no ingredients (written without brackets; Hyoje, 26 Oct: the fill scripts run only with a full migration, so Staging needs them typed — a shared, database-free rule in src/lib/records/ingredients.ts that the entry app will use too), or a record (activity + title + start + end; an all-day record by its dates — the title because one Amazon order is several 구매 records at the same time, Hyoje 26 Oct) is in Staging twice or is already in the database (Hyoje, 26 Oct: Staging is an upload tool; a change to a record goes through the edit feature or a full migration). A Staging record with no match in its year tab is a warning only. Everything is inserted in one transaction; the report says which rows to clear. Shared sheet reading and the change gate moved into src/lib/migration/sheet.ts; prepareSheet now returns each record’s row number, and (both migrations) refuses an alcohol unit or amount without its item — more units or amounts than items in AX–AZ, which the parser would drop quietly (Hyoje, 26 Oct). §11.1, §11.2 and §15.3 updated: day to day, new records go up by Staging and the full migration is for past changes"],
     ["4.23","26 Oct 2026","YEAR TABS AND THE ROLLOVER (WBS #73, new §11.8), brought forward by Hyoje so the one hard deadline is safe. Both migrations take the Archive file’s tab names from the sheet (the one archive tab ~N, a 4-digit tab per later year) and check them against N, stored as admin_settings.archiveUntil (§6.13; absent = 2025). The daily migration rebuilds every year tab, --full adds the archive, each tab clearing only its own years; a record in the wrong tab is now refused (before, a 2025 row in the 2026 tab was added again on every daily run). npm run migrate -- --full --rollover, after the January merge, moves N on only if the run succeeds; a half-done merge, a missing year tab or two archive tabs stop the run. The /admin rename steps name the tabs from N with a count per tab. TEST DATABASE (WBS #69) REDUCED: no sync script — local dev reads fargaze-log-test from .env.development.local (scripts still read .env.local, production), and test is refreshed by restore-test.yml (§2.4, §15.2). Nightly backup moved to 02:23 UTC (§12.8)"],
+    ["4.24","27 Oct 2026","THE EDIT FEATURE (WBS #70, new §15.6), designed with Hyoje 26–27 Oct; step 1 of 5 (the single-record API) built. The form edits the record in its own shape (a list of foods, people as method / type / person), never the sheet’s comma, | and + strings; the checks run on the record (master lists, ingredients for added or changed items, the same record twice, the sheet’s separators refused in list values until cutover). Each save is one change-list entry (master_change, list records) with ONE LINE PER CHANGED CELL — tab, how to find the row, column, what changed (naming the food or the people group), the whole cell before and after — and one Mark repeated tick; unticked, it blocks the migrations. A record moving to another year tab: delete the row there, add it here. Delete moves the record whole to the new collection log_trash (§6.14); Undo until a migration rebuilds the year. Bulk Find & replace in records (title, additional info, online / other location, notes, purchase item and unit, food and drink item names) is step 2. WEEKDAYS ARE CALCULATED (Hyoje, 27 Oct): the migrations no longer read columns L and S; start / end.weekday come from the date (weekdayOf), the form has no weekday field and the change list no weekday lines; one full migration recalculates every record. Year tabs and the rollover (v4.23) marked done: production check passed 26 Oct"],
     ["4.21","26 Oct 2026","DAILY STRIPS FOR DIET AND DRINKING; ONE RULE FOR FUTURE DAYS; MONTHS IN THE CALENDAR (§9.3.3, §9.3.4, §9.3.9). Diet: the Spicy days strip is replaced by Daily diet · carbs — each day coloured by its carbs index (below 4 blue, 4–8 amber, over 8 red), tooltip listing every food- or drink-bearing record of the day (time, meal type, items, 🌶 on a meal rated H, servings in 인분 or a drink-only record’s shared amount), opening upwards; diet.summary gains days. Drinking: a Daily drinking strip under the drinks row (below 4 blue, 4–10 amber, over 10 red), tooltip with the day’s total and each record’s items as logged and drinks; drinking.summary gains rangeStart, rangeEnd and days. Shared colours and band rule in src/app/insights/_lib/day-bands.ts. Strips and calendars in Diet, Drinking, Exercise and Sleep now cover the whole period and draw days from today on as future days (faint, no border, ‘not yet’; futureFrom = localToday()); exercise.summary gains rangeStart / rangeEnd. The calendar pop-up marks months: ‘Oct 1’ in bold on each 1st and on the first day shown, and a stepped line along each month boundary. Checked by Hyoje on 26 Oct"],
   ],
   [1100, 1300, 6960]
@@ -356,7 +357,7 @@ C(table(["Field Path","Type","Source Column","Notes"],[
   ["start.year","Number","start 년",""],
   ["start.month","Number","start 월",""],
   ["start.day","Number","start 일",""],
-  ["start.weekday","String","start 요일","Korean weekday string"],
+  ["start.weekday","String","(calculated)","일–토. (v4.24) Calculated from the start date by weekdayOf (transform.ts); the sheet’s column L is no longer read — 4,351 stored weekdays did not match their dates"],
   ["start.hour","String","start 시","\"9:00\", \"14:30\""],
   ["start.timezoneOffset","Number","start 시차","UTC offset in hours, FRACTIONAL where the zone is (9 KST, 1 BST, 5.5 IST, 5.75 Nepal). Read with parseNumber \u2014 parseInteger truncated IST to 5 until v4.8."],
 ],[2400,1400,2400,3160]));
@@ -369,7 +370,7 @@ C(table(["Field Path","Type","Source Column","Notes"],[
   ["end.year","Number","end 년",""],
   ["end.month","Number","end 월",""],
   ["end.day","Number","end 일",""],
-  ["end.weekday","String","end 요일",""],
+  ["end.weekday","String","(calculated)","(v4.24) Calculated from the end date; column S is no longer read"],
   ["end.hour","String","end 시",""],
   ["end.timezoneOffset","Number","end 시차","UTC offset in hours, fractional where the zone is. Differs from start.timezoneOffset only on a record that crossed zones while it ran."],
 ],[2400,1400,2400,3160]));
@@ -709,6 +710,17 @@ C(table(["Field","Type","Notes"],[
   ["createdAt / updatedAt","Date","timestamps"],
 ],[2400,2000,4960]));
 C(p("Model src/models/AdminSettings.ts; logic src/lib/admin/pins.ts; GET / PUT /api/admin/pins. GET /api/admin/lists also returns pinned per list."));
+C(spacer());
+
+C(h2("6.14 log_trash (added v4.24)"));
+C(p("Records deleted in the app (§15.6). The log collection holds only live records, so nothing that reads it has to skip deleted ones."));
+C(table(["Field","Type","Notes"],[
+  ["userId","String","Owner"],
+  ["record","Mixed","The whole log document as it was, _id included, so Undo puts it back unchanged"],
+  ["deletedAt","Date","When it was deleted; index { userId, deletedAt }"],
+  ["changeId","ObjectId","The change-list entry (master_change) of the delete"],
+],[2400,2000,4960]));
+C(p("Model src/models/LogTrash.ts. Index { userId, record._id } for Undo."));
 C(spacer());
 
 C(h1("7. Search — Index, API & UI"));
@@ -1684,7 +1696,7 @@ C(table(["Columns","In the Active sheet","Reads","Database"],[
   ["F","Typed, dropdown","Activity C (8 values)","activity.crossActivity (default 평시)"],
   ["G","Formula: 타인 / 함께 / 혼자 from people method in BB","—","activity.relationship"],
   ["H","Typed, no dropdown","—","start.timezone"],
-  ["L, S","Formula: weekday from the date","—","start / end.weekday"],
+  ["L, S","Formula: weekday from the date","—","(v4.24) Not read: start / end.weekday are calculated from the date"],
   ["M, T","Typed, or a formula copying the start time or the previous end time","—","start / end.hour"],
   ["N, U","Formula: offset of the zone in H / O","TimeDiff A:B","start / end.timezoneOffset (fractions kept: IST 5.5)"],
   ["O–R","Formula copying the start zone and date; typed over when the end differs","—","end.timezone / year / month / day"],
@@ -2259,10 +2271,10 @@ C(
   bullet("3. Master lists out of the migration; generic admin editor in production — steps 1–4 and 6 done 25–26 Oct; step 5 (rename for the other lists) later (§15.5)"),
   bullet("4. Staging tab and migration, with the duplicate and year-tab checks — done 26 Oct, tested on fargaze-log-test, then production (§11.7)"),
   bullet("5. Test database — (v4.23) reduced 26 Oct: local dev on fargaze-log-test via .env.development.local, refreshed by restore-test.yml; no sync script. Done"),
-  bullet("6. Edit feature with its change list, test then production"),
+  bullet("6. Edit feature with its change list, test then production — designed 26–27 Oct, step 1 of 5 built (§15.6)"),
   bullet("7. Entry app: offline, all field groups, on test; the comparison report"),
   bullet("8. Nightly export to a spreadsheet, proven on test"),
-  bullet("9. Year rollover setting (before January) — brought forward and built 26 Oct, right after 5 (§11.8)"),
+  bullet("9. Year rollover setting (before January) — brought forward and done 26 Oct, right after 5 (§11.8); reminders set for 12 Dec, 1 Jan and 2 Jan"),
   bullet("10. Cutover"),
 );
 C(h2("15.4 Sheet Survey (23 Oct)"));
@@ -2352,6 +2364,62 @@ C(
   bullet("Google Maps, not OpenStreetMap: Hyoje found OpenStreetMap’s quality poor. A pin the user places is the user’s own data, so it is kept as is (Google’s terms concern its geocoding results and copying its map data). No OpenStreetMap round trip: it would move the point to the nearest mapped object"),
   bullet("The pin is Google’s classic Marker: AdvancedMarkerElement needs a Map ID. It logs a deprecation notice in the console; it is still supported. The loader moved from JourneyMap.tsx to src/app/_components/google-maps.ts, shared by both maps; the key still comes from /api/maps-key"),
 );
+C(spacer());
+
+C(h2("15.6 The Edit Feature (WBS #70, v4.24)"));
+C(p("Changes and deletions of existing records, made in the app and repeated in the sheet by hand until cutover. Agreed with Hyoje on 26–27 Oct. Editing is more than half of the entry app (#71): the same form will add new records."));
+C(h3("15.6.1 Decisions"));
+C(
+  bullet("The record keeps its own shape (27 Oct). The database already holds lists of objects — each food with item, amount, unit, note and ingredients; each person with method, type and person. The sheet’s comma lists, | groups and + exist only in the sheet, because a cell can’t hold a list. Going from the sheet to the database loses some of that text (‘A+B’ becomes two foods with the amount halved; ‘등’ is dropped), so the database can’t rebuild the sheet’s exact cells, and edits don’t round-trip through a row. The nightly export (#72) gets its own record → row, as close to the sheet as possible, and may differ only where the sheet can’t hold the shape"),
+  bullet("The checks run on the record. Refused: no activity or one not in Activities; no start date; a date or time that isn’t one; a date without a time zone; an end time without an end date or without a start time; end before start; any value not in its master list (unknownValues, the migration’s rule: activity with category, cost layers, currency, alcohol item with unit, ingredients, bowel values, time zones, every reference list); item, amount and unit missing any of the three — purchases, drinks, foods, alcohol, exercise (Hyoje, 27 Oct); a food or drink added or changed with no ingredients; a cost without its KRW amount or either category layer, or a foreign amount without its currency (or the reverse); a 귀가 trip to 집 without a return type (Hyoje, 27 Oct); a number field that isn’t a number; another record with the same activity, title, start and end (the Staging rule); nothing changed; the record changed since it was opened (409); until cutover, a character the sheet splits that cell on (SHEET_IS_TRUTH in src/lib/records/edit.ts) — as the migration reads it: ‘,’ in every list column; also ‘+’ in food, drink, alcohol and exercise items; also ‘| ( )’ in food and drink items (ingredients); ‘,’ and ‘|’ in a person’s name, method and type (people groups). ‘+’ and ‘(’ in purchase items and notes are plain text (corrected 27 Oct: the first rule refused 1,291 old purchases such as ‘올리브유+와인’ and 50 wine notes)"),
+  bullet("A rule an old record already breaks doesn’t block an edit that leaves that part as it was: it shows as a warning (‘as before’); new or changed parts must pass. Warnings also: a start time with no end time — saved as an open record with no duration, for the ongoing and planned records of #71 (Hyoje, 27 Oct). Not checked, as in the migration: place names, free text, and which field groups an activity needs (#71). scripts/check-record-form.ts lists old records that break a rule"),
+  bullet("A start or end the form leaves as it was is kept as stored — date, time, zone, offset, datetime — and so is the duration when both are; only a changed point is worked out again. Found by check-record-form.ts on production (27 Oct): 28 records have broken times (end before start, an end year 0, ‘8:045:00 오후’, ‘21-01-26’); recomputing them would have shown change lines nobody made. Empty lists are stored as [] (the database’s array default); a list entry’s own _id carries no data"),
+  bullet("Weekdays are calculated, never entered (Hyoje, 27 Oct): the same check found 4,351 stored weekdays that didn’t match their dates, and some 2026 records saying ‘Fri’. weekdayOf (transform.ts) gives 일–토 from the local date — already the date in the record’s own zone. The migrations no longer read columns L and S; the form has no weekday field and sets it on every save; the change list has no weekday lines; the entry app (#71) has no weekday field. One full migration recalculates every record"),
+  bullet("Calculated by the server, as the sheet does: the category from the activity list, weekdays, all-day, duration, and the offset — kept when the zone, date and time are unchanged (§15.2), otherwise the zone code’s offset from the Time zones list, as the TimeDiff tab gives it. Each code has one offset: GMT and BST are separate codes (corrected 27 Oct: the first build used the IANA zone’s rules, which would give BST +0 in winter). The same time written differently (09:00) keeps the stored text"),
+  bullet("Each save is one change-list entry (master_change, list records, kind edit; a delete is kind delete, an undone delete add) with one Mark repeated tick. While unticked it blocks migrate and staging like a list change; the gate lists it by title"),
+  bullet("A record whose start moves to another year tab: delete the row there, add it to the new tab"),
+  bullet("Delete moves the record whole to log_trash (§6.14). Undo: an edit, while the record is as the edit left it; a delete, unless a migration has rebuilt that year since (every record of the year was then created after the delete) or another record now has the same key. Undo after the tick is its own entry with the reverse sheet lines"),
+  bullet("A record changed since it was opened is refused (409): the save sends the updatedAt it read"),
+  bullet("Test database first (local dev reads it, §15.2), then production"),
+);
+C(h3("15.6.2 The Change List: One Line per Changed Cell"));
+C(p("Hyoje, 27 Oct: a table, with how to find the row, the column, the original and the changed value; several changed cells in one row are several lines. src/lib/records/sheetCells.ts writes it."));
+C(table(["Column","What it holds"],[
+  ["Tab","The year tab (2026, ~2025 …, §11.8)"],
+  ["Find the row","‘2026-10-26 (월) 19:30 · 저녁 · 회식’ — date, weekday, time, activity, title"],
+  ["Column","Letter and name, e.g. ‘BD People’, ‘AT Food item’"],
+  ["What changed","The line to act on: Added / Removed / Changed, naming the item — ‘Added 최정문 to group 2 (대면 · 친목), after 이창섭’; ‘양념 치킨 (1st): removed ingredient 밀’; ‘Added 김밥(김|쌀) as the 3rd item, after 떡볶이’"],
+  ["Before / After","The WHOLE cell, written the sheet’s way, so the change can be placed. It is the database’s value: ‘A+B’ shows as ‘A, B’, so the row is found by date and time, not by its text"],
+],[2200,7160]));
+C(spacer());
+C(
+  bullet("Linked columns: foods, drinks, alcohol, purchases and exercise are matched by position across their columns (item, amount, unit, note …); people by | group across method, type and person. Lists are aligned by name, so an insertion or removal reads as one change, not a shift of every later item"),
+  bullet("Several changes in one cell: one line each"),
+  bullet("Calculated cells (category, offset) are listed too, marked calculated: the year tabs hold their values; weekdays are not listed (not read). Columns V–Z are not in the database; when the start or end changes, one line says to update them if the sheet keeps values there"),
+  bullet("Moving to another tab: a ‘Delete this row from …’ line, then ‘Add a row to …’ with every filled cell. A delete: one ‘Delete this row’ line"),
+);
+C(h3("15.6.3 Bulk Find & Replace (step 2)"));
+C(
+  bullet("A page in the gear menu, like the place rename. Fields: title, additional info, online location, other location (whole value or part of the text); food, drink and alcohol notes, purchase item, purchase unit, food item and drink item names (whole value: one item’s own value; the ingredients in brackets stay). Fields with a master list are changed on its admin page, not here"),
+  bullet("Optional filters: a date range, an activity. The preview lists every matching record with the match highlighted"),
+  bullet("When the new text contains the old (James → James Potter), a place that already says the new text is skipped, and the preview counts the skips. The sheet’s Find & Replace can’t skip, so its steps are two: replace James → James Potter, then James Potter Potter → James Potter, with the counts to expect. List cells use Find & Replace with regular expressions, a pattern generated to match only a whole item between commas, + or ("),
+  bullet("One change-list entry with Undo; it shows on Record changes too"),
+);
+C(h3("15.6.4 Pages and API"));
+C(
+  bullet("Edit: an Edit button in the record pane the Calendar and Search open; it opens /records/<id>, a full page (fits the Fold 6 outer screen). Edit mode shows the field groups the record has, plus Add a group"),
+  bullet("Record changes (gear menu): the saved edits still to repeat in the sheet, each with its table, Mark repeated and Undo; older ones by date"),
+  bullet("GET /api/records/<id> → { form, updatedAt, category, tab, findRow }. POST /api/records/<id>/preview { form } → { problems, warnings, title, tab, findRow, moveTo, lines }. PUT /api/records/<id> { form, updatedAt } → saves (409 changed since; 422 { problems }). DELETE /api/records/<id> { updatedAt } → to log_trash. GET /api/records/changes?since= → the Record changes list. Tick: PATCH /api/admin/changes/<id>; Undo: POST /api/admin/changes/<id>/undo (dispatches to undoRecordChange)"),
+  bullet("Code: src/lib/records/form.ts (RecordForm, fromRecord, buildRecord, normaliseHour — pure), src/lib/records/sheetCells.ts (sheetCells, changeLines, sheetChange, findRowText — pure), src/lib/records/edit.ts (server). scripts/check-record-form.ts (read-only): opens every record in the form and reports any the form would refuse or change without an edit, and old records that break a rule"),
+);
+C(h3("15.6.5 Order of Work"));
+C(table(["Step","What","Status"],[
+  ["1","Single-record API: read, preview, save, delete to trash, Undo; the change lines; the migration gate; check-record-form.ts","Built 27 Oct; rules corrected the same day after Hyoje’s review. In the cloud: 35 checks with an in-memory database (round trip, people group, ingredient, added / removed food, times, refusals, save, conflict, duplicate, year move, Undo before and after the tick, delete, Undo of a delete, a rebuilt year) 18 rule checks (item sets, open records, GMT / BST, cost, return type, old records as warnings) and 15 checks on the record shapes production showed (wrong and English weekdays, list entries with _id, + and ( in purchases, exercise and wine notes, broken times)"],
+  ["2","Bulk Find & replace API: preview, apply, Undo",""],
+  ["3","The form page and the Edit button",""],
+  ["4","Record changes and Find & replace pages",""],
+  ["5","Test database, then production",""],
+],[700,4300,4360]));
 C(spacer());
 
 C(new Paragraph({ children: [new TextRun({ text: "Appendices", bold: true, size: 28 })], spacing: { before: 280, after: 140 } }));
@@ -2497,6 +2565,10 @@ C(table(["Path","Purpose"],[
   ["scripts/migrate-staging.ts","(v4.22) Staging migration (§11.7): npm run staging [-- --check]. Adds the Staging tab’s records; stops on an unticked change, a refused row, a food or drink without ingredients, a record twice in Staging or one already in the database; warns about a record missing from its year tab; inserts in one transaction"],
   ["src/lib/migration/staging.ts","(v4.22) The Staging checks as plain functions: recordKey (activity + title + start + end; all-day by date), describe, duplicatesWithin, alreadyThere, existingQuery, KEY_FIELDS, yearTabFor, missingFromYearTab"],
   ["src/lib/migration/sheet.ts","(v4.22) getSheetData and waitingChanges, shared by both migrations; (v4.23) listTabs, the Archive file’s tab names"],
+  ["src/lib/records/form.ts","(v4.24) The record form, pure: RecordForm, fromRecord, buildRecord (the stored shape, calculated fields, refusals and warnings), normaliseHour (§15.6)"],
+  ["src/lib/records/sheetCells.ts","(v4.24) The change list for the sheet, pure: one line per changed cell, naming items and people groups; sheetChange (same tab / move), findRowText (§15.6.2)"],
+  ["src/lib/records/edit.ts","(v4.24) Server: getForEdit, previewEdit, saveEdit, deleteRecord, undoRecordChange, listRecordChanges; SHEET_IS_TRUTH"],
+  ["scripts/check-record-form.ts","(v4.24) Read-only: every record through the form; reports records refused or changed without an edit"],
   ["src/lib/records/ingredients.ts","(v4.22) missingIngredients(record) — foods and drinks with no real ingredient (empty or Not Defined); describeMissing. Pure: used by the Staging migration, meant for the entry app (#71)"],
       ["scripts/fill-historical-ingredients.ts","(v4.17) Names corrected to the Ingredient tab: 기타 해산물, 채소 육수, 짜장. Fills food.foods[].ingredients on existing rows from embedded REVIEWED_MAP (1,156 entries) + bestGuess fallback; modes: --dry-run, --export-worklist, default write; treats [\"Not Defined\"] as refillable (NEW v3.1)"],
   ["scripts/inspect-ingredients.ts","Survey: docs with foods, items with/without ingredients, Not Defined count, top level2 distribution, samples (NEW v3.1)"],
@@ -2541,7 +2613,7 @@ C(table(["Path","Purpose"],[
 C(spacer());
 
 // ===== FOOTER =====
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.23 — 26 October 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.24 — 27 October 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 
 // ===== DOCUMENT ASSEMBLY =====
@@ -2578,6 +2650,6 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-Log-Data-Design-v4.23.docx", buffer);
-  console.log("Wrote FarGaze-Log-Data-Design-v4.23.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-Log-Data-Design-v4.24.docx", buffer);
+  console.log("Wrote FarGaze-Log-Data-Design-v4.24.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });

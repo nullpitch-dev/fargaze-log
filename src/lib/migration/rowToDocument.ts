@@ -11,6 +11,7 @@ import {
   parseFoodIngredients,
   parsePeople,
   computeTotalSeconds,
+  weekdayOf,
 } from './transform';
 
 // Column indices (0-based)
@@ -26,14 +27,14 @@ const C = {
   START_YEAR: 8,
   START_MONTH: 9,
   START_DAY: 10,
-  START_WEEKDAY: 11,
+  START_WEEKDAY: 11,   // not read since v4.24: weekdayOf(date)
   START_HOUR: 12,
   START_TZ_OFFSET: 13,
   END_TZ: 14,
   END_YEAR: 15,
   END_MONTH: 16,
   END_DAY: 17,
-  END_WEEKDAY: 18,
+  END_WEEKDAY: 18,     // not read since v4.24: weekdayOf(date)
   END_HOUR: 19,
   END_TZ_OFFSET: 20,
   LOC_ACTIVITY: 26,
@@ -241,7 +242,7 @@ export function rowToDocument(row: any[], userId: string): any {
       year: parseInteger(get(row, C.START_YEAR)),
       month: parseInteger(get(row, C.START_MONTH)),
       day: parseInteger(get(row, C.START_DAY)),
-      weekday: parseString(get(row, C.START_WEEKDAY)),
+      weekday: weekdayOf(parseInteger(get(row, C.START_YEAR)), parseInteger(get(row, C.START_MONTH)), parseInteger(get(row, C.START_DAY))),
       hour: parseString(startHour),
       timezoneOffset: startTzOffset,
     },
@@ -251,7 +252,7 @@ export function rowToDocument(row: any[], userId: string): any {
       year: parseInteger(get(row, C.END_YEAR)),
       month: parseInteger(get(row, C.END_MONTH)),
       day: parseInteger(get(row, C.END_DAY)),
-      weekday: parseString(get(row, C.END_WEEKDAY)),
+      weekday: weekdayOf(parseInteger(get(row, C.END_YEAR)), parseInteger(get(row, C.END_MONTH)), parseInteger(get(row, C.END_DAY))),
       hour: parseString(endHour),
       timezoneOffset: endTzOffset,
     },

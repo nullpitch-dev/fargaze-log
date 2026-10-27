@@ -78,6 +78,19 @@ export function parseDateTime(
   }
 }
 
+/**
+ * The weekday of a local calendar date, '일'–'토' (#70, Hyoje 27 Oct). The system
+ * calculates it: the sheet's weekday columns (L, S) are no longer read, because
+ * 4,351 of them did not match their dates. The date is already the local date in
+ * the record's own zone, so the zone needs no further step. null for an invalid date.
+ */
+export function weekdayOf(year: number | null | undefined, month: number | null | undefined, day: number | null | undefined): string | null {
+  if (!year || !month || !day) return null;
+  const t = new Date(Date.UTC(year, month - 1, day));
+  if (t.getUTCFullYear() !== year || t.getUTCMonth() !== month - 1 || t.getUTCDate() !== day) return null;
+  return ['일', '월', '화', '수', '목', '금', '토'][t.getUTCDay()];
+}
+
 // ── MULTI-VALUE PARSING ───────────────────────────────────────────────────────
 
 // Split comma-separated string into array, filter empty

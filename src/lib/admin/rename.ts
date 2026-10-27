@@ -26,6 +26,7 @@ import CalendarSettings from '@/models/CalendarSettings';
 import { colorKeyFor } from '@/app/calendar/_lib/calendar-colors';
 import { getArchiveUntil } from '@/lib/archiveYear';
 import { countsByTab, savedByTab, type TabCount } from '@/lib/yearTabs';
+import { RECORDS_LIST, undoRecordChange } from '@/lib/records/edit';
 import { type ListDef, toRow } from './lists';
 import { PLACE_SLUG, previewPlaceRename, applyPlaceRename, undoPlaceChange, type PlacePreview } from './renamePlace';
 
@@ -407,6 +408,7 @@ export async function undoChange(userId: string, changeId: string, defOf: (slug:
   Promise<{ ok: true; changeId: string; recordsChanged: number; sheetNeeded: boolean } | Fail> {
   const ch = await MasterChange.findOne({ _id: changeId, userId }).lean() as any;
   if (!ch) return fail(404, 'Unknown change.');
+  if (ch.list === RECORDS_LIST) return undoRecordChange(userId, ch);   // #70
   const blocked = undoBlocked(ch);
   if (blocked) return fail(409, blocked);
   const def = defOf(ch.list);

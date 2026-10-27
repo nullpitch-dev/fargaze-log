@@ -13,6 +13,12 @@ import { Schema, model, models } from 'mongoose';
 //   sheetSteps       what to repeat in the sheet, in plain words
 //   undoneAt         set when the change was undone (the undo is its own entry)
 //   extra            rename / merge: { title, plan, counts } — what Undo needs (#67 step 3)
+//
+// Record changes (#70) use the same list, so an unticked one blocks the migrations too:
+//   list 'records', kind 'edit' | 'delete' (an undone delete is logged as 'add'),
+//   rowId the record's _id, before / after the whole record, recordIds [its _id],
+//   extra { title, tab, findRow, moveTo, lines: [{ column, what, before, after,
+//   calculated? }], afterUpdatedAt } — one line per changed cell (src/lib/records)
 const MasterChangeSchema = new Schema(
   {
     userId:         { type: String, required: true },
