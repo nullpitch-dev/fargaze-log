@@ -10,7 +10,11 @@
 //   3. a food or drink without ingredients (written without brackets) stops the run:
 //      the fill scripts run only with a full migration, so Staging needs them typed;
 //   4. the same record (activity + title + start + end) twice in Staging stops the run;
-//   5. a Staging record already in the database stops the run.
+//   5. a Staging record already in the database stops the run;
+//   6. (#70, 28 Oct) a record that breaks a record rule stops the run — the same rules
+//      as the edit form for a new record: item, amount and unit together; a cost's KRW
+//      amount and both category layers; a 귀가 trip to 집 needs its return type; times
+//      that make sense; no separator inside a value (src/lib/records/form.ts).
 // A Staging record missing from its year tab is a warning only: it is still sent, but
 // the next full migration would drop it, so copy the row into the year tab.
 // After a successful run, clear the Staging rows by hand.
@@ -29,6 +33,8 @@ import {
   type Located,
 } from '../src/lib/migration/staging';
 import { missingIngredients, describeMissing } from '../src/lib/records/ingredients';
+import { newRecordRules } from '../src/lib/records/form';
+import { loadFormContext } from '../src/lib/records/edit';
 import Log from '../src/models/Log';
 import { getArchiveUntil } from '../src/lib/archiveYear';
 
@@ -89,6 +95,26 @@ async function main() {
         `  ✗ ${k} — '${STAGING_TAB}' row${rows.length === 1 ? '' : 's'} ${[...new Set(rows)].join(', ')}`),
       'Write each with its ingredients in brackets, e.g. 김치찌개(김치|돼지고기) or 라떼(커피|우유),',
       'in Staging and in the year tab, then run again.']);
+  }
+
+  // 3b. The record rules a new record must pass (the edit form's rules, #70).
+  const formCtx = await loadFormContext(USER_ID);
+  const broken = new Map<string, number[]>();
+  const openRecords: string[] = [];
+  for (const it of items) {
+    const r = newRecordRules(it.doc, formCtx);
+    for (const p of r.problems) broken.set(p, [...(broken.get(p) ?? []), it.row]);
+    for (const w of r.warnings) if (w.startsWith('No end time')) openRecords.push(`  ! '${STAGING_TAB}' row ${it.row} · ${describe(it.doc)} — ${w}`);
+  }
+  if (broken.size) {
+    const rows = new Set([...broken.values()].flat()).size;
+    stop(`${rows} Staging row${rows === 1 ? ' breaks' : 's break'} a record rule.`, [
+      ...[...broken.entries()].map(([p, rs]) => `  ✗ ${p} — '${STAGING_TAB}' row${rs.length === 1 ? '' : 's'} ${[...new Set(rs)].join(', ')}`),
+      'Fix each row in Staging and in the year tab, then run again.']);
+  }
+  if (openRecords.length) {
+    console.warn(`\n⚠️  ${openRecords.length} Staging record${openRecords.length === 1 ? ' has' : 's have'} a start time but no end time (sent as open records).`);
+    openRecords.forEach(l => console.warn(l));
   }
 
   // 4. The same record twice in Staging.

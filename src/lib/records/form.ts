@@ -377,6 +377,17 @@ export function buildRecord(form: RecordForm, base: any | null, ctx: FormContext
   return { doc, problems: [...new Set(problems)], warnings };
 }
 
+/**
+ * The record rules for a NEW record that didn't come through the form — a Staging row
+ * (#70, Hyoje 28 Oct: a 귀가 trip to 집 without a return type passed Staging). The same
+ * rules as buildRecord with no base, so nothing counts as 'as before'. The full
+ * migration doesn't use it: it rebuilds old records, and some of them break these rules.
+ */
+export function newRecordRules(doc: any, ctx: FormContext): { problems: string[]; warnings: string[] } {
+  const b = buildRecord(fromRecord(doc), null, ctx);
+  return { problems: b.problems, warnings: b.warnings };
+}
+
 function strip(p: any) {
   const { _ms, _unchanged, ...rest } = p;
   void _ms; void _unchanged;
