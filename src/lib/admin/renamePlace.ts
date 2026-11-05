@@ -134,13 +134,16 @@ const titleOf = (p: PlacePlan) =>
 const range = (tab: string, col: string, row: number) => `'${tab}'!${col}${row}:${col}`;
 const expect = (x: number) => (x === 0 ? 'expect none' : `expect ${n(x)}`);
 
+const NOTHING = 'Nothing to do in the sheet: no record or favourite-place period uses this name.';
+export const placeNeedsSheet = (steps: string[]) => !(steps.length === 1 && steps[0] === NOTHING);
+
 /** Sheet steps for a rename or merge (the reverse of a rename is a rename with the sides swapped). */
 export function placeSteps(p: Pick<PlacePlan, 'action' | 'from' | 'to'>, c: PlaceCounts): string[] {
   const { from, to } = p;
   const steps: string[] = [];
-  steps.push(p.action === 'merge'
-    ? `PlaceCoord tab: delete the row ${from.key} (${to.key} stays).`
-    : `PlaceCoord tab: change the name in column A from ${from.key} to ${to.key}.`);
+  // Nothing reads the PlaceCoord tab any more (5 Nov): no step for it. With no record
+  // and no favourite period using the name, there is nothing to repeat at all.
+  if (!c.total && !c.favorites) return [NOTHING];
   if (c.favorites) {
     steps.push(`FavoritePlace tab: find and replace ${from.key} → ${to.key} in column B (range ${range('FavoritePlace', 'B', 2)}, “Match case” and “Match entire cell contents”; ${expect(c.favorites)}).`);
   }
@@ -185,7 +188,7 @@ export async function previewPlaceRename(def: ListDef, userId: string, id: strin
 // ── Apply ────────────────────────────────────────────────────────────────────
 
 export async function applyPlaceRename(def: ListDef, userId: string, id: string, values: Record<string, unknown>, expectRecords: number):
-  Promise<{ ok: true; changeId: string; recordsChanged: number } | Fail> {
+  Promise<{ ok: true; changeId: string; recordsChanged: number; sheetNeeded: boolean } | Fail> {
   const pv = await previewPlaceRename(def, userId, id, values);
   if (!pv.ok) return pv;
   const { plan: p, counts } = pv.preview;
@@ -222,7 +225,8 @@ export async function applyPlaceRename(def: ListDef, userId: string, id: string,
         before, after: { ...before, name: p.to.key },
         recordsChanged: all.length, recordIds: all,
         sheetSteps: pv.preview.sheetSteps,
-        extra: { title: pv.preview.title, plan: p, counts, fieldIds, favIds },
+        ...(placeNeedsSheet(pv.preview.sheetSteps) ? {} : { sheetDone: true, sheetDoneAt: new Date() }),
+        extra: { title: pv.preview.title, plan: p, counts, fieldIds, favIds, noSheet: !placeNeedsSheet(pv.preview.sheetSteps) },
       }], { session });
       changeId = String(ch._id);
       changed = all.length;
@@ -236,7 +240,7 @@ export async function applyPlaceRename(def: ListDef, userId: string, id: string,
   } finally {
     await session.endSession();
   }
-  return { ok: true, changeId, recordsChanged: changed };
+  return { ok: true, changeId, recordsChanged: changed, sheetNeeded: placeNeedsSheet(pv.preview.sheetSteps) };
 }
 
 // ── Undo ─────────────────────────────────────────────────────────────────────
@@ -272,7 +276,8 @@ export async function undoPlaceChange(def: ListDef, userId: string, ch: any):
     if (!self || self.name !== p.to.key) return fail(409, `Undo is no longer possible: the row ${p.to.key} has changed since. Make the opposite change instead.`);
   }
 
-  const sheetNeeded = !!ch.sheetDone;
+  // Logged already ticked because nothing needed repeating: the undo needs nothing either.
+  const sheetNeeded = !!ch.sheetDone && !ch.extra?.noSheet;
   // Only a rename reaches here once ticked (undoBlocked), so its reverse is a rename.
   const sheetSteps = sheetNeeded
     ? placeSteps({ action: 'rename', from: p.to, to: p.from }, ch.extra.counts as PlaceCounts)

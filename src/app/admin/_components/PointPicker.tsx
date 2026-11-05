@@ -7,6 +7,14 @@
 //   • Map / Satellite to check the building
 //   • "Apply this point" hands back exactly where the pin is (6 decimals ≈ 0.1 m);
 //     the page saves it like any other edit, or puts it in the row being edited
+//   • (5 Nov, after Hyoje's trip) Search: type a name or address, pick a suggestion,
+//     and the pin goes there — for places visited earlier, where 📍 Here can't help.
+//     Needs "Places API (New)" turned on for the Maps key; without it the map works.
+//   • (5 Nov) Tapping a place's icon on the map selects that place (pin + name),
+//     replacing a searched one; tapping elsewhere or dragging only moves the pin.
+//   • (5 Nov) Nothing is applied until the main button: a tick box "Use this name"
+//     (ticked when the Place box is empty) makes it "Use this point and name", which
+//     fills both and closes. A saved row (not being edited) only takes the point.
 //
 // The pin is Google's classic Marker: the newer AdvancedMarkerElement needs a Map ID
 // set up in Google Cloud. The classic one is still supported (it logs a notice).
@@ -46,7 +54,12 @@ export function locate(): Promise<Located> {
   });
 }
 
-export function PointPicker({ title, start, here, applyLabel = 'Apply this point', onApply, onClose }: {
+interface Suggestion { main: string; secondary: string; prediction: G }
+interface Found { name: string; address: string }
+
+const SEARCH_OFF = 'Search is not available: turn on “Places API (New)” for the Maps key in Google Cloud. The map still works.';
+
+export function PointPicker({ title, start, here, applyLabel = 'Apply this point', onApply, onUseName, hasName = false, onClose }: {
   title: string;
   /** The point to show; null opens on the default view with no pin until you tap or use Here. */
   start: LatLng | null;
@@ -54,6 +67,10 @@ export function PointPicker({ title, start, here, applyLabel = 'Apply this point
   here?: Located | null;
   applyLabel?: string;
   onApply: (p: LatLng) => void | Promise<void>;
+  /** Given when the row is being edited: the selected place's name can go in its Place box. */
+  onUseName?: (name: string) => void;
+  /** The Place box has a name already: the "Use this name" tick then starts unticked. */
+  hasName?: boolean;
   onClose: () => void;
 }) {
   const boxRef = useRef<HTMLDivElement>(null);
@@ -65,6 +82,15 @@ export function PointPicker({ title, start, here, applyLabel = 'Apply this point
   const [locating, setLocating] = useState(false);
   const [locError, setLocError] = useState('');
   const [saving, setSaving] = useState(false);
+  // Search (Places API (New)).
+  const placesRef = useRef<G>(null);
+  const tokenRef = useRef<G>(null);
+  const askRef = useRef(0);
+  const [query, setQuery] = useState('');
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [searchError, setSearchError] = useState('');
+  const [found, setFound] = useState<Found | null>(null);
+  const [useName, setUseName] = useState(!hasName);
 
   // Create the map and the pin once.
   useEffect(() => {
@@ -81,20 +107,90 @@ export function PointPicker({ title, start, here, applyLabel = 'Apply this point
         center: first ?? DEFAULT_VIEW, zoom: first ? 18 : 12,
         disableDefaultUI: true, zoomControl: true, mapTypeControl: true,
         mapTypeControlOptions: { mapTypeIds: ['roadmap', 'hybrid'] },
-        clickableIcons: false, gestureHandling: 'greedy',
+        clickableIcons: true, gestureHandling: 'greedy',
       });
       const pin = new Marker({ map, position: first ?? null, draggable: true, visible: !!first, title: 'Drag me' });
       pin.addListener('dragend', () => { const p = pin.getPosition(); setPos({ lat: p.lat(), lng: p.lng() }); setAccuracy(null); });
+      // A tapped icon: its name, address and exact point.
+      async function selectPlace(placeId: string) {
+        const lib = placesRef.current;
+        if (!lib?.Place) { setSearchError(SEARCH_OFF); return; }
+        try {
+          const place = new lib.Place({ id: placeId });
+          await place.fetchFields({ fields: ['displayName', 'location', 'formattedAddress'] });
+          const loc = place.location;
+          if (loc) {
+            const p = { lat: loc.lat(), lng: loc.lng() };
+            setPos(p); pinRef.current?.setPosition(p);
+          }
+          if (place.displayName) { setFound({ name: place.displayName, address: place.formattedAddress ?? '' }); setSearchError(''); }
+        } catch {
+          setSearchError(SEARCH_OFF);
+        }
+      }
       map.addListener('click', (e: G) => {
         pin.setPosition(e.latLng); pin.setVisible(true);
         setPos({ lat: e.latLng.lat(), lng: e.latLng.lng() }); setAccuracy(null);
+        // A place's icon: select that place instead of opening Google's own pop-up.
+        if (e.placeId) { e.stop?.(); selectPlace(e.placeId); }
       });
       mapRef.current = map;
       pinRef.current = pin;
+      // Search is optional: the map works without it.
+      try { placesRef.current = await g.maps.importLibrary('places'); } catch { placesRef.current = null; }
     })().catch((e: Error) => { if (!cancelled) setFailed(e.message); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Suggestions as you type, near what the map shows.
+  useEffect(() => {
+    const text = query.trim();
+    if (text.length < 2 || found?.name === text) return;   // the input clears the list
+    const ask = ++askRef.current;
+    const t = setTimeout(async () => {
+      const lib = placesRef.current;
+      if (!lib?.AutocompleteSuggestion) { setSearchError(SEARCH_OFF); return; }
+      try {
+        tokenRef.current ??= new lib.AutocompleteSessionToken();
+        const bounds = mapRef.current?.getBounds?.();
+        const { suggestions: list } = await lib.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+          input: text, sessionToken: tokenRef.current, ...(bounds ? { locationBias: bounds } : {}),
+        });
+        if (ask !== askRef.current) return;
+        setSearchError('');
+        setSuggestions((list ?? []).filter((x: G) => x.placePrediction).slice(0, 6).map((x: G) => ({
+          main: x.placePrediction.mainText?.text ?? x.placePrediction.text?.text ?? '',
+          secondary: x.placePrediction.secondaryText?.text ?? '',
+          prediction: x.placePrediction,
+        })));
+      } catch {
+        if (ask === askRef.current) { setSuggestions([]); setSearchError(SEARCH_OFF); }
+      }
+    }, 250);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
+
+  async function pick(sg: Suggestion) {
+    setSuggestions([]); setSearchError('');
+    try {
+      const place = sg.prediction.toPlace();
+      await place.fetchFields({ fields: ['displayName', 'location', 'formattedAddress'] });
+      tokenRef.current = null;                          // a pick ends the search session
+      const loc = place.location;
+      if (!loc) { setSearchError('Google has no point for that place.'); return; }
+      const p = { lat: loc.lat(), lng: loc.lng() };
+      setPos(p); setAccuracy(null);
+      pinRef.current?.setPosition(p); pinRef.current?.setVisible(true);
+      mapRef.current?.panTo(p); mapRef.current?.setZoom(18);
+      const name = place.displayName ?? sg.main;
+      setFound({ name, address: place.formattedAddress ?? sg.secondary });
+      setQuery(name);
+    } catch {
+      setSearchError(SEARCH_OFF);
+    }
+  }
 
   async function goHere() {
     setLocating(true); setLocError('');
@@ -113,33 +209,74 @@ export function PointPicker({ title, start, here, applyLabel = 'Apply this point
   async function apply() {
     if (!pos) return;
     setSaving(true);
-    try { await onApply({ lat: round6(pos.lat), lng: round6(pos.lng) }); }
-    finally { setSaving(false); }
+    try {
+      if (withName) onUseName!(found!.name);
+      await onApply({ lat: round6(pos.lat), lng: round6(pos.lng) });
+    } finally { setSaving(false); }
   }
 
+  const withName = !!onUseName && !!found && useName;
   const moved = pos && start ? metres(start, pos) : null;
-  const ready = !!pos && (here != null || !start || (moved ?? 0) >= 0.5);
+  const ready = !!pos && (here != null || !start || (moved ?? 0) >= 0.5 || withName);
   const btn = 'px-3 py-1.5 rounded-lg text-sm disabled:opacity-40';
 
   return (
     <ModalShell title={title} onClose={onClose}>
+      <div className="relative">
+        <input
+          value={query}
+          onChange={e => { setQuery(e.target.value); setFound(null); if (e.target.value.trim().length < 2) setSuggestions([]); }}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && suggestions[0]) { e.preventDefault(); pick(suggestions[0]); }
+            if (e.key === 'Escape' && suggestions.length) { e.stopPropagation(); setSuggestions([]); }
+          }}
+          placeholder="Search a place or address"
+          aria-label="Search a place or address"
+          disabled={!!failed || saving}
+          className="w-full px-3 py-1.5 rounded-lg border border-stone-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 text-sm text-stone-900 dark:text-zinc-100 placeholder:text-stone-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-stone-400 dark:focus:ring-zinc-500"
+        />
+        {suggestions.length > 0 && (
+          <ul role="listbox" className="absolute z-10 left-0 right-0 mt-1 rounded-lg border border-stone-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg overflow-hidden">
+            {suggestions.map((sg, i) => (
+              <li key={i} role="option" aria-selected={false}>
+                <button onClick={() => pick(sg)} className="w-full text-left px-3 py-2 hover:bg-stone-50 dark:hover:bg-zinc-800">
+                  <span className="block text-sm text-stone-900 dark:text-zinc-100 truncate">{sg.main}</span>
+                  {sg.secondary && <span className="block text-xs text-stone-500 dark:text-zinc-400 truncate">{sg.secondary}</span>}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      {searchError && <p className="text-xs text-amber-700 dark:text-amber-400">{searchError}</p>}
+      {found && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+          <span className="text-stone-700 dark:text-zinc-200 min-w-0"><b className="font-medium">{found.name}</b>{found.address && <span className="text-stone-500 dark:text-zinc-400"> · {found.address}</span>}</span>
+          {onUseName
+            ? <label className="inline-flex items-center gap-1.5 text-stone-700 dark:text-zinc-200 cursor-pointer">
+                <input type="checkbox" checked={useName} onChange={e => setUseName(e.target.checked)} className="accent-stone-700 dark:accent-zinc-300" />
+                Use this name
+              </label>
+            : <span className="text-stone-400 dark:text-zinc-500">To use this name, press Edit on the row first.</span>}
+        </div>
+      )}
       <div ref={boxRef} className="w-full h-[60vh] max-h-[520px] rounded-lg bg-stone-100 dark:bg-zinc-800" />
       {failed && <p className="text-sm text-red-600 dark:text-red-400">Could not load the map: {failed}</p>}
       <div className="text-xs text-stone-600 dark:text-zinc-300 space-y-0.5">
-        <p className="font-mono">{pos ? `${round6(pos.lat)}, ${round6(pos.lng)}` : 'No point yet: tap the map or use 📍 Here.'}</p>
+        <p className="font-mono">{pos ? `${round6(pos.lat)}, ${round6(pos.lng)}` : 'No point yet: search, tap the map or use 📍 Here.'}</p>
         {accuracy != null && <p>Your position, ±{Math.round(accuracy)} m{accuracy > 50 ? ' — not very exact; check the pin.' : '.'}</p>}
         {moved != null && moved >= 0.5 && <p>Moved {fmtDist(moved)} from the saved point.</p>}
-        {!failed && <p className="text-stone-400 dark:text-zinc-500">Drag the pin, or tap the map to put it there.</p>}
+        {!failed && <p className="text-stone-400 dark:text-zinc-500">Drag the pin, tap the map to put it there, or tap a place’s icon to choose that place.</p>}
         {locError && <p className="text-red-600 dark:text-red-400">{locError}</p>}
       </div>
       <div className="flex items-center gap-3">
         <button onClick={goHere} disabled={locating || saving}
-          className={`${btn} border border-stone-300 dark:border-zinc-600 text-stone-700 dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800`}>
+          className={`${btn} whitespace-nowrap border border-stone-300 dark:border-zinc-600 text-stone-700 dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800`}>
           {locating ? 'Finding you…' : '📍 Here'}
         </button>
         <button onClick={apply} disabled={!ready || saving}
           className={`${btn} ml-auto bg-stone-800 dark:bg-zinc-700 text-white font-medium hover:bg-stone-900 dark:hover:bg-zinc-600`}>
-          {saving ? 'Saving…' : applyLabel}
+          {saving ? 'Saving…' : withName ? `${applyLabel} and name` : applyLabel}
         </button>
         <button onClick={onClose} disabled={saving} className="text-xs text-stone-500 dark:text-zinc-400 hover:text-stone-900 dark:hover:text-zinc-100">Cancel</button>
       </div>

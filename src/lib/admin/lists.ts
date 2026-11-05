@@ -68,6 +68,10 @@ export interface SheetPlace {
   column?: string;
   /** the Active sheet dropdown(s) that read this list */
   dropdown?: string;
+  /** (5 Nov) Nothing reads this tab any more, so an add, edit or delete of the list
+   *  alone needs no sheet step: its change is logged already ticked. A rename or merge
+   *  still has sheet steps for the records that use the name. */
+  tabUnused?: boolean;
 }
 
 export interface ListDef {
@@ -303,8 +307,9 @@ export const LISTS: ListDef[] = [
     refuseUnknown: false,
     viaFavorites: true,
     // Source is no longer kept (26 Oct): old values stay in the database, unseen and
-    // untouched. It stays in the order so sheet steps leave the tab's column C empty.
-    sheet: { where: 'PlaceCoord tab', order: ['name', 'coords', 'source', 'note'] },
+    // untouched. The PlaceCoord tab is no longer read by anything (Hyoje, 5 Nov), so
+    // points need no sheet steps; renames still change the records' names (AA, BE, BF).
+    sheet: { where: 'PlaceCoord tab', order: ['name', 'coords', 'source', 'note'], tabUnused: true },
   },
 ];
 

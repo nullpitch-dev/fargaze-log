@@ -205,7 +205,7 @@ export async function deleteRecord(userId: string, id: string, updatedAt: string
 export function recordUndoBlocked(ch: any): string | null {
   if (ch.undoneAt) return 'Already undone.';
   if (ch.undoOf) return 'This is an undo; make the change again instead.';
-  if (ch.kind !== 'edit' && ch.kind !== 'delete') return 'This change can’t be undone.';
+  if (ch.kind !== 'edit' && ch.kind !== 'delete' && ch.kind !== 'replace') return 'This change can’t be undone.';
   return null;
 }
 
@@ -293,7 +293,7 @@ export async function listRecordChanges(userId: string, opts: { since?: Date | n
   if (opts.since) or.push({ createdAt: { $gte: opts.since } });
   const rows = await MasterChange.find({ userId, list: RECORDS_LIST, $or: or })
     .sort({ createdAt: -1 }).limit(limit)
-    .select('kind rowId sheetDone sheetDoneAt undoneAt undoOf createdAt extra').lean() as any[];
+    .select('kind rowId recordsChanged sheetDone sheetDoneAt undoneAt undoOf createdAt extra.title extra.tab extra.findRow extra.moveTo extra.lines extra.steps extra.places').lean() as any[];
   return rows.map(r => ({
     id: String(r._id),
     kind: r.kind,
@@ -302,7 +302,11 @@ export async function listRecordChanges(userId: string, opts: { since?: Date | n
     tab: r.extra?.tab ?? '',
     findRow: r.extra?.findRow ?? '',
     moveTo: r.extra?.moveTo ?? null,
-    lines: (r.extra?.lines ?? []) as ChangeLine[],
+    /** One line per changed cell; a filtered replace adds tab and findRow to each line. */
+    lines: (r.extra?.lines ?? []) as (ChangeLine & { tab?: string; findRow?: string })[],
+    /** Find & Replace steps (an unfiltered replace). */
+    steps: (r.extra?.steps ?? []) as string[],
+    records: r.recordsChanged ?? 1,
     createdAt: r.createdAt,
     sheetDone: !!r.sheetDone,
     sheetDoneAt: r.sheetDoneAt ?? null,

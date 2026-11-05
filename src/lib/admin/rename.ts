@@ -26,7 +26,8 @@ import CalendarSettings from '@/models/CalendarSettings';
 import { colorKeyFor } from '@/app/calendar/_lib/calendar-colors';
 import { getArchiveUntil } from '@/lib/archiveYear';
 import { countsByTab, savedByTab, type TabCount } from '@/lib/yearTabs';
-import { RECORDS_LIST, undoRecordChange } from '@/lib/records/edit';
+import { RECORDS_LIST, undoRecordChange, recordUndoBlocked } from '@/lib/records/edit';
+import { undoReplace } from '@/lib/records/replace';
 import { type ListDef, toRow } from './lists';
 import { PLACE_SLUG, previewPlaceRename, applyPlaceRename, undoPlaceChange, type PlacePreview } from './renamePlace';
 
@@ -326,7 +327,7 @@ async function calendarChange(userId: string, p: Plan, write: boolean, session?:
 // ── Apply ────────────────────────────────────────────────────────────────────
 
 export async function applyRename(def: ListDef, userId: string, req: RenameRequest, expectRecords: number):
-  Promise<{ ok: true; changeId: string; recordsChanged: number } | Fail> {
+  Promise<{ ok: true; changeId: string; recordsChanged: number; sheetNeeded?: boolean } | Fail> {
   if (def.slug === PLACE_SLUG) {
     return req.mode === 'row' ? applyPlaceRename(def, userId, req.id, req.values, expectRecords) : fail(400, 'Place points have no categories.');
   }
@@ -400,7 +401,7 @@ export function undoBlocked(ch: any): string | null {
   if (ch.undoneAt) return 'Already undone.';
   if (ch.undoOf) return 'This is an undo; make the change again instead.';
   if (!ch.extra?.plan) return 'This change has no plan to undo.';
-  if (ch.kind === 'merge' && ch.sheetDone) return 'A merge can be undone only before it is repeated in the sheet: after that, the sheet can’t tell its rows apart.';
+  if (ch.kind === 'merge' && ch.sheetDone && !ch.extra?.noSheet) return 'A merge can be undone only before it is repeated in the sheet: after that, the sheet can’t tell its rows apart.';
   return null;
 }
 
@@ -408,7 +409,11 @@ export async function undoChange(userId: string, changeId: string, defOf: (slug:
   Promise<{ ok: true; changeId: string; recordsChanged: number; sheetNeeded: boolean } | Fail> {
   const ch = await MasterChange.findOne({ _id: changeId, userId }).lean() as any;
   if (!ch) return fail(404, 'Unknown change.');
-  if (ch.list === RECORDS_LIST) return undoRecordChange(userId, ch);   // #70
+  if (ch.list === RECORDS_LIST) {                                        // #70
+    if (ch.kind !== 'replace') return undoRecordChange(userId, ch);
+    const blocked = recordUndoBlocked(ch);
+    return blocked ? fail(409, blocked) : undoReplace(userId, ch);
+  }
   const blocked = undoBlocked(ch);
   if (blocked) return fail(409, blocked);
   const def = defOf(ch.list);

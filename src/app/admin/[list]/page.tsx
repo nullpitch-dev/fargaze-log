@@ -171,6 +171,8 @@ export default function AdminListPage() {
   >(null);
   const [locatingKey, setLocatingKey] = useState<string | null>(null);
 
+  // Place points (5 Nov): nothing reads the PlaceCoord tab, so most changes need no sheet step.
+  const repeatNote = (b: { sheetNeeded?: boolean }) => (b.sheetNeeded === false ? ' Nothing to do in the sheet.' : ' Repeat it in the sheet, then tick it below.');
   const pointOf = (c: Cell): LatLng | null => (c && typeof c === 'object' && 'lat' in c ? { lat: c.lat, lng: c.lng } : null);
   const draftPoint = (text: string): LatLng | null => {
     const m = text.trim().match(/^(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)$/);
@@ -187,7 +189,7 @@ export default function AdminListPage() {
     const b = await r.json().catch(() => ({}));
     setPicker(null);
     if (!r.ok) { setRowError(b.error ?? `HTTP ${r.status}`); return; }
-    setNotice(`Point saved for ${rowLabel(data!.list.columns.filter(c => !c.narrow), row)}. Repeat it in the sheet, then tick it below.`);
+    setNotice(`Point saved for ${rowLabel(data!.list.columns.filter(c => !c.narrow), row)}.${repeatNote(b)}`);
     setReload(n => n + 1);
   }
 
@@ -235,7 +237,7 @@ export default function AdminListPage() {
         return;
       }
       setEditing(null);
-      setNotice(isNew ? 'Added. Repeat it in the sheet, then tick it below.' : 'Saved. Repeat it in the sheet, then tick it below.');
+      setNotice(`${isNew ? 'Added.' : 'Saved.'}${repeatNote(b)}`);
       setReload(n => n + 1);
     } finally {
       setSaving(false);
@@ -267,7 +269,7 @@ export default function AdminListPage() {
       });
       const b = await r.json().catch(() => ({}));
       if (!r.ok) { setRowError(b.error ?? `HTTP ${r.status}`); return; }
-      setNotice(`Done: ${preview.data.title}, ${recs(b.recordsChanged)} changed. Repeat it in the sheet, then tick it below.`);
+      setNotice(`Done: ${preview.data.title}, ${recs(b.recordsChanged)} changed.${repeatNote(b)}`);
       setPreview(null); setEditing(null); setCatForm(null);
       setReload(n => n + 1);
     } finally {
@@ -301,7 +303,7 @@ export default function AdminListPage() {
       const r = await fetch(`/api/admin/lists/${encodeURIComponent(slug)}/${row._id}`, { method: 'DELETE' });
       const b = await r.json().catch(() => ({}));
       if (!r.ok) { setRowError(b.error ?? `HTTP ${r.status}`); return; }
-      setNotice('Deleted. Repeat it in the sheet, then tick it below.');
+      setNotice(`Deleted.${repeatNote(b)}`);
       setReload(n => n + 1);
     } finally {
       setBusy(null);
@@ -695,6 +697,8 @@ export default function AdminListPage() {
               onApply={p => (picker.mode === 'row'
                 ? saveRowPoint(picker.row, picker.key, p)
                 : (setCell(picker.key, `${p.lat}, ${p.lng}`), setPicker(null)))}
+              onUseName={picker.mode === 'draft' ? (name => setCell(data.list.indexBy ?? 'name', name)) : undefined}
+              hasName={picker.mode === 'draft' && !!String(editing?.draft[data.list.indexBy ?? 'name'] ?? '').trim()}
               onClose={() => setPicker(null)}
             />
           )}

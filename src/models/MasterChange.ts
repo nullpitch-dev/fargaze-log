@@ -16,6 +16,9 @@ import { Schema, model, models } from 'mongoose';
 //
 // Record changes (#70) use the same list, so an unticked one blocks the migrations too:
 //   list 'records', kind 'edit' | 'delete' (an undone delete is logged as 'add'),
+//   or 'replace' — a bulk Find & replace (src/lib/records/replace.ts): before holds the
+//   request, extra { title, steps (Find & Replace), lines (per record, when filtered),
+//   items: [{ id, path, before, after, … }] for Undo, afterUpdatedAt };
 //   rowId the record's _id, before / after the whole record, recordIds [its _id],
 //   extra { title, tab, findRow, moveTo, lines: [{ column, what, before, after,
 //   calculated? }], afterUpdatedAt } — one line per changed cell (src/lib/records)
@@ -23,7 +26,7 @@ const MasterChangeSchema = new Schema(
   {
     userId:         { type: String, required: true },
     list:           { type: String, required: true },
-    kind:           { type: String, required: true, enum: ['add', 'edit', 'delete', 'rename', 'merge'] },
+    kind:           { type: String, required: true, enum: ['add', 'edit', 'delete', 'rename', 'merge', 'replace'] },
     rowId:          { type: String, default: null },
     before:         { type: Schema.Types.Mixed, default: null },
     after:          { type: Schema.Types.Mixed, default: null },

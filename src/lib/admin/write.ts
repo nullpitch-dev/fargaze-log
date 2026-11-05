@@ -20,12 +20,19 @@ import FavoritePlace from '@/models/FavoritePlace';
 import { type ListDef, type CellValue, toRow, lockedColumns } from './lists';
 
 export type WriteResult =
-  | { ok: true; id: string }
+  | { ok: true; id: string; sheetNeeded: boolean }
 	| { ok: false; status: number; error: string; needsConfirm?: { column: string; label: string; value: string }; needsRename?: boolean };
 
 type Values = Record<string, CellValue>;
 
 const fail = (status: number, error: string): WriteResult => ({ ok: false, status, error });
+
+/** A list whose sheet tab nothing reads (place points): its change is logged as already
+ *  repeated, so it never blocks a migration. */
+function logged(def: ListDef, steps: string[]): { sheetSteps: string[]; sheetDone?: boolean; sheetDoneAt?: Date } {
+  if (!def.sheet.tabUnused) return { sheetSteps: steps };
+  return { sheetSteps: [`Nothing to do in the sheet: the ${def.sheet.where} is no longer read.`], sheetDone: true, sheetDoneAt: new Date() };
+}
 const records = (n: number) => `${n.toLocaleString()} record${n === 1 ? '' : 's'} use${n === 1 ? 's' : ''}`;
 
 // ── Parsing what the page sends ──────────────────────────────────────────────
@@ -209,9 +216,9 @@ export async function addRow(def: ListDef, userId: string, raw: Record<string, u
   const created = await model.create(doc);
   await MasterChange.create({
     userId, list: def.slug, kind: 'add', rowId: String(created._id),
-    after: p.values, sheetSteps: sheetSteps(def, 'add', null, p.values),
+    after: p.values, ...logged(def, sheetSteps(def, 'add', null, p.values)),
   });
-  return { ok: true, id: String(created._id) };
+  return { ok: true, id: String(created._id), sheetNeeded: !def.sheet.tabUnused };
 }
 
 export async function editRow(def: ListDef, userId: string, id: string, raw: Record<string, unknown>, confirmNew: boolean): Promise<WriteResult> {
@@ -253,9 +260,9 @@ export async function editRow(def: ListDef, userId: string, id: string, raw: Rec
   await model.updateOne({ _id: existing._id }, { $set: p.fields });
   await MasterChange.create({
     userId, list: def.slug, kind: 'edit', rowId: id,
-    before, after: p.values, sheetSteps: sheetSteps(def, 'edit', before, p.values),
+    before, after: p.values, ...logged(def, sheetSteps(def, 'edit', before, p.values)),
   });
-  return { ok: true, id };
+  return { ok: true, id, sheetNeeded: !def.sheet.tabUnused };
 }
 
 export async function deleteRow(def: ListDef, userId: string, id: string): Promise<WriteResult> {
@@ -276,7 +283,7 @@ export async function deleteRow(def: ListDef, userId: string, id: string): Promi
   await model.deleteOne({ _id: existing._id });
   await MasterChange.create({
     userId, list: def.slug, kind: 'delete', rowId: id,
-    before, sheetSteps: sheetSteps(def, 'delete', before, null),
+    before, ...logged(def, sheetSteps(def, 'delete', before, null)),
   });
-  return { ok: true, id };
+  return { ok: true, id, sheetNeeded: !def.sheet.tabUnused };
 }
