@@ -56,6 +56,28 @@ interface ListResponse {
 
 // ── Formatting ───────────────────────────────────────────────────────────────
 
+/** "7 Nov 26" — the Changed column on a phone. */
+function whenShort(iso: string | null | undefined): string {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' });
+}
+
+/** Copies a place name; shows ✓ for a moment. */
+function CopyName({ text }: { text: string }) {
+  const [done, setDone] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        navigator.clipboard?.writeText(text).then(() => { setDone(true); setTimeout(() => setDone(false), 1200); }, () => {});
+      }}
+      title="Copy the name"
+      aria-label={`Copy ${text}`}
+      className="ml-1.5 align-middle text-[11px] text-stone-300 dark:text-zinc-600 hover:text-stone-700 dark:hover:text-zinc-200"
+    >{done ? '✓' : '⧉'}</button>
+  );
+}
+
 /** "7 Nov 2026, 13:20" in the browser's time. */
 function whenText(iso: string | null | undefined): string {
   if (!iso) return '';
@@ -825,12 +847,12 @@ export default function AdminListPage() {
                     </Fragment>
                   ))}
                   {tools.changedColumn && (
-                    <th onClick={() => clickSort('__changed')} title="When the point was last added or edited" className={`${th} w-40`}>
+                    <th onClick={() => clickSort('__changed')} title="When the point was last added or edited" className={`${th} sm:w-40`}>
                       Changed <span className="text-[8px]">{arrow('__changed')}</span>
                     </th>
                   )}
                   {data.list.usageCounted && (
-                    <th onClick={() => clickSort('__used')} className={`${th} text-right ${tools.changedColumn ? 'w-48' : 'w-24'}`}>
+                    <th onClick={() => clickSort('__used')} className={`${th} text-right ${tools.changedColumn ? 'sm:w-48' : 'w-24'}`}>
                       Records <span className="text-[8px]">{arrow('__used')}</span>
                     </th>
                   )}
@@ -844,8 +866,9 @@ export default function AdminListPage() {
                   <tr className="border-b last:border-0 border-stone-100 dark:border-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-800/60">
                     {shown.map(c => (
                       <Fragment key={c.key}>
-                        <td title={c.narrow ? cellText(r.values[c.key], c.type) || undefined : undefined} className={`px-3 py-1.5 ${c.type === 'number' || c.type === 'coords' ? 'font-mono text-xs' : ''} ${c.type === 'number' ? 'text-right' : ''} ${c.narrow ? 'max-w-40 truncate text-xs' : ''} text-stone-800 dark:text-zinc-100`}>
+                        <td title={c.narrow ? cellText(r.values[c.key], c.type) || undefined : undefined} className={`px-3 py-1.5 ${c.type === 'number' || c.type === 'coords' ? 'font-mono text-xs' : ''} ${c.type === 'number' ? 'text-right' : ''} ${c.narrow ? 'max-w-40 truncate text-xs' : ''} ${tools.changedColumn && c.key === data.list.indexBy ? 'min-w-40 break-words' : ''} text-stone-800 dark:text-zinc-100`}>
                           {cellText(r.values[c.key], c.type) || <span className="text-stone-300 dark:text-zinc-600">—</span>}
+                          {tools.changedColumn && c.key === data.list.indexBy && !!cellText(r.values[c.key], c.type) && <CopyName text={cellText(r.values[c.key], c.type)} />}
                         </td>
                         {c.type === 'coords' && (
                           <td className="px-3 py-1.5">
@@ -863,7 +886,9 @@ export default function AdminListPage() {
                       <td
                         title={r.createdAt ? `Added ${whenText(r.createdAt)}` : undefined}
                         className="px-3 py-1.5 text-xs text-stone-500 dark:text-zinc-400 whitespace-nowrap"
-                      >{whenText(r.updatedAt) || <span className="text-stone-300 dark:text-zinc-600">—</span>}</td>
+                      >{r.updatedAt
+                        ? <><span className="sm:hidden">{whenShort(r.updatedAt)}</span><span className="hidden sm:inline">{whenText(r.updatedAt)}</span></>
+                        : <span className="text-stone-300 dark:text-zinc-600">—</span>}</td>
                     )}
                     {data.list.usageCounted && (
                       <td

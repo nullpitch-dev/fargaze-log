@@ -16,7 +16,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze Log", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Data Design & Requirements Document", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 4.27  |  7 November 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 4.28  |  7 November 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
 );
 C(p([new TextRun({ text: "Structure: ", bold: true }), new TextRun("Part I Foundations · Part II Data · Part III Features · Part IV Operations · Appendices. The body is the complete, always-current source of truth; the changelog below carries one line per version. Work status, open questions and the backlog live in the separate WBS, not here.")]));
 
@@ -72,6 +72,7 @@ C(table(
     ["4.25","27 Oct 2026","EDIT FEATURE STEP 1 DONE (checked on production: all 46,132 records come back unchanged through the form; the 28 broken-time records fixed in the sheet and a full migration run, which also recalculated every weekday) and STEP 2 BUILT: bulk Find & replace in records (§15.6.3) — fields, whole value or part of the text, the James → James Potter skip, two-pass sheet steps, regular expressions for list cells, per-record lines when a date or activity filter is used, one change-list entry (kind replace, §6.12) with Undo. People names added to the fields (Hyoje’s 길동이 → 홍길동 example; names have no master list). STAGING NOW CHECKS THE RECORD RULES too (§11.7): a 귀가 trip to 집 without a return type had passed it"],
     ["4.26","5 Nov 2026","#70 STEP 2 DONE (bulk Find & replace API, pushed). PLACE POINTS AFTER HYOJE’S TRIP (§15.5.7–15.5.9): search in the map pop-up (Places API (New)); tapping a place’s icon selects that place; one main button “Use this point and name” with a Use this name tick box; place-point changes need no sheet step any more (the PlaceCoord tab is read by nothing) — a rename or merge of a used name still does. PLACE DETAILS agreed (§15.5.9, to build after #70 step 3): “A - B” where only A has a point; the longest name with a point wins. Documents are now updated once per finished step (Hyoje, 28 Oct)"],
     ["4.27","7 Nov 2026","#70 STEP 3 DONE (pushed 7 Nov): THE EDIT PAGE /records/<id> and RECORD CHANGES (§15.6.4–15.6.6), shaped by six rounds of Hyoje’s testing 5–7 Nov. English labels everywhere, the record pane too, with an Edit button; checked as you type; the Check card shows PLAIN change lines (‘Added 라면 (밀, 고기 국물) 1 인분 to Foods’, ‘Removed 민아 from 대면 · 가족’), each with an × that puts that part back, and the sheet cells folded below; Saved screen with Mark repeated and Undo; Record changes page in the gear menu with a count. New rules: Relationship follows People (the sheet’s formula in G; a method shared by every group is written once, as the sheet does); a people group needs a name; a journey added to a record must be whole, and a 이동 record must have its whole journey (Staging too). Form helpers: time picker, type-to-search for alcohol and cost category, notes folded, cost typed in KRW or in a currency with a rate (KRW calculated; the rate is not stored), body fat (kg) from weight × %, a whole-meal amount shared by portions. ‘Transport’ is called Journey on screen"],
+    ["4.28","7 Nov 2026","67.8 PLACE DETAILS “A - B” DONE (pushed 7 Nov, §15.5.9) and PLACE POINTS PAGE TOOLS (§15.5.10), shaped by Hyoje’s testing the same day. A name uses the point of the longest name that has one (src/lib/places/details.ts); Place points counts each record once under the point it uses, ‘12 (5 with details)’, and the detail names open under the row; renaming a point carries everything under it — records, favourite periods and child points — with a regular-expression sheet step; refused: a child point landing on a name already taken (merge too) and a new name that starts with the old one and “ - ”. Journeys joins legs and finds workplaces by the point’s place. The page: Note out of the table, a Changed column, foldable parts (Places open, the rest folded, remembered per browser), Missing points (3 / 6 / 12 months or all; names with no point listed under A; + Add point, Exclude, Rename) and Excluded with Put back (admin_settings.pointExcluded, §6.13). Rename a name with no point: exact text in Place / From / To and favourite periods, preview, Undo (e.g. ‘Brooklands College 302’ → ‘Brooklands College - 302’). Hyoje does not want Location filled automatically for 이동 records"],
     ["4.21","26 Oct 2026","DAILY STRIPS FOR DIET AND DRINKING; ONE RULE FOR FUTURE DAYS; MONTHS IN THE CALENDAR (§9.3.3, §9.3.4, §9.3.9). Diet: the Spicy days strip is replaced by Daily diet · carbs — each day coloured by its carbs index (below 4 blue, 4–8 amber, over 8 red), tooltip listing every food- or drink-bearing record of the day (time, meal type, items, 🌶 on a meal rated H, servings in 인분 or a drink-only record’s shared amount), opening upwards; diet.summary gains days. Drinking: a Daily drinking strip under the drinks row (below 4 blue, 4–10 amber, over 10 red), tooltip with the day’s total and each record’s items as logged and drinks; drinking.summary gains rangeStart, rangeEnd and days. Shared colours and band rule in src/app/insights/_lib/day-bands.ts. Strips and calendars in Diet, Drinking, Exercise and Sleep now cover the whole period and draw days from today on as future days (faint, no border, ‘not yet’; futureFrom = localToday()); exercise.summary gains rangeStart / rangeEnd. The calendar pop-up marks months: ‘Oct 1’ in bold on each 1st and on the first day shown, and a stepped line along each month boundary. Checked by Hyoje on 26 Oct"],
   ],
   [1100, 1300, 6960]
@@ -710,6 +711,7 @@ C(table(["Field","Type","Notes"],[
   ["userId","String","Owner; unique index { userId }"],
   ["pins","String[]","Slugs of the lists shown as shortcuts in the gear menu, kept in /admin order. Absent until the first pin or unpin: the API then supplies the starter list (activity, cost, place-coord, ingredient)"],
   ["archiveUntil","Number","(v4.23) N: the last year in the Archive file’s archive tab ~N; later years have a tab each (§11.8). Absent = 2025. Set only by npm run migrate -- --full --rollover; read by both migrations and by the /admin rename steps (src/lib/archiveYear.ts)"],
+  ["pointExcluded","{ name, at }[]","(v4.28) Names left out of Place points > Missing points (§15.5.10), with when; Put back removes the entry. Absent until the first Exclude"],
   ["createdAt / updatedAt","Date","timestamps"],
 ],[2400,2000,4960]));
 C(p("Model src/models/AdminSettings.ts; logic src/lib/admin/pins.ts; GET / PUT /api/admin/pins. GET /api/admin/lists also returns pinned per list."));
@@ -2380,7 +2382,7 @@ C(
 );
 C(spacer());
 
-C(h3("15.5.9 Place Details: “A - B” (agreed 5 Nov, to build after #70 step 3)"));
+C(h3("15.5.9 Place Details: “A - B” (agreed 5 Nov, built 7 Nov, v4.28)"));
 C(p("Hyoje’s convention from his trip: in a place name, “A - B” means A has a point and B — a hotel room, a golf course’s course, a department store’s shop — does not. His old records don’t follow it yet; he will tidy them with the edit feature."));
 C(
   bullet("The separator is exactly “ - ” (space, hyphen, space), so ‘Saint-Denis’ stays one name"),
@@ -2389,6 +2391,21 @@ C(
   bullet("Place points: each record counts once, under the point it uses (‘12 (5 with details)’); ‘A - B’ is not a missing point when A resolves"),
   bullet("Renaming a point renames everything under it (Harrods → Harrods London also changes ‘Harrods - …’); the sheet step is a regular-expression Find & Replace that matches the name alone or followed by “ - …”"),
   bullet("The entry app (#71) has two boxes, Place (picked from the points) and Detail (free text); the sheet keeps “A - B” in one cell"),
+  bullet("(v4.28, built) One helper for all of it, src/lib/places/details.ts: pointNameFor (the longest name with a point), withFavorite (a label at the head: ‘회사 - 회의실’ → ‘<the real 회사> - 회의실’), underFilter (MongoDB ^A( - .*)?$). Counting is one $group by the three resolved values; the longest-name rule runs in code, so a record with ‘A - B’ in Place and ‘A’ in To counts once"),
+  bullet("(v4.28) A rename carries child points too (‘Harrods - Food Hall’ → ‘Harrods London - Food Hall’) and favourite periods whose name is under it. Refused: a child landing on a name another point already has — a merge included, the message names it — and a new name that starts with the old one and “ - ” (everything under it would change too). Sheet step: Find ^A( - .*)?$, replace A′$1, with ‘Search using regular expressions’. Undo reverses the head swap on the same records"),
+  bullet("(v4.28) Journeys: From and To count as the longest form that is a favourite label or has a point, so legs join, 집 ends a journey and workplaces are found as without the detail (Hyoje puts no details in From / To; this is in case); map routes are grouped by point; only a name where no part has a point is missing"),
+);
+C(spacer());
+
+C(h3("15.5.10 Place Points Page Tools (v4.28, 7 Nov)"));
+C(p("Asked for by Hyoje on 7 Nov to find and fix names with no point. The page only; the other lists are unchanged (lists.ts page: hideColumns, changedColumn, foldable, missingPoints)."));
+C(
+  bullet("Note left out of the table (its box stays in the edit row); a Changed column: when the point was last added or edited, ‘Added …’ on hover, sorted newest first on the first click. Points loaded by the old PlaceCoord migration all carry that run’s date"),
+  bullet("Foldable parts, each with ▸ / ▾: Places (open), Changes since, Missing points and Excluded (folded); remembered per list on the browser (localStorage). Missing points and Excluded load only while one is open"),
+  bullet("Places rows with details: ‘▸ (N with details)’ opens the names logged under the point, each with its count and Rename"),
+  bullet("Missing points (GET /api/admin/lists/place-coord/missing?months=3|6|12|all; London date, local start dates): names in Place, From and To with no point under the longest-name rule, favourite labels resolved; listed under A (‘+N with details’, which opens each name as logged). Columns: Name, Records (by field on hover), Last used, then + Add point (the Add row with the name filled in), Exclude, Rename. A bare favourite label (an all-day record, or no period covering it) is left out: it needs a period, not a point"),
+  bullet("Exclude (a car in Location: 내차, 민아 차, 렌터카 …): the name — and everything under it — leaves Missing points; Excluded lists it with its records in the same period, last used and when excluded, and Put back. Kept in admin_settings.pointExcluded (§6.13), so phone and desktop agree; records, counts and the sheet don’t change. Hyoje does not want Location filled automatically for 이동: the app can’t know whose car, or where he is between two cities"),
+  bullet("Rename a name with no point (POST …/missing { rename: { from, to }, expectRecords? }; without expectRecords, the preview): exactly that text in Place, From, To and favourite periods; the preview gives the records by tab and field, which point the new name will use, and how many records already say it (they join); the sheet step is Find ^X$ → Y. One change-list entry (place-coord, rename, plan mode ‘name’) with Undo until the next migration. Refused: a name that has a point (rename it under Places), a favourite label, a name no record says exactly. Cases: ‘Brooklands College 302’ → ‘Brooklands College - 302’; the old front-nine / back-nine names ‘Farleigh Golf Club Blue - Yellow’ → ‘Farleigh Golf Club - Blue > Yellow’"),
 );
 C(spacer());
 
@@ -2527,14 +2544,16 @@ C(table(["Path","Purpose"],[
   ["scripts/survey-sheets.ts","(v4.16) Read-only sheet survey (§15.4): writes myfiles/survey/survey-YYYY-MM-DD.md and .json"],
   ["src/lib/survey/sheetSurvey.ts","(v4.16) The survey's analysis: cell kinds, formula shapes, dropdown and master-tab checks, field-group usage by category and activity, master-list comparison. Pure"],
   ["src/lib/admin/lists.ts","(v4.17) The 18 admin list descriptions: columns and types, unique columns, usage specs (record fields per column), sheet place (tab, column, dropdown), recordsFollow, fixedOnEdit; toRow, rowKey, lockedColumns; REFERENCE_LIST_NAMES, RETIRED_REFERENCE_LISTS"],
-  ["src/lib/admin/renamePlace.ts","(v4.20) Rename and merge for place points: plan (name only), counts per field and year, favourite places following, sheet steps for AA / BE / BF, transaction, Undo by IDs per field"],
+  ["src/lib/admin/renamePlace.ts","(v4.20) Rename and merge for place points: plan (name only), counts per field and year, favourite places following, sheet steps for AA / BE / BF, transaction, Undo by IDs per field (v4.28) Everything under the name follows (child points, “A - …” records and periods), regex sheet steps; previewNameRename / applyNameRename for a name with no point (exact)"],
+  ["src/lib/places/details.ts","(v4.28) Place details “A - B” (§15.5.9): namePrefixes, pointNameFor, splitHead, withFavorite, isUnder, swapHead, escapeRegex, underFilter. Pure"],
+  ["src/app/api/admin/lists/[list]/missing/route.ts","(v4.28) Place points > Missing points: GET ?months=3|6|12|all (names + excluded); POST { exclude | putBack } or { rename, expectRecords? } (§15.5.10)"],
   ["src/lib/admin/pins.ts","(v4.20) Gear-menu pins: STARTER_PINS, getPins, setPinned (kept in /admin order)"],
   ["src/app/api/admin/pins/route.ts","(v4.20) GET the shortcuts; PUT { slug, pinned } to pin or unpin one list"],
   ["src/models/AdminSettings.ts","(v4.20) admin_settings: { userId, pins } (§6.13)"],
   ["src/app/admin/_components/PointPicker.tsx","(v4.20) Map pop-up: draggable pin, tap to move, 📍 Here (locate), Map / Satellite, Apply this point"],
   ["src/app/_components/google-maps.ts","(v4.20) loadGoogleMaps and getMapsKey, shared by JourneyMap and PointPicker"],
   ["src/app/NavBar.tsx","(v4.20) Gear button opens the menu (All master lists + pins); under 520 px the FARGAZE word is hidden and the links sit closer"],
-  ["src/lib/admin/usage.ts","(v4.17) computeUsage: records per row (distinct records across specs) and values used in records but missing from the list (v4.20) Counts without record IDs where the specs open no arrays (one pass across Place / From / To and similar), breakdown per labelled spec, favourite-place labels resolved for viaFavorites lists, no orphans when refuseUnknown is false"],
+  ["src/lib/admin/usage.ts","(v4.17) computeUsage: records per row (distinct records across specs) and values used in records but missing from the list (v4.20) Counts without record IDs where the specs open no arrays (one pass across Place / From / To and similar), breakdown per labelled spec, favourite-place labels resolved for viaFavorites lists, no orphans when refuseUnknown is false (v4.28) placeDetails: each record once under the point it uses, details and detailNames per row; missingPoints"],
   ["src/lib/admin/write.ts","(v4.17) addRow / editRow / deleteRow: parseInput (text, number, coords, zone + local time → true instant), locked and fixed columns, duplicates, favourite-place periods, confirmNew, rowUsage, sheetSteps, master_change logging (v4.20) deleteRow refuses a place point that a favourite-place period names"],
   ["src/lib/admin/guard.ts","(v4.17) requireUser — session check for every admin route; connects the database"],
   ["src/app/admin/page.tsx","(v4.17) /admin — lists by group with rows, last change and how many changes to repeat; banner when any"],
@@ -2667,7 +2686,7 @@ C(table(["Path","Purpose"],[
 C(spacer());
 
 // ===== FOOTER =====
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.27 — 7 November 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.28 — 7 November 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 
 // ===== DOCUMENT ASSEMBLY =====
@@ -2704,6 +2723,6 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-Log-Data-Design-v4.27.docx", buffer);
-  console.log("Wrote FarGaze-Log-Data-Design-v4.27.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-Log-Data-Design-v4.28.docx", buffer);
+  console.log("Wrote FarGaze-Log-Data-Design-v4.28.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });
