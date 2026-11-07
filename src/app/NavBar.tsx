@@ -26,6 +26,18 @@ export default function NavBar() {
   const menuRef = useRef<HTMLDivElement>(null);
   const close = () => setOpenOn(null);
 
+  // Record changes waiting for the sheet (#70, 5 Nov): a dot on the gear and a count in
+  // the menu, read on every page change so a fresh save shows.
+  const [waiting, setWaiting] = useState(0);
+  useEffect(() => {
+    let live = true;
+    fetch('/api/records/changes?count=1')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (live && d) setWaiting(d.waiting ?? 0); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [pathname]);
+
   // Read the pins each time the menu opens, so a star just ticked on /admin shows.
   function toggle() {
     if (open) { close(); return; }
@@ -77,8 +89,9 @@ export default function NavBar() {
           aria-label="Master lists"
           aria-haspopup="menu"
           aria-expanded={open}
-          className={`${navClass('/admin')} p-1 -m-1`}
+          className={`${navClass('/admin')} p-1 -m-1 relative`}
         >
+          {waiting > 0 && <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-500" aria-label={`${waiting} record changes waiting for the sheet`} />}
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <circle cx="12" cy="12" r="3" />
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
@@ -91,6 +104,10 @@ export default function NavBar() {
             className="absolute right-0 top-full mt-3 w-56 z-50 py-1 bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-700 rounded-lg shadow-lg"
           >
             <Link href="/admin" role="menuitem" onClick={close} className={item('/admin')}>All master lists</Link>
+            <Link href="/records/changes" role="menuitem" onClick={close} className={`${item('/records/changes')} flex items-center justify-between`}>
+              Record changes
+              {waiting > 0 && <span className="ml-2 rounded-full bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 text-xs px-1.5">{waiting}</span>}
+            </Link>
             <div className="my-1 border-t border-stone-100 dark:border-zinc-800" />
             {pinsError && <p className="px-4 py-2 text-xs text-red-600 dark:text-red-400">Could not load shortcuts</p>}
             {!pins && !pinsError && <p className="px-4 py-2 text-xs text-stone-400 dark:text-zinc-500">Loading…</p>}

@@ -10,6 +10,7 @@
 // works out what the sheet calculates: the category from the activity, weekdays,
 // offsets, all-day and the duration. Empty lists are [] (the database's array default).
 
+import { relationshipOf } from './relationship';
 import { computeTotalSeconds, weekdayOf } from '../migration/transform';
 
 // ── Shape ────────────────────────────────────────────────────────────────────
@@ -290,9 +291,12 @@ export function buildRecord(form: RecordForm, base: any | null, ctx: FormContext
     .filter(x => listCheck('Alcohol', x.i, x.item, { amount: x.amount, unit: x.unit, note: x.note }, oldAlcohol.has(key({ a: x.item, b: x.amount, c: x.unit })), SEP_PLUS))
     .map(x => ({ item: x.item, amount: x.amount, unit: x.unit, note: x.note }));
 
+  const oldPeople = oldItems('people', ['method', 'category', 'target']);
   const people = (f?.people ?? []).map((x, i) => ({ method: t(x?.method), category: t(x?.category), target: t(x?.target), i }))
     .filter(x => {
       if (!x.method && !x.category && !x.target) return false;
+      // A group without a name (the form's people cards, 5 Nov).
+      if (!x.target) flag(`People: a ${[x.method, x.category].filter(Boolean).join(' · ') || ''} group has no name`.replace('a  group', 'a group'), oldPeople.has(key({ a: x.method, b: x.category, c: x.target })));
       if (ctx.sheetIsTruth) {
         for (const [k, v] of [['method', x.method], ['category', x.category], ['person', x.target]] as const) {
           if (/[,|]/.test(v)) problems.push(`People, ${ORD(x.i)} entry: the ${k} '${v}' can't hold , or | until cutover`);
@@ -324,7 +328,8 @@ export function buildRecord(form: RecordForm, base: any | null, ctx: FormContext
     sync: base?.sync ?? { status: null, eventId: null, export: null },
     activity: {
       category, name: str(name), title: str(f?.activity?.title), additionalInfo: str(f?.activity?.additionalInfo),
-      crossActivity: str(f?.activity?.crossActivity), relationship: str(f?.activity?.relationship),
+      // Relationship follows People, like the sheet's formula in G (5 Nov); not typed.
+      crossActivity: str(f?.activity?.crossActivity), relationship: relationshipOf(people),
     },
     start: start ? strip(start) : base?.start ?? null,
     end: end ? strip(end) : base?.end ?? null,
@@ -371,10 +376,36 @@ export function buildRecord(form: RecordForm, base: any | null, ctx: FormContext
   // A trip home (purpose 귀가, to 집) records how it ended (Design §9: ReturnType sits on
   // the leg that arrives home).
   const tr = doc.transport;
+  // Transport added to a record that had none must be whole (Hyoje, 7 Nov): From, To,
+  // Purpose and Method (the return type as below). Editing an existing trip, Staging and
+  // the migrations are unchanged.
+  const hadTransport = base && Object.values(base.transport ?? {}).some(v => v != null && String(v).trim() !== '');
+  const baseTr = base?.transport && { from: base.transport.from, to: base.transport.to, purpose: base.transport.purpose, method: base.transport.method, returnType: base.transport.returnType };
+  if (doc.activity.category === '이동') {
+    // A 이동 record must have its whole journey (Hyoje, 7 Nov) — Staging rows too. An old
+    // record whose journey is left as it was only warns.
+    const missing = transportMissing(tr).filter(m => m !== 'Return type');
+    if (missing.length) flag(`Journey: a 이동 record needs its journey — fill in ${missing.join(', ')}`, !!base && same(tr, baseTr));
+  } else if (base && !hadTransport && Object.values(tr).some(v => v)) {
+    const missing = transportMissing(tr).filter(m => m !== 'Return type');
+    if (missing.length) problems.push(`Journey: fill in ${missing.join(', ')}`);
+  }
   if (tr.purpose === '귀가' && tr.to === '집' && !tr.returnType) {
     flag('Return type is required on a 귀가 trip to 집', same(tr, base?.transport && { from: base.transport.from, to: base.transport.to, purpose: base.transport.purpose, method: base.transport.method, returnType: base.transport.returnType }));
   }
   return { doc, problems: [...new Set(problems)], warnings };
+}
+
+/** What a whole trip still lacks: From, To, Purpose, Method (+ Return type on 귀가 to 집). */
+export function transportMissing(tr: { from?: string | null; to?: string | null; purpose?: string | null; method?: string | null; returnType?: string | null }): string[] {
+  const t = (v: unknown) => (v == null ? '' : String(v).trim());
+  const out: string[] = [];
+  if (!t(tr.from)) out.push('From');
+  if (!t(tr.to)) out.push('To');
+  if (!t(tr.purpose)) out.push('Purpose');
+  if (!t(tr.method)) out.push('Method');
+  if (t(tr.purpose) === '귀가' && t(tr.to) === '집' && !t(tr.returnType)) out.push('Return type');
+  return out;
 }
 
 /**

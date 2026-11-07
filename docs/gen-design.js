@@ -16,7 +16,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze Log", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Data Design & Requirements Document", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 4.25  |  27 October 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 4.26  |  5 November 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
 );
 C(p([new TextRun({ text: "Structure: ", bold: true }), new TextRun("Part I Foundations · Part II Data · Part III Features · Part IV Operations · Appendices. The body is the complete, always-current source of truth; the changelog below carries one line per version. Work status, open questions and the backlog live in the separate WBS, not here.")]));
 
@@ -70,6 +70,7 @@ C(table(
     ["4.23","26 Oct 2026","YEAR TABS AND THE ROLLOVER (WBS #73, new §11.8), brought forward by Hyoje so the one hard deadline is safe. Both migrations take the Archive file’s tab names from the sheet (the one archive tab ~N, a 4-digit tab per later year) and check them against N, stored as admin_settings.archiveUntil (§6.13; absent = 2025). The daily migration rebuilds every year tab, --full adds the archive, each tab clearing only its own years; a record in the wrong tab is now refused (before, a 2025 row in the 2026 tab was added again on every daily run). npm run migrate -- --full --rollover, after the January merge, moves N on only if the run succeeds; a half-done merge, a missing year tab or two archive tabs stop the run. The /admin rename steps name the tabs from N with a count per tab. TEST DATABASE (WBS #69) REDUCED: no sync script — local dev reads fargaze-log-test from .env.development.local (scripts still read .env.local, production), and test is refreshed by restore-test.yml (§2.4, §15.2). Nightly backup moved to 02:23 UTC (§12.8)"],
     ["4.24","27 Oct 2026","THE EDIT FEATURE (WBS #70, new §15.6), designed with Hyoje 26–27 Oct; step 1 of 5 (the single-record API) built. The form edits the record in its own shape (a list of foods, people as method / type / person), never the sheet’s comma, | and + strings; the checks run on the record (master lists, ingredients for added or changed items, the same record twice, the sheet’s separators refused in list values until cutover). Each save is one change-list entry (master_change, list records) with ONE LINE PER CHANGED CELL — tab, how to find the row, column, what changed (naming the food or the people group), the whole cell before and after — and one Mark repeated tick; unticked, it blocks the migrations. A record moving to another year tab: delete the row there, add it here. Delete moves the record whole to the new collection log_trash (§6.14); Undo until a migration rebuilds the year. Bulk Find & replace in records (title, additional info, online / other location, notes, purchase item and unit, food and drink item names) is step 2. WEEKDAYS ARE CALCULATED (Hyoje, 27 Oct): the migrations no longer read columns L and S; start / end.weekday come from the date (weekdayOf), the form has no weekday field and the change list no weekday lines; one full migration recalculates every record. Year tabs and the rollover (v4.23) marked done: production check passed 26 Oct"],
     ["4.25","27 Oct 2026","EDIT FEATURE STEP 1 DONE (checked on production: all 46,132 records come back unchanged through the form; the 28 broken-time records fixed in the sheet and a full migration run, which also recalculated every weekday) and STEP 2 BUILT: bulk Find & replace in records (§15.6.3) — fields, whole value or part of the text, the James → James Potter skip, two-pass sheet steps, regular expressions for list cells, per-record lines when a date or activity filter is used, one change-list entry (kind replace, §6.12) with Undo. People names added to the fields (Hyoje’s 길동이 → 홍길동 example; names have no master list). STAGING NOW CHECKS THE RECORD RULES too (§11.7): a 귀가 trip to 집 without a return type had passed it"],
+    ["4.26","5 Nov 2026","#70 STEP 2 DONE (bulk Find & replace API, pushed). PLACE POINTS AFTER HYOJE’S TRIP (§15.5.7–15.5.9): search in the map pop-up (Places API (New)); tapping a place’s icon selects that place; one main button “Use this point and name” with a Use this name tick box; place-point changes need no sheet step any more (the PlaceCoord tab is read by nothing) — a rename or merge of a used name still does. PLACE DETAILS agreed (§15.5.9, to build after #70 step 3): “A - B” where only A has a point; the longest name with a point wins. Documents are now updated once per finished step (Hyoje, 28 Oct)"],
     ["4.21","26 Oct 2026","DAILY STRIPS FOR DIET AND DRINKING; ONE RULE FOR FUTURE DAYS; MONTHS IN THE CALENDAR (§9.3.3, §9.3.4, §9.3.9). Diet: the Spicy days strip is replaced by Daily diet · carbs — each day coloured by its carbs index (below 4 blue, 4–8 amber, over 8 red), tooltip listing every food- or drink-bearing record of the day (time, meal type, items, 🌶 on a meal rated H, servings in 인분 or a drink-only record’s shared amount), opening upwards; diet.summary gains days. Drinking: a Daily drinking strip under the drinks row (below 4 blue, 4–10 amber, over 10 red), tooltip with the day’s total and each record’s items as logged and drinks; drinking.summary gains rangeStart, rangeEnd and days. Shared colours and band rule in src/app/insights/_lib/day-bands.ts. Strips and calendars in Diet, Drinking, Exercise and Sleep now cover the whole period and draw days from today on as future days (faint, no border, ‘not yet’; futureFrom = localToday()); exercise.summary gains rangeStart / rangeEnd. The calendar pop-up marks months: ‘Oct 1’ in bold on each 1st and on the first day shown, and a stepped line along each month boundary. Checked by Hyoje on 26 Oct"],
   ],
   [1100, 1300, 6960]
@@ -2273,7 +2274,7 @@ C(
   bullet("3. Master lists out of the migration; generic admin editor in production — steps 1–4 and 6 done 25–26 Oct; step 5 (rename for the other lists) later (§15.5)"),
   bullet("4. Staging tab and migration, with the duplicate and year-tab checks — done 26 Oct, tested on fargaze-log-test, then production (§11.7)"),
   bullet("5. Test database — (v4.23) reduced 26 Oct: local dev on fargaze-log-test via .env.development.local, refreshed by restore-test.yml; no sync script. Done"),
-  bullet("6. Edit feature with its change list, test then production — designed 26–27 Oct; steps 1 (done) and 2 (built) of 5 (§15.6)"),
+  bullet("6. Edit feature with its change list, test then production — designed 26–27 Oct; steps 1 and 2 of 5 done (§15.6)"),
   bullet("7. Entry app: offline, all field groups, on test; the comparison report"),
   bullet("8. Nightly export to a spreadsheet, proven on test"),
   bullet("9. Year rollover setting (before January) — brought forward and done 26 Oct, right after 5 (§11.8); reminders set for 12 Dec, 1 Jan and 2 Jan"),
@@ -2368,6 +2369,28 @@ C(
 );
 C(spacer());
 
+C(h3("15.5.8 Search, Tapped Places and No Sheet Steps (5 Nov)"));
+C(p("After Hyoje’s holiday: 📍 Here was easy for a place he was at, but a place visited earlier was hard to add."));
+C(
+  bullet("Search above the map: suggestions as you type, biased to what the map shows (Places API (New), AutocompleteSuggestion with a session token); picking one moves the pin there (zoom 18) and shows its name and address. Needs “Places API (New)” on in Cloud project fargaze-log and allowed on the browser key; without it an amber note says so and the map still works"),
+  bullet("Tapping a place’s icon on the map selects that place (clickableIcons; Google’s own pop-up is stopped; Place.fetchFields) and replaces a searched one. Tapping an empty spot or dragging only moves the pin; the selected name stays"),
+  bullet("Nothing applies until the main button. A ‘Use this name’ tick box under the selected place — ticked when the Place box is empty, unticked when it already has a name — turns the button into ‘Use this point and name’, which fills both and closes (Hyoje: a separate Use this name button that acted at once was inconsistent). From a saved row’s Map button there is no tick box: changing the name there would be a rename"),
+  bullet("No sheet steps for place points (Hyoje agreed 5 Nov): nothing reads the PlaceCoord tab any more, so an add, move, note or delete is logged already ticked (‘Nothing to do in the sheet’; SheetPlace.tabUnused, write.ts logged()). A rename or merge of a name that records or favourite periods use still has its tick, with only the AA / BE / BF and FavoritePlace steps — otherwise a full migration would quietly bring the old name back (place names are not refused when unknown). A rename with no records is logged ticked, and its Undo needs nothing either"),
+);
+C(spacer());
+
+C(h3("15.5.9 Place Details: “A - B” (agreed 5 Nov, to build after #70 step 3)"));
+C(p("Hyoje’s convention from his trip: in a place name, “A - B” means A has a point and B — a hotel room, a golf course’s course, a department store’s shop — does not. His old records don’t follow it yet; he will tidy them with the edit feature."));
+C(
+  bullet("The separator is exactly “ - ” (space, hyphen, space), so ‘Saint-Denis’ stays one name"),
+  bullet("A record uses the point of the longest name that has one: drop “ - …” parts from the end until a name with a point is found. ‘Harrods - Food Hall - The Steak House’ uses ‘Harrods - Food Hall’ if that has a point, otherwise ‘Harrods’; an exact point always wins, so old names with their own point keep working"),
+  bullet("The same for Place (AA), From (BE) and To (BF), and for favourites: ‘회사 - 회의실’ uses the point 회사 had at that time"),
+  bullet("Place points: each record counts once, under the point it uses (‘12 (5 with details)’); ‘A - B’ is not a missing point when A resolves"),
+  bullet("Renaming a point renames everything under it (Harrods → Harrods London also changes ‘Harrods - …’); the sheet step is a regular-expression Find & Replace that matches the name alone or followed by “ - …”"),
+  bullet("The entry app (#71) has two boxes, Place (picked from the points) and Detail (free text); the sheet keeps “A - B” in one cell"),
+);
+C(spacer());
+
 C(h2("15.6 The Edit Feature (WBS #70, v4.24)"));
 C(p("Changes and deletions of existing records, made in the app and repeated in the sheet by hand until cutover. Agreed with Hyoje on 26–27 Oct. Editing is more than half of the entry app (#71): the same form will add new records."));
 C(h3("15.6.1 Decisions"));
@@ -2431,7 +2454,7 @@ C(
 C(h3("15.6.5 Order of Work"));
 C(table(["Step","What","Status"],[
   ["1","Single-record API: read, preview, save, delete to trash, Undo; the change lines; the migration gate; check-record-form.ts","Done 27 Oct (production check: all 46,132 records unchanged through the form); rules corrected the same day after Hyoje’s review. In the cloud: 35 checks with an in-memory database (round trip, people group, ingredient, added / removed food, times, refusals, save, conflict, duplicate, year move, Undo before and after the tick, delete, Undo of a delete, a rebuilt year) 18 rule checks (item sets, open records, GMT / BST, cost, return type, old records as warnings) and 15 checks on the record shapes production showed (wrong and English weekdays, list entries with _id, + and ( in purchases, exercise and wine notes, broken times)"],
-  ["2","Bulk Find & replace API: preview, apply, Undo","Built 27 Oct (§15.6.3)"],
+  ["2","Bulk Find & replace API: preview, apply, Undo","Done 5 Nov (§15.6.3)"],
   ["3","The form page and the Edit button",""],
   ["4","Record changes and Find & replace pages",""],
   ["5","Test database, then production",""],
@@ -2630,7 +2653,7 @@ C(table(["Path","Purpose"],[
 C(spacer());
 
 // ===== FOOTER =====
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.25 — 27 October 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.26 — 5 November 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 
 // ===== DOCUMENT ASSEMBLY =====
@@ -2667,6 +2690,6 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-Log-Data-Design-v4.25.docx", buffer);
-  console.log("Wrote FarGaze-Log-Data-Design-v4.25.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-Log-Data-Design-v4.26.docx", buffer);
+  console.log("Wrote FarGaze-Log-Data-Design-v4.26.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });

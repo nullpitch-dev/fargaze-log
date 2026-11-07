@@ -26,6 +26,8 @@ const SHOW = process.argv.includes('--all') ? Infinity : 5;
 const SKIP = new Set(['_id', 'userId', 'createdAt', 'updatedAt', '__v']);
 // The system calculates weekdays from the date (v4.24); counted on their own below.
 const WEEKDAY = new Set(['start.weekday', 'end.weekday']);
+// Relationship follows People like the sheet's formula (5 Nov); listed on its own below.
+const RELATIONSHIP = 'activity.relationship';
 
 const norm = (v: any): any => {
   if (v instanceof Date) return v.toISOString();
@@ -64,6 +66,9 @@ async function main() {
   const warned = new Map<string, string[]>();
   const group = (m: string) => m.replace(/'[^']*'/g, "'…'");
   let n = 0, clean = 0, withLines = 0, weekdays = 0;
+  const relationships: string[] = [];
+  // stored → formula, with the years it happens in (5 Nov: 640 records, to decide what to do)
+  const relPairs = new Map<string, { n: number; years: Map<number, number>; activities: Map<string, number> }>();
   const label = (d: any) => `${d.start?.year}-${String(d.start?.month).padStart(2, '0')}-${String(d.start?.day).padStart(2, '0')} ${d.start?.hour ?? 'all day'} · ${d.activity?.name ?? ''} · ${d._id}`;
 
   for await (const base of Log.find({ userId: USER_ID }).lean().cursor() as any) {
@@ -72,8 +77,18 @@ async function main() {
     for (const p of b.problems) refused.set(group(p), [...(refused.get(group(p)) ?? []), `${label(base)} — ${p}`]);
     for (const w of b.warnings) warned.set(group(w), [...(warned.get(group(w)) ?? []), `${label(base)} — ${w}`]);
     const all = diff(norm(base), norm(b.doc));
-    const d = all.filter(x => !WEEKDAY.has(x.path));
-    if (all.length > d.length) weekdays++;
+    const rel = all.find(x => x.path === RELATIONSHIP);
+    if (rel) {
+      const k = `${JSON.stringify(rel.a)} → ${JSON.stringify(rel.b)}`;
+      const e = relPairs.get(k) ?? { n: 0, years: new Map(), activities: new Map() };
+      e.n++;
+      e.years.set(base.start?.year, (e.years.get(base.start?.year) ?? 0) + 1);
+      e.activities.set(base.activity?.name ?? '', (e.activities.get(base.activity?.name ?? '') ?? 0) + 1);
+      relPairs.set(k, e);
+    }
+    if (rel) relationships.push(`${label(base)}: ${JSON.stringify(rel.a)} → ${JSON.stringify(rel.b)} (people: ${JSON.stringify((base.people ?? []).map((p: any) => p.method))})`);
+    const d = all.filter(x => !WEEKDAY.has(x.path) && x.path !== RELATIONSHIP);
+    if (all.some(x => WEEKDAY.has(x.path))) weekdays++;   // (5 Nov: counted relationships too — fixed)
     for (const x of d) changed.set(x.path, [...(changed.get(x.path) ?? []), `${label(base)}: ${JSON.stringify(x.a)} → ${JSON.stringify(x.b)}`]);
     if (changeLines(base, b.doc).length) withLines++;
     if (!b.problems.length && !d.length) clean++;
@@ -82,7 +97,16 @@ async function main() {
 
   console.log(`\n${n} records: ${clean} come back exactly as they are.`);
   console.log(`${withLines} would show change lines although nothing was edited.`);
-  console.log(`${weekdays} stored weekday${weekdays === 1 ? '' : 's'} differ from the date; the system recalculates them (0 after a full migration).\n`);
+  console.log(`${weekdays} stored weekday${weekdays === 1 ? '' : 's'} differ from the date; the system recalculates them (0 after a full migration).`);
+  console.log(`${relationships.length} stored relationship${relationships.length === 1 ? '' : 's'} differ from what People says (the sheet's formula in G); an edit sets the formula's value.`);
+  const top = (m: Map<any, number>, k: number) => [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, k).map(([x, c]) => `${x} ${c}`).join(', ');
+  for (const [k, e] of [...relPairs.entries()].sort((a, b) => b[1].n - a[1].n)) {
+    console.log(`  ${k}: ${e.n} — years: ${[...e.years.entries()].sort((a, b) => a[0] - b[0]).map(([y, c]) => `${y} ${c}`).join(', ')}`);
+    console.log(`      activities: ${top(e.activities, 8)}`);
+  }
+  relationships.slice(0, SHOW).forEach(x => console.log(`      ${x}`));
+  if (relationships.length > SHOW) console.log(`      … and ${relationships.length - SHOW} more (--all lists them)`);
+  console.log('');
   const report = (title: string, m: Map<string, string[]>) => {
     if (!m.size) { console.log(`${title}: none ✅\n`); return; }
     console.log(`${title}:`);

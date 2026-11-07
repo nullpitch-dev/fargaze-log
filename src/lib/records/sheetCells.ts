@@ -13,10 +13,16 @@
 // '양념 치킨+떡볶이' was stored as two foods with the amount halved, so it shows as
 // '양념 치킨, 떡볶이'. Find the row by its date and time, not by searching the text.
 //
+// (5 Nov) Hyoje found the cell lines hard to read ("one item, one amount and one unit
+// were removed"), so a change also comes as PLAIN lines, one per real change, the way a
+// person says it: "Added 라면 (밀, 고기 국물) 1 인분 to Foods", "Removed 민아 from 대면 · 가족".
+// The cell lines stay for repeating the change in the sheet.
+//
 // The weekday columns (L, S) are left out: the system calculates the weekday from
 // the date and the migration no longer reads them (Hyoje, 27 Oct).
 
-import { ordinal } from './form';
+import { oneIfSame } from './relationship';
+import { ordinal, transportMissing } from './form';
 import { weekdayOf } from '../migration/transform';
 
 export interface ChangeLine {
@@ -25,6 +31,16 @@ export interface ChangeLine {
   before: string;
   after: string;
   calculated?: boolean;    // the sheet calculates it in Active; year tabs hold the value
+  /** The part of the edit form this line comes from, so the edit page's × can put it back
+   *  ('activity.title', 'start', 'food.foods', 'people' …). None on calculated lines. */
+  part?: string;
+}
+
+/** A change the way a person says it. `part` as on ChangeLine. */
+export interface PlainChange {
+  text: string;
+  part?: string;
+  calculated?: boolean;
 }
 
 // ── Columns ──────────────────────────────────────────────────────────────────
@@ -53,10 +69,11 @@ const joinList = (vals: string[]) => {
 };
 
 interface GroupField { i: number; label: string; key: string; noun: string }
-interface ItemGroup { path: string; noun: string; ingredients: boolean; fields: GroupField[] }
+interface ItemGroup { path: string; noun: string; plural: string; ingredients: boolean; fields: GroupField[] }
 
+const PLURAL: Record<string, string> = { Purchase: 'Purchases', Drink: 'Drinks', Food: 'Foods', Alcohol: 'Alcohol', Exercise: 'Exercise' };
 const group = (path: string, noun: string, ingredients: boolean, fields: [number, string, string][]): ItemGroup =>
-  ({ path, noun, ingredients, fields: fields.map(([i, key, label]) => ({ i, key, label, noun })) });
+  ({ path, noun, plural: PLURAL[noun] ?? noun, ingredients, fields: fields.map(([i, key, label]) => ({ i, key, label, noun })) });
 
 const GROUPS: ItemGroup[] = [
   group('purchase', 'Purchase', false, [[34, 'item', 'Purchase item'], [35, 'amount', 'Purchase amount'], [36, 'unit', 'Purchase unit']]),
@@ -84,10 +101,12 @@ export function peopleGroups(doc: any): PeopleGroup[] {
   return out;
 }
 
-interface Column { i: number; label: string; cell: (doc: any) => string; calculated?: boolean; group?: string }
+interface Column { i: number; label: string; cell: (doc: any) => string; calculated?: boolean; group?: string; part?: string }
 
+// A start or end cell puts back the whole point (date, time, zone).
+const partOf = (path: string) => (/^(start|end)\./.test(path) ? path.split('.')[0] : path);
 const scalar = (i: number, label: string, path: string, calculated = false): Column =>
-  ({ i, label, cell: (d: any) => s(get(d, path)), calculated });
+  ({ i, label, cell: (d: any) => s(get(d, path)), calculated, ...(calculated ? {} : { part: partOf(path) }) });
 
 const COLUMNS: Column[] = [
   scalar(0, 'Category', 'activity.category', true),
@@ -95,7 +114,7 @@ const COLUMNS: Column[] = [
   scalar(2, 'Title', 'activity.title'),
   scalar(3, 'Additional info', 'activity.additionalInfo'),
   scalar(5, 'Cross activity', 'activity.crossActivity'),
-  scalar(6, 'Relationship', 'activity.relationship'),
+  scalar(6, 'Relationship', 'activity.relationship', true),   // follows People (5 Nov)
   scalar(7, 'Start zone', 'start.timezone'),
   scalar(8, 'Start year', 'start.year'),
   scalar(9, 'Start month', 'start.month'),
@@ -120,17 +139,17 @@ const COLUMNS: Column[] = [
   scalar(38, 'Carbs', 'food.carbs'),
   scalar(39, 'Fat', 'food.fat'),
   scalar(40, 'Spiciness', 'food.spiciness'),
-  { i: 53, label: 'People method', cell: (d: any) => peopleGroups(d).map(g => g.method).join('|'), group: 'people' },
-  { i: 54, label: 'People type', cell: (d: any) => peopleGroups(d).map(g => g.category).join('|'), group: 'people' },
-  { i: 55, label: 'People', cell: (d: any) => peopleGroups(d).map(g => g.targets.join(', ')).join('|'), group: 'people' },
+  { i: 53, label: 'People method', cell: (d: any) => oneIfSame(peopleGroups(d).map(g => g.method)).join('|'), group: 'people', part: 'people' },
+  { i: 54, label: 'People type', cell: (d: any) => oneIfSame(peopleGroups(d).map(g => g.category)).join('|'), group: 'people', part: 'people' },
+  { i: 55, label: 'People', cell: (d: any) => peopleGroups(d).map(g => g.targets.join(', ')).join('|'), group: 'people', part: 'people' },
   scalar(56, 'From', 'transport.from'),
   scalar(57, 'To', 'transport.to'),
   scalar(58, 'Purpose', 'transport.purpose'),
   scalar(59, 'Transport', 'transport.method'),
   scalar(60, 'Return type', 'transport.returnType'),
   scalar(61, 'Bowel amount', 'bowel.amount'),
-  { i: 62, label: 'Bowel quality', cell: (d: any) => arr(d?.bowel?.quality).join('+') },
-  { i: 63, label: 'Bowel characteristics', cell: (d: any) => arr(d?.bowel?.characteristics).join('+') },
+  { i: 62, label: 'Bowel quality', cell: (d: any) => arr(d?.bowel?.quality).join('+'), part: 'bowel.quality' },
+  { i: 63, label: 'Bowel characteristics', cell: (d: any) => arr(d?.bowel?.characteristics).join('+'), part: 'bowel.characteristics' },
   scalar(64, 'Weight', 'body.weight'),
   scalar(65, 'Muscle', 'body.muscleMass'),
   scalar(66, 'Body fat', 'body.bodyFat'),
@@ -146,7 +165,7 @@ const COLUMNS: Column[] = [
   scalar(81, 'City', 'travel.city'),
   scalar(82, 'Travel theme', 'travel.theme'),
   scalar(83, 'Notes', 'notes'),
-  ...GROUPS.flatMap(g => g.fields.map(f => ({ i: f.i, label: f.label, cell: groupCell(g, f), group: g.path }))),
+  ...GROUPS.flatMap(g => g.fields.map(f => ({ i: f.i, label: f.label, cell: groupCell(g, f), group: g.path, part: g.path }))),
 ].sort((a, b) => a.i - b.i);
 
 const colName = (c: { i: number; label: string }) => `${colLetter(c.i)} ${c.label}`;
@@ -295,7 +314,9 @@ export function changeLines(before: any, after: any): ChangeLine[] {
   for (const c of COLUMNS) {
     const b = c.cell(before), a = c.cell(after);
     if (a === b) continue;
-    const base = { column: colName(c), before: b, after: a, ...(c.calculated ? { calculated: true } : {}) };
+    // AD (KRW) is a formula in Active's template line for a foreign cost (Hyoje, 7 Nov).
+    const calc = c.calculated || (c.i === 29 && s(after?.cost?.currency) !== '');
+    const base = { column: colName(c), before: b, after: a, ...(calc ? { calculated: true } : {}), ...(c.part ? { part: c.part } : {}) };
     const whats = c.group ? detail.get(c.i) ?? ['Changed'] : [b === '' ? 'Added' : a === '' ? 'Removed' : 'Changed'];
     for (const what of whats) lines.push({ ...base, what });
   }
@@ -318,12 +339,137 @@ export function deleteRowLines(doc: any, tab: string): ChangeLine[] {
   return [{ column: 'Row', what: `Delete this row from '${tab}'`, before: findRowText(doc), after: '' }];
 }
 
+// ── Plain lines ──────────────────────────────────────────────────────────────
+
+/** 라면 (밀, 고기 국물) 1 인분 — a list item as a person writes it. */
+function itemPlain(g: ItemGroup, x: any): string {
+  const ings = g.ingredients ? realIngredients(x) : [];
+  const parts = [`${s(x?.item)}${ings.length ? ` (${ings.join(', ')})` : ''}`, [s(x?.amount), s(x?.unit)].filter(Boolean).join(' ')];
+  if (x?.loadKg != null && x.loadKg !== '') parts.push(`${x.loadKg} kg`);
+  if (s(x?.setStyle)) parts.push(s(x.setStyle));
+  const note = s(x?.note);
+  return parts.filter(Boolean).join(' ') + (note ? ` — ${note}` : '');
+}
+
+const pointPlain = (p: any) => {
+  if (!p?.year) return '(empty)';
+  return `${p.year}-${pad(p.month)}-${pad(p.day)} ${s(p.hour) || 'all day'}${s(p.timezone) ? ` ${s(p.timezone)}` : ''}`;
+};
+/** 85,000 KRW, or 20 GBP (36,400 KRW). */
+const num = (v: unknown) => (v == null || v === '' ? '' : Number.isFinite(Number(v)) ? Number(v).toLocaleString('en-GB') : s(v));
+const moneyPlain = (d: any) => {
+  const k = num(d?.cost?.amountKRW), f = num(d?.cost?.amountForeign), c = s(d?.cost?.currency);
+  if (c || f) return `${f || '?'} ${c || '?'}${k ? ` (${k} KRW)` : ''}`;
+  return k ? `${k} KRW` : '(empty)';
+};
+/** ABC Hotel → 집 · 귀가 · 택시 · 대중교통 */
+const journeyPlain = (d: any) => {
+  const t = d?.transport ?? {};
+  return `${s(t.from) || '?'} → ${s(t.to) || '?'} · ${[s(t.purpose), s(t.method), s(t.returnType)].filter(Boolean).join(' · ')}`;
+};
+const hasTransport = (d: any) => ['from', 'to', 'purpose', 'method', 'returnType'].some(k => s(d?.transport?.[k]) !== '');
+/** 80.4 kg · muscle 35 kg · fat 21.5% (17.3 kg) */
+const bodyPlain = (d: any) => {
+  const b = d?.body ?? {};
+  const parts = [num(b.weight) && `${num(b.weight)} kg`, num(b.muscleMass) && `muscle ${num(b.muscleMass)} kg`,
+    (num(b.bodyFatPercent) || num(b.bodyFat)) && `fat ${num(b.bodyFatPercent) ? `${num(b.bodyFatPercent)}%` : ''}${num(b.bodyFat) ? ` (${num(b.bodyFat)} kg)` : ''}`.replace('fat  (', 'fat (')];
+  return parts.filter(Boolean).join(' · ') || '(empty)';
+};
+const costPlain = (d: any) => [s(d?.cost?.category), s(d?.cost?.categoryDetail)].filter(Boolean).join(' › ');
+const CALC_NOTE: Record<number, string> = { 0: 'from the activity', 6: 'follows People', 13: 'from the zone', 20: 'from the zone' };
+
+function scalarPlain(label: string, b: string, a: string): string {
+  if (b === '') return `${label}: added ${a}`;
+  if (a === '') return `${label}: removed ${b}`;
+  return `${label}: ${b} → ${a}`;
+}
+
+function groupPlain(g: ItemGroup, before: any, after: any): PlainChange[] {
+  const out: PlainChange[] = [];
+  const a = arr(get(before, g.path)), b = arr(get(after, g.path));
+  for (const st of align(a, b, x => s(x?.item))) {
+    if (st.kind === 'added') out.push({ text: `Added ${itemPlain(g, st.b)} to ${g.plural}`, part: g.path });
+    else if (st.kind === 'removed') out.push({ text: `Removed ${itemPlain(g, st.a)} from ${g.plural}`, part: g.path });
+    else if (st.kind === 'changed' && s(st.a?.item) !== s(st.b?.item) && itemPlain(g, { ...st.a, item: '' }) !== itemPlain(g, { ...st.b, item: '' })) {
+      // A different item in the same place, not a renamed one: say it as removed + added.
+      out.push({ text: `Removed ${itemPlain(g, st.a)} from ${g.plural}`, part: g.path });
+      out.push({ text: `Added ${itemPlain(g, st.b)} to ${g.plural}`, part: g.path });
+    } else {
+      const x = itemPlain(g, st.a), y = itemPlain(g, st.b);
+      const ia = realIngredients(st.a).join('|'), ib = realIngredients(st.b).join('|');
+      if (x !== y || ia !== ib) out.push({ text: `${g.plural}: ${x} → ${y}`, part: g.path });
+    }
+  }
+  return out;
+}
+
+function peoplePlain(before: any, after: any): PlainChange[] {
+  const out: PlainChange[] = [];
+  const say = (text: string) => out.push({ text, part: 'people' });
+  const a = peopleGroups(before), b = peopleGroups(after);
+  const label = (g: PeopleGroup) => [g.method, g.category].filter(Boolean).join(' · ') || 'a group with no method or type';
+  const names = (g: PeopleGroup) => g.targets.join(', ') || 'nobody named';
+  for (const st of align(a, b, g => `${g.method}·${g.category}`)) {
+    if (st.kind === 'added') { say(`Added ${label(st.b)}: ${names(st.b)}`); continue; }
+    if (st.kind === 'removed') { say(`Removed ${label(st.a)} (${names(st.a)})`); continue; }
+    if (st.kind === 'changed') say(`${label(st.a)} → ${label(st.b)}`);
+    for (const t of align(st.a.targets, st.b.targets, x => x)) {
+      if (t.kind === 'added') say(`Added ${t.b} to ${label(st.b)}`);
+      else if (t.kind === 'removed') say(`Removed ${t.a} from ${label(st.b)}`);
+      else if (t.kind === 'changed') say(`${label(st.b)}: ${t.a} → ${t.b}`);
+    }
+  }
+  return out;
+}
+
+/** The change in plain lines, in the sheet's column order. */
+export function plainChanges(before: any, after: any): PlainChange[] {
+  const out: PlainChange[] = [];
+  const done = new Set<string>();
+  const once = (k: string) => (done.has(k) ? false : (done.add(k), true));
+  for (const c of COLUMNS) {
+    const b = c.cell(before), a = c.cell(after);
+    if (a === b) continue;
+    if (c.group) {
+      if (!once(c.group)) continue;
+      if (c.group === 'people') out.push(...peoplePlain(before, after));
+      else out.push(...groupPlain(GROUPS.find(g => g.path === c.group)!, before, after));
+    } else if (c.part === 'start' || c.part === 'end') {
+      if (once(c.part)) out.push({ text: `${c.part === 'start' ? 'Start' : 'End'}: ${pointPlain(before?.[c.part])} → ${pointPlain(after?.[c.part])}`, part: c.part });
+    } else if (c.i >= 56 && c.i <= 60 && !hasTransport(before)) {
+      // A journey added to a record: one line, once it is whole (Hyoje, 7 Nov).
+      if (once('transport') && !transportMissing(after?.transport ?? {}).length) {
+        out.push({ text: `Added journey: ${journeyPlain(after)}`, part: 'transport' });
+      }
+    } else if (c.i >= 56 && c.i <= 60 && !hasTransport(after)) {
+      // A journey removed: one line with the whole journey.
+      if (once('transport')) out.push({ text: `Removed journey: ${journeyPlain(before)}`, part: 'transport' });
+    } else if (c.i >= 64 && c.i <= 67) {
+      // Weight, muscle, fat % and the fat (kg) worked out from them: one line (7 Nov).
+      if (once('body')) out.push({ text: `Body: ${bodyPlain(before)} → ${bodyPlain(after)}`, part: 'body' });
+    } else if (c.i >= 29 && c.i <= 31) {
+      // The amounts and the currency go together: one line.
+      if (once('cost.amounts')) out.push({ text: `Cost: ${moneyPlain(before)} → ${moneyPlain(after)}`, part: 'cost.amounts' });
+    } else if (c.i === 32 || c.i === 33) {
+      if (once('cost.category')) out.push({ text: scalarPlain('Cost category', costPlain(before), costPlain(after)), part: 'cost.category' });
+    } else if (c.calculated) {
+      out.push({ text: `${scalarPlain(c.label, b, a)} (${CALC_NOTE[c.i] ?? 'calculated'})`, calculated: true });
+    } else {
+      out.push({ text: scalarPlain(c.label, b, a), part: c.part });
+    }
+  }
+  return out;
+}
+
 /** The whole change for the sheet: same tab → changed cells; another tab → delete + add. */
 export function sheetChange(before: any, after: any, tabBefore: string | null, tabAfter: string | null):
-  { tab: string; findRow: string; moveTo: string | null; lines: ChangeLine[] } {
+  { tab: string; findRow: string; moveTo: string | null; lines: ChangeLine[]; changes: PlainChange[] } {
   const tab = tabBefore ?? '(no tab)';
   if (tabAfter && tabAfter !== tabBefore) {
-    return { tab, findRow: findRowText(before), moveTo: tabAfter, lines: [...deleteRowLines(before, tab), ...addRowLines(after, tabAfter)] };
+    // A move to another tab comes from the start date: the Row lines' × puts the start back.
+    const lines = [...deleteRowLines(before, tab), ...addRowLines(after, tabAfter)].map(l => (l.column === 'Row' ? { ...l, part: 'start' } : l));
+    const changes = [{ text: `Moves from tab ${tab} to ${tabAfter} (the start date)`, part: 'start' }, ...plainChanges(before, after).filter(c => c.part !== 'start')];
+    return { tab, findRow: findRowText(before), moveTo: tabAfter, lines, changes };
   }
-  return { tab, findRow: findRowText(before), moveTo: null, lines: changeLines(before, after) };
+  return { tab, findRow: findRowText(before), moveTo: null, lines: changeLines(before, after), changes: plainChanges(before, after) };
 }

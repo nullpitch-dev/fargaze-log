@@ -23,7 +23,7 @@ import { recordKey, existingQuery, yearTabFor, KEY_FIELDS } from '../migration/s
 import { missingIngredients, describeMissing } from './ingredients';
 import { getArchiveUntil } from '../archiveYear';
 import { buildRecord, fromRecord, type FormContext, type RecordForm } from './form';
-import { sheetChange, deleteRowLines, addRowLines, findRowText, type ChangeLine } from './sheetCells';
+import { sheetChange, deleteRowLines, addRowLines, findRowText, type ChangeLine, type PlainChange } from './sheetCells';
 
 export const RECORDS_LIST = 'records';
 
@@ -219,6 +219,7 @@ export async function undoRecordChange(userId: string, ch: any) {
 
   let restore: any;
   let lines: ChangeLine[] = [];
+  let changes: PlainChange[] = [];
   let tab = '', findRow = '', moveTo: string | null = null;
   let kind: 'edit' | 'add';
   let current: any = null;
@@ -229,7 +230,7 @@ export async function undoRecordChange(userId: string, ch: any) {
     if (iso(current.updatedAt) !== iso(ch.extra?.afterUpdatedAt)) return fail(409, 'Undo is no longer possible: the record was changed again since. Edit it again instead.');
     restore = { ...ch.before, updatedAt: now };
     const c = sheetChange(current, ch.before, yearTabFor(current, archiveUntil), yearTabFor(ch.before, archiveUntil));
-    ({ tab, findRow, moveTo, lines } = c);
+    ({ tab, findRow, moveTo, lines, changes } = c);
     kind = 'edit';
   } else {
     const trash = await LogTrash.findOne({ userId, 'record._id': ch.recordIds?.[0] ?? ch.rowId }).lean() as any;
@@ -271,7 +272,7 @@ export async function undoRecordChange(userId: string, ch: any) {
         recordsChanged: 1, recordIds: ch.recordIds,
         sheetSteps: steps, sheetDone: !sheetNeeded, sheetDoneAt: sheetNeeded ? null : now,
         undoOf: ch._id,
-        extra: { title: `Undo: ${ch.extra?.title ?? ''}`, tab, findRow, moveTo, lines: sheetNeeded ? lines : [], afterUpdatedAt: kind === 'edit' ? now : null },
+        extra: { title: `Undo: ${ch.extra?.title ?? ''}`, tab, findRow, moveTo, lines: sheetNeeded ? lines : [], changes: sheetNeeded ? changes : [], afterUpdatedAt: kind === 'edit' ? now : null },
       }], { session });
       newId = String(u._id);
     });
@@ -281,7 +282,8 @@ export async function undoRecordChange(userId: string, ch: any) {
   } finally {
     await session.endSession();
   }
-  return { ok: true as const, changeId: newId, recordsChanged: 1, sheetNeeded };
+  // The lines go back to the edit page's result screen (#70 step 3).
+  return { ok: true as const, changeId: newId, recordsChanged: 1, sheetNeeded, tab, findRow, moveTo, lines: sheetNeeded ? lines : [], changes: sheetNeeded ? changes : [] };
 }
 
 // ── The Record changes page ──────────────────────────────────────────────────
@@ -293,7 +295,7 @@ export async function listRecordChanges(userId: string, opts: { since?: Date | n
   if (opts.since) or.push({ createdAt: { $gte: opts.since } });
   const rows = await MasterChange.find({ userId, list: RECORDS_LIST, $or: or })
     .sort({ createdAt: -1 }).limit(limit)
-    .select('kind rowId recordsChanged sheetDone sheetDoneAt undoneAt undoOf createdAt extra.title extra.tab extra.findRow extra.moveTo extra.lines extra.steps extra.places').lean() as any[];
+    .select('kind rowId recordsChanged sheetDone sheetDoneAt undoneAt undoOf createdAt extra.title extra.tab extra.findRow extra.moveTo extra.lines extra.changes extra.steps extra.places').lean() as any[];
   return rows.map(r => ({
     id: String(r._id),
     kind: r.kind,
@@ -304,6 +306,8 @@ export async function listRecordChanges(userId: string, opts: { since?: Date | n
     moveTo: r.extra?.moveTo ?? null,
     /** One line per changed cell; a filtered replace adds tab and findRow to each line. */
     lines: (r.extra?.lines ?? []) as (ChangeLine & { tab?: string; findRow?: string })[],
+    /** Plain lines (edits saved from 5 Nov on; older entries and the rest have none). */
+    changes: (r.extra?.changes ?? []) as PlainChange[],
     /** Find & Replace steps (an unfiltered replace). */
     steps: (r.extra?.steps ?? []) as string[],
     records: r.recordsChanged ?? 1,
