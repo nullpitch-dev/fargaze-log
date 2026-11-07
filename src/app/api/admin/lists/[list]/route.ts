@@ -60,8 +60,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ list: st
       zoneCodes: (zones as any[]).map(z => z.code),
       indexBy: def.indexBy ?? null,
       viaFavorites: !!def.viaFavorites,
+      page: def.page ?? null,
     },
-    rows: rows.map(r => ({ ...r, used: usage.counted ? usage.used[r._id] : null, usedBy: usage.breakdown[r._id] ?? null })),
+    rows: rows.map(r => ({ ...r, used: usage.counted ? usage.used[r._id] : null, usedBy: usage.breakdown[r._id] ?? null, usedDetail: usage.details ? usage.details[r._id] ?? 0 : null, detailNames: usage.detailNames?.[r._id] ?? null })),
     orphans: usage.orphans,
     since: since.toISOString().slice(0, 10),
     // Undo is offered for renames and merges; the plan behind it stays on the server.

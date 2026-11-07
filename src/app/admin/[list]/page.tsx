@@ -15,7 +15,7 @@ import { PointPicker, locate, type LatLng, type Located } from '../_components/P
 type ColumnType = 'text' | 'number' | 'zoneTime' | 'coords';
 interface Column { key: string; label: string; type: ColumnType; required?: boolean; pickExisting?: boolean; narrow?: boolean; noSearch?: boolean }
 type Cell = string | number | null | { timezone: string; local: string } | { lat: number; lng: number };
-interface Row { _id: string; values: Record<string, Cell>; updatedAt: string | null; used: number | null; usedBy?: Record<string, number> | null }
+interface Row { _id: string; values: Record<string, Cell>; updatedAt: string | null; createdAt?: string | null; used: number | null; usedBy?: Record<string, number> | null; usedDetail?: number | null; detailNames?: { name: string; records: number }[] | null }
 interface Orphan { values: Record<string, string>; records: number }
 interface Change {
   _id: string;
@@ -39,8 +39,15 @@ interface RenamePreview {
   sheetSteps: string[];
 }
 type RenameBody = { mode: 'row'; id: string; values: Record<string, unknown> } | { mode: 'category'; from: string; to: string };
+interface PageTools { hideColumns?: string[]; changedColumn?: boolean; foldable?: boolean; missingPoints?: boolean }
+interface MissingPoint { name: string; records: number; byField: Record<string, number>; last: string; details: { name: string; records: number }[]; exact: number }
+interface NamePreview { title: string; counts: RenamePreview['counts']; warnings: string[]; sheetSteps: string[]; uses: string | null }
+type Months = '3' | '6' | '12' | 'all';
+type PartKey = 'places' | 'changes' | 'missing' | 'excluded';
+const FOLD_DEFAULT: Record<PartKey, boolean> = { places: true, changes: false, missing: false, excluded: false };
+type ExcludedPoint = MissingPoint & { at: string | null };
 interface ListResponse {
-  list: { slug: string; title: string; group: string; note: string | null; columns: Column[]; recordsFollow: boolean; usageCounted: boolean; locked: string[]; fixedOnEdit: string[]; zoneCodes: string[]; codeNames: { key: Record<string, string>; cat: Record<string, string> }; indexBy: string | null; viaFavorites: boolean };
+  list: { slug: string; title: string; group: string; note: string | null; columns: Column[]; recordsFollow: boolean; usageCounted: boolean; locked: string[]; fixedOnEdit: string[]; zoneCodes: string[]; codeNames: { key: Record<string, string>; cat: Record<string, string> }; indexBy: string | null; viaFavorites: boolean; page: PageTools | null };
   rows: Row[];
   orphans: Orphan[];
   since: string;
@@ -48,6 +55,30 @@ interface ListResponse {
 }
 
 // ── Formatting ───────────────────────────────────────────────────────────────
+
+/** "7 Nov 2026, 13:20" in the browser's time. */
+function whenText(iso: string | null | undefined): string {
+  if (!iso) return '';
+  return new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+/** A part's heading: a button that folds and unfolds it (just the title when the
+ *  list's page isn't foldable). */
+function PartHeading({ title, count, open, foldable, onToggle, children }: {
+  title: string; count?: string; open: boolean; foldable: boolean; onToggle: () => void; children?: React.ReactNode;
+}) {
+  const label = <p className="text-xs text-stone-500 dark:text-zinc-400 uppercase tracking-widest">{title}{count && <span className="normal-case tracking-normal ml-1.5">{count}</span>}</p>;
+  return (
+    <div className="flex flex-wrap items-center gap-3 mb-2">
+      {foldable ? (
+        <button onClick={onToggle} aria-expanded={open} className="flex items-center gap-1.5 hover:text-stone-900 dark:hover:text-zinc-100">
+          <span className="w-3 text-[10px] text-stone-400 dark:text-zinc-500">{open ? '▾' : '▸'}</span>{label}
+        </button>
+      ) : label}
+      {(open || !foldable) && children}
+    </div>
+  );
+}
 
 function cellText(c: Cell, type: ColumnType): string {
   if (c === null || c === undefined || c === '') return '';
@@ -170,6 +201,17 @@ export default function AdminListPage() {
     | null
   >(null);
   const [locatingKey, setLocatingKey] = useState<string | null>(null);
+  // Foldable parts (place points, 7 Nov): remembered per list on this browser.
+  const [fold, setFold] = useState<Record<PartKey, boolean>>(FOLD_DEFAULT);
+  const [months, setMonths] = useState<Months>('3');
+  const [missing, setMissing] = useState<{ from: string | null; names: MissingPoint[]; excluded: ExcludedPoint[] } | null>(null);
+  const [missingError, setMissingError] = useState('');
+  const [missingSort, setMissingSort] = useState<'records' | 'last' | 'name'>('records');
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [expandedPts, setExpandedPts] = useState<Set<string>>(new Set());   // Places rows showing their details
+  const flip = (set: Set<string>, k: string) => { const t = new Set(set); if (t.has(k)) t.delete(k); else t.add(k); return t; };
+  // Renaming a name with no point (7 Nov): the name as logged, the new text, its preview.
+  const [nameRename, setNameRename] = useState<{ from: string; to: string; preview: NamePreview | null; error: string } | null>(null);
 
   // Place points (5 Nov): nothing reads the PlaceCoord tab, so most changes need no sheet step.
   const repeatNote = (b: { sheetNeeded?: boolean }) => (b.sheetNeeded === false ? ' Nothing to do in the sheet.' : ' Repeat it in the sheet, then tick it below.');
@@ -336,7 +378,96 @@ export default function AdminListPage() {
       .catch(e => setError(String(e.message ?? e)));
   }, [slug, since, reload]);
 
+  const tools: PageTools = data?.list.page ?? {};
+  const foldable = !!tools.foldable;
+  const isOpen = (k: PartKey) => !foldable || fold[k];
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(`fg-admin-fold:${slug}`) ?? 'null');
+      if (saved && typeof saved === 'object') setFold({ ...FOLD_DEFAULT, ...saved });
+    } catch { /* storage can be unavailable */ }
+  }, [slug]);
+  const toggle = (k: PartKey) => setFold(f => {
+    const next = { ...f, [k]: !f[k] };
+    try { localStorage.setItem(`fg-admin-fold:${slug}`, JSON.stringify(next)); } catch { /* ignore */ }
+    return next;
+  });
+
+  // Missing points and Excluded: loaded only while one of them is open.
+  const [missingReload, setMissingReload] = useState(0);
+  const wantMissing = !!tools.missingPoints && (fold.missing || fold.excluded);
+  useEffect(() => {
+    if (!wantMissing) return;
+    setMissingError('');
+    fetch(`/api/admin/lists/${encodeURIComponent(slug)}/missing?months=${months}`)
+      .then(r => (r.ok ? r.json() : r.json().then(b => Promise.reject(new Error(b.error ?? `HTTP ${r.status}`)))))
+      .then(b => setMissing({ from: b.from, names: b.names, excluded: b.excluded ?? [] }))
+      .catch(e => setMissingError(String(e.message ?? e)));
+  }, [slug, months, reload, missingReload, wantMissing]);
+
+  async function nameRenameCall(confirm: boolean) {
+    if (!nameRename) return;
+    setSaving(true);
+    setNameRename(r => (r ? { ...r, error: '' } : r));
+    try {
+      const r = await fetch(`/api/admin/lists/${encodeURIComponent(slug)}/missing`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rename: { from: nameRename.from, to: nameRename.to },
+          ...(confirm && nameRename.preview ? { expectRecords: nameRename.preview.counts.total } : {}),
+        }),
+      });
+      const b = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(b.error ?? `HTTP ${r.status}`);
+      if (!confirm) { setNameRename(x => (x ? { ...x, preview: b.preview } : x)); return; }
+      setNameRename(null);
+      setNotice(`Renamed ${nameRename.from} → ${nameRename.to}: ${recs(b.recordsChanged)} changed.${repeatNote(b)}`);
+      setReload(x => x + 1);
+    } catch (e: any) {
+      setNameRename(x => (x ? { ...x, error: String(e.message ?? e) } : x));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /** Exclude a name from Missing points, or put it back (admin_settings; nothing else changes). */
+  async function setExcluded(name: string, exclude: boolean) {
+    setBusy('ex:' + name); setMissingError('');
+    try {
+      const r = await fetch(`/api/admin/lists/${encodeURIComponent(slug)}/missing`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(exclude ? { exclude: name } : { putBack: name }),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? `HTTP ${r.status}`);
+      setMissingReload(x => x + 1);
+    } catch (e: any) {
+      setMissingError(String(e.message ?? e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const missingRows = useMemo(() => {
+    const out = [...(missing?.names ?? [])];
+    if (missingSort === 'last') out.sort((a, b) => b.last.localeCompare(a.last) || b.records - a.records);
+    if (missingSort === 'name') out.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+    return out;
+  }, [missing, missingSort]);
+
+  /** "+ Add point" from Missing points: the Add row with the name filled in. */
+  function addFromMissing(name: string) {
+    if (!data) return;
+    setFold(f => ({ ...f, places: true }));
+    setQuery(''); setLetter(null);
+    setRowError(''); setNotice('');
+    setEditing({ id: 'new', draft: { ...toDraft(data.list.columns, null), [data.list.indexBy ?? 'name']: name } });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
   const columns = data?.list.columns ?? [];
+  // Columns shown in the table; hidden ones stay in the edit row, under Changed.
+  const shown = columns.filter(c => !tools.hideColumns?.includes(c.key));
+  const hiddenCols = columns.filter(c => tools.hideColumns?.includes(c.key));
   // Place points rename and merge like activities but have no category (26 Oct).
   const hasCategory = columns.some(c => c.key === 'category');
 
@@ -351,8 +482,11 @@ export default function AdminListPage() {
     if (sort) {
       const col = columns.find(c => c.key === sort.key);
       out = [...out].sort((a, b) => {
-        const va = sort.key === '__used' ? a.used ?? -1 : sortValue(a.values[sort.key], col?.type ?? 'text');
-        const vb = sort.key === '__used' ? b.used ?? -1 : sortValue(b.values[sort.key], col?.type ?? 'text');
+        const val = (r: Row) => sort.key === '__used' ? r.used ?? -1
+          : sort.key === '__changed' ? r.updatedAt ?? ''
+          : sortValue(r.values[sort.key], col?.type ?? 'text');
+        const va = val(a);
+        const vb = val(b);
         const cmp = typeof va === 'number' && typeof vb === 'number' ? va - vb : String(va).localeCompare(String(vb), 'ko');
         return cmp * sort.dir;
       });
@@ -375,8 +509,11 @@ export default function AdminListPage() {
     return [...m].sort((a, b) => a[0].localeCompare(b[0], 'ko'));
   }, [data]);
 
-  const clickSort = (key: string) =>
-    setSort(s => (s?.key === key ? (s.dir === 1 ? { key, dir: -1 } : null) : { key, dir: 1 }));
+  // Changed starts newest first; everything else A→Z / smallest first.
+  const clickSort = (key: string) => {
+    const first: 1 | -1 = key === '__changed' ? -1 : 1;
+    setSort(s => (s?.key === key ? (s.dir === first ? { key, dir: (-first) as 1 | -1 } : null) : { key, dir: first }));
+  };
   const arrow = (key: string) => (sort?.key === key ? (sort.dir === 1 ? '▲' : '▼') : '');
 
   // The row being added or edited, as input boxes in place.
@@ -387,7 +524,7 @@ export default function AdminListPage() {
     const lockedHere = (key: string) => fixedHere(key) || (!!row && used > 0 && !data.list.recordsFollow && data.list.locked.includes(key));
     return (
       <tr key={row?._id ?? 'new'} className="border-b border-stone-200 dark:border-zinc-700 bg-amber-50/60 dark:bg-zinc-800">
-        {data.list.columns.map(c => {
+        {[...shown, ...(tools.changedColumn ? hiddenCols : [])].map(c => {
           const v = editing.draft[c.key];
           const locked = lockedHere(c.key);
           const title = !locked ? undefined
@@ -436,6 +573,7 @@ export default function AdminListPage() {
             </Fragment>
           );
         })}
+        {tools.changedColumn && !hiddenCols.length && <td />}
         {data.list.usageCounted && (
           <td className="px-3 py-1.5 text-right font-mono text-xs text-stone-500 dark:text-zinc-400 align-top pt-3">{row ? used.toLocaleString() : ''}</td>
         )}
@@ -448,6 +586,59 @@ export default function AdminListPage() {
   }
 
   const th = 'text-left font-medium px-3 py-2 cursor-pointer select-none whitespace-nowrap hover:text-stone-800 dark:hover:text-zinc-100';
+
+  // Rename a name with no point: the new text, then a preview like a point rename's.
+  function nameRenameBox() {
+    if (!nameRename) return null;
+    const pv = nameRename.preview;
+    return (
+      <div className={`rounded-lg px-3 py-2 text-sm ${pv ? 'border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950' : 'bg-amber-50/60 dark:bg-zinc-800'}`}>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-stone-600 dark:text-zinc-300">Rename <b className="font-medium text-stone-900 dark:text-zinc-50">{nameRename.from}</b> →</span>
+          <input
+            value={nameRename.to}
+            autoFocus
+            onChange={e => setNameRename(r => (r ? { ...r, to: e.target.value, preview: null } : r))}
+            onKeyDown={e => { if (e.key === 'Enter' && !pv) nameRenameCall(false); if (e.key === 'Escape') setNameRename(null); }}
+            disabled={!!pv || saving}
+            className={`${input.replace('w-full ', '')} flex-1 min-w-48`}
+          />
+          {!pv && (
+            <button
+              onClick={() => nameRenameCall(false)}
+              disabled={saving || !nameRename.to.trim() || nameRename.to.trim() === nameRename.from}
+              className="text-xs font-medium text-stone-900 dark:text-zinc-100 hover:underline disabled:opacity-40"
+            >Preview</button>
+          )}
+          {!pv && <button onClick={() => setNameRename(null)} disabled={saving} className={linkBtn}>Cancel</button>}
+        </div>
+        {nameRename.error && <p className="mt-2 text-red-600 dark:text-red-400 text-xs">{nameRename.error}</p>}
+        {pv && (
+          <div className="mt-2">
+            <p className="font-medium text-stone-900 dark:text-zinc-50">{pv.title}</p>
+            <p className="mt-1 text-stone-700 dark:text-zinc-200">
+              {pv.counts.total === 0
+                ? 'No record says it: only favourite-place periods and the sheet change.'
+                : <>{recs(pv.counts.total)} ({pv.counts.first === pv.counts.last ? pv.counts.first : `${pv.counts.first}–${pv.counts.last}`}) will change: {pv.counts.byTab.filter(t => t.n).map(t => `${t.n.toLocaleString()} in ${t.tab}`).join(', ')}.</>}
+            </p>
+            {pv.warnings.length > 0 && (
+              <ul className="mt-1 text-amber-800 dark:text-amber-300">{pv.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>
+            )}
+            <p className="mt-3 text-xs text-stone-500 dark:text-zinc-400 uppercase tracking-widest">Then in the sheet</p>
+            <StepList steps={pv.sheetSteps} className="mt-1 text-xs text-stone-700 dark:text-zinc-200 space-y-0.5" />
+            <div className="mt-3 flex gap-4 items-center">
+              <button
+                onClick={() => nameRenameCall(true)}
+                disabled={saving}
+                className="px-3 py-1.5 bg-stone-800 dark:bg-zinc-700 text-white rounded-lg text-sm font-medium hover:bg-stone-900 dark:hover:bg-zinc-600 disabled:opacity-40"
+              >{saving ? 'Changing…' : pv.counts.total ? `Confirm: change ${recs(pv.counts.total)}` : 'Confirm'}</button>
+              <button onClick={() => setNameRename(r => (r ? { ...r, preview: null } : r))} disabled={saving} className={linkBtn}>Back</button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col flex-1 px-4 py-8 max-w-5xl mx-auto w-full">
@@ -485,7 +676,12 @@ export default function AdminListPage() {
             </div>
           )}
 
-          <div className="mt-5 mb-3 flex gap-3 items-center">
+          <section className="mt-5">
+          {foldable && (
+            <PartHeading title="Places" count={`(${data.rows.length.toLocaleString()})`} open={fold.places} foldable onToggle={() => toggle('places')} />
+          )}
+          {isOpen('places') && (<>
+          <div className="mb-3 flex gap-3 items-center">
             <input
               value={query}
               onChange={e => setQuery(e.target.value)}
@@ -620,7 +816,7 @@ export default function AdminListPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800 text-xs text-stone-500 dark:text-zinc-400">
-                  {columns.map(c => (
+                  {shown.map(c => (
                     <Fragment key={c.key}>
                       <th onClick={() => clickSort(c.key)} className={`${th} ${c.type === 'number' ? 'text-right' : ''} ${c.narrow ? 'w-40' : ''}`}>
                         {c.label} <span className="text-[8px]">{arrow(c.key)}</span>
@@ -628,8 +824,13 @@ export default function AdminListPage() {
                       {c.type === 'coords' && <th className="text-left font-medium px-3 py-2 w-20">Map</th>}
                     </Fragment>
                   ))}
+                  {tools.changedColumn && (
+                    <th onClick={() => clickSort('__changed')} title="When the point was last added or edited" className={`${th} w-40`}>
+                      Changed <span className="text-[8px]">{arrow('__changed')}</span>
+                    </th>
+                  )}
                   {data.list.usageCounted && (
-                    <th onClick={() => clickSort('__used')} className={`${th} text-right w-24`}>
+                    <th onClick={() => clickSort('__used')} className={`${th} text-right ${tools.changedColumn ? 'w-48' : 'w-24'}`}>
                       Records <span className="text-[8px]">{arrow('__used')}</span>
                     </th>
                   )}
@@ -639,8 +840,9 @@ export default function AdminListPage() {
               <tbody>
                 {editing?.id === 'new' && editorRow(null)}
                 {rows.map(r => editing?.id === r._id ? editorRow(r) : (
-                  <tr key={r._id} className="border-b last:border-0 border-stone-100 dark:border-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-800/60">
-                    {columns.map(c => (
+                  <Fragment key={r._id}>
+                  <tr className="border-b last:border-0 border-stone-100 dark:border-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-800/60">
+                    {shown.map(c => (
                       <Fragment key={c.key}>
                         <td title={c.narrow ? cellText(r.values[c.key], c.type) || undefined : undefined} className={`px-3 py-1.5 ${c.type === 'number' || c.type === 'coords' ? 'font-mono text-xs' : ''} ${c.type === 'number' ? 'text-right' : ''} ${c.narrow ? 'max-w-40 truncate text-xs' : ''} text-stone-800 dark:text-zinc-100`}>
                           {cellText(r.values[c.key], c.type) || <span className="text-stone-300 dark:text-zinc-600">—</span>}
@@ -657,12 +859,28 @@ export default function AdminListPage() {
                         )}
                       </Fragment>
                     ))}
+                    {tools.changedColumn && (
+                      <td
+                        title={r.createdAt ? `Added ${whenText(r.createdAt)}` : undefined}
+                        className="px-3 py-1.5 text-xs text-stone-500 dark:text-zinc-400 whitespace-nowrap"
+                      >{whenText(r.updatedAt) || <span className="text-stone-300 dark:text-zinc-600">—</span>}</td>
+                    )}
                     {data.list.usageCounted && (
                       <td
-                        title={r.usedBy && r.used ? Object.entries(r.usedBy).map(([k, x]) => `${k} ${x.toLocaleString()}`).join(' · ') + (data.list.viaFavorites ? ' (집 / 회사 / 사이트 / 내차 included)' : '') : undefined}
+                        title={r.usedBy && r.used ? Object.entries(r.usedBy).map(([k, x]) => `${k} ${x.toLocaleString()}`).join(' · ') + (data.list.viaFavorites ? ' (집 / 회사 / 사이트 / 내차 included)' : '') + (r.usedDetail ? `; ${r.usedDetail.toLocaleString()} through “ - …”` : '') : undefined}
                         className={`px-3 py-1.5 text-right font-mono text-xs ${r.used ? 'text-stone-600 dark:text-zinc-300' : 'text-stone-300 dark:text-zinc-600'} ${r.usedBy && r.used ? 'cursor-help' : ''}`}
                       >
                         {(r.used ?? 0).toLocaleString()}
+                        {!!r.usedDetail && (r.detailNames?.length ? (
+                          <button
+                            onClick={() => setExpandedPts(s => flip(s, r._id))}
+                            aria-expanded={expandedPts.has(r._id)}
+                            title={expandedPts.has(r._id) ? 'Hide the names with details' : 'Show the names logged under this point, to rename one'}
+                            className="block sm:inline sm:ml-1 text-[11px] text-stone-400 dark:text-zinc-500 hover:text-stone-700 dark:hover:text-zinc-200 whitespace-nowrap"
+                          >{expandedPts.has(r._id) ? '▾' : '▸'} ({r.usedDetail.toLocaleString()} with details)</button>
+                        ) : (
+                          <span className="block sm:inline sm:ml-1 text-[11px] text-stone-400 dark:text-zinc-500 whitespace-nowrap" title="Records that use this point through “ - …” (a room, a shop …)">({r.usedDetail.toLocaleString()} with details)</span>
+                        ))}
                       </td>
                     )}
                     <td className="px-3 py-1.5 text-right whitespace-nowrap space-x-3">
@@ -677,9 +895,30 @@ export default function AdminListPage() {
                       >Delete</button>
                     </td>
                   </tr>
+                  {expandedPts.has(r._id) && (r.detailNames ?? []).map(d => (
+                    <tr key={'d:' + d.name} className="border-b border-stone-100 dark:border-zinc-800 bg-stone-50/60 dark:bg-zinc-800/40">
+                      <td className="pl-7 pr-3 py-1 text-xs text-stone-700 dark:text-zinc-200">{d.name}</td>
+                      <td colSpan={shown.length - 1 + shown.filter(c => c.type === 'coords').length + (tools.changedColumn ? 1 : 0)} />
+                      <td className="px-3 py-1 text-right font-mono text-xs text-stone-500 dark:text-zinc-400">{d.records.toLocaleString()}</td>
+                      <td className="px-3 py-1 text-right whitespace-nowrap">
+                        <button
+                          onClick={() => { setRowError(''); setNotice(''); setNameRename({ from: d.name, to: d.name, preview: null, error: '' }); }}
+                          disabled={!!nameRename || !!editing || !!preview}
+                          title="Change this name in the records"
+                          className={linkBtn}
+                        >Rename</button>
+                      </td>
+                    </tr>
+                  ))}
+                  {expandedPts.has(r._id) && nameRename && (r.detailNames ?? []).some(d => d.name === nameRename.from) && (
+                    <tr className="border-b border-stone-200 dark:border-zinc-700">
+                      <td colSpan={shown.length + shown.filter(c => c.type === 'coords').length + (tools.changedColumn ? 1 : 0) + 2} className="px-3 py-2">{nameRenameBox()}</td>
+                    </tr>
+                  )}
+                  </Fragment>
                 ))}
                 {rows.length === 0 && editing?.id !== 'new' && (
-                  <tr><td colSpan={columns.length + columns.filter(c => c.type === 'coords').length + 2} className="px-3 py-4 text-center text-sm text-stone-500 dark:text-zinc-400">No rows.</td></tr>
+                  <tr><td colSpan={shown.length + shown.filter(c => c.type === 'coords').length + (tools.changedColumn ? 1 : 0) + 2} className="px-3 py-4 text-center text-sm text-stone-500 dark:text-zinc-400">No rows.</td></tr>
                 )}
               </tbody>
             </table>
@@ -687,6 +926,8 @@ export default function AdminListPage() {
           {!data.list.usageCounted && (
             <p className="mt-2 text-xs text-stone-500 dark:text-zinc-400">Records are not counted for this list.</p>
           )}
+          </>)}
+          </section>
 
           {picker && (
             <PointPicker
@@ -704,16 +945,19 @@ export default function AdminListPage() {
           )}
 
           <section className="mt-8">
-            <div className="flex items-center gap-3 mb-2">
-              <p className="text-xs text-stone-500 dark:text-zinc-400 uppercase tracking-widest">Changes since</p>
+            <PartHeading
+              title="Changes since"
+              count={foldable && !fold.changes ? `${data.since}${data.changes.some(c => !c.sheetDone && c.sheetSteps.length) ? ' · some to repeat in the sheet' : ''}` : undefined}
+              open={fold.changes} foldable={foldable} onToggle={() => toggle('changes')}
+            >
               <input
                 type="date"
                 value={since}
                 onChange={e => e.target.value && setSince(e.target.value)}
                 className="bg-white dark:bg-zinc-900 border border-stone-300 dark:border-zinc-600 rounded px-2 py-1 text-stone-800 dark:text-zinc-100 text-xs focus:outline-none focus:border-stone-400"
               />
-            </div>
-            {data.changes.length === 0 ? (
+            </PartHeading>
+            {!isOpen('changes') ? null : data.changes.length === 0 ? (
               <p className="text-sm text-stone-500 dark:text-zinc-400">No changes since {data.since}.</p>
             ) : (
               <div className="border border-stone-200 dark:border-zinc-700 rounded-lg overflow-x-auto shadow-sm bg-white dark:bg-zinc-900">
@@ -774,6 +1018,179 @@ export default function AdminListPage() {
               </div>
             )}
           </section>
+
+          {tools.missingPoints && (
+            <section className="mt-8">
+              <PartHeading
+                title="Missing points"
+                count={fold.missing && missing ? `(${missing.names.length.toLocaleString()})` : undefined}
+                open={fold.missing} foldable={foldable} onToggle={() => toggle('missing')}
+              >
+                <div className="flex gap-1" role="group" aria-label="Records from">
+                  {([['3', '3 months'], ['6', '6 months'], ['12', '1 year'], ['all', 'All']] as [Months, string][]).map(([m, label]) => (
+                    <button
+                      key={m}
+                      onClick={() => setMonths(m)}
+                      aria-pressed={months === m}
+                      className={`h-7 px-2.5 rounded text-xs transition-colors ${months === m
+                        ? 'bg-stone-800 dark:bg-zinc-200 text-white dark:text-zinc-900 font-semibold'
+                        : 'bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-700 text-stone-700 dark:text-zinc-200 hover:bg-stone-100 dark:hover:bg-zinc-800'}`}
+                    >{label}</button>
+                  ))}
+                </div>
+              </PartHeading>
+              {isOpen('missing') && (<>
+                <p className="mb-2 text-xs text-stone-500 dark:text-zinc-400">
+                  Names in Place, From and To with no point{missing?.from ? `, in records from ${missing.from}` : ''}. 집 / 회사 / 사이트 / 내차 are resolved first; “A - B” is listed under A. Exclude a name that isn’t a place (a car in Location).
+                </p>
+                {missingError && (
+                  <div className="mb-3 px-4 py-2 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm">Could not load missing points: {missingError}</div>
+                )}
+                {notice && !fold.places && (
+                  <div className="mb-3 px-4 py-2 bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 rounded-lg text-emerald-700 dark:text-emerald-300 text-sm">{notice}</div>
+                )}
+                {!missing && !missingError && <p className="text-sm text-stone-500 dark:text-zinc-400">Loading…</p>}
+                {missing && (missing.names.length === 0 ? (
+                  <p className="text-sm text-stone-500 dark:text-zinc-400">Every name has a point.</p>
+                ) : (
+                  <div className="border border-stone-200 dark:border-zinc-700 rounded-lg overflow-x-auto shadow-sm bg-white dark:bg-zinc-900">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800 text-xs text-stone-500 dark:text-zinc-400">
+                          <th onClick={() => setMissingSort('name')} className={th}>Name <span className="text-[8px]">{missingSort === 'name' ? '▲' : ''}</span></th>
+                          <th onClick={() => setMissingSort('records')} className={`${th} text-right w-24`}>Records <span className="text-[8px]">{missingSort === 'records' ? '▼' : ''}</span></th>
+                          <th onClick={() => setMissingSort('last')} className={`${th} w-28`}>Last used <span className="text-[8px]">{missingSort === 'last' ? '▼' : ''}</span></th>
+                          <th className="w-40" />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {missingRows.map(m => {
+                          const open = expanded.has(m.name);
+                          const logged = [...(m.exact ? [{ name: m.name, records: m.exact }] : []), ...m.details];
+                          const renameBtn = (name: string) => (
+                            <button
+                              onClick={() => { setRowError(''); setNotice(''); setNameRename({ from: name, to: name, preview: null, error: '' }); }}
+                              disabled={!!nameRename || !!editing || !!preview}
+                              title="Change this name in the records (e.g. “X 302” → “X - 302” to use X’s point)"
+                              className={linkBtn}
+                            >Rename</button>
+                          );
+                          return (
+                          <Fragment key={m.name}>
+                          <tr className="border-b last:border-0 border-stone-100 dark:border-zinc-800 align-top hover:bg-stone-50 dark:hover:bg-zinc-800/60">
+                            <td className="px-3 py-1.5 text-stone-800 dark:text-zinc-100">
+                              {m.name}
+                              {m.details.length > 0 && (
+                                <button
+                                  onClick={() => setExpanded(s => { const t = new Set(s); if (t.has(m.name)) t.delete(m.name); else t.add(m.name); return t; })}
+                                  aria-expanded={open}
+                                  title={open ? 'Hide the names as logged' : 'Show each name as logged, to rename one'}
+                                  className="block text-left text-[11px] text-stone-400 dark:text-zinc-500 hover:text-stone-700 dark:hover:text-zinc-200"
+                                >{open ? '▾' : '▸'} +{m.details.length} with details{open ? '' : `: ${m.details.slice(0, 2).map(d => d.name.slice(m.name.length + 3)).join(', ')}${m.details.length > 2 ? ', …' : ''}`}</button>
+                              )}
+                            </td>
+                            <td
+                              title={Object.entries(m.byField).map(([k, x]) => `${k} ${x.toLocaleString()}`).join(' · ')}
+                              className="px-3 py-1.5 text-right font-mono text-xs text-stone-600 dark:text-zinc-300 cursor-help"
+                            >{m.records.toLocaleString()}</td>
+                            <td className="px-3 py-1.5 font-mono text-xs text-stone-500 dark:text-zinc-400 whitespace-nowrap">{m.last}</td>
+                            <td className="px-3 py-1.5 text-right whitespace-nowrap space-x-3">
+                              <button
+                                onClick={() => addFromMissing(m.name)}
+                                disabled={!!editing || !!catForm || !!preview}
+                                className="text-xs font-medium text-stone-900 dark:text-zinc-100 hover:underline disabled:opacity-30 disabled:cursor-not-allowed"
+                              >+ Add point</button>
+                              <button
+                                onClick={() => setExcluded(m.name, true)}
+                                disabled={busy === 'ex:' + m.name}
+                                title="Not a place (e.g. a car): leave it out of Missing points. Put it back under Excluded."
+                                className={linkBtn}
+                              >Exclude</button>
+                              {m.details.length === 0
+                                ? renameBtn(m.name)
+                                : <span aria-hidden className={`${linkBtn} invisible`}>Rename</span>}
+                            </td>
+                          </tr>
+                          {open && logged.map(d => (
+                            <tr key={'d:' + d.name} className="border-b border-stone-100 dark:border-zinc-800 bg-stone-50/60 dark:bg-zinc-800/40">
+                              <td className="pl-7 pr-3 py-1 text-xs text-stone-700 dark:text-zinc-200">{d.name}</td>
+                              <td className="px-3 py-1 text-right font-mono text-xs text-stone-500 dark:text-zinc-400">{d.records.toLocaleString()}</td>
+                              <td />
+                              <td className="px-3 py-1 text-right whitespace-nowrap">{renameBtn(d.name)}</td>
+                            </tr>
+                          ))}
+                          {nameRename && (nameRename.from === m.name || m.details.some(d => d.name === nameRename.from)) && (
+                            <tr className="border-b border-stone-200 dark:border-zinc-700">
+                              <td colSpan={4} className="px-3 py-2">{nameRenameBox()}</td>
+                            </tr>
+                          )}
+                          </Fragment>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
+              </>)}
+            </section>
+          )}
+
+          {tools.missingPoints && (
+            <section className="mt-8">
+              <PartHeading
+                title="Excluded"
+                count={fold.excluded && missing ? `(${missing.excluded.length.toLocaleString()})` : undefined}
+                open={fold.excluded} foldable={foldable} onToggle={() => toggle('excluded')}
+              />
+              {isOpen('excluded') && (<>
+                <p className="mb-2 text-xs text-stone-500 dark:text-zinc-400">
+                  Names left out of Missing points. Records{missing?.from ? ` from ${missing.from}` : ''}, as in the period above. Put back shows a name there again.
+                </p>
+                {missingError && !fold.missing && (
+                  <div className="mb-3 px-4 py-2 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm">{missingError}</div>
+                )}
+                {!missing && !missingError && <p className="text-sm text-stone-500 dark:text-zinc-400">Loading…</p>}
+                {missing && (missing.excluded.length === 0 ? (
+                  <p className="text-sm text-stone-500 dark:text-zinc-400">Nothing excluded.</p>
+                ) : (
+                  <div className="border border-stone-200 dark:border-zinc-700 rounded-lg overflow-x-auto shadow-sm bg-white dark:bg-zinc-900">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800 text-xs text-stone-500 dark:text-zinc-400">
+                          <th className="text-left font-medium px-3 py-2">Name</th>
+                          <th className="text-right font-medium px-3 py-2 w-24">Records</th>
+                          <th className="text-left font-medium px-3 py-2 w-28">Last used</th>
+                          <th className="text-left font-medium px-3 py-2 w-40">Excluded</th>
+                          <th className="w-24" />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {missing.excluded.map(m => (
+                          <tr key={m.name} className="border-b last:border-0 border-stone-100 dark:border-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-800/60">
+                            <td className="px-3 py-1.5 text-stone-800 dark:text-zinc-100">{m.name}</td>
+                            <td
+                              title={Object.entries(m.byField).map(([k, x]) => `${k} ${x.toLocaleString()}`).join(' · ') || undefined}
+                              className={`px-3 py-1.5 text-right font-mono text-xs ${m.records ? 'text-stone-600 dark:text-zinc-300' : 'text-stone-300 dark:text-zinc-600'}`}
+                            >{m.records.toLocaleString()}</td>
+                            <td className="px-3 py-1.5 font-mono text-xs text-stone-500 dark:text-zinc-400 whitespace-nowrap">{m.last || '—'}</td>
+                            <td className="px-3 py-1.5 text-xs text-stone-500 dark:text-zinc-400 whitespace-nowrap">{whenText(m.at)}</td>
+                            <td className="px-3 py-1.5 text-right whitespace-nowrap">
+                              <button
+                                onClick={() => setExcluded(m.name, false)}
+                                disabled={busy === 'ex:' + m.name}
+                                title="Show it in Missing points again"
+                                className={`${linkBtn} underline`}
+                              >Put back</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
+              </>)}
+            </section>
+          )}
         </>
       )}
     </div>

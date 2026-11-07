@@ -65,6 +65,7 @@ import { buildJourneys, legsFromDocs, HOME, type Journey, type Leg } from './tra
 import { resolveFavoritePlace, type FavoritePlaceDoc } from '@/lib/migration/favoritePlace';
 import type { PlaceCoordDoc } from '@/lib/migration/placeCoord';
 import { percentile } from './util';
+import { DETAIL_SEP, namePrefixes, pointNameFor, withFavorite } from '@/lib/places/details';
 
 export const FLIGHT = '비행기';
 export const GOLF = '골프';
@@ -261,20 +262,34 @@ export function prepareTransport(
   placeCoords: Pick<PlaceCoordDoc, 'name' | 'lat' | 'lng'>[] = [],
 ): TransportContext {
   const allLegs = legsFromDocs(docs);
+  const pointOf = new Map(placeCoords.map(p => [p.name, { lat: p.lat, lng: p.lng }]));
+  const labels = new Set(favorites.map(f => f.label));
+
+  // Place details (#67.8): From / To "A - B" count as the place whose point they use,
+  // so legs join, 집 ends a journey and workplaces are found as without the detail.
+  // Hyoje doesn't put details in From / To; this is just in case. Kept as the longest
+  // form that is a favourite label or has a point (else as logged).
+  const base = (name: string) => name.includes(DETAIL_SEP)
+    ? namePrefixes(name).find(p => labels.has(p) || pointOf.has(p)) ?? name
+    : name;
+  for (const l of allLegs) { l.from = base(l.from); l.to = base(l.to); }
+
   const flightLegs = allLegs.filter(l => l.method === FLIGHT);
   const journeys = buildJourneys(allLegs.filter(l => l.method !== FLIGHT));
 
-  // Display names: 집 / 회사 / 사이트 / 내차 → the real place at that moment.
+  // Display names: 집 / 회사 / 사이트 / 내차 → the real place at that moment, then the
+  // place whose point is used ("Harrods - Food Hall" → "Harrods" when only it has one).
   const fav = favorites.map(f => ({
     ...f,
     from: f.from ? { ...f.from, at: new Date(f.from.at) } : null,
     to: f.to ? { ...f.to, at: new Date(f.to.at) } : null,
   }));
-  const named = (label: string, atMs: number) =>
-    resolveFavoritePlace(fav, label, new Date(atMs)) ?? label;
+  const named = (label: string, atMs: number) => {
+    const real = withFavorite(label, x => resolveFavoritePlace(fav, x, new Date(atMs)));
+    return pointNameFor(real, n => pointOf.has(n)) ?? real;
+  };
 
   // Distances: both ends by real name → place_coord. Set once on every leg (flights too).
-  const pointOf = new Map(placeCoords.map(p => [p.name, { lat: p.lat, lng: p.lng }]));
   const homeNames = new Set(fav.filter(f => f.label === HOME).map(f => f.name));
   const fast = new Map<string, { from: string; to: string; legs: number; maxKmh: number }>();
   let tooFastLegs = 0;

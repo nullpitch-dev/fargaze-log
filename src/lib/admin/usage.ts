@@ -15,11 +15,17 @@
 //
 // viaFavorites (place points): a record that says 집 / 회사 / 사이트 / 내차 counts for
 // the place that label meant at the record's moment (spec.at: start or end), the
-// way Journeys resolves it (favoritePlace.ts, resolveFavoritePlace).
+// way Journeys resolves it (favoritePlace.ts, resolveFavoritePlace). A label at the
+// head of "A - B" resolves too: "회사 - 회의실" → "<the real 회사> - 회의실".
+//
+// placeDetails (place points, #67.8): each record counts once under each point it
+// uses — the longest name with a point (places/details.ts) — and "with details"
+// counts the records that reached the point through a " - …" part.
 
 import Log from '@/models/Log';
 import FavoritePlace from '@/models/FavoritePlace';
 import { type ListDef, type RowOut, type UsageSpec, rowKey } from './lists';
+import { DETAIL_SEP, pointNameFor, splitHead } from '@/lib/places/details';
 
 export interface Orphan { values: Record<string, string>; records: number }
 export interface UsageResult {
@@ -28,6 +34,10 @@ export interface UsageResult {
   /** Per row, records per labelled spec (Place · From · To); only lists whose specs have labels. */
   breakdown: Record<string, Record<string, number>>;
   orphans: Orphan[];
+  /** placeDetails lists: per row, the records that reached it through " - …". */
+  details?: Record<string, number>;
+  /** placeDetails lists: per row, the names as logged under it ("A - B"), most used first. */
+  detailNames?: Record<string, { name: string; records: number }[]>;
 }
 
 const filled = { $exists: true, $nin: [null, ''] };
@@ -42,6 +52,12 @@ async function resolver(def: ListDef, userId: string): Promise<Resolve> {
   if (!periods.length) return null;
   return (spec, path) => {
     const at = spec.at ?? 'start';
+    // The label is the head of "A - B" (or the whole value); the detail is kept.
+    const v = '$' + path;
+    const isStr = { $eq: [{ $type: v }, 'string'] };
+    const i = { $cond: [isStr, { $indexOfCP: [v, DETAIL_SEP] }, -1] };
+    const head = { $cond: [{ $gte: [i, 0] }, { $substrCP: [v, 0, i] }, v] };
+    const rest = { $cond: [{ $gte: [i, 0] }, { $substrCP: [v, i, { $strLenCP: v }] }, ''] };
     // True instant: the stored datetime is the naive local clock; the offset is in hours.
     // All-day records have no time: no moment, so their label stays as it is.
     const inst = { $cond: [
@@ -53,12 +69,12 @@ async function resolver(def: ListDef, userId: string): Promise<Resolve> {
       $switch: {
         branches: periods.map(p => ({
           case: { $and: [
-            { $eq: ['$' + path, p.label] },
+            { $eq: [head, p.label] },
             { $ne: [inst, null] },   // null sorts before every date, so check it first
             ...(p.from?.at ? [{ $gte: [inst, p.from.at] }] : []),
             ...(p.to?.at ? [{ $lte: [inst, p.to.at] }] : []),
           ] },
-          then: p.name,
+          then: { $concat: [p.name, rest] },
         })),
         default: '$' + path,
       },
@@ -124,6 +140,7 @@ export async function computeUsage(def: ListDef, userId: string, rows: RowOut[])
   const specs = def.usage ?? [];
   if (!specs.length) return { counted: false, used: {}, breakdown: {}, orphans: [] };
 
+  if (def.placeDetails) return byPlaceDetails(def, userId, rows, specs);
   const noArrays = specs.every(s => !s.unwind?.length);
   const shared = sharedColumn(specs);
   if (noArrays && (specs.length === 1 || shared)) return byCounting(def, userId, rows, specs, shared);
@@ -162,6 +179,128 @@ async function byCounting(def: ListDef, userId: string, rows: RowOut[], specs: U
     orphans.sort((a, b) => b.records - a.records);
   }
   return { counted: true, used, breakdown, orphans };
+}
+
+// ── Place details (#67.8) ────────────────────────────────────────────────────
+
+/** Every spec is one `name` column with no arrays. One pass groups the records by
+ *  their (resolved) value in each spec; the longest-name rule then runs here, so a
+ *  record counts once per point even when Place says "A - B" and To says "A". */
+async function byPlaceDetails(def: ListDef, userId: string, rows: RowOut[], specs: UsageSpec[]): Promise<UsageResult> {
+  const res = await resolver(def, userId);
+  const paths = specs.map(s => Object.values(s.key)[0]);
+  const combos = await Log.aggregate([
+    { $match: { userId, $or: paths.map(p => ({ [p]: filled })) } },
+    { $group: { _id: Object.fromEntries(specs.map((s, i) => ['s' + i, res ? res(s, paths[i]) : '$' + paths[i]])), n: { $sum: 1 } } },
+  ]).allowDiskUse(true) as { _id: Record<string, unknown>; n: number }[];
+
+  const idOf = new Map(rows.map(r => [String(r.values.name ?? ''), r._id]));
+  const memo = new Map<string, string | null>();
+  const pointOf = (v: string) => {
+    if (!memo.has(v)) memo.set(v, pointNameFor(v, n => idOf.has(n)));
+    return memo.get(v)!;
+  };
+
+  const used: Record<string, number> = {};
+  const details: Record<string, number> = {};
+  const names: Record<string, Map<string, number>> = {};
+  const breakdown: Record<string, Record<string, number>> = {};
+  for (const { _id, n } of combos) {
+    const perPoint = new Map<string, { labels: Set<string>; detail: boolean; names: Set<string> }>();
+    specs.forEach((s, i) => {
+      const v = _id['s' + i];
+      if (typeof v !== 'string' || !v) return;
+      const p = pointOf(v);
+      if (!p) return;
+      const e = perPoint.get(p) ?? { labels: new Set<string>(), detail: false, names: new Set<string>() };
+      if (s.label) e.labels.add(s.label);
+      if (v !== p) { e.detail = true; e.names.add(v); }
+      perPoint.set(p, e);
+    });
+    for (const [p, e] of perPoint) {
+      const id = idOf.get(p)!;
+      used[id] = (used[id] ?? 0) + n;
+      if (e.detail) details[id] = (details[id] ?? 0) + n;
+      for (const v of e.names) (names[id] ??= new Map()).set(v, (names[id].get(v) ?? 0) + n);
+      for (const l of e.labels) (breakdown[id] ??= {})[l] = (breakdown[id]?.[l] ?? 0) + n;
+    }
+  }
+  for (const r of rows) used[r._id] ??= 0;
+  // Names without a point are normal here (refuseUnknown false): no orphans.
+  const detailNames = Object.fromEntries(Object.entries(names).map(([id, m]) => [id,
+    [...m].map(([name, records]) => ({ name, records })).sort((a, b) => b.records - a.records || a.name.localeCompare(b.name))]));
+  return { counted: true, used, breakdown, orphans: [], details, detailNames };
+}
+
+// ── Missing place points (7 Nov 2026) ─────────────────────────────────────────
+
+export interface MissingPoint {
+  /** The name a point would go on: the part before the first " - " (listed under A). */
+  name: string;
+  /** Records using it, each once; by field (Place / From / To). */
+  records: number;
+  byField: Record<string, number>;
+  /** Latest local start date, YYYY-MM-DD. */
+  last: string;
+  /** The names as logged with a detail ("A - B"), most used first. */
+  details: { name: string; records: number }[];
+  /** Records that say A itself (no detail). */
+  exact: number;
+}
+
+/** Names in Place / From / To with no point (longest-name rule, labels resolved) in
+ *  records starting on or after `fromYmd` (YYYYMMDD; null = all). Bare favourite
+ *  labels (an all-day record, or no period covering it) are left out: they need a
+ *  favourite period, not a point. Excluded names are split off by the route. */
+export async function missingPoints(def: ListDef, userId: string, fromYmd: number | null): Promise<MissingPoint[]> {
+  const specs = def.usage ?? [];
+  const res = await resolver(def, userId);
+  const paths = specs.map(s => Object.values(s.key)[0]);
+  const ymd = { $add: [{ $multiply: ['$start.year', 10000] }, { $multiply: ['$start.month', 100] }, '$start.day'] };
+  const [combos, points, labels] = await Promise.all([
+    Log.aggregate([
+      { $match: { userId, $or: paths.map(p => ({ [p]: filled })), ...(fromYmd ? { $expr: { $gte: [ymd, fromYmd] } } : {}) } },
+      { $group: {
+        _id: Object.fromEntries(specs.map((s, i) => ['s' + i, res ? res(s, paths[i]) : '$' + paths[i]])),
+        n: { $sum: 1 }, last: { $max: ymd },
+      } },
+    ]).allowDiskUse(true) as Promise<{ _id: Record<string, unknown>; n: number; last: number }[]>,
+    def.model().find({ userId }).select('name').lean() as Promise<any[]>,
+    FavoritePlace.distinct('label', { userId }) as Promise<string[]>,
+  ]);
+  const has = new Set(points.map(p => String(p.name)));
+  const isLabel = new Set(labels.map(String));
+
+  const out = new Map<string, MissingPoint & { detailMap: Map<string, number>; lastN: number }>();
+  for (const { _id, n, last } of combos) {
+    const perHead = new Map<string, { fields: Set<string>; details: Set<string>; exact: boolean }>();
+    specs.forEach((s, i) => {
+      const v = _id['s' + i];
+      if (typeof v !== 'string' || !v || isLabel.has(v)) return;
+      if (pointNameFor(v, x => has.has(x))) return;
+      const { head, rest } = splitHead(v);
+      const e = perHead.get(head) ?? { fields: new Set<string>(), details: new Set<string>(), exact: false };
+      e.fields.add(s.label ?? 'Place');
+      if (rest) e.details.add(v); else e.exact = true;
+      perHead.set(head, e);
+    });
+    for (const [head, e] of perHead) {
+      const m = out.get(head) ?? { name: head, records: 0, byField: {} as Record<string, number>, last: '', details: [], exact: 0, detailMap: new Map<string, number>(), lastN: 0 };
+      m.records += n;
+      if (e.exact) m.exact += n;
+      for (const f of e.fields) m.byField[f] = (m.byField[f] ?? 0) + n;
+      for (const d of e.details) m.detailMap.set(d, (m.detailMap.get(d) ?? 0) + n);
+      m.lastN = Math.max(m.lastN, last ?? 0);
+      out.set(head, m);
+    }
+  }
+  return [...out.values()]
+    .map(({ detailMap, lastN, ...m }) => ({
+      ...m,
+      last: lastN ? `${String(lastN).slice(0, 4)}-${String(lastN).slice(4, 6)}-${String(lastN).slice(6, 8)}` : '',
+      details: [...detailMap].map(([name, records]) => ({ name, records })).sort((a, b) => b.records - a.records || a.name.localeCompare(b.name)),
+    }))
+    .sort((a, b) => b.records - a.records || b.last.localeCompare(a.last) || a.name.localeCompare(b.name, 'ko'));
 }
 
 // ── By record IDs ────────────────────────────────────────────────────────────

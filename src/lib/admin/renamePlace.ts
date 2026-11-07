@@ -12,6 +12,12 @@
 //     note is refused (save one, then the other).
 //   - Preview first; one transaction; Undo until the next migration (a merge only
 //     before it is ticked), records matched by the IDs kept per field.
+//   - Place details "A - B" (#67.8, Design §15.5.9): everything under the name
+//     follows — records' "Harrods - Food Hall", favourite periods' names, and point
+//     rows like "Harrods - Food Hall" become "Harrods London - …". A change that
+//     would give a point row a name another row already has is refused (merge
+//     included), and so is a new name that starts with the old one and " - ".
+//     The sheet step is a regular-expression Find & replace: ^A( - .*)?$ → B$1.
 
 import mongoose from 'mongoose';
 import Log from '@/models/Log';
@@ -21,6 +27,7 @@ import { getArchiveUntil } from '@/lib/archiveYear';
 import { countsByTab, savedByTab, type TabCount } from '@/lib/yearTabs';
 import { type ListDef, toRow } from './lists';
 import { parseCoordsText } from './write';
+import { escapeRegex, isUnder, pointNameFor, swapHead, underFilter } from '@/lib/places/details';
 
 export const PLACE_SLUG = 'place-coord';
 
@@ -41,6 +48,9 @@ export interface PlacePlan {
   to: { key: string };
   /** The old row as it was, so Undo can put a merged row back. */
   fromDoc: { lat: number; lng: number; note: string; source: string };
+  /** Point rows under the old name ("Harrods - Food Hall"), renamed with it (#67.8).
+   *  Missing on changes saved before 67.8. */
+  children?: { id: string; from: string; to: string }[];
 }
 
 /** byTab: records per Archive-file tab, newest year tab first, the archive last (#73);
@@ -85,7 +95,21 @@ async function makePlan(def: ListDef, userId: string, id: string, values: Record
     return fail(400, `Change the name on its own: put the ${pointMoved ? 'point' : 'note'} back, save the new name, then edit the ${pointMoved ? 'point' : 'note'}.`);
   }
 
+  if (isUnder(toKey, fromKey)) {
+    return fail(400, `The new name can’t be ${fromKey} with a detail added: everything called “${fromKey} - …” would change too. Add ${toKey} as a new point instead.`);
+  }
+
   const target = await model.findOne({ userId, name: toKey, _id: { $ne: row._id } }).lean() as any;
+  // Point rows under the old name move with it; none may land on a name already taken.
+  const kids = await model.find({ userId, name: underFilter(fromKey), _id: { $ne: row._id } }).select('name').lean() as any[];
+  const children = kids.map(k => ({ id: String(k._id), from: String(k.name), to: swapHead(String(k.name), fromKey, toKey) }));
+  if (children.length) {
+    const taken = await model.find({ userId, name: { $in: children.map(c => c.to) } }).select('name').lean() as any[];
+    if (taken.length) {
+      const list = taken.map(t => String(t.name)).sort();
+      return fail(409, `Refused: ${list.join(', ')} ${list.length === 1 ? 'is' : 'are'} already a point, and ${children.filter(c => list.includes(c.to)).map(c => c.from).join(', ')} would take that name. Merge or rename ${list.length === 1 ? 'that point' : 'those points'} first.`);
+    }
+  }
   return {
     mode: 'row', place: true,
     action: target ? 'merge' : 'rename',
@@ -93,14 +117,18 @@ async function makePlan(def: ListDef, userId: string, id: string, values: Record
     targetId: target ? String(target._id) : null,
     from: { key: fromKey }, to: { key: toKey },
     fromDoc: { lat: row.lat, lng: row.lng, note: row.note ?? '', source: row.source ?? 'manual' },
+    children,
   };
 }
 
-const anyField = (userId: string, name: string) => ({ userId, $or: FIELDS.map(f => ({ [f.path]: name })) });
+/** Records with the name, or the name and " - …", in any of the three fields. */
+const anyField = (userId: string, name: string) => ({ userId, $or: FIELDS.map(f => ({ [f.path]: underFilter(name) })) });
 
-async function countRecords(userId: string, name: string): Promise<PlaceCounts> {
+/** `exact`: only the name itself (a name rename, 7 Nov), not "name - …". */
+async function countRecords(userId: string, name: string, exact = false): Promise<PlaceCounts> {
+  const m = exact ? name : underFilter(name);
   const byYear = await Log.aggregate([
-    { $match: anyField(userId, name) },
+    { $match: { userId, $or: FIELDS.map(f => ({ [f.path]: m })) } },
     { $group: { _id: '$start.year', n: { $sum: 1 } } },
   ]) as { _id: number | null; n: number }[];
   const years = byYear.map(y => y._id).filter((y): y is number => typeof y === 'number');
@@ -113,7 +141,7 @@ async function countRecords(userId: string, name: string): Promise<PlaceCounts> 
   const byField = {} as PlaceCounts['byField'];
   for (const f of FIELDS) {
     const g = await Log.aggregate([
-      { $match: { userId, [f.path]: name } },
+      { $match: { userId, [f.path]: m } },
       { $group: { _id: '$start.year', n: { $sum: 1 } } },
     ]) as { _id: number | null; n: number }[];
     byField[f.key] = { byTab: countsByTab(asYears(g), archiveUntil, thisYear) };
@@ -122,7 +150,7 @@ async function countRecords(userId: string, name: string): Promise<PlaceCounts> 
     total: sum(() => true), byTab: countsByTab(asYears(byYear), archiveUntil, thisYear),
     first: years.length ? Math.min(...years) : null, last: years.length ? Math.max(...years) : null,
     byField,
-    favorites: await FavoritePlace.countDocuments({ userId, name }),
+    favorites: await FavoritePlace.countDocuments({ userId, name: m }),
   };
 }
 
@@ -135,21 +163,29 @@ const range = (tab: string, col: string, row: number) => `'${tab}'!${col}${row}:
 const expect = (x: number) => (x === 0 ? 'expect none' : `expect ${n(x)}`);
 
 const NOTHING = 'Nothing to do in the sheet: no record or favourite-place period uses this name.';
+
+/** Find / Replace for Google Sheets with “Search using regular expressions”: the name
+ *  alone or followed by “ - …” (#67.8). $1 keeps the detail. */
+export const regexPair = (from: string, to: string, exact = false) => (exact
+  ? { find: `^${escapeRegex(from)}$`, replace: to }
+  : { find: `^${escapeRegex(from)}( - .*)?$`, replace: `${to}$1` });
 export const placeNeedsSheet = (steps: string[]) => !(steps.length === 1 && steps[0] === NOTHING);
 
 /** Sheet steps for a rename or merge (the reverse of a rename is a rename with the sides swapped). */
-export function placeSteps(p: Pick<PlacePlan, 'action' | 'from' | 'to'>, c: PlaceCounts): string[] {
+export function placeSteps(p: Pick<PlacePlan, 'action' | 'from' | 'to'>, c: PlaceCounts, exact = false): string[] {
   const { from, to } = p;
   const steps: string[] = [];
   // Nothing reads the PlaceCoord tab any more (5 Nov): no step for it. With no record
   // and no favourite period using the name, there is nothing to repeat at all.
   if (!c.total && !c.favorites) return [NOTHING];
+  const rx = regexPair(from.key, to.key, exact);
+  const how = `Find ${rx.find} and replace with ${rx.replace}. Tick “Match case” and “Search using regular expressions”, leave “Also search within formulas” off and choose “Specific range”. ${exact ? `This changes only cells that say exactly ${from.key}.` : `This changes ${from.key} and every “${from.key} - …” (place details).`}`;
   if (c.favorites) {
-    steps.push(`FavoritePlace tab: find and replace ${from.key} → ${to.key} in column B (range ${range('FavoritePlace', 'B', 2)}, “Match case” and “Match entire cell contents”; ${expect(c.favorites)}).`);
+    steps.push(`FavoritePlace tab, column B (range ${range('FavoritePlace', 'B', 2)}; ${expect(c.favorites)}): ${how}`);
   }
   const tabs = savedByTab(c).map(t => t.tab);
   const inTab = (key: FieldKey, tab: string) => fieldTabs(c, key).find(t => t.tab === tab)?.n ?? 0;
-  steps.push(`Find and replace ${from.key} → ${to.key} in columns AA (place), BE (from) and BF (to), one range at a time. Tick “Match case” and “Match entire cell contents”, leave “Also search within formulas” off and choose “Specific range”. Sheets says how many it replaced; the ${tabs[0]} tab can show more if rows were added since the last migration.`);
+  steps.push(`Columns AA (place), BE (from) and BF (to), one range at a time: ${how} Sheets says how many it replaced; the ${tabs[0]} tab can show more if rows were added since the last migration.`);
   for (const tab of tabs) {
     steps.push(`   Archive file, tab ${tab}: ${FIELDS.map(f => `${range(tab, f.col, 4)} (${expect(inTab(f.key, tab))})`).join(', ')}.`);
   }
@@ -177,15 +213,39 @@ export async function previewPlaceRename(def: ListDef, userId: string, id: strin
     const d = target ? km(p.fromDoc, target) : 0;
     warnings.push(`${p.from.key} is deleted from the list; its records take ${p.to.key}, and ${p.to.key}’s point stays${d >= 0.05 ? ` (the two points are ${d < 10 ? d.toFixed(1) : Math.round(d)} km apart)` : ''}.`);
   }
+  const withDetail = await Log.countDocuments({ userId, $or: FIELDS.map(f => ({ [f.path]: { $regex: `^${escapeRegex(p.from.key)} - ` } })) });
+  if (withDetail) warnings.push(`${plural(withDetail, 'record')} ${withDetail === 1 ? 'says' : 'say'} “${p.from.key} - …”; ${withDetail === 1 ? 'it becomes' : 'they become'} “${p.to.key} - …” (in the count above).`);
+  if (p.children?.length) {
+    warnings.push(`Point${p.children.length === 1 ? '' : 's'} under it follow${p.children.length === 1 ? 's' : ''}: ${p.children.map(c => `${c.from} → ${c.to}`).join(', ')}.`);
+  }
   if (counts.favorites) {
-    const fav = await FavoritePlace.find({ userId, name: p.from.key }).select('label').lean() as any[];
+    const fav = await FavoritePlace.find({ userId, name: underFilter(p.from.key) }).select('label name').lean() as any[];
     const labels = [...new Set(fav.map(x => x.label))].join(', ');
-    warnings.push(`${p.from.key} is the place for ${labels} in ${plural(counts.favorites, 'favourite-place period')}; ${counts.favorites === 1 ? 'it takes' : 'they take'} ${p.to.key} too. Records that say ${labels} keep saying it and follow with the period${counts.favorites === 1 ? '' : 's'} (they are not in the count above).`);
+    const names = [...new Set(fav.map(x => String(x.name)))];
+    const what = names.length === 1 && names[0] === p.from.key ? p.from.key : `${names.join(', ')} (under ${p.from.key})`;
+    warnings.push(`${what} is the place for ${labels} in ${plural(counts.favorites, 'favourite-place period')}; ${counts.favorites === 1 ? 'it takes' : 'they take'} ${p.to.key}${what === p.from.key ? '' : ' - …'} too. Records that say ${labels} keep saying it and follow with the period${counts.favorites === 1 ? '' : 's'} (they are not in the count above).`);
   }
   return { ok: true, preview: { title: titleOf(p), counts, rows: 1, warnings, sheetSteps: placeSteps(p, counts), plan: p } };
 }
 
 // ── Apply ────────────────────────────────────────────────────────────────────
+
+/** Swaps the head `from` → `to` on `path` of the given documents, value by value
+ *  ("Harrods - Food Hall" → "Harrods London - Food Hall"). Only values still under
+ *  `from` change. Returns how many documents changed. */
+async function swapHeads(model: mongoose.Model<any>, ids: unknown[], path: string, from: string, to: string, session: mongoose.ClientSession): Promise<number> {
+  if (!ids.length) return 0;
+  const docs = await model.find({ _id: { $in: ids }, [path]: underFilter(from) }).select(path).session(session).lean() as any[];
+  const byValue = new Map<string, unknown[]>();
+  for (const d of docs) {
+    const v = String(path.split('.').reduce((o: any, k) => o?.[k], d));
+    byValue.set(v, [...(byValue.get(v) ?? []), d._id]);
+  }
+  for (const [v, vids] of byValue) {
+    await model.updateMany({ _id: { $in: vids } }, { $set: { [path]: swapHead(v, from, to) } }, { session });
+  }
+  return docs.length;
+}
 
 export async function applyPlaceRename(def: ListDef, userId: string, id: string, values: Record<string, unknown>, expectRecords: number):
   Promise<{ ok: true; changeId: string; recordsChanged: number; sheetNeeded: boolean } | Fail> {
@@ -205,9 +265,9 @@ export async function applyPlaceRename(def: ListDef, userId: string, id: string,
       if (all.length !== expectRecords) throw new Error('STALE');
       const fieldIds = {} as Record<FieldKey, mongoose.Types.ObjectId[]>;
       for (const f of FIELDS) {
-        fieldIds[f.key] = (await Log.find({ userId, [f.path]: p.from.key }).select('_id').session(session).lean() as any[]).map(d => d._id);
+        fieldIds[f.key] = (await Log.find({ userId, [f.path]: underFilter(p.from.key) }).select('_id').session(session).lean() as any[]).map(d => d._id);
       }
-      const favIds = (await FavoritePlace.find({ userId, name: p.from.key }).select('_id').session(session).lean() as any[]).map(d => d._id);
+      const favIds = (await FavoritePlace.find({ userId, name: underFilter(p.from.key) }).select('_id').session(session).lean() as any[]).map(d => d._id);
 
       const self = await model.findOne({ _id: p.rowId, userId }).session(session).lean() as any;
       if (!self) throw new Error('GONE');
@@ -215,10 +275,13 @@ export async function applyPlaceRename(def: ListDef, userId: string, id: string,
       if (p.action === 'merge') await model.deleteOne({ _id: self._id }, { session });
       else await model.updateOne({ _id: self._id }, { $set: { name: p.to.key } }, { session });
 
-      for (const f of FIELDS) {
-        if (fieldIds[f.key].length) await Log.updateMany({ _id: { $in: fieldIds[f.key] } }, { $set: { [f.path]: p.to.key } }, { session });
+      // Point rows under the old name; the plan checked none lands on a taken name.
+      for (const c of p.children ?? []) {
+        const r = await model.updateOne({ _id: c.id, userId, name: c.from }, { $set: { name: c.to } }, { session });
+        if (!r.matchedCount) throw new Error('STALE');
       }
-      if (favIds.length) await FavoritePlace.updateMany({ _id: { $in: favIds } }, { $set: { name: p.to.key } }, { session });
+      for (const f of FIELDS) await swapHeads(Log, fieldIds[f.key], f.path, p.from.key, p.to.key, session);
+      await swapHeads(FavoritePlace, favIds, 'name', p.from.key, p.to.key, session);
 
       const [ch] = await MasterChange.create([{
         userId, list: def.slug, kind: p.action === 'merge' ? 'merge' : 'rename', rowId: p.rowId,
@@ -248,6 +311,7 @@ export async function applyPlaceRename(def: ListDef, userId: string, id: string,
 /** Undoes a place rename or merge. undoBlocked (rename.ts) has already been checked. */
 export async function undoPlaceChange(def: ListDef, userId: string, ch: any):
   Promise<{ ok: true; changeId: string; recordsChanged: number; sheetNeeded: boolean } | Fail> {
+  if (ch.extra?.plan?.mode === 'name') return undoNameRename(userId, ch);
   const model = def.model();
   const p = ch.extra.plan as PlacePlan;
   const fieldIds = (ch.extra.fieldIds ?? {}) as Record<FieldKey, mongoose.Types.ObjectId[]>;
@@ -258,13 +322,13 @@ export async function undoPlaceChange(def: ListDef, userId: string, ch: any):
   for (const f of FIELDS) {
     const ids = fieldIds[f.key] ?? [];
     if (!ids.length) continue;
-    const still = await Log.countDocuments({ _id: { $in: ids }, userId, [f.path]: p.to.key });
+    const still = await Log.countDocuments({ _id: { $in: ids }, userId, [f.path]: underFilter(p.to.key) });
     if (still !== ids.length) {
       const gone = ids.length - still;
       return fail(409, `Undo is no longer possible: ${plural(gone, 'record')} ${gone === 1 ? 'has' : 'have'} been reloaded by a migration or changed since. Make the opposite change instead.`);
     }
   }
-  if (favIds.length && await FavoritePlace.countDocuments({ _id: { $in: favIds }, userId, name: p.to.key }) !== favIds.length) {
+  if (favIds.length && await FavoritePlace.countDocuments({ _id: { $in: favIds }, userId, name: underFilter(p.to.key) }) !== favIds.length) {
     return fail(409, 'Undo is no longer possible: a favourite-place period has changed since. Make the opposite change instead.');
   }
   // The list must still look as the change left it.
@@ -274,6 +338,10 @@ export async function undoPlaceChange(def: ListDef, userId: string, ch: any):
   } else {
     const self = await model.findOne({ _id: p.rowId, userId }).lean() as any;
     if (!self || self.name !== p.to.key) return fail(409, `Undo is no longer possible: the row ${p.to.key} has changed since. Make the opposite change instead.`);
+  }
+  for (const c of p.children ?? []) {
+    if (!(await model.exists({ _id: c.id, userId, name: c.to }))) return fail(409, `Undo is no longer possible: the point ${c.to} has changed since. Make the opposite change instead.`);
+    if (await model.exists({ userId, name: c.from })) return fail(409, `Undo is no longer possible: ${c.from} is in the list again.`);
   }
 
   // Logged already ticked because nothing needed repeating: the undo needs nothing either.
@@ -292,11 +360,11 @@ export async function undoPlaceChange(def: ListDef, userId: string, ch: any):
       } else {
         await model.updateOne({ _id: p.rowId, userId }, { $set: { name: p.from.key } }, { session });
       }
-      for (const f of FIELDS) {
-        const ids = fieldIds[f.key] ?? [];
-        if (ids.length) await Log.updateMany({ _id: { $in: ids } }, { $set: { [f.path]: p.from.key } }, { session });
+      for (const c of p.children ?? []) {
+        await model.updateOne({ _id: c.id, userId }, { $set: { name: c.from } }, { session });
       }
-      if (favIds.length) await FavoritePlace.updateMany({ _id: { $in: favIds } }, { $set: { name: p.from.key } }, { session });
+      for (const f of FIELDS) await swapHeads(Log, fieldIds[f.key] ?? [], f.path, p.to.key, p.from.key, session);
+      await swapHeads(FavoritePlace, favIds, 'name', p.to.key, p.from.key, session);
 
       const now = new Date();
       await MasterChange.updateOne({ _id: ch._id }, {
@@ -315,6 +383,152 @@ export async function undoPlaceChange(def: ListDef, userId: string, ch: any):
   } catch (e: any) {
     if (e?.code === 11000) return fail(409, `Undo is no longer possible: ${p.from.key} is in the list again.`);
     throw e;
+  } finally {
+    await session.endSession();
+  }
+  return { ok: true, changeId: newId, recordsChanged: all.length, sheetNeeded };
+}
+
+
+// ── Renaming a name with no point (7 Nov 2026) ───────────────────────────────
+//
+// Place points > Missing points: a name as logged that has no point of its own can be
+// renamed — exactly that text, in Place / From / To and favourite-place periods. E.g.
+// "Brooklands College 302" → "Brooklands College - 302", which then uses Brooklands
+// College's point (67.8); "Farleigh Golf Club Blue - Yellow" → "Farleigh Golf Club -
+// Blue > Yellow". If the new name is already used, the records simply join it. One
+// change-list entry (list place-coord, kind rename, plan.mode 'name') with Undo until
+// the next migration. Refused: a name that is a point (rename it under Places), a
+// favourite label (집 / 회사 …), no record saying it exactly.
+
+export interface NamePlan { mode: 'name'; from: { key: string }; to: { key: string } }
+
+export interface NamePreview {
+  title: string; counts: PlaceCounts; warnings: string[]; sheetSteps: string[]; plan: NamePlan;
+  /** The point the new name will use (longest-name rule), or null. */
+  uses: string | null;
+}
+
+export async function previewNameRename(def: ListDef, userId: string, fromRaw: unknown, toRaw: unknown):
+  Promise<{ ok: true; preview: NamePreview } | Fail> {
+  const from = str(fromRaw);
+  const to = str(toRaw).replace(/\s+/g, ' ');
+  if (!from || !to) return fail(400, 'Give the name as logged and the new name.');
+  if (from === to) return fail(400, 'The new name is the same as the old one.');
+  const model = def.model();
+  if (await model.exists({ userId, name: from })) return fail(409, `${from} has a point: rename it under Places instead.`);
+  const labels = new Set((await FavoritePlace.distinct('label', { userId }) as string[]).map(String));
+  if (labels.has(from)) return fail(409, `${from} is a favourite label (집 / 회사 …): it stands for a different place in each period, so it can’t be renamed here.`);
+
+  const counts = await countRecords(userId, from, true);
+  if (!counts.total && !counts.favorites) {
+    return fail(404, `No record says exactly “${from}”. If it comes from 집 / 회사 / 사이트 / 내차, fix the favourite-place period instead.`);
+  }
+  const plan: NamePlan = { mode: 'name', from: { key: from }, to: { key: to } };
+  const points = new Set((await model.find({ userId }).select('name').lean() as any[]).map(d => String(d.name)));
+  const uses = pointNameFor(to, x => points.has(x));
+
+  const warnings: string[] = [];
+  const parts = FIELDS.map(f => [f.label, fieldTabs(counts, f.key).reduce((a, t) => a + t.n, 0)] as const).filter(([, x]) => x);
+  if (parts.length > 1) warnings.push(`Where it is written: ${parts.map(([l, x]) => `${l} ${n(x)}`).join(' · ')} (a record can have it in more than one place).`);
+  warnings.push(uses
+    ? `${to} will use the point of ${uses}${uses === to ? '' : ` (detail: ${to.slice(uses.length + 3)})`}.`
+    : `${to} has no point either: it stays in Missing points.`);
+  const already = await Log.countDocuments({ userId, $or: FIELDS.map(f => ({ [f.path]: to })) });
+  if (already) warnings.push(`${plural(already, 'record')} already ${already === 1 ? 'says' : 'say'} ${to}; these join ${already === 1 ? 'it' : 'them'}.`);
+  if (counts.favorites) warnings.push(`${plural(counts.favorites, 'favourite-place period')} name${counts.favorites === 1 ? 's' : ''} ${from}; ${counts.favorites === 1 ? 'it takes' : 'they take'} ${to} too.`);
+  return {
+    ok: true,
+    preview: { title: `Rename the name ${from} → ${to}`, counts, warnings, sheetSteps: placeSteps({ action: 'rename', from: plan.from, to: plan.to }, counts, true), plan, uses },
+  };
+}
+
+export async function applyNameRename(def: ListDef, userId: string, from: unknown, to: unknown, expectRecords: number):
+  Promise<{ ok: true; changeId: string; recordsChanged: number; sheetNeeded: boolean } | Fail> {
+  const pv = await previewNameRename(def, userId, from, to);
+  if (!pv.ok) return pv;
+  const { plan: p, counts } = pv.preview;
+  if (counts.total !== expectRecords) {
+    return fail(409, `The records changed since the preview (${n(expectRecords)} then, ${n(counts.total)} now). Preview again.`);
+  }
+  const noSheet = !placeNeedsSheet(pv.preview.sheetSteps);
+  const session = await mongoose.startSession();
+  let changeId = '';
+  try {
+    await session.withTransaction(async () => {
+      const all = (await Log.find({ userId, $or: FIELDS.map(f => ({ [f.path]: p.from.key })) }).select('_id').session(session).lean() as any[]).map(d => d._id);
+      if (all.length !== expectRecords) throw new Error('STALE');
+      const fieldIds = {} as Record<FieldKey, mongoose.Types.ObjectId[]>;
+      for (const f of FIELDS) {
+        fieldIds[f.key] = (await Log.find({ userId, [f.path]: p.from.key }).select('_id').session(session).lean() as any[]).map(d => d._id);
+        if (fieldIds[f.key].length) await Log.updateMany({ _id: { $in: fieldIds[f.key] } }, { $set: { [f.path]: p.to.key } }, { session });
+      }
+      const favIds = (await FavoritePlace.find({ userId, name: p.from.key }).select('_id').session(session).lean() as any[]).map(d => d._id);
+      if (favIds.length) await FavoritePlace.updateMany({ _id: { $in: favIds } }, { $set: { name: p.to.key } }, { session });
+
+      const [ch] = await MasterChange.create([{
+        userId, list: def.slug, kind: 'rename', rowId: null,
+        before: { name: p.from.key }, after: { name: p.to.key },
+        recordsChanged: all.length, recordIds: all,
+        sheetSteps: pv.preview.sheetSteps,
+        ...(noSheet ? { sheetDone: true, sheetDoneAt: new Date() } : {}),
+        extra: { title: pv.preview.title, plan: p, counts, fieldIds, favIds, noSheet },
+      }], { session });
+      changeId = String(ch._id);
+    });
+  } catch (e: any) {
+    if (String(e?.message ?? e) === 'STALE') return fail(409, 'The records changed since the preview. Preview again.');
+    throw e;
+  } finally {
+    await session.endSession();
+  }
+  return { ok: true, changeId, recordsChanged: expectRecords, sheetNeeded: !noSheet };
+}
+
+/** Undoes a name rename: the same records (and periods) go back, if they still say the new name. */
+async function undoNameRename(userId: string, ch: any):
+  Promise<{ ok: true; changeId: string; recordsChanged: number; sheetNeeded: boolean } | Fail> {
+  const p = ch.extra.plan as NamePlan;
+  const fieldIds = (ch.extra.fieldIds ?? {}) as Record<FieldKey, mongoose.Types.ObjectId[]>;
+  const favIds = (ch.extra.favIds ?? []) as mongoose.Types.ObjectId[];
+  const all = ch.recordIds as mongoose.Types.ObjectId[];
+  for (const f of FIELDS) {
+    const ids = fieldIds[f.key] ?? [];
+    if (!ids.length) continue;
+    const still = await Log.countDocuments({ _id: { $in: ids }, userId, [f.path]: p.to.key });
+    if (still !== ids.length) {
+      const gone = ids.length - still;
+      return fail(409, `Undo is no longer possible: ${plural(gone, 'record')} ${gone === 1 ? 'has' : 'have'} been reloaded by a migration or changed since. Make the opposite change instead.`);
+    }
+  }
+  if (favIds.length && await FavoritePlace.countDocuments({ _id: { $in: favIds }, userId, name: p.to.key }) !== favIds.length) {
+    return fail(409, 'Undo is no longer possible: a favourite-place period has changed since. Make the opposite change instead.');
+  }
+  const sheetNeeded = !!ch.sheetDone && !ch.extra?.noSheet;
+  const sheetSteps = sheetNeeded
+    ? placeSteps({ action: 'rename', from: p.to, to: p.from }, ch.extra.counts as PlaceCounts, true)
+    : ['Nothing to do in the sheet: this was undone before it was repeated there.'];
+  const session = await mongoose.startSession();
+  let newId = '';
+  try {
+    await session.withTransaction(async () => {
+      for (const f of FIELDS) {
+        const ids = fieldIds[f.key] ?? [];
+        if (ids.length) await Log.updateMany({ _id: { $in: ids } }, { $set: { [f.path]: p.from.key } }, { session });
+      }
+      if (favIds.length) await FavoritePlace.updateMany({ _id: { $in: favIds } }, { $set: { name: p.from.key } }, { session });
+      const now = new Date();
+      await MasterChange.updateOne({ _id: ch._id }, { $set: { undoneAt: now, ...(sheetNeeded ? {} : { sheetDone: true, sheetDoneAt: now }) } }, { session });
+      const [u] = await MasterChange.create([{
+        userId, list: ch.list, kind: ch.kind, rowId: null,
+        before: ch.after, after: ch.before,
+        recordsChanged: all.length, recordIds: all,
+        sheetSteps, sheetDone: !sheetNeeded, sheetDoneAt: sheetNeeded ? null : now,
+        undoOf: ch._id,
+        extra: { title: `Undo: ${ch.extra.title}` },
+      }], { session });
+      newId = String(u._id);
+    });
   } finally {
     await session.endSession();
   }

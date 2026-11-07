@@ -16,7 +16,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze Log", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Data Design & Requirements Document", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 4.26  |  5 November 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 4.27  |  7 November 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
 );
 C(p([new TextRun({ text: "Structure: ", bold: true }), new TextRun("Part I Foundations · Part II Data · Part III Features · Part IV Operations · Appendices. The body is the complete, always-current source of truth; the changelog below carries one line per version. Work status, open questions and the backlog live in the separate WBS, not here.")]));
 
@@ -71,6 +71,7 @@ C(table(
     ["4.24","27 Oct 2026","THE EDIT FEATURE (WBS #70, new §15.6), designed with Hyoje 26–27 Oct; step 1 of 5 (the single-record API) built. The form edits the record in its own shape (a list of foods, people as method / type / person), never the sheet’s comma, | and + strings; the checks run on the record (master lists, ingredients for added or changed items, the same record twice, the sheet’s separators refused in list values until cutover). Each save is one change-list entry (master_change, list records) with ONE LINE PER CHANGED CELL — tab, how to find the row, column, what changed (naming the food or the people group), the whole cell before and after — and one Mark repeated tick; unticked, it blocks the migrations. A record moving to another year tab: delete the row there, add it here. Delete moves the record whole to the new collection log_trash (§6.14); Undo until a migration rebuilds the year. Bulk Find & replace in records (title, additional info, online / other location, notes, purchase item and unit, food and drink item names) is step 2. WEEKDAYS ARE CALCULATED (Hyoje, 27 Oct): the migrations no longer read columns L and S; start / end.weekday come from the date (weekdayOf), the form has no weekday field and the change list no weekday lines; one full migration recalculates every record. Year tabs and the rollover (v4.23) marked done: production check passed 26 Oct"],
     ["4.25","27 Oct 2026","EDIT FEATURE STEP 1 DONE (checked on production: all 46,132 records come back unchanged through the form; the 28 broken-time records fixed in the sheet and a full migration run, which also recalculated every weekday) and STEP 2 BUILT: bulk Find & replace in records (§15.6.3) — fields, whole value or part of the text, the James → James Potter skip, two-pass sheet steps, regular expressions for list cells, per-record lines when a date or activity filter is used, one change-list entry (kind replace, §6.12) with Undo. People names added to the fields (Hyoje’s 길동이 → 홍길동 example; names have no master list). STAGING NOW CHECKS THE RECORD RULES too (§11.7): a 귀가 trip to 집 without a return type had passed it"],
     ["4.26","5 Nov 2026","#70 STEP 2 DONE (bulk Find & replace API, pushed). PLACE POINTS AFTER HYOJE’S TRIP (§15.5.7–15.5.9): search in the map pop-up (Places API (New)); tapping a place’s icon selects that place; one main button “Use this point and name” with a Use this name tick box; place-point changes need no sheet step any more (the PlaceCoord tab is read by nothing) — a rename or merge of a used name still does. PLACE DETAILS agreed (§15.5.9, to build after #70 step 3): “A - B” where only A has a point; the longest name with a point wins. Documents are now updated once per finished step (Hyoje, 28 Oct)"],
+    ["4.27","7 Nov 2026","#70 STEP 3 DONE (pushed 7 Nov): THE EDIT PAGE /records/<id> and RECORD CHANGES (§15.6.4–15.6.6), shaped by six rounds of Hyoje’s testing 5–7 Nov. English labels everywhere, the record pane too, with an Edit button; checked as you type; the Check card shows PLAIN change lines (‘Added 라면 (밀, 고기 국물) 1 인분 to Foods’, ‘Removed 민아 from 대면 · 가족’), each with an × that puts that part back, and the sheet cells folded below; Saved screen with Mark repeated and Undo; Record changes page in the gear menu with a count. New rules: Relationship follows People (the sheet’s formula in G; a method shared by every group is written once, as the sheet does); a people group needs a name; a journey added to a record must be whole, and a 이동 record must have its whole journey (Staging too). Form helpers: time picker, type-to-search for alcohol and cost category, notes folded, cost typed in KRW or in a currency with a rate (KRW calculated; the rate is not stored), body fat (kg) from weight × %, a whole-meal amount shared by portions. ‘Transport’ is called Journey on screen"],
     ["4.21","26 Oct 2026","DAILY STRIPS FOR DIET AND DRINKING; ONE RULE FOR FUTURE DAYS; MONTHS IN THE CALENDAR (§9.3.3, §9.3.4, §9.3.9). Diet: the Spicy days strip is replaced by Daily diet · carbs — each day coloured by its carbs index (below 4 blue, 4–8 amber, over 8 red), tooltip listing every food- or drink-bearing record of the day (time, meal type, items, 🌶 on a meal rated H, servings in 인분 or a drink-only record’s shared amount), opening upwards; diet.summary gains days. Drinking: a Daily drinking strip under the drinks row (below 4 blue, 4–10 amber, over 10 red), tooltip with the day’s total and each record’s items as logged and drinks; drinking.summary gains rangeStart, rangeEnd and days. Shared colours and band rule in src/app/insights/_lib/day-bands.ts. Strips and calendars in Diet, Drinking, Exercise and Sleep now cover the whole period and draw days from today on as future days (faint, no border, ‘not yet’; futureFrom = localToday()); exercise.summary gains rangeStart / rangeEnd. The calendar pop-up marks months: ‘Oct 1’ in bold on each 1st and on the first day shown, and a stepped line along each month boundary. Checked by Hyoje on 26 Oct"],
   ],
   [1100, 1300, 6960]
@@ -2274,7 +2275,7 @@ C(
   bullet("3. Master lists out of the migration; generic admin editor in production — steps 1–4 and 6 done 25–26 Oct; step 5 (rename for the other lists) later (§15.5)"),
   bullet("4. Staging tab and migration, with the duplicate and year-tab checks — done 26 Oct, tested on fargaze-log-test, then production (§11.7)"),
   bullet("5. Test database — (v4.23) reduced 26 Oct: local dev on fargaze-log-test via .env.development.local, refreshed by restore-test.yml; no sync script. Done"),
-  bullet("6. Edit feature with its change list, test then production — designed 26–27 Oct; steps 1 and 2 of 5 done (§15.6)"),
+  bullet("6. Edit feature with its change list, test then production — designed 26–27 Oct; steps 1–3 of 5 done (§15.6; step 3, the edit page, 7 Nov)"),
   bullet("7. Entry app: offline, all field groups, on test; the comparison report"),
   bullet("8. Nightly export to a spreadsheet, proven on test"),
   bullet("9. Year rollover setting (before January) — brought forward and done 26 Oct, right after 5 (§11.8); reminders set for 12 Dec, 1 Jan and 2 Jan"),
@@ -2407,6 +2408,11 @@ C(
   bullet("Delete moves the record whole to log_trash (§6.14). Undo: an edit, while the record is as the edit left it; a delete, unless a migration has rebuilt that year since (every record of the year was then created after the delete) or another record now has the same key. Undo after the tick is its own entry with the reverse sheet lines"),
   bullet("A record changed since it was opened is refused (409): the save sends the updatedAt it read"),
   bullet("Test database first (local dev reads it, §15.2), then production"),
+  bullet("(v4.27, 5–7 Nov, from Hyoje’s testing) Relationship is calculated, never typed: the sheet’s formula in G — =IF(BB=\"타인\",\"타인\",IF(BB>0,\"함께\",\"혼자\")) — on the People method cell BB (relationshipOf, src/lib/records/relationship.ts). The sheet writes a method (or type) shared by every group ONCE (BB ‘타인’, BC ‘가족|친목’; the migration gives it to each group), so the code does the same (oneIfSame) — first built as ‘타인|타인’, which wrongly gave 함께 for 246 가족 기록 records. The form shows Relationship read-only (‘Follows People’)"),
+  bullet("(v4.27) More refusals: a people group with no name (82 old 회의 records have one: a warning when left as they are); a journey ADDED to a record that had none without From, To, Purpose and Method; a record whose activity category is 이동 without its whole journey — Staging rows too (newRecordRules); an old one left unchanged warns. Editing an existing journey of another activity keeps the old rules"),
+  bullet("(v4.27) Cost: no currency — the KRW amount is typed; a currency — the foreign amount and a rate are typed, KRW = round(foreign × rate) and is read-only (in Active a foreign-cost line has a formula in AD, so the change table marks AD calculated). The rate starts from the Exchange rates list, or for a saved cost from its own KRW ÷ foreign, so an untouched cost never changes; it is used for that record only and not stored — no rate history (Hyoje, 5 Nov)"),
+  bullet("(v4.27) Body: the scale gives weight, muscle mass and body fat %; body fat (kg) = round(weight × % ÷ 100, 1), read-only; a stored value stays until weight or % change (Hyoje, 7 Nov)"),
+  bullet("(v4.27) Whole meal (Hyoje, 7 Nov): a tick above Foods; one amount and unit for the meal; each food has a Portion (%) — editable when ticked, amount = whole × portion ÷ all portions; unticked, the portion is worked out from the food’s own amount. As the sheet’s ‘A+B’ with one amount, which the migration divides. Portions live on the page only; only amounts are stored; the tick is off when a record opens"),
 );
 C(h3("15.6.2 The Change List: One Line per Changed Cell"));
 C(p("Hyoje, 27 Oct: a table, with how to find the row, the column, the original and the changed value; several changed cells in one row are several lines. src/lib/records/sheetCells.ts writes it."));
@@ -2423,6 +2429,7 @@ C(
   bullet("Several changes in one cell: one line each"),
   bullet("Calculated cells (category, offset) are listed too, marked calculated: the year tabs hold their values; weekdays are not listed (not read). Columns V–Z are not in the database; when the start or end changes, one line says to update them if the sheet keeps values there"),
   bullet("Moving to another tab: a ‘Delete this row from …’ line, then ‘Add a row to …’ with every filled cell. A delete: one ‘Delete this row’ line"),
+  bullet("(v4.27) PLAIN LINES (Hyoje, 5 Nov: the cell lines alone read as ‘one item, one amount and one unit were removed’). plainChanges (sheetCells.ts) writes one line per real change, the way a person says it: ‘Added 라면 (밀, 고기 국물) 1 인분 to Foods’, ‘Removed 소주 2 병 from Alcohol’, ‘Foods: 김치찌개 … 1 인분 → … 2 인분’, ‘Added 민아 to 대면 · 가족’, ‘Removed 대면 · 업무 (…)’, ‘Start: … → …’, ‘Cost: 85,000 KRW → 20 GBP (36,400 KRW)’, ‘Body: … → 80.4 kg · fat 21.5% (17.3 kg)’, ‘Added journey: A → B · 귀가 · 택시 · 대중교통’ (only once whole), ‘Removed journey: …’. A different item in the same place is Removed + Added; a renamed one stays one line. Calculated values (category, relationship, offsets) are grey with their reason. Each line carries the part of the form it came from, so the edit page can put it back. sheetChange returns lines and changes; both are stored in the entry (extra.changes; entries from before 7 Nov have none and show their cell lines as before)"),
 );
 C(h3("15.6.3 Bulk Find & Replace (step 2, built 27 Oct)"));
 C(p("A page in the gear menu, like the place rename. Fields with a master list are changed on its admin page, not here. src/lib/records/replace.ts."));
@@ -2446,8 +2453,11 @@ C(
 );
 C(h3("15.6.4 Pages and API"));
 C(
-  bullet("Edit: an Edit button in the record pane the Calendar and Search open; it opens /records/<id>, a full page (fits the Fold 6 outer screen). Edit mode shows the field groups the record has, plus Add a group"),
-  bullet("Record changes (gear menu): the saved edits still to repeat in the sheet, each with its table, Mark repeated and Undo; older ones by date"),
+  bullet("(v4.27, built) The record pane (Calendar, Search) is in English — the app is meant to be global; the data stays as written — with an Edit button that opens /records/<id>"),
+  bullet("(v4.27) The edit page: one column with a sticky Save bar on narrow screens (the Fold 6 outer screen, 344 px); the Check card beside the form from 1024 px. Sections the record uses are shown, others added from ‘Add a section’; Activity, Time, Place and Notes always; Journey always for 이동, without Remove. Checked as you type: the form goes to the preview half a second after the last change; problems (red) block Save, notes (amber) don’t. The Check card: plain lines, each with an × that puts that part back as it was (a removed section comes back the same way — no pop-ups), then ‘Sheet cells’ folded. Leaving with unsaved changes asks first; a record changed since it was opened gives a Reload button"),
+  bullet("(v4.27) Inputs: list values are drop-downs that keep an old value outside the list (marked) or, for long lists, type-to-search boxes (alcohol, cost category; ingredients as chips); free text suggests values already used, most used first (GET /api/records/options, kept ten minutes per user); people are cards — How, Type, name chips (free text, no names list; renaming everywhere is Find & replace’s job); times use the device’s time picker; the weekday shows beside the date, never typed; notes fold behind ‘+ Note’"),
+  bullet("(v4.27) After Save or Delete, a result screen: the plain lines with the sheet cells open, Mark repeated and Undo. An Undo of a change already repeated is its own entry with its own lines and tick"),
+  bullet("(v4.27, brought forward from step 4) Record changes, /records/changes, in the gear menu with a count (and an amber dot on the gear while any wait; GET /api/records/changes?count=1): every change still waiting for the sheet, however old, with its lines (or Find & Replace steps), Mark repeated, Undo and Open the record; those ticked in the last 30 days folded below"),
   bullet("GET /api/records/<id> → { form, updatedAt, category, tab, findRow }. POST /api/records/<id>/preview { form } → { problems, warnings, title, tab, findRow, moveTo, lines }. PUT /api/records/<id> { form, updatedAt } → saves (409 changed since; 422 { problems }). DELETE /api/records/<id> { updatedAt } → to log_trash. GET /api/records/changes?since= → the Record changes list. Tick: PATCH /api/admin/changes/<id>; Undo: POST /api/admin/changes/<id>/undo (dispatches to undoRecordChange)"),
   bullet("Code: src/lib/records/form.ts (RecordForm, fromRecord, buildRecord, normaliseHour — pure), src/lib/records/sheetCells.ts (sheetCells, changeLines, sheetChange, findRowText — pure), src/lib/records/edit.ts (server). scripts/check-record-form.ts (read-only): opens every record in the form and reports any the form would refuse or change without an edit, and old records that break a rule"),
 );
@@ -2455,8 +2465,8 @@ C(h3("15.6.5 Order of Work"));
 C(table(["Step","What","Status"],[
   ["1","Single-record API: read, preview, save, delete to trash, Undo; the change lines; the migration gate; check-record-form.ts","Done 27 Oct (production check: all 46,132 records unchanged through the form); rules corrected the same day after Hyoje’s review. In the cloud: 35 checks with an in-memory database (round trip, people group, ingredient, added / removed food, times, refusals, save, conflict, duplicate, year move, Undo before and after the tick, delete, Undo of a delete, a rebuilt year) 18 rule checks (item sets, open records, GMT / BST, cost, return type, old records as warnings) and 15 checks on the record shapes production showed (wrong and English weekdays, list entries with _id, + and ( in purchases, exercise and wine notes, broken times)"],
   ["2","Bulk Find & replace API: preview, apply, Undo","Done 5 Nov (§15.6.3)"],
-  ["3","The form page and the Edit button",""],
-  ["4","Record changes and Find & replace pages",""],
+  ["3","The form page and the Edit button; Record changes page","Done 7 Nov (§15.6.4), after six rounds of Hyoje’s testing; rendered light / dark at 1280 and 344 px with the real rules behind a fake API before each delivery"],
+  ["4","Find & replace page (Record changes moved to step 3)",""],
   ["5","Test database, then production",""],
 ],[700,4300,4360]));
 C(spacer());
@@ -2607,6 +2617,10 @@ C(table(["Path","Purpose"],[
   ["src/lib/records/form.ts","(v4.24) The record form, pure: RecordForm, fromRecord, buildRecord (the stored shape, calculated fields, refusals and warnings), normaliseHour (§15.6)"],
   ["src/lib/records/sheetCells.ts","(v4.24) The change list for the sheet, pure: one line per changed cell, naming items and people groups; sheetChange (same tab / move), findRowText (§15.6.2)"],
   ["src/lib/records/replace.ts","(v4.25) Bulk Find & replace: REPLACE_FIELDS, replaceInText (with the skip), itemRegex (the Sheets pattern), findReplaceSteps, perRecordLines, previewReplace, applyReplace, undoReplace (§15.6.3)"],
+  ["src/lib/records/relationship.ts","(v4.27) Pure: peopleMethodCell, relationshipOf (the sheet’s G formula), oneIfSame"],
+  ["src/lib/records/formOptions.ts","(v4.27) The edit page’s pickers: list values and values used in records, most used first; exchange rates"],
+  ["src/app/records/[id]/page.tsx, src/app/records/_components/*","(v4.27) The edit page: RecordEditor, fields (Text, PickText, Select, NumberBox, NoteBox, chips, ItemList), PeopleEditor, ChangeTable"],
+  ["src/app/records/changes/page.tsx","(v4.27) Record changes"],
   ["src/lib/records/edit.ts","(v4.24) Server: getForEdit, previewEdit, saveEdit, deleteRecord, undoRecordChange, listRecordChanges; SHEET_IS_TRUTH"],
   ["scripts/check-record-form.ts","(v4.24) Read-only: every record through the form; reports records refused or changed without an edit"],
   ["src/lib/records/ingredients.ts","(v4.22) missingIngredients(record) — foods and drinks with no real ingredient (empty or Not Defined); describeMissing. Pure: used by the Staging migration, meant for the entry app (#71)"],
@@ -2653,7 +2667,7 @@ C(table(["Path","Purpose"],[
 C(spacer());
 
 // ===== FOOTER =====
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.26 — 5 November 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.27 — 7 November 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 
 // ===== DOCUMENT ASSEMBLY =====
@@ -2690,6 +2704,6 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-Log-Data-Design-v4.26.docx", buffer);
-  console.log("Wrote FarGaze-Log-Data-Design-v4.26.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-Log-Data-Design-v4.27.docx", buffer);
+  console.log("Wrote FarGaze-Log-Data-Design-v4.27.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });

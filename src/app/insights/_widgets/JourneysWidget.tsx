@@ -509,7 +509,7 @@ function MissingModal({ rows, onClose }: { rows: { name: string; arrivals: numbe
         </button>
       }>
       <p className="text-[11px] text-stone-500 dark:text-zinc-400 leading-snug">
-        Arrivals in this period at places with no point in the PlaceCoord sheet, busiest first.
+        Arrivals in this period at places with no place point, busiest first. “A - B” counts as A when only A has a point.
         Add a name exactly as shown (Copy names puts one per line, ready for the Name column),
         then run <code className="text-[10px]">npm run migrate-place-coord</code>.
       </p>

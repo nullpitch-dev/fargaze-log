@@ -90,6 +90,12 @@ export interface ListDef {
   /** Records that say 집 / 회사 / 사이트 / 내차 count for the place that label meant
    *  then (favourite places), as Journeys reads them; a place a period names can't be deleted. */
   viaFavorites?: boolean;
+  /** Place details "A - B" (#67.8): a record counts under the point of the longest
+   *  name that has one; "12 (5 with details)". Needs one single-column `name` key. */
+  placeDetails?: boolean;
+  /** Place points page (7 Nov): columns left out of the table (still in the edit
+   *  row), a Changed column, foldable parts and the Missing points part. */
+  page?: { hideColumns?: string[]; changedColumn?: boolean; foldable?: boolean; missingPoints?: boolean };
   /** Columns that never change on an existing row here, used or not: lists without a
    *  record count, whose names records refer to (place points, favourite places).
    *  Renaming them must also change the records, so it waits for rename (step 3). */
@@ -292,7 +298,7 @@ export const LISTS: ListDef[] = [
     ],
     unique: ['name'],
     sort: { name: 1 },
-    note: 'One name = one point. Names are as logged after 집 / 회사 / 사이트 / 내차 are resolved.',
+    note: 'One name = one point. Names are as logged after 집 / 회사 / 사이트 / 내차 are resolved. “A - B” uses A’s point when B has none.',
     indexBy: 'name',
     // Records counted where the name is written, and (viaFavorites) where 집 / 회사 …
     // meant it at that moment: Place and From at the record's start, To at its end,
@@ -306,6 +312,8 @@ export const LISTS: ListDef[] = [
     recordsFollow: true,
     refuseUnknown: false,
     viaFavorites: true,
+    placeDetails: true,
+    page: { hideColumns: ['note'], changedColumn: true, foldable: true, missingPoints: true },
     // Source is no longer kept (26 Oct): old values stay in the database, unseen and
     // untouched. The PlaceCoord tab is no longer read by anything (Hyoje, 5 Nov), so
     // points need no sheet steps; renames still change the records' names (AA, BE, BF).
@@ -325,6 +333,7 @@ export interface RowOut {
   _id: string;
   values: Record<string, CellValue>;
   updatedAt: string | null;
+  createdAt: string | null;
 }
 
 export function toRow(def: ListDef, doc: any): RowOut {
@@ -339,7 +348,8 @@ export function toRow(def: ListDef, doc: any): RowOut {
       values[c.key] = doc[c.key] ?? null;
     }
   }
-  return { _id: String(doc._id), values, updatedAt: doc.updatedAt ? new Date(doc.updatedAt).toISOString() : null };
+  const iso = (d: unknown) => (d ? new Date(d as string).toISOString() : null);
+  return { _id: String(doc._id), values, updatedAt: iso(doc.updatedAt), createdAt: iso(doc.createdAt) };
 }
 
 /** Joins the values of the given columns into one comparable key. */
