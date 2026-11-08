@@ -800,7 +800,7 @@ export default function AdminListPage() {
             <p className="mb-2 text-xs text-stone-500 dark:text-zinc-400">
               {hasCategory
                 ? <>A new name renames this row, a new category moves it, and the name of another row merges it into that row. Past records follow; you&apos;ll see a preview first.</>
-                : <>A new name renames this row, and the name of another row merges it into that row. Past records follow; you&apos;ll see a preview first. Change the name on its own, then the other columns.</>}
+                : <>A new name renames this row, and the name of another row merges it into that row. Past records follow; you&apos;ll see a preview first.{columns.length > 1 && <> Change the name on its own, then the other columns.</>}</>}
             </p>
           )}
           {editing && editing.id !== 'new' && !data.list.recordsFollow && (data.list.fixedOnEdit.length > 0 || ((data.rows.find(r => r._id === editing.id)?.used ?? 0) > 0 && data.list.locked.length > 0)) && (

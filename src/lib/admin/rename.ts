@@ -1,6 +1,7 @@
 // Rename, move and merge for the lists whose records follow (#67 step 3):
 // activities and cost categories. Place points (26 Oct) have their own rules in
-// renamePlace.ts; the three entry points below hand them over.
+// renamePlace.ts, and the reference lists (#67.5, 8 Nov) in renameRef.ts; the three
+// entry points below hand them over.
 //
 // Agreed with Hyoje (23–24 Oct 2026):
 //   - A row's name or category is changed here, never by adding a row and deleting
@@ -30,6 +31,7 @@ import { RECORDS_LIST, undoRecordChange, recordUndoBlocked } from '@/lib/records
 import { undoReplace } from '@/lib/records/replace';
 import { type ListDef, toRow } from './lists';
 import { PLACE_SLUG, previewPlaceRename, applyPlaceRename, undoPlaceChange, type PlacePreview } from './renamePlace';
+import { isRefList, refLockedNames, previewRefRename, applyRefRename, undoRefChange, type RefPreview } from './renameRef';
 
 // ── What follows, per list ───────────────────────────────────────────────────
 
@@ -72,6 +74,7 @@ export const followFor = (def: ListDef): Follow | null => (def.recordsFollow ? F
 
 /** Names and categories the page shows as locked, with the pages that need them. */
 export function lockedNames(def: ListDef): { key: Record<string, string>; cat: Record<string, string> } {
+  if (isRefList(def)) return { key: refLockedNames(def), cat: {} };          // #67.5
   const f = followFor(def);
   return { key: f?.inCode.key ?? {}, cat: f?.inCode.cat ?? {} };
 }
@@ -251,7 +254,12 @@ export function stepsFor(f: Follow, p: Plan, c: Counts, masterRows: number): str
 
 // ── Preview ──────────────────────────────────────────────────────────────────
 
-export async function previewRename(def: ListDef, userId: string, req: RenameRequest): Promise<{ ok: true; preview: Preview | PlacePreview } | Fail> {
+export async function previewRename(def: ListDef, userId: string, req: RenameRequest): Promise<{ ok: true; preview: Preview | PlacePreview | RefPreview } | Fail> {
+  if (isRefList(def)) {                                                  // #67.5
+    if (req.mode !== 'row') return fail(400, 'Reference lists have no categories.');
+    const out = await previewRefRename(def, userId, req.id, req.values);
+    return out.ok ? { ok: true, preview: out.preview } : out;
+  }
   if (def.slug === PLACE_SLUG) {
     return req.mode === 'row' ? previewPlaceRename(def, userId, req.id, req.values) : fail(400, 'Place points have no categories.');
   }
@@ -328,6 +336,9 @@ async function calendarChange(userId: string, p: Plan, write: boolean, session?:
 
 export async function applyRename(def: ListDef, userId: string, req: RenameRequest, expectRecords: number):
   Promise<{ ok: true; changeId: string; recordsChanged: number; sheetNeeded?: boolean } | Fail> {
+  if (isRefList(def)) {                                                  // #67.5
+    return req.mode === 'row' ? applyRefRename(def, userId, req.id, req.values, expectRecords) : fail(400, 'Reference lists have no categories.');
+  }
   if (def.slug === PLACE_SLUG) {
     return req.mode === 'row' ? applyPlaceRename(def, userId, req.id, req.values, expectRecords) : fail(400, 'Place points have no categories.');
   }
@@ -418,6 +429,7 @@ export async function undoChange(userId: string, changeId: string, defOf: (slug:
   if (blocked) return fail(409, blocked);
   const def = defOf(ch.list);
   if (def?.slug === PLACE_SLUG) return undoPlaceChange(def, userId, ch);
+  if (def && isRefList(def)) return undoRefChange(def, userId, ch);     // #67.5
   const f = def && followFor(def);
   if (!def || !f) return fail(400, 'Unknown list.');
   const model = def.model();

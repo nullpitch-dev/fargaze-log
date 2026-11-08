@@ -13,7 +13,7 @@
 //             vocabularies in one collection).
 //   recordsFollow  rename / merge / move are applied to past records too
 //             (Hyoje, 23–24 Oct: activity and cost first; 26 Oct: place points;
-//             other lists later).
+//             8 Nov: the reference lists; ingredients, alcohol and bowel after cutover).
 //   refuseUnknown  false = a value in records that the list lacks is normal (place
 //             names without a point): no missing-values box, and the migration
 //             does not refuse it. Default true.
@@ -145,6 +145,8 @@ const referenceDefs: ListDef[] = REFERENCE_LIST_NAMES.map(r => ({
   unique: ['value'],
   sort: { order: 1 },
   usage: r.usage,
+  // #67.5 (8 Nov): rename and merge with past records following (renameRef.ts).
+  recordsFollow: true,
   sheet: { where: `Activity tab, column ${r.column}`, order: ['value'], column: r.column, dropdown: r.dropdown },
 }));
 

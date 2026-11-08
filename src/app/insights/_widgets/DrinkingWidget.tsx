@@ -127,7 +127,8 @@ const OCCASION_COLORS: Record<string, string> = {
 };
 
 const RELATION_COLORS: Record<string, string> = {
-  '가족': '#1d4ed8', '업무': '#7c3aed', '친목': '#0891b2',
+  // 친구 was 친목 until the People-type clean-up (8 Nov); both keep the colour.
+  '가족': '#1d4ed8', '업무': '#7c3aed', '친목': '#0891b2', '친구': '#0891b2',
   '연애': '#ec4899', '종교': '#d97706', '기타': '#6b7280',
 };
 
