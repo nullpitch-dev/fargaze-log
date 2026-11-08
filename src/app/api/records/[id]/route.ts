@@ -1,5 +1,7 @@
 // /api/records/<id> — one record for the edit form (#70, Design §15.6).
 //   GET                              → { form, updatedAt, category, tab, findRow }
+//   GET ?view=1                      → { entry } the record as stored, for the record pane
+//                                      (Find & replace preview rows, 8 Nov)
 //   PUT    { form, updatedAt }       → saves; one change-list entry, one line per changed cell
 //   DELETE { updatedAt }             → moves the record to log_trash; one change-list entry
 // updatedAt is the value GET returned: a record changed since is refused (409).
@@ -8,14 +10,21 @@
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/admin/guard';
 import { getForEdit, saveEdit, deleteRecord } from '@/lib/records/edit';
+import mongoose from 'mongoose';
+import Log from '@/models/Log';
 
 type Ctx = { params: Promise<{ id: string }> };
 const reply = (out: any) => (out.ok ? NextResponse.json(out) : NextResponse.json(out, { status: out.status }));
 
-export async function GET(_req: Request, { params }: Ctx) {
+export async function GET(req: Request, { params }: Ctx) {
   const g = await requireUser();
   if (g.denied) return g.denied;
   const { id } = await params;
+  if (new URL(req.url).searchParams.get('view')) {
+    if (!mongoose.isValidObjectId(id)) return NextResponse.json({ error: 'Unknown record.' }, { status: 404 });
+    const entry = await Log.findOne({ _id: id, userId: g.userId }).select('-userId -sync.eventId -__v').lean();
+    return entry ? NextResponse.json({ entry }) : NextResponse.json({ error: 'This record no longer exists.' }, { status: 404 });
+  }
   return reply(await getForEdit(g.userId, id));
 }
 

@@ -108,6 +108,7 @@ export default function NavBar() {
               Record changes
               {waiting > 0 && <span className="ml-2 rounded-full bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 text-xs px-1.5">{waiting}</span>}
             </Link>
+            <Link href="/records/replace" role="menuitem" onClick={close} className={item('/records/replace')}>Find &amp; replace</Link>
             <div className="my-1 border-t border-stone-100 dark:border-zinc-800" />
             {pinsError && <p className="px-4 py-2 text-xs text-red-600 dark:text-red-400">Could not load shortcuts</p>}
             {!pins && !pinsError && <p className="px-4 py-2 text-xs text-stone-400 dark:text-zinc-500">Loading…</p>}

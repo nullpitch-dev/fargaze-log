@@ -8,6 +8,7 @@
 // A point column (place points) gets a Map column and 📍 Here (PointPicker).
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
+import { StepList } from '@/app/_components/SheetSteps';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { PointPicker, locate, type LatLng, type Located } from '../_components/PointPicker';
@@ -185,18 +186,6 @@ const monthAgo = () => new Date(Date.now() - 30 * 86400_000).toISOString().slice
 const recs = (x: number) => `${x.toLocaleString()} record${x === 1 ? '' : 's'}`;
 
 // Sheet steps: a line starting with spaces belongs to the step above it.
-function StepList({ steps, className }: { steps: string[]; className: string }) {
-  let k = 0;
-  return (
-    <ol className={className}>
-      {steps.map((st, i) => {
-        const sub = st.startsWith(' ');
-        if (!sub) k++;
-        return <li key={i} className={sub ? 'pl-5' : ''}>{sub ? st.trim() : `${k}. ${st}`}</li>;
-      })}
-    </ol>
-  );
-}
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 

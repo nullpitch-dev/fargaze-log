@@ -12,6 +12,7 @@
 //   - A new value in a "pick existing" column (category, group, label …) needs
 //     confirmNew, so a typo doesn't create a category by accident.
 
+import { computeUsage } from './usage';
 import type { Types } from 'mongoose';
 import Log from '@/models/Log';
 import MasterChange from '@/models/MasterChange';
@@ -271,7 +272,16 @@ export async function deleteRow(def: ListDef, userId: string, id: string): Promi
   if (!existing) return fail(404, 'This row no longer exists. Reload the page.');
   const before = toRow(def, existing).values;
 
-  const used = await rowUsage(def, userId, before as Record<string, unknown>);
+  // Place points count as the list does (8 Nov): a record whose name only reaches this
+  // point through a favourite label (Morrisons → Morrisons Weybridge in its period) or
+  // whose "A - B" uses another point doesn't need it. Other lists: the plain count.
+  let used: number | null;
+  if (def.placeDetails) {
+    const all = (await model.find({ userId, ...(def.filter ?? {}) }).lean() as any[]).map(d => toRow(def, d));
+    used = (await computeUsage(def, userId, all)).used[String(existing._id)] ?? 0;
+  } else {
+    used = await rowUsage(def, userId, before as Record<string, unknown>);
+  }
   if (used) return fail(409, `Can't delete: ${records(used)} this row.`);
   // Place points: 집 / 회사 … resolve to it in a favourite-place period, with or
   // without records yet; deleting it would leave that period without a point.

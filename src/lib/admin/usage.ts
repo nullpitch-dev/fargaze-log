@@ -59,11 +59,17 @@ async function resolver(def: ListDef, userId: string): Promise<Resolve> {
     const head = { $cond: [{ $gte: [i, 0] }, { $substrCP: [v, 0, i] }, v] };
     const rest = { $cond: [{ $gte: [i, 0] }, { $substrCP: [v, i, { $strLenCP: v }] }, ''] };
     // True instant: the stored datetime is the naive local clock; the offset is in hours.
-    // All-day records have no time: no moment, so their label stays as it is.
+    // All-day records (no datetime) count as 12:00 on their local date — the midday rule,
+    // agreed 7 Nov 2026 — so their label resolves too. No date either: stays as it is.
+    const off = { $multiply: [{ $ifNull: [`$${at}.timezoneOffset`, { $ifNull: ['$start.timezoneOffset', 0] }] }, 3_600_000] };
+    const y = { $ifNull: [`$${at}.year`, '$start.year'] };
+    const midday = { $dateFromParts: {
+      year: y, month: { $ifNull: [`$${at}.month`, '$start.month'] }, day: { $ifNull: [`$${at}.day`, '$start.day'] }, hour: 12,
+    } };
     const inst = { $cond: [
       { $eq: [{ $type: `$${at}.datetime` }, 'date'] },
-      { $subtract: [`$${at}.datetime`, { $multiply: [{ $ifNull: [`$${at}.timezoneOffset`, 0] }, 3_600_000] }] },
-      null,
+      { $subtract: [`$${at}.datetime`, off] },
+      { $cond: [{ $isNumber: y }, { $subtract: [midday, off] }, null] },
     ] };
     return {
       $switch: {

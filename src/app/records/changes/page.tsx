@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ChangeTable, type Line, type Plain } from '../_components/ChangeTable';
+import { StepList } from '@/app/_components/SheetSteps';
 
 interface Change {
   id: string;
@@ -60,9 +61,7 @@ function ChangeCard({ c, busy, onTick, onUndo }: { c: Change; busy: boolean; onT
       </div>
 
       {c.steps.length > 0 && (
-        <ol className="list-decimal pl-5 text-sm text-stone-700 dark:text-zinc-200 space-y-1">
-          {c.steps.map((s, i) => <li key={i} className="break-words">{s}</li>)}
-        </ol>
+        <StepList steps={c.steps} className="text-sm text-stone-700 dark:text-zinc-200 space-y-1" />
       )}
       {perRecord
         ? byRecord(c.lines).map((r, i) => <ChangeTable key={i} tab={r.tab} findRow={r.findRow} lines={r.lines} />)
