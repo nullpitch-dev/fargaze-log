@@ -274,4 +274,7 @@ LogSchema.index({ userId: 1, 'start.datetime': -1 });
 // Calendar (#59): finds long "(기간)" records that started before the viewed range.
 LogSchema.index({ userId: 1, 'duration.totalSeconds': -1 });
 
+// The entry app's plans (log_plan, #71) are records of the same shape.
+export { LogSchema };
+
 export default mongoose.models.Log || mongoose.model<ILog>('Log', LogSchema);
