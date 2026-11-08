@@ -1,6 +1,8 @@
 // The entry form's field groups (#71, Design §15.7). Pure: the phone uses it too.
 // Keys follow the survey's FIELD_GROUPS (sheetSurvey.ts) where they meet the form;
-// title, time, zones and calendar are always on the form, so they are not groups.
+// title, time, zones, calendar and Cross activity are always on the form, so they are
+// not groups (Cross activity is filled on every record: 평시 unless 업무, 출장, 여행 …,
+// Hyoje 8 Nov).
 // An activity's rules (activity_master.groups) name these keys: `shown` opens the
 // group on a new record, `required` refuses a record without it (대변 → bowel).
 // An activity without rules takes its category's: the groups most of its activities
@@ -9,7 +11,6 @@
 export interface EntryGroup { key: string; label: string; paths: string[] }
 
 export const ENTRY_GROUPS: EntryGroup[] = [
-  { key: 'link',      label: 'Cross activity',  paths: ['activity.crossActivity'] },
   { key: 'place',     label: 'Place',           paths: ['location'] },
   { key: 'cost',      label: 'Cost',            paths: ['cost'] },
   { key: 'purchase',  label: 'Purchase',        paths: ['purchase'] },
