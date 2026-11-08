@@ -16,7 +16,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze Log", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Data Design & Requirements Document", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 4.29  |  8 November 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 4.30  |  8 November 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
 );
 C(p([new TextRun({ text: "Structure: ", bold: true }), new TextRun("Part I Foundations · Part II Data · Part III Features · Part IV Operations · Appendices. The body is the complete, always-current source of truth; the changelog below carries one line per version. Work status, open questions and the backlog live in the separate WBS, not here.")]));
 
@@ -74,6 +74,7 @@ C(table(
     ["4.27","7 Nov 2026","#70 STEP 3 DONE (pushed 7 Nov): THE EDIT PAGE /records/<id> and RECORD CHANGES (§15.6.4–15.6.6), shaped by six rounds of Hyoje’s testing 5–7 Nov. English labels everywhere, the record pane too, with an Edit button; checked as you type; the Check card shows PLAIN change lines (‘Added 라면 (밀, 고기 국물) 1 인분 to Foods’, ‘Removed 민아 from 대면 · 가족’), each with an × that puts that part back, and the sheet cells folded below; Saved screen with Mark repeated and Undo; Record changes page in the gear menu with a count. New rules: Relationship follows People (the sheet’s formula in G; a method shared by every group is written once, as the sheet does); a people group needs a name; a journey added to a record must be whole, and a 이동 record must have its whole journey (Staging too). Form helpers: time picker, type-to-search for alcohol and cost category, notes folded, cost typed in KRW or in a currency with a rate (KRW calculated; the rate is not stored), body fat (kg) from weight × %, a whole-meal amount shared by portions. ‘Transport’ is called Journey on screen"],
     ["4.28","7 Nov 2026","67.8 PLACE DETAILS “A - B” DONE (pushed 7 Nov, §15.5.9) and PLACE POINTS PAGE TOOLS (§15.5.10), shaped by Hyoje’s testing the same day. A name uses the point of the longest name that has one (src/lib/places/details.ts); Place points counts each record once under the point it uses, ‘12 (5 with details)’, and the detail names open under the row; renaming a point carries everything under it — records, favourite periods and child points — with a regular-expression sheet step; refused: a child point landing on a name already taken (merge too) and a new name that starts with the old one and “ - ”. Journeys joins legs and finds workplaces by the point’s place. The page: Note out of the table, a Changed column, foldable parts (Places open, the rest folded, remembered per browser), Missing points (3 / 6 / 12 months or all; names with no point listed under A; + Add point, Exclude, Rename) and Excluded with Put back (admin_settings.pointExcluded, §6.13). Rename a name with no point: exact text in Place / From / To and favourite periods, preview, Undo (e.g. ‘Brooklands College 302’ → ‘Brooklands College - 302’). Hyoje does not want Location filled automatically for 이동 records"],
     ["4.29","8 Nov 2026","#70 DONE: STEP 4, THE FIND & REPLACE PAGE (§15.6.3), tested by Hyoje on fargaze-log-test and pushed (15b643a). /records/replace in the gear menu: field, match, Find with values already used, Replace with, optional dates and activity, a Preview button; rows show date · activity · before → after and open the record pane; a Saved screen with Mark repeated and Undo. Items (purchase item and unit, food and drink item) can now be replaced as part of the text; a food or drink part replace is refused when the text appears in any record’s ingredients, which the sheet cell also holds. The step-2 routes had not been saved as built (the preview code sat at /api/records/replace, apply was not routed); now /api/records/replace (fields, used values, apply) and /preview. SHEET STEPS everywhere: the counts to expect in bold, the text to find and to put copied with a click (src/app/_components/SheetSteps.tsx). THE MIDDAY RULE: all-day records resolve 집 / 회사 / 사이트 / 내차 at 12:00 on their date (§15.5.6). Place points Delete now counts records as the list does (a favourite label with the point’s own name no longer blocks it)"],
+    ["4.30","8 Nov 2026","#67.5 RENAME AND MERGE FOR THE REFERENCE LISTS (new §15.5.11), asked for by Hyoje on 8 Nov for his People-type clean-up (from an activity perspective to a person perspective: 친목 → 친구, 업무친목 → 업무친구, 업무지인 merged into 업무친구; 경조사 to be split record by record later). The nine reference lists now follow like activities: a new value renames, a value the list already has merges (the old row is deleted, records take the kept value — records are changed, never deleted); preview, one change-list entry, Undo until the next migration (a merge only before the tick). People lists: the dropdown combinations (가족|친목, no records) follow the rename; sheet steps for BB / BC are a regular expression matching the value as a whole | part, run twice; groups that end up side by side with the same method and type (업무친구|업무친구) are left as they are, because the migration reads them as the same people. Undo keeps, per record, exactly which fields changed (extra.hits). Values the code looks for are locked both ways. New src/lib/admin/renameRef.ts. Tested by Hyoje on fargaze-log-test and in production 8 Nov (92a2139). Ingredients, alcohol items and bowel values: after cutover (WBS 67.9). The #71 entry-app design was started and parked the same morning"],
     ["4.21","26 Oct 2026","DAILY STRIPS FOR DIET AND DRINKING; ONE RULE FOR FUTURE DAYS; MONTHS IN THE CALENDAR (§9.3.3, §9.3.4, §9.3.9). Diet: the Spicy days strip is replaced by Daily diet · carbs — each day coloured by its carbs index (below 4 blue, 4–8 amber, over 8 red), tooltip listing every food- or drink-bearing record of the day (time, meal type, items, 🌶 on a meal rated H, servings in 인분 or a drink-only record’s shared amount), opening upwards; diet.summary gains days. Drinking: a Daily drinking strip under the drinks row (below 4 blue, 4–10 amber, over 10 red), tooltip with the day’s total and each record’s items as logged and drinks; drinking.summary gains rangeStart, rangeEnd and days. Shared colours and band rule in src/app/insights/_lib/day-bands.ts. Strips and calendars in Diet, Drinking, Exercise and Sleep now cover the whole period and draw days from today on as future days (faint, no border, ‘not yet’; futureFrom = localToday()); exercise.summary gains rangeStart / rangeEnd. The calendar pop-up marks months: ‘Oct 1’ in bold on each 1st and on the first day shown, and a stepped line along each month boundary. Checked by Hyoje on 26 Oct"],
   ],
   [1100, 1300, 6960]
@@ -700,7 +701,7 @@ C(table(["Field","Type","Notes"],[
   ["sheetSteps","String[]","What to repeat in the sheet, in plain words (tab, column, old and new values)"],
   ["sheetDone / sheetDoneAt","Boolean / Date","Ticked with Mark repeated on the list page; undo clears it"],
   ["undoneAt / undoOf","Date / ObjectId","undoneAt marks a change that was undone; the undo is its own entry, pointing back with undoOf"],
-  ["extra","Mixed","(v4.18) Rename / merge only: { title, plan, counts } — the preview’s title, what changed (row or category, from, to, the deleted row’s ID on a merge) and the record counts; what Undo and the reverse sheet steps need"],
+  ["extra","Mixed","(v4.18) Rename / merge only: { title, plan, counts } — the preview’s title, what changed (row or category, from, to, the deleted row’s ID on a merge) and the record counts; what Undo and the reverse sheet steps need. (v4.30) Reference lists: plan { listName, action, rowId, order, targetId, from, to, combos }, counts with per-column counts for the sheet steps, and hits [{ id, year, paths, idx }] — the fields each record had changed"],
   ["createdAt / updatedAt","Date","timestamps"],
 ],[2400,2000,4960]));
 C(note("Note: Indexes { userId, list, createdAt: -1 } and { userId, sheetDone }. A change with sheetDone false is a change to repeat; since v4.18 the daily migration stops, deleting nothing, while any exists."));
@@ -2275,7 +2276,7 @@ C(h2("15.3 Order of work"));
 C(
   bullet("1. Nightly backups and a rehearsed restore — done 22 Oct"),
   bullet("2. Read-only survey: master tabs and the sheet columns that use them, typed vs formula columns, which columns each activity uses — done 23 Oct (§15.4)"),
-  bullet("3. Master lists out of the migration; generic admin editor in production — steps 1–4 and 6 done 25–26 Oct; step 5 (rename for the other lists) later (§15.5)"),
+  bullet("3. Master lists out of the migration; generic admin editor in production — steps 1–4 and 6 done 25–26 Oct; rename for the reference lists done 8 Nov (§15.5.11); ingredients, alcohol items and bowel values after cutover (§15.5)"),
   bullet("4. Staging tab and migration, with the duplicate and year-tab checks — done 26 Oct, tested on fargaze-log-test, then production (§11.7)"),
   bullet("5. Test database — (v4.23) reduced 26 Oct: local dev on fargaze-log-test via .env.development.local, refreshed by restore-test.yml; no sync script. Done"),
   bullet("6. Edit feature with its change list, test then production — designed 26–27 Oct; steps 1–3 of 5 done (§15.6; step 3, the edit page, 7 Nov)"),
@@ -2304,6 +2305,7 @@ C(table(["Step","What","Status"],[
   ["3","Rename and merge for activities and cost categories: preview (records, years), the sheet steps (row in the master tab; whole-cell Find & Replace in the year tabs, Active, History and Future; for a category, column A of the year tabs too, which hold plain values), records changed in one operation, Undo until the next migration","Done 25 Oct (§15.5.4)"],
   ["4","Migration refuses unknown values (every row checked before anything is deleted; --check and --full); master loaders removed from the repo. The pending-change gate was brought forward into step 3. §11.2, §11.6, §12","Done 25 Oct"],
   ["4+","(26 Oct, beyond the plan) Gear menu with pinned shortcuts; narrow-screen menu bar; case-insensitive order; Place points: alphabet bar, records counted, rename and merge, Map and 📍 Here. §15.5.5–15.5.7","Done 26 Oct"],
+  ["4++","(8 Nov, WBS 67.5) Rename and merge for the nine reference lists, records following (§15.5.11). Ingredients, alcohol items and bowel values after cutover (WBS 67.9), when the app is the truth and no sheet steps are needed","Done 8 Nov"],
   ["5","Design and WBS; Data Entry Plan","Each session"],
 ],[700,6860,1800]));
 C(spacer());
@@ -2407,6 +2409,20 @@ C(
   bullet("Missing points (GET /api/admin/lists/place-coord/missing?months=3|6|12|all; London date, local start dates): names in Place, From and To with no point under the longest-name rule, favourite labels resolved; listed under A (‘+N with details’, which opens each name as logged). Columns: Name, Records (by field on hover), Last used, then + Add point (the Add row with the name filled in), Exclude, Rename. A bare favourite label (an all-day record, or no period covering it) is left out: it needs a period, not a point"),
   bullet("Exclude (a car in Location: 내차, 민아 차, 렌터카 …): the name — and everything under it — leaves Missing points; Excluded lists it with its records in the same period, last used and when excluded, and Put back. Kept in admin_settings.pointExcluded (§6.13), so phone and desktop agree; records, counts and the sheet don’t change. Hyoje does not want Location filled automatically for 이동: the app can’t know whose car, or where he is between two cities"),
   bullet("Rename a name with no point (POST …/missing { rename: { from, to }, expectRecords? }; without expectRecords, the preview): exactly that text in Place, From, To and favourite periods; the preview gives the records by tab and field, which point the new name will use, and how many records already say it (they join); the sheet step is Find ^X$ → Y. One change-list entry (place-coord, rename, plan mode ‘name’) with Undo until the next migration. Refused: a name that has a point (rename it under Places), a favourite label, a name no record says exactly. Cases: ‘Brooklands College 302’ → ‘Brooklands College - 302’; the old front-nine / back-nine names ‘Farleigh Golf Club Blue - Yellow’ → ‘Farleigh Golf Club - Blue > Yellow’"),
+);
+C(spacer());
+
+C(h3("15.5.11 Reference Lists: Rename and Merge (WBS 67.5, v4.30, 8 Nov)"));
+C(p("Asked for by Hyoje on 8 Nov: People types change from an activity perspective to a person perspective (친목 → 친구, 업무친목 → 업무친구, 업무지인 merged into 업무친구; 경조사 split record by record later on the edit page). The nine reference lists (Cross activity, Relationship, Nutrient level, Food type, Transport purpose / method / return type, People method / type) now have recordsFollow; the logic is src/lib/admin/renameRef.ts, which rename.ts hands them to in preview, apply and undo (as for place points)."));
+C(
+  bullet("Edit a value and type a new one: a value the list lacks renames the row; a value it has merges into it — the old row is deleted and its records take the kept value. Records are changed, never deleted. Preview first (records by tab, warnings, numbered sheet steps); one change-list entry; Undo until the next migration, a merge only before it is ticked"),
+  bullet("Record fields per list come from the list’s usage spec: scalar paths (Nutrient level: food.carbs, food.fat and food.spiciness — sheet AM, AN, AO) and people (people.method BB, people.category BC, every person with the value)"),
+  bullet("Locked both ways — not renamed, and nothing merged into them — because the code looks for them: Relationship 혼자 / 함께 / 타인; People method 타인 (the Relationship formula); Transport purpose 출근, 귀가; Transport method 도보, 기차, 비행기; Return type 근무 후 귀가, 퇴근길 식사 후 귀가, 퇴근길 볼일 후 귀가, 업무회식 후 귀가, 친목모임 후 귀가; Meal type 아침, 점심, 저녁; Cross activity 골프. A | in a new value is refused (it separates people groups)"),
+  bullet("People combinations: the People lists also hold rows like 가족|친목 with no records — the sheet’s BC dropdown offers them to enter two groups at once; the migration checks each part. Renaming 친목 renames every combination with it as one | part; one that then equals another row is deleted (merged). Hyoje keeps them until cutover (8 Nov); after cutover the app enters groups separately and they can go"),
+  bullet("Sheet steps: the Activity tab column (change, or remove and move up on a merge; combinations too); a whole-cell Find & Replace per scalar column; for BB / BC a regular expression (^|\\|)value(\\||$) → $1new$2 that matches the value only as a whole part, with the count per tab for the first and the second run (Sheets replaces one of two neighbouring parts per run). A merge can leave two neighbouring groups with the same method and type (업무친구|업무친구): left as it is, because the migration reads it as the same people; the preview says in how many records"),
+  bullet("Undo: master_change.extra.hits keeps, per record, the scalar paths and the people positions the change wrote, so a merge’s Undo puts back only those (a person who already had the kept value stays). Refused when any of them no longer holds the new value (a migration or an edit since)"),
+  bullet("Drinking’s fixed colour for 친목 also applies to 친구"),
+  bullet("Tested by Hyoje on fargaze-log-test and in production on 8 Nov: 친목 → 친구 (1,490 records), 업무친목 → 업무친구 (85), 업무지인 merged into 업무친구 (92); sheet steps repeated and ticked"),
 );
 C(spacer());
 
@@ -2572,7 +2588,8 @@ C(table(["Path","Purpose"],[
   ["src/app/api/admin/changes/[id]/route.ts","(v4.17) PATCH { sheetDone } — ticks or unticks a change"],
   ["src/app/api/admin/changes/[id]/undo/route.ts","(v4.18) POST — undoes a rename or merge (§15.5.4)"],
   ["src/app/api/admin/lists/[list]/rename/route.ts","(v4.18) POST — previews, or with apply and the preview’s record count carries out, a rename, move or merge (§15.5.4)"],
-  ["src/lib/admin/rename.ts","(v4.18) Rename, move and merge for activities and cost categories: plan, record counts by year, sheet steps, the transaction, Calendar settings, Undo; names the code looks for are locked (v4.20) Hands place points to renamePlace.ts in preview, apply and undo"],
+  ["src/lib/admin/renameRef.ts","(v4.30) Rename and merge for the nine reference lists (§15.5.11): plan with the people combinations, records by field and tab, locked code values, sheet steps (whole-cell and the | part regular expression), transaction, Undo by the fields each record had changed"],
+  ["src/lib/admin/rename.ts","(v4.18) Rename, move and merge for activities and cost categories: plan, record counts by year, sheet steps, the transaction, Calendar settings, Undo; names the code looks for are locked (v4.20) Hands place points to renamePlace.ts in preview, apply and undo (v4.30) and the reference lists to renameRef.ts"],
   ["src/models/MasterChange.ts","(v4.17) master_change model (§6.12)"],
   ["src/models/ReferenceList.ts","(v4.17) One document per value; unique { userId, listName, value } (§6.3)"],
   ["src/models/ActivityMaster.ts","(v4.17) Unique index { userId, name } — a name is unique across categories"],
@@ -2694,7 +2711,7 @@ C(table(["Path","Purpose"],[
 C(spacer());
 
 // ===== FOOTER =====
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.29 — 8 November 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.30 — 8 November 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 
 // ===== DOCUMENT ASSEMBLY =====
@@ -2731,6 +2748,6 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-Log-Data-Design-v4.29.docx", buffer);
-  console.log("Wrote FarGaze-Log-Data-Design-v4.29.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-Log-Data-Design-v4.30.docx", buffer);
+  console.log("Wrote FarGaze-Log-Data-Design-v4.30.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });
