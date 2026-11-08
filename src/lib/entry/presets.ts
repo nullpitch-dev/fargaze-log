@@ -4,26 +4,13 @@
 
 import mongoose from 'mongoose';
 import EntryPreset from '../../models/EntryPreset';
-import { mergeForm } from './save';
-import { addMinutes } from './time';
-import type { RecordForm } from '../records/form';
 
 type Fail = { ok: false; status: number; error: string };
 const fail = (status: number, error: string): Fail => ({ ok: false, status, error });
 
-export type PresetTime = { kind: 'open' | 'moment' | 'length'; minutes: number | null };
+import type { PresetTime } from './forms';
 
-/** The form a preset opens, at a local date and time in a zone code. Pure. */
-export function presetForm(p: { form: any; time: PresetTime }, now: { date: string; hour: string; timezone: string }): RecordForm {
-  const f = mergeForm(p.form);
-  f.start = { ...now };
-  if (p.time.kind === 'moment') f.end = { ...now };
-  else if (p.time.kind === 'length' && p.time.minutes != null) {
-    const e = addMinutes(now.date, now.hour, p.time.minutes);
-    f.end = { ...e, timezone: now.timezone };
-  } else f.end = { date: '', hour: '', timezone: '' };
-  return f;
-}
+export { presetForm } from './forms';
 
 function validate(b: any): { ok: true; v: { name: string; form: any; time: PresetTime } } | Fail {
   const name = typeof b?.name === 'string' ? b.name.trim() : '';

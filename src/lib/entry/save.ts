@@ -18,6 +18,7 @@
 
 import mongoose from 'mongoose';
 import Log from '../../models/Log';
+import LogTrash from '../../models/LogTrash';
 import LogPlan from '../../models/LogPlan';
 import ActivityMaster from '../../models/ActivityMaster';
 import { loadMasterChecks, unknownValues } from '../migration/checkRecords';
@@ -25,7 +26,7 @@ import { recordKey, existingQuery, KEY_FIELDS } from '../migration/staging';
 import { missingIngredients, describeMissing } from '../records/ingredients';
 import { loadFormContext } from '../records/edit';
 import { buildRecord, fromRecord, type RecordForm } from '../records/form';
-import { ENTRY_GROUPS, groupFilled, rulesFor } from './groups';
+import { isOpen, missingRequired } from './groups';
 import { instantOf } from './time';
 
 type Fail = { ok: false; status: number; error: string; problems?: string[] };
@@ -40,19 +41,8 @@ export function kindOf(doc: any, now = Date.now()): EntryKind {
   return t != null && t > now ? 'plan' : 'record';
 }
 
-/** An empty form; a partial one (preset, repeat) laid over it section by section. */
-export function blankForm(): RecordForm {
-  return fromRecord({});
-}
-export function mergeForm(partial: any): RecordForm {
-  const f: any = blankForm();
-  for (const [k, v] of Object.entries(partial ?? {})) {
-    if (k === 'start' || k === 'end') continue;
-    if (v && typeof v === 'object' && !Array.isArray(v) && f[k] && typeof f[k] === 'object' && !Array.isArray(f[k])) f[k] = { ...f[k], ...v };
-    else if (v !== undefined) f[k] = v;
-  }
-  return f;
-}
+export { blankForm, mergeForm } from './forms';
+import { mergeForm } from './forms';
 
 // ── Check ────────────────────────────────────────────────────────────────────
 
@@ -74,12 +64,13 @@ export async function checkEntry(userId: string, form: RecordForm, opts: { base?
   problems.push(...unknownValues(doc, checks));
   for (const m of missingIngredients(doc)) problems.push(`${describeMissing(m)} has no ingredients — choose at least one`);
 
-  // The activity's required groups (대변 → Bowel).
+  // The activity's required groups (대변 → Bowel): needed once the record has an end; an
+  // open record may wait for them (Hyoje, 8 Nov), and End now refuses until they are there.
   if (doc.activity?.name) {
     const acts = await ActivityMaster.find({ userId }).select('name category groups').lean() as any[];
-    const rules = rulesFor(doc.activity.name, acts);
-    for (const key of rules.required) {
-      if (!groupFilled(doc, key)) problems.push(`${ENTRY_GROUPS.find(g => g.key === key)?.label ?? key} is required for ${doc.activity.name}`);
+    for (const label of missingRequired(doc, acts)) {
+      if (isOpen(doc)) warnings.push(`${label} is needed before it ends`);
+      else problems.push(`${label} is required for ${doc.activity.name}`);
     }
   }
 
@@ -122,7 +113,7 @@ export async function createEntry(userId: string, id: string | null | undefined,
   const c = await checkEntry(userId, form);
   if (c.problems.length) return fail(422, 'Not saved.', c.problems);
   const now = new Date();
-  const doc = { ...c.doc, _id, createdAt: now, updatedAt: now };
+  const doc = { ...c.doc, _id, origin: 'app', createdAt: now, updatedAt: now };
   try {
     if (c.kind === 'plan') await LogPlan.create([{ ...doc, plan: { state: 'open' } }]);
     else await Log.create([doc]);
@@ -153,7 +144,7 @@ export async function getPlan(userId: string, id: string) {
 /** A plan's record fields, ready for `log`. */
 function asRecord(doc: any, recordId: mongoose.Types.ObjectId, now: Date) {
   const { plan: _p, _id: _i, __v: _v, ...rest } = doc;
-  return { ...rest, _id: recordId, createdAt: now, updatedAt: now };
+  return { ...rest, _id: recordId, origin: 'app', createdAt: now, updatedAt: now };
 }
 
 /** Writes the record and marks the plan done, in one transaction. */
@@ -252,4 +243,44 @@ export async function settleOne(userId: string, plan: any, now = Date.now()): Pr
   const c = await checkEntry(userId, fromRecord(plan), { base: plan, selfId: String(plan._id), now });
   if (c.problems.length) return false;         // left in To confirm, where Hyoje sees why
   try { await happen(userId, plan, c.doc, 'auto'); return true; } catch (e: any) { if (e?.conflict) return false; throw e; }
+}
+
+// ── Records made here ────────────────────────────────────────────────────────
+
+/** End now (Open on the home screen): sets the end of a record with none. */
+export async function endRecord(userId: string, id: string, end: { date: string; hour: string; timezone: string }, updatedAt: string) {
+  if (!mongoose.isValidObjectId(id)) return fail(404, 'Unknown record.');
+  const base = await Log.findOne({ _id: id, userId }).lean() as any;
+  if (!base) return fail(404, 'This record no longer exists.');
+  if (iso(base.updatedAt) !== updatedAt) return fail(409, 'This record was changed since. Reload and try again.');
+  if (!isOpen(base) && base.end?.year) return fail(409, 'This record has an end already.');
+  const form = fromRecord(base);
+  form.end = { date: end?.date ?? '', hour: end?.hour ?? '', timezone: end?.timezone ?? '' };
+  const c = await checkEntry(userId, form, { base, selfId: String(base._id), now: Number.MAX_SAFE_INTEGER });
+  if (c.problems.length) return fail(422, 'Can’t end it yet: open the record and fill this in.', c.problems);
+  const now = new Date();
+  const { _id: _i, createdAt: _c, ...fields } = c.doc;
+  const res = await Log.replaceOne({ _id: base._id, userId, updatedAt: base.updatedAt }, { ...fields, _id: base._id, createdAt: base.createdAt, updatedAt: now }, { timestamps: false } as any);
+  if (!res.matchedCount) return fail(409, 'This record was changed since. Reload and try again.');
+  return { ok: true as const, updatedAt: now.toISOString() };
+}
+
+const UNDO_MINUTES = 15;
+
+/** Undo on the toast after saving: a record or plan made here in the last few minutes. */
+export async function discardNew(userId: string, id: string) {
+  if (!mongoose.isValidObjectId(id)) return fail(404, 'Unknown entry.');
+  const since = new Date(Date.now() - UNDO_MINUTES * 60_000);
+  const plan = await LogPlan.findOne({ _id: id, userId }).lean() as any;
+  if (plan) {
+    if (plan.plan?.state !== 'open' || plan.plan?.repeatId || new Date(plan.createdAt) < since) return fail(409, 'Too late to undo here: delete the plan instead.');
+    await LogPlan.deleteOne({ _id: plan._id, userId });
+    return { ok: true as const, kind: 'plan' as const };
+  }
+  const rec = await Log.findOne({ _id: id, userId }).lean() as any;
+  if (!rec) return fail(404, 'Already gone.');
+  if (new Date(rec.createdAt) < since || iso(rec.updatedAt) !== iso(rec.createdAt)) return fail(409, 'Too late to undo here: open the record and delete it.');
+  await LogTrash.create([{ userId, record: rec, deletedAt: new Date(), changeId: null }]);
+  await Log.deleteOne({ _id: rec._id, userId });
+  return { ok: true as const, kind: 'record' as const };
 }

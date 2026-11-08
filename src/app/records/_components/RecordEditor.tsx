@@ -14,6 +14,11 @@
 // card has an × that puts that part back as it was (a removed section comes back the
 // same way); the result screen points to Record changes for later.
 // The weekday is never typed: the system works it out from the date.
+//
+// #71 (8 Nov): the same form makes new records and adjusts plans (mode 'new' / 'plan',
+// Design §15.7). Those modes check through /api/entry/check, open the activity's field
+// groups (groups.ts rulesFor), offer a Place picker with a Detail box ("회사 - 회의실 1"),
+// save without a change-list entry and go back to the entry home with a toast.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -24,13 +29,28 @@ import { Field, ItemList, NoteBox, NumberBox, PickText, Row, Section, Select, Ta
 import { PeopleEditor } from './PeopleEditor';
 import { ChangeTable, type Line, type Plain } from './ChangeTable';
 import { relationshipOf } from '@/lib/records/relationship';
+import { rulesFor, type EntryGroup } from '@/lib/entry/groups';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-interface Loaded { id: string; form: RecordForm; updatedAt: string; category: string | null; tab: string | null; findRow: string }
-interface Check { problems: string[]; warnings: string[]; tab: string; findRow: string; moveTo: string | null; lines: Line[]; changes: Plain[] }
+interface Loaded { id: string; form: RecordForm; updatedAt: string; category: string | null; tab: string | null; findRow: string; noSheet?: boolean }
+interface Check { problems: string[]; warnings: string[]; tab: string; findRow: string; moveTo: string | null; lines: Line[]; changes: Plain[]; kind?: 'record' | 'plan' }
+export type EditorMode = 'edit' | 'new' | 'plan';
+interface EntryOptions { groups: EntryGroup[]; activities: { name: string; category: string; groups?: { required?: string[]; shown?: string[] } }[]; labels: string[] }
+
+/** An entry group (groups.ts) → the editor's section. */
+const GROUP_SECTION: Record<string, Optional | 'place' | 'notes' | null> = {
+  place: 'place', notes: 'notes', cost: 'cost', purchase: 'purchase', meal: 'food', foods: 'food', drinks: 'food', alcohols: 'food',
+  people: 'people', transport: 'transport', bowel: 'bowel', body: 'body', sleep: 'sleep', exercise: 'exercise',
+  reading: 'reading', movie: 'movie', golf: 'golf', income: 'income', travel: 'travel',
+};
+/** "회사 - 회의실 1" → ["회사", "회의실 1"]: the place and its detail (67.8). */
+const splitPlace = (v: string): [string, string] => { const i = v.indexOf(' - '); return i < 0 ? [v, ''] : [v.slice(0, i), v.slice(i + 3)]; };
+const joinPlace = (a: string, b: string) => (b.trim() ? `${a.trim()} - ${b.trim()}` : a.trim());
 interface Result {
   kind: 'saved' | 'deleted';
+  /** Made in the entry app (#71): not in the sheet, nothing to repeat there. */
+  noSheet?: boolean;
   changeId: string;
   tab: string; findRow: string; moveTo: string | null; lines: Line[]; changes: Plain[];
   sheetDone: boolean;
@@ -165,8 +185,11 @@ const danger = `${btn} border-red-300 text-red-700 hover:bg-red-50 dark:border-r
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
-export function RecordEditor({ id }: { id: string }) {
+export function RecordEditor({ id, mode = 'edit', initial, presetId }: { id: string; mode?: EditorMode; initial?: RecordForm; presetId?: string }) {
   const router = useRouter();
+  const entryMode = mode !== 'edit';
+  const [entryOpts, setEntryOpts] = useState<EntryOptions | null>(null);
+  const [presetBox, setPresetBox] = useState<null | { name: string; kind: 'open' | 'moment' | 'length'; minutes: string; error: string; saved: boolean }>(null);
   const [rec, setRec] = useState<Loaded | null>(null);
   const [opts, setOpts] = useState<FormOptions | null>(null);
   const [form, setForm] = useState<RecordForm | null>(null);
@@ -190,12 +213,22 @@ export function RecordEditor({ id }: { id: string }) {
     let live = true;
     (async () => {
       try {
-        const [r, o] = await Promise.all([
-          fetch(`/api/records/${id}`, { cache: 'no-store' }),
+        const [r, o, e] = await Promise.all([
+          mode === 'new' ? Promise.resolve(null) : fetch(mode === 'plan' ? `/api/entry/plans/${id}` : `/api/records/${id}`, { cache: 'no-store' }),
           opts ? Promise.resolve(null) : fetch('/api/records/options'),
+          entryMode && !entryOpts ? fetch('/api/entry/rules') : Promise.resolve(null),
         ]);
-        const rb = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(rb.error ?? `HTTP ${r.status}`);
+        let rb: any = mode === 'new' ? { id, form: initial, updatedAt: '', category: null, tab: null, findRow: '' } : await r!.json().catch(() => ({}));
+        if (r && !r.ok) throw new Error(rb.error ?? `HTTP ${r.status}`);
+        if (mode === 'plan') {
+          if (rb.state !== 'open') throw new Error(rb.state === 'done' ? 'This plan is a record now: open it from Today or the Calendar.' : 'This plan was deleted.');
+          rb = { ...rb, category: null, tab: null, findRow: '' };
+        }
+        if (e) {
+          const eb = await e.json().catch(() => ({}));
+          if (!e.ok) throw new Error(eb.error ?? `HTTP ${e.status}`);
+          if (live) setEntryOpts(eb);
+        }
         if (o) {
           const ob = await o.json().catch(() => ({}));
           if (!o.ok) throw new Error(ob.error ?? `HTTP ${o.status}`);
@@ -214,7 +247,9 @@ export function RecordEditor({ id }: { id: string }) {
 
   const formKey = useMemo(() => (form ? formJson(form) : ''), [form]);
   const origKey = useMemo(() => (rec ? JSON.stringify(rec.form) : ''), [rec]);
-  const dirty = !!form && !result && formKey !== origKey;
+  const changed = !!form && !result && formKey !== origKey;
+  // A new entry or a plan is checked (and can be saved) as it is: confirming a plan unchanged is fine.
+  const dirty = entryMode ? !!form && !result : changed;
 
   // Check as you type: half a second after the last change.
   const seq = useRef(0);
@@ -223,20 +258,20 @@ export function RecordEditor({ id }: { id: string }) {
     const n = ++seq.current;
     const t = setTimeout(async () => {
       try {
-        const r = await fetch(`/api/records/${id}/preview`, {
+        const r = await fetch(entryMode ? '/api/entry/check' : `/api/records/${id}/preview`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: formJson({ form }),
         });
         const b = await r.json().catch(() => ({}));
         if (n !== seq.current) return;
         if (!r.ok) { setCheckError(b.error ?? `HTTP ${r.status}`); return; }
         setCheckError('');
-        setCheck({ for: formJson(form), data: b });
+        setCheck({ for: formJson(form), data: entryMode ? { problems: b.problems ?? [], warnings: b.warnings ?? [], tab: '', findRow: '', moveTo: null, lines: [], changes: [], kind: b.kind } : b });
       } catch (e: any) {
         if (n === seq.current) setCheckError(String(e.message ?? e));
       }
     }, 500);
     return () => clearTimeout(t);
-  }, [dirty, form, id]);
+  }, [dirty, form, id, entryMode]);
 
   const current = check && check.for === formKey ? check.data : null;
   const checking = dirty && !current && !checkError;
@@ -244,7 +279,7 @@ export function RecordEditor({ id }: { id: string }) {
 
   // Unsaved changes: ask before leaving (closing the tab, or a link in the app).
   useEffect(() => {
-    if (!dirty) return;
+    if (!changed) return;
     const onUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
     const onClick = (e: MouseEvent) => {
       const a = (e.target as HTMLElement)?.closest?.('a[href]') as HTMLAnchorElement | null;
@@ -254,12 +289,13 @@ export function RecordEditor({ id }: { id: string }) {
     window.addEventListener('beforeunload', onUnload);
     document.addEventListener('click', onClick, true);
     return () => { window.removeEventListener('beforeunload', onUnload); document.removeEventListener('click', onClick, true); };
-  }, [dirty]);
+  }, [changed]);
 
   const goBack = useCallback(() => {
-    if (dirty && !window.confirm('Leave without saving? Your changes will be lost.')) return;
+    if (changed && !window.confirm('Leave without saving? Your changes will be lost.')) return;
+    if (entryMode) { router.push('/entry'); return; }
     if (window.history.length > 1) router.back(); else router.push('/calendar');
-  }, [dirty, router]);
+  }, [changed, router, entryMode]);
 
   const lookups = useMemo(() => {
     if (!opts) return null;
@@ -283,13 +319,30 @@ export function RecordEditor({ id }: { id: string }) {
   async function save() {
     if (!rec || !form || !canSave) return;
     setSaving(true); setSaveError(null);
+    if (entryMode) {
+      try {
+        const r = mode === 'new'
+          ? await fetch('/api/entry/records', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: formJson({ id, form, presetId }) })
+          : await fetch(`/api/entry/plans/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: formJson({ form, updatedAt: rec.updatedAt }) });
+        const b = await r.json().catch(() => ({}));
+        if (!r.ok) { setSaveError({ text: b.error ?? `HTTP ${r.status}`, problems: b.problems, conflict: r.status === 409 }); return; }
+        const saved = new URLSearchParams({ saved: b.kind, id: b.id ?? id });
+        if (mode === 'plan') saved.set('from', 'plan');
+        router.push(`/entry?${saved}`);
+      } catch (e: any) {
+        setSaveError({ text: String(e.message ?? e) });
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
     try {
       const r = await fetch(`/api/records/${id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: formJson({ form, updatedAt: rec.updatedAt }),
       });
       const b = await r.json().catch(() => ({}));
       if (!r.ok) { setSaveError({ text: b.error ?? `HTTP ${r.status}`, problems: b.problems, conflict: r.status === 409 }); return; }
-      setResult({ kind: 'saved', changeId: b.changeId, tab: b.tab, findRow: b.findRow, moveTo: b.moveTo, lines: b.lines, changes: b.changes ?? [], sheetDone: false, undone: null });
+      setResult({ kind: 'saved', noSheet: !!b.noSheet, changeId: b.changeId, tab: b.tab, findRow: b.findRow, moveTo: b.moveTo, lines: b.lines, changes: b.changes ?? [], sheetDone: !!b.noSheet, undone: null });
       window.scrollTo({ top: 0 });
     } catch (e: any) {
       setSaveError({ text: String(e.message ?? e) });
@@ -300,6 +353,18 @@ export function RecordEditor({ id }: { id: string }) {
 
   async function remove() {
     if (!rec) return;
+    if (mode === 'plan') {
+      setSaving(true); setSaveError(null);
+      try {
+        const r = await fetch(`/api/entry/plans/${id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ updatedAt: rec.updatedAt }) });
+        const b = await r.json().catch(() => ({}));
+        if (!r.ok) { setSaveError({ text: b.error ?? `HTTP ${r.status}`, conflict: r.status === 409 }); return; }
+        router.push(`/entry?deleted=${id}`);
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
     if (!window.confirm('Delete this record?\n\nIt goes to the trash; Undo on the next screen puts it back.')) return;
     setSaving(true); setSaveError(null);
     try {
@@ -308,7 +373,7 @@ export function RecordEditor({ id }: { id: string }) {
       });
       const b = await r.json().catch(() => ({}));
       if (!r.ok) { setSaveError({ text: b.error ?? `HTTP ${r.status}`, conflict: r.status === 409 }); return; }
-      setResult({ kind: 'deleted', changeId: b.changeId, tab: b.tab, findRow: b.findRow, moveTo: null, lines: b.lines, changes: [], sheetDone: false, undone: null });
+      setResult({ kind: 'deleted', noSheet: !!b.noSheet, changeId: b.changeId, tab: b.tab, findRow: b.findRow, moveTo: null, lines: b.lines, changes: [], sheetDone: !!b.noSheet, undone: null });
       window.scrollTo({ top: 0 });
     } catch (e: any) {
       setSaveError({ text: String(e.message ?? e) });
@@ -341,6 +406,7 @@ export function RecordEditor({ id }: { id: string }) {
       const r = await fetch(`/api/admin/changes/${result.changeId}/undo`, { method: 'POST' });
       const b = await r.json().catch(() => ({}));
       if (!r.ok) { setResultError(b.error ?? `HTTP ${r.status}`); return; }
+      if (result.noSheet) { setResult({ ...result, undone: { sheetNeeded: false, changeId: b.changeId, sheetDone: true, tab: '', findRow: '', moveTo: null, lines: [], changes: [] } }); return; }
       setResult({ ...result, undone: { sheetNeeded: !!b.sheetNeeded, changeId: b.changeId, sheetDone: false, tab: b.tab, findRow: b.findRow, moveTo: b.moveTo ?? null, lines: b.lines ?? [], changes: b.changes ?? [] } });
     } finally {
       setBusy(false);
@@ -352,7 +418,7 @@ export function RecordEditor({ id }: { id: string }) {
   if (result) {
     const gone = result.kind === 'deleted' && !result.undone;
     const u = result.undone;
-    const showSheet = !u || u.sheetNeeded;
+    const showSheet = !result.noSheet && (!u || u.sheetNeeded);
     const done = u ? u.sheetDone : result.sheetDone;
     return (
       <div className="flex flex-col flex-1 px-4 py-6 max-w-3xl mx-auto w-full gap-4">
@@ -361,7 +427,10 @@ export function RecordEditor({ id }: { id: string }) {
             {result.undone ? (result.kind === 'saved' ? 'Edit undone' : 'Delete undone') : result.kind === 'saved' ? 'Saved' : 'Deleted'}
           </h1>
           <p className="text-sm text-stone-600 dark:text-zinc-300 mt-1">
-            {u
+            {result.noSheet
+              ? u ? 'Undone. This record was made in the app: nothing to do in the sheet.'
+                : `${result.kind === 'saved' ? 'Saved' : 'In the trash'}. This record was made in the app: nothing to do in the sheet.`
+              : u
               ? u.sheetNeeded
                 ? result.kind === 'saved'
                   ? 'The record is back as it was. You had repeated the edit in the sheet, so undo it there too: make the changes below there, then press Mark repeated.'
@@ -371,7 +440,7 @@ export function RecordEditor({ id }: { id: string }) {
                 ? 'Repeat these changes in the sheet, then press Mark repeated. Until then, the migrations wait.'
                 : 'The record is in the trash. Delete the row in the sheet, then press Mark repeated. Until then, the migrations wait.'}
           </p>
-          {!done && (
+          {!done && !result.noSheet && (
             <p className="text-xs text-stone-500 dark:text-zinc-400 mt-1">
               No time now? It waits on <Link href="/records/changes" className="underline">Record changes</Link> (gear menu ⚙), with Mark repeated and Undo.
             </p>
@@ -394,6 +463,9 @@ export function RecordEditor({ id }: { id: string }) {
               {!u && <button onClick={undo} disabled={busy} className={secondary}>{result.kind === 'saved' ? 'Undo this edit' : 'Undo the delete'}</button>}
             </div>
           </div>
+        )}
+        {result.noSheet && !u && (
+          <div><button onClick={undo} disabled={busy} className={secondary}>{result.kind === 'saved' ? 'Undo this edit' : 'Undo the delete'}</button></div>
         )}
         {resultError && <p className="text-sm text-red-700 dark:text-red-300">{resultError}</p>}
 
@@ -425,12 +497,17 @@ export function RecordEditor({ id }: { id: string }) {
   const patch = <K extends keyof RecordForm>(k: K, p: Partial<RecordForm[K]>) => setForm(prev => (prev ? { ...prev, [k]: { ...(prev[k] as object), ...p } } : prev));
   // A 이동 record always has its journey: shown, and no Remove (Hyoje, 7 Nov).
   const journeyNeeded = lookups.actCat.get(f.activity.name.trim()) === '이동';
-  const shown = (k: Optional) => added.has(k) || hasData(f, k) || (k === 'transport' && journeyNeeded);
+  const rules = entryMode && entryOpts ? rulesFor(f.activity.name.trim(), entryOpts.activities) : null;
+  const ruleSections = new Set((rules?.shown ?? []).map(k => GROUP_SECTION[k]).filter(Boolean));
+  const requiredSections = new Set((rules?.required ?? []).map(k => GROUP_SECTION[k]).filter(Boolean));
+  const req = (k: string) => (requiredSections.has(k as any) ? ' · required' : '');
+  const shown = (k: Optional) => added.has(k) || hasData(f, k) || (k === 'transport' && journeyNeeded) || ruleSections.has(k);
   const hide = (k: Optional) => { setForm(prev => (prev ? cleared(prev, k) : prev)); setAdded(s => { const n = new Set(s); n.delete(k); return n; }); };
   const ref = (name: string) => opts.ref[name] ?? [];
   const category = lookups.actCat.get(f.activity.name.trim());
   const used = opts.used;
-  const removeBtn = (k: Optional) => () => hide(k);
+  const placeSuggest = entryMode && entryOpts ? [...entryOpts.labels, ...used.places.filter(x => !entryOpts.labels.includes(x))] : used.places;
+  const removeBtn = (k: Optional) => (requiredSections.has(k) ? undefined : () => hide(k));
 
   // Whole meal: one amount for all the foods, shared evenly — as the sheet's 'A+B' with one
   // amount, which the migration divides (Hyoje, 7 Nov). Off when a record opens.
@@ -467,6 +544,9 @@ export function RecordEditor({ id }: { id: string }) {
     patch('cost', { currency: cur, amountKRW: krw(f.cost.amountForeign, r) });
   };
 
+  // An end typed without a zone takes the start's zone (Hyoje, 8 Nov); it can still be changed.
+  const setPoint = (which: 'start' | 'end', p: Partial<RecordForm['start']>) =>
+    patch(which, which === 'end' && !f.end.timezone && f.start.timezone && (p.date || p.hour) ? { ...p, timezone: f.start.timezone } : p);
   const point = (which: 'start' | 'end') => {
     const p = f[which];
     const wd = weekdayText(p.date);
@@ -474,10 +554,10 @@ export function RecordEditor({ id }: { id: string }) {
       <div className="flex flex-col gap-1">
         <span className="text-xs text-stone-500 dark:text-zinc-400">{which === 'start' ? 'Start' : 'End'}</span>
         <div className="grid grid-cols-2 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,1fr)] gap-2">
-          <input type="date" value={p.date} onChange={e => patch(which, { date: e.target.value })} aria-label={`${which} date`} className={`${inputCls} col-span-2 sm:col-span-1`} />
+          <input type="date" value={p.date} onChange={e => setPoint(which, { date: e.target.value })} aria-label={`${which} date`} className={`${inputCls} col-span-2 sm:col-span-1`} />
           {pickerTime(p.hour) != null
-            ? <input type="time" value={pickerTime(p.hour)!} onChange={e => patch(which, { hour: e.target.value })} aria-label={`${which} time`} className={`${inputCls} font-mono`} />
-            : <input value={p.hour} onChange={e => patch(which, { hour: e.target.value })} placeholder="H:mm" aria-label={`${which} time`} className={`${inputCls} font-mono`} />}
+            ? <input type="time" value={pickerTime(p.hour)!} onChange={e => setPoint(which, { hour: e.target.value })} aria-label={`${which} time`} className={`${inputCls} font-mono`} />
+            : <input value={p.hour} onChange={e => setPoint(which, { hour: e.target.value })} placeholder="H:mm" aria-label={`${which} time`} className={`${inputCls} font-mono`} />}
           <Select value={p.timezone} onChange={v => patch(which, { timezone: v })} options={lookups.zones} empty="Zone" />
         </div>
         <span className="text-xs text-stone-400 dark:text-zinc-500">{wd ? `${wd} (worked out from the date)` : ' '}</span>
@@ -527,6 +607,11 @@ export function RecordEditor({ id }: { id: string }) {
     <div id="check" className="bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-700 rounded-lg p-4 shadow-sm flex flex-col gap-3 min-w-0">
       <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-500 dark:text-zinc-400">Check</h2>
       {!dirty && <p className="text-sm text-stone-500 dark:text-zinc-400">No changes yet. Each change is checked as you type.</p>}
+      {entryMode && current && (
+        <p className="text-sm text-stone-700 dark:text-zinc-200">{current.kind === 'plan'
+          ? 'Starts later: it will be saved as a plan, and wait in To confirm once its start has passed.'
+          : 'Will be saved as a record.'}</p>
+      )}
       {checking && <p className="text-sm text-stone-500 dark:text-zinc-400">Checking…</p>}
       {checkError && <p className="text-sm text-red-700 dark:text-red-300">The check failed: {checkError}</p>}
       {current && (
@@ -543,7 +628,7 @@ export function RecordEditor({ id }: { id: string }) {
               <ul className="mt-1 list-disc pl-5 text-sm text-amber-800 dark:text-amber-300 space-y-0.5">{warnings.map((p, i) => <li key={i}>{p}</li>)}</ul>
             </div>
           )}
-          {current.lines.length > 0 && (
+          {current.lines.length > 0 && !rec.noSheet && (
             <div className="flex flex-col gap-1">
               <p className="text-sm font-medium text-stone-700 dark:text-zinc-200">For the sheet, after saving</p>
               <ChangeTable tab={current.tab} findRow={current.findRow} moveTo={current.moveTo} lines={current.lines} changes={current.changes} cellsOpen={false}
@@ -560,6 +645,7 @@ export function RecordEditor({ id }: { id: string }) {
     : checkError ? <span className="text-red-700 dark:text-red-300">The check failed</span>
     : checking ? <span className="text-stone-500 dark:text-zinc-400">Checking…</span>
     : problems.length ? <a href="#check" className="text-red-700 dark:text-red-300 underline">{plural(problems.length, 'problem')}: can’t save yet</a>
+    : entryMode ? <span className="text-stone-700 dark:text-zinc-200">Ready{current!.kind === 'plan' ? ' · a plan' : ''}{warnings.length ? <a href="#check" className="text-amber-700 dark:text-amber-300 underline"> · {plural(warnings.length, 'note')}</a> : null}</span>
     : <span className="text-stone-700 dark:text-zinc-200">Ready · <a href="#check" className="underline">{plural((current!.changes?.length || current!.lines.length), 'change')}</a>{warnings.length ? <a href="#check" className="text-amber-700 dark:text-amber-300 underline"> · {plural(warnings.length, 'note')}</a> : null}</span>;
 
   return (
@@ -567,8 +653,9 @@ export function RecordEditor({ id }: { id: string }) {
       <div className="px-4 pt-6 max-w-6xl mx-auto w-full">
         <button onClick={goBack} className="text-xs text-stone-500 dark:text-zinc-400 hover:text-stone-800 dark:hover:text-zinc-100">← Back</button>
         <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <h1 className="text-lg font-semibold text-stone-800 dark:text-zinc-100">Edit record</h1>
-          <span className="text-xs text-stone-500 dark:text-zinc-400">Tab {rec.tab ?? '(none)'} · <span className="font-mono break-all">{rec.findRow}</span></span>
+          <h1 className="text-lg font-semibold text-stone-800 dark:text-zinc-100">{mode === 'new' ? 'New' : mode === 'plan' ? 'Plan' : 'Edit record'}</h1>
+          {mode === 'edit' && <span className="text-xs text-stone-500 dark:text-zinc-400">Tab {rec.tab ?? '(none)'} · <span className="font-mono break-all">{rec.findRow}</span></span>}
+          {mode === 'plan' && <span className="text-xs text-stone-500 dark:text-zinc-400">Change anything; a start that has passed makes it a record.</span>}
         </div>
       </div>
 
@@ -606,8 +693,20 @@ export function RecordEditor({ id }: { id: string }) {
             <p className="text-xs text-stone-400 dark:text-zinc-500">No times = all day. A start time without an end time = still going (an open record).</p>
           </Section>
 
-          <Section title="Place">
-            <Field label="Place"><Text value={f.location.activity} onChange={v => patch('location', { activity: v })} suggest={used.places} /></Field>
+          <Section title={`Place${req('place')}`}>
+            {entryMode ? (
+              <Row>
+                <Field label="Place" note="집 / 회사 / 사이트 / 내차 or a place's name">
+                  <Text value={splitPlace(f.location.activity)[0]} onChange={v => patch('location', { activity: joinPlace(v, splitPlace(f.location.activity)[1]) })}
+                    suggest={[...(entryOpts?.labels ?? []), ...used.places.filter(x => !(entryOpts?.labels ?? []).includes(x))]} />
+                </Field>
+                <Field label="Detail" note="Room, shop, course … saved as “Place - Detail”">
+                  <Text value={splitPlace(f.location.activity)[1]} onChange={v => patch('location', { activity: joinPlace(splitPlace(f.location.activity)[0], v) })} />
+                </Field>
+              </Row>
+            ) : (
+              <Field label="Place"><Text value={f.location.activity} onChange={v => patch('location', { activity: v })} suggest={used.places} /></Field>
+            )}
             <Row>
               <Field label="Online"><Text value={f.location.online} onChange={v => patch('location', { online: v })} suggest={used.online} /></Field>
               <Field label="Someone else’s place"><Text value={f.location.other} onChange={v => patch('location', { other: v })} suggest={used.places} /></Field>
@@ -615,16 +714,16 @@ export function RecordEditor({ id }: { id: string }) {
           </Section>
 
           {shown('people') && (
-            <Section title="People" onRemove={removeBtn('people')}>
+            <Section title={`People${req('people')}`} onRemove={removeBtn('people')}>
               <PeopleEditor people={f.people} onChange={v => set('people', v)} methods={ref('people.method')} categories={ref('people.category')} names={used.people} />
             </Section>
           )}
 
           {shown('transport') && (
-            <Section title="Journey" onRemove={journeyNeeded ? undefined : removeBtn('transport')}>
+            <Section title={`Journey${req('transport')}`} onRemove={journeyNeeded ? undefined : removeBtn('transport')}>
               <Row>
-                <Field label="From"><Text value={f.transport.from} onChange={v => patch('transport', { from: v })} suggest={used.places} /></Field>
-                <Field label="To"><Text value={f.transport.to} onChange={v => patch('transport', { to: v })} suggest={used.places} /></Field>
+                <Field label="From"><Text value={f.transport.from} onChange={v => patch('transport', { from: v })} suggest={placeSuggest} /></Field>
+                <Field label="To"><Text value={f.transport.to} onChange={v => patch('transport', { to: v })} suggest={placeSuggest} /></Field>
               </Row>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <Field label="Purpose"><Select value={f.transport.purpose} onChange={v => patch('transport', { purpose: v })} options={ref('transport.purpose')} /></Field>
@@ -635,7 +734,7 @@ export function RecordEditor({ id }: { id: string }) {
           )}
 
           {shown('cost') && (
-            <Section title="Cost" onRemove={removeBtn('cost')}>
+            <Section title={`Cost${req('cost')}`} onRemove={removeBtn('cost')}>
               <Field label="Category">
                 <PickText value={f.cost.category || f.cost.categoryDetail ? `${f.cost.category}\u0000${f.cost.categoryDetail}` : ''}
                   onChange={v => { const [category = '', categoryDetail = ''] = v ? v.split('\u0000') : []; patch('cost', { category, categoryDetail }); }}
@@ -665,7 +764,7 @@ export function RecordEditor({ id }: { id: string }) {
           )}
 
           {shown('purchase') && (
-            <Section title="Purchases" onRemove={removeBtn('purchase')}>
+            <Section title={`Purchases${req('purchase')}`} onRemove={removeBtn('purchase')}>
               <ItemList<FormItem> items={f.purchase} onChange={v => set('purchase', v)} blank={blankItem} addLabel="+ Add an item"
                 render={(x, setX) => (
                   <div className="grid grid-cols-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2">
@@ -678,7 +777,7 @@ export function RecordEditor({ id }: { id: string }) {
           )}
 
           {shown('food') && (
-            <Section title="Food & drink" onRemove={removeBtn('food')}>
+            <Section title={`Food & drink${req('food')}`} onRemove={removeBtn('food')}>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <Field label="Type"><Select value={f.food.type} onChange={v => patch('food', { type: v })} options={ref('food.type')} /></Field>
                 <Field label="Carbs"><Select value={f.food.carbs} onChange={v => patch('food', { carbs: v })} options={ref('nutrient_level')} /></Field>
@@ -724,7 +823,7 @@ export function RecordEditor({ id }: { id: string }) {
           )}
 
           {shown('exercise') && (
-            <Section title="Exercise" onRemove={removeBtn('exercise')}>
+            <Section title={`Exercise${req('exercise')}`} onRemove={removeBtn('exercise')}>
               <ItemList<FormExercise> items={f.exercise} onChange={v => set('exercise', v)} blank={blankExercise} addLabel="+ Add an exercise"
                 render={(x, setX) => (
                   <div className="grid grid-cols-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2">
@@ -739,7 +838,7 @@ export function RecordEditor({ id }: { id: string }) {
           )}
 
           {shown('body') && (
-            <Section title="Body" onRemove={removeBtn('body')}>
+            <Section title={`Body${req('body')}`} onRemove={removeBtn('body')}>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {/* The scale gives weight, muscle mass and body fat %; body fat (kg) is
                     weight × % (Hyoje, 7 Nov). A saved value stays until weight or % change. */}
@@ -756,13 +855,13 @@ export function RecordEditor({ id }: { id: string }) {
           )}
 
           {shown('sleep') && (
-            <Section title="Sleep" onRemove={removeBtn('sleep')}>
+            <Section title={`Sleep${req('sleep')}`} onRemove={removeBtn('sleep')}>
               <Field label="Quality"><Text value={f.sleep.quality} onChange={v => patch('sleep', { quality: v })} suggest={used.sleep} /></Field>
             </Section>
           )}
 
           {shown('bowel') && (
-            <Section title="Bowel" onRemove={removeBtn('bowel')}>
+            <Section title={`Bowel${req('bowel')}`} onRemove={removeBtn('bowel')}>
               <div className="sm:w-1/2"><Field label="Amount"><Select value={f.bowel.amount} onChange={v => patch('bowel', { amount: v })} options={opts.bowel.amount} /></Field></div>
               <div className="flex flex-col gap-1"><span className="text-xs text-stone-500 dark:text-zinc-400">Quality</span>
                 <ToggleChips values={f.bowel.quality} options={opts.bowel.quality} onChange={v => patch('bowel', { quality: v })} /></div>
@@ -772,7 +871,7 @@ export function RecordEditor({ id }: { id: string }) {
           )}
 
           {shown('golf') && (
-            <Section title="Golf" onRemove={removeBtn('golf')}>
+            <Section title={`Golf${req('golf')}`} onRemove={removeBtn('golf')}>
               <div className="grid grid-cols-3 gap-3">
                 <Field label="Score"><NumberBox value={f.golf.score} onChange={v => patch('golf', { score: v })} /></Field>
                 <Field label="Approach"><NumberBox value={f.golf.approach} onChange={v => patch('golf', { approach: v })} /></Field>
@@ -782,19 +881,19 @@ export function RecordEditor({ id }: { id: string }) {
           )}
 
           {shown('reading') && (
-            <Section title="Reading" onRemove={removeBtn('reading')}>
+            <Section title={`Reading${req('reading')}`} onRemove={removeBtn('reading')}>
               <Field label="Book title"><Text value={f.reading.title} onChange={v => patch('reading', { title: v })} /></Field>
             </Section>
           )}
 
           {shown('movie') && (
-            <Section title="Movie" onRemove={removeBtn('movie')}>
+            <Section title={`Movie${req('movie')}`} onRemove={removeBtn('movie')}>
               <Field label="Movie title"><Text value={f.movie.title} onChange={v => patch('movie', { title: v })} /></Field>
             </Section>
           )}
 
           {shown('travel') && (
-            <Section title="Travel" onRemove={removeBtn('travel')}>
+            <Section title={`Travel${req('travel')}`} onRemove={removeBtn('travel')}>
               <Row>
                 <Field label="City"><Text value={f.travel.city} onChange={v => patch('travel', { city: v })} suggest={used.cities} /></Field>
                 <Field label="Theme"><Text value={f.travel.theme} onChange={v => patch('travel', { theme: v })} suggest={used.themes} /></Field>
@@ -803,7 +902,7 @@ export function RecordEditor({ id }: { id: string }) {
           )}
 
           {shown('income') && (
-            <Section title="Income" onRemove={removeBtn('income')}>
+            <Section title={`Income${req('income')}`} onRemove={removeBtn('income')}>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Before tax"><NumberBox value={f.income.gross} onChange={v => patch('income', { gross: v })} suffix="₩" /></Field>
                 <Field label="After tax"><NumberBox value={f.income.net} onChange={v => patch('income', { net: v })} suffix="₩" /></Field>
@@ -824,9 +923,43 @@ export function RecordEditor({ id }: { id: string }) {
             <textarea value={f.notes} onChange={e => set('notes', e.target.value)} rows={3} className={`${inputCls} resize-y`} />
           </Section>
 
-          <div className="flex justify-end">
-            <button onClick={remove} disabled={saving} className={danger}>Delete this record</button>
-          </div>
+          {mode === 'new' && (
+            <div className="flex flex-col gap-2">
+              {!presetBox ? (
+                <div><button type="button" className={addBtn} onClick={() => setPresetBox({ name: f.activity.title.trim() || f.activity.name.trim(), kind: f.end.date ? 'length' : 'open', minutes: '', error: '', saved: false })}>Save as preset…</button></div>
+              ) : presetBox.saved ? (
+                <p className="text-sm text-stone-600 dark:text-zinc-300">Preset “{presetBox.name}” saved: it is on the home screen now. (This entry is not saved yet.)</p>
+              ) : (
+                <Section title="Save as preset">
+                  <p className="text-xs text-stone-500 dark:text-zinc-400">Keeps the activity and everything filled in here, but not the times. A tap on the home screen opens this form filled in.</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <Field label="Name"><Text value={presetBox.name} onChange={v => setPresetBox({ ...presetBox, name: v, error: '' })} /></Field>
+                    <Field label="Time">
+                      <Select value={presetBox.kind} onChange={v => setPresetBox({ ...presetBox, kind: (v || 'length') as any, error: '' })}
+                        options={[{ value: 'open', label: 'Starts now, stays open' }, { value: 'moment', label: 'A moment (start = end)' }, { value: 'length', label: 'Now, for a usual length' }]} />
+                    </Field>
+                    {presetBox.kind === 'length' && <Field label="Usual length"><Text value={presetBox.minutes} onChange={v => setPresetBox({ ...presetBox, minutes: v, error: '' })} placeholder="minutes" /></Field>}
+                  </div>
+                  {presetBox.error && <p className="text-sm text-red-700 dark:text-red-300">{presetBox.error}</p>}
+                  <div className="flex gap-2">
+                    <button type="button" className={primary} onClick={async () => {
+                      const r = await fetch('/api/entry/presets', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: formJson({ name: presetBox.name, form: f, time: { kind: presetBox.kind, minutes: presetBox.minutes } }) });
+                      const b = await r.json().catch(() => ({}));
+                      setPresetBox(r.ok ? { ...presetBox, saved: true } : { ...presetBox, error: b.error ?? `HTTP ${r.status}` });
+                    }}>Save preset</button>
+                    <button type="button" className={secondary} onClick={() => setPresetBox(null)}>Cancel</button>
+                  </div>
+                </Section>
+              )}
+            </div>
+          )}
+
+          {mode !== 'new' && (
+            <div className="flex justify-end">
+              <button onClick={remove} disabled={saving} className={danger}>{mode === 'plan' ? 'Delete this plan' : 'Delete this record'}</button>
+            </div>
+          )}
         </div>
 
         <div className="lg:sticky lg:top-4">{checkPanel}</div>
@@ -837,7 +970,7 @@ export function RecordEditor({ id }: { id: string }) {
         <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center gap-3">
           <div className="flex-1 min-w-0 text-sm truncate">{status}</div>
           <button onClick={goBack} className={secondary}>Cancel</button>
-          <button onClick={save} disabled={!canSave} className={primary}>{saving ? 'Saving…' : 'Save'}</button>
+          <button onClick={save} disabled={!canSave} className={primary}>{saving ? 'Saving…' : entryMode && current?.kind === 'plan' ? 'Save plan' : 'Save'}</button>
         </div>
       </div>
     </div>

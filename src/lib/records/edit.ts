@@ -11,6 +11,10 @@
 //   - test database first, then production (Design §15.2)
 // Undo works until a migration rebuilds the record's year (its _id is then gone);
 // after the tick, the undo is its own entry with the sheet steps to reverse it.
+// #71 (8 Nov): a record made in the entry app (origin 'app') is not in the sheet, so its
+// edits and deletes are logged as already done (extra.noSheet) and show no sheet steps;
+// a record ended here must then have its activity's required groups (groups.ts).
+
 
 import mongoose from 'mongoose';
 import Log from '../../models/Log';
@@ -24,6 +28,10 @@ import { missingIngredients, describeMissing } from './ingredients';
 import { getArchiveUntil } from '../archiveYear';
 import { buildRecord, fromRecord, type FormContext, type RecordForm } from './form';
 import { sheetChange, deleteRowLines, addRowLines, findRowText, type ChangeLine, type PlainChange } from './sheetCells';
+import { isOpen, missingRequired } from '../entry/groups';
+
+const APP_ONLY = ['Nothing to do in the sheet: this record was made in the app.'];
+const appMade = (doc: any) => doc?.origin === 'app';
 
 export const RECORDS_LIST = 'records';
 
@@ -64,6 +72,7 @@ export async function getForEdit(userId: string, id: string) {
     category: doc.activity?.category ?? null,
     tab: yearTabFor(doc, archiveUntil),
     findRow: findRowText(doc),
+    noSheet: appMade(doc),
   };
 }
 
@@ -111,6 +120,12 @@ async function prepare(userId: string, id: string, form: RecordForm): Promise<{ 
     problems.push('Another record has the same activity, title, start and end');
   }
 
+  // Ending an open record here: its activity's required groups must be there (#71).
+  if (isOpen(base) && !isOpen(doc) && doc.activity?.name) {
+    const acts = await ActivityMaster.find({ userId }).select('name category groups').lean() as any[];
+    for (const label of missingRequired(doc, acts)) problems.push(`${label} is required for ${doc.activity.name}`);
+  }
+
   const archiveUntil = await getArchiveUntil(userId);
   const change = sheetChange(base, doc, yearTabFor(base, archiveUntil), yearTabFor(doc, archiveUntil));
   if (!change.lines.length) problems.push('Nothing changed');
@@ -121,7 +136,7 @@ export async function previewEdit(userId: string, id: string, form: RecordForm) 
   const r = await prepare(userId, id, form);
   if (!r.ok) return r;
   const { problems, warnings, title, change } = r.p;
-  return { ok: true as const, problems, warnings, title, ...change };
+  return { ok: true as const, problems, warnings, title, ...change, noSheet: appMade(r.p.base) };
 }
 
 // ── Save ─────────────────────────────────────────────────────────────────────
@@ -136,7 +151,8 @@ export async function saveEdit(userId: string, id: string, form: RecordForm, upd
   if (problems.length) return fail(422, 'The record was not saved.', problems);
 
   const now = new Date();
-  const saved = { ...doc, _id: base._id, createdAt: base.createdAt, updatedAt: now };
+  const saved = { ...doc, _id: base._id, ...(appMade(base) ? { origin: 'app' } : {}), createdAt: base.createdAt, updatedAt: now };
+  const noSheet = appMade(base);
   const session = await mongoose.startSession();
   let changeId = '';
   try {
@@ -146,8 +162,9 @@ export async function saveEdit(userId: string, id: string, form: RecordForm, upd
       const [ch] = await MasterChange.create([{
         userId, list: RECORDS_LIST, kind: 'edit', rowId: String(base._id),
         before: base, after: saved, recordsChanged: 1, recordIds: [base._id],
-        sheetSteps: toText(change.tab, change.findRow, change.lines),
-        extra: { title, ...change, afterUpdatedAt: now },
+        sheetSteps: noSheet ? APP_ONLY : toText(change.tab, change.findRow, change.lines),
+        ...(noSheet ? { sheetDone: true, sheetDoneAt: now } : {}),
+        extra: { title, ...change, afterUpdatedAt: now, noSheet },
       }], { session });
       changeId = String(ch._id);
     });
@@ -157,7 +174,7 @@ export async function saveEdit(userId: string, id: string, form: RecordForm, upd
   } finally {
     await session.endSession();
   }
-  return { ok: true as const, changeId, updatedAt: now.toISOString(), ...change };
+  return { ok: true as const, changeId, updatedAt: now.toISOString(), ...change, noSheet };
 }
 
 // ── Delete ───────────────────────────────────────────────────────────────────
@@ -174,6 +191,7 @@ export async function deleteRecord(userId: string, id: string, updatedAt: string
   const lines = deleteRowLines(base, tab);
   const findRow = findRowText(base);
   const now = new Date();
+  const noSheet = appMade(base);
 
   const session = await mongoose.startSession();
   let changeId = '';
@@ -184,8 +202,9 @@ export async function deleteRecord(userId: string, id: string, updatedAt: string
       const [ch] = await MasterChange.create([{
         userId, list: RECORDS_LIST, kind: 'delete', rowId: String(base._id),
         before: base, after: null, recordsChanged: 1, recordIds: [base._id],
-        sheetSteps: toText(tab, findRow, lines),
-        extra: { title: `Delete: ${findRow}`, tab, findRow, moveTo: null, lines },
+        sheetSteps: noSheet ? APP_ONLY : toText(tab, findRow, lines),
+        ...(noSheet ? { sheetDone: true, sheetDoneAt: now } : {}),
+        extra: { title: `Delete: ${findRow}`, tab, findRow, moveTo: null, lines, noSheet },
       }], { session });
       changeId = String(ch._id);
       await LogTrash.create([{ userId, record: base, deletedAt: now, changeId: ch._id }], { session });
@@ -196,7 +215,7 @@ export async function deleteRecord(userId: string, id: string, updatedAt: string
   } finally {
     await session.endSession();
   }
-  return { ok: true as const, changeId, tab, findRow, lines };
+  return { ok: true as const, changeId, tab, findRow, lines, noSheet };
 }
 
 // ── Undo ─────────────────────────────────────────────────────────────────────
@@ -213,7 +232,7 @@ export async function undoRecordChange(userId: string, ch: any) {
   const blocked = recordUndoBlocked(ch);
   if (blocked) return fail(409, blocked);
   const archiveUntil = await getArchiveUntil(userId);
-  const sheetNeeded = !!ch.sheetDone;
+  const sheetNeeded = !!ch.sheetDone && !ch.extra?.noSheet;
   const now = new Date();
   const nothing = ['Nothing to do in the sheet: this was undone before it was repeated there.'];
 

@@ -1,0 +1,72 @@
+// Forms for the entry app (#71). Pure: the phone builds them too.
+
+import type { RecordForm } from '../records/form';
+import { addMinutes } from './time';
+
+export type PresetTime = { kind: 'open' | 'moment' | 'length'; minutes: number | null };
+export interface FormPointValue { date: string; hour: string; timezone: string }
+
+/** An empty form; a partial one (preset, repeat) laid over it section by section. */
+// The same as form.ts fromRecord({}), written out: form.ts reaches the database models
+// (through the migration's transform), which must not end up on the phone.
+export function blankForm(): RecordForm {
+  const p = () => ({ date: '', hour: '', timezone: '' });
+  return {
+    activity: { name: '', title: '', additionalInfo: '', crossActivity: '', relationship: '' },
+    start: p(), end: p(),
+    location: { activity: '', online: '', other: '' },
+    cost: { amountKRW: null, amountForeign: null, currency: '', categoryDetail: '', category: '' },
+    purchase: [],
+    food: { type: '', carbs: '', fat: '', spiciness: '', drinks: [], foods: [], alcohols: [] },
+    people: [],
+    transport: { from: '', to: '', purpose: '', method: '', returnType: '' },
+    bowel: { amount: '', quality: [], characteristics: [] },
+    body: { weight: null, muscleMass: null, bodyFat: null, bodyFatPercent: null },
+    sleep: { quality: '' },
+    exercise: [],
+    reading: { title: '' }, movie: { title: '' },
+    golf: { score: null, approach: null, putts: null },
+    income: { gross: null, net: null },
+    travel: { city: '', theme: '' },
+    notes: '',
+  };
+}
+export function mergeForm(partial: any): RecordForm {
+  const f: any = blankForm();
+  for (const [k, v] of Object.entries(partial ?? {})) {
+    if (k === 'start' || k === 'end') continue;
+    if (v && typeof v === 'object' && !Array.isArray(v) && f[k] && typeof f[k] === 'object' && !Array.isArray(f[k])) f[k] = { ...f[k], ...v };
+    else if (v !== undefined) f[k] = v;
+  }
+  return f;
+}
+
+/** The form a preset opens, at a local date and time in a zone code. */
+export function presetForm(p: { form: any; time: PresetTime }, now: FormPointValue): RecordForm {
+  const f = mergeForm(p.form);
+  f.start = { ...now };
+  if (p.time.kind === 'moment') f.end = { ...now };
+  else if (p.time.kind === 'length' && p.time.minutes != null) {
+    const e = addMinutes(now.date, now.hour, p.time.minutes);
+    f.end = { ...e, timezone: now.timezone };
+  } else f.end = { date: '', hour: '', timezone: '' };
+  return f;
+}
+
+/** Copy recent (Hyoje, 8 Nov): the record's fields, starting now and still open (no end);
+ *  the cost amounts blank, so a foreign amount takes the Exchange rates list's rate. */
+export function copyForm(src: RecordForm, now: FormPointValue): RecordForm {
+  const f: RecordForm = JSON.parse(JSON.stringify(src));
+  f.start = { ...now };
+  f.end = { date: '', hour: '', timezone: '' };
+  f.cost = { ...f.cost, amountKRW: null, amountForeign: null };
+  return f;
+}
+
+/** A new ObjectId-shaped ID made on the phone (seconds + random), so a retry never saves twice. */
+export function newEntryId(): string {
+  const secs = Math.floor(Date.now() / 1000).toString(16).padStart(8, '0');
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  return secs + [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
+}

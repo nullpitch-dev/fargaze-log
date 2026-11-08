@@ -5,6 +5,8 @@
 //   Today      — today's records in Hyoje's zone, by start
 //   Coming up  — plans in the next 7 days
 //   Presets    — in his order
+//   Recent     — for Copy recent: the latest record of each activity + title among the
+//                last 300 records (about two weeks); typing searches all years (searchRecent)
 // Opening it first tops up the repeats and settles "count as done" plans (repeats.ts).
 
 import Log from '../../models/Log';
@@ -56,10 +58,22 @@ export async function home(userId: string, iana = 'Europe/London', now = Date.no
     } else if (dateOf(p.start) <= addDays(today, COMING_DAYS)) comingUp.push(item(p, extra));
   }
 
-  const [open, todays] = await Promise.all([
-    Log.find({ userId, 'start.year': { $ne: null }, 'end.year': null }).sort({ 'start.datetime': -1 }).limit(100).lean(),
+  const [open, todays, latest] = await Promise.all([
+    // Open: no end at all, or a start time without an end time (as the form says).
+    Log.find({ userId, 'start.year': { $ne: null }, $or: [{ 'end.year': null }, { 'start.hour': { $nin: [null, ''] }, 'end.hour': { $in: [null, ''] } }] })
+      .sort({ 'start.datetime': -1 }).limit(100).lean(),
     Log.find({ userId, 'start.year': y, 'start.month': m, 'start.day': d }).sort({ 'start.datetime': 1 }).lean(),
+    Log.find({ userId, 'start.datetime': { $ne: null } }).sort({ 'start.datetime': -1 }).limit(300)
+      .select('activity start end location updatedAt').lean(),
   ]);
+  // Copy recent: the latest record of each activity + title, newest first.
+  const seen = new Set<string>();
+  const recent = (latest as any[]).filter(r => {
+    const k = `${r.activity?.name}\u0001${r.activity?.title ?? ''}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  }).slice(0, 40).map(r => item(r));
 
   return {
     ok: true as const,
@@ -69,7 +83,26 @@ export async function home(userId: string, iana = 'Europe/London', now = Date.no
     open: (open as any[]).map(r => item(r)),
     todayRecords: (todays as any[]).map(r => item(r)),
     comingUp,
+    recent,
     presets: await listPresets(userId),
     refreshed,
   };
+}
+
+/** Copy recent with a search: every record whose activity or title has the text, the
+ *  latest of each activity + title, newest first (all years). */
+export async function searchRecent(userId: string, q: string) {
+  const text = q.trim();
+  if (!text) return { ok: true as const, recent: [] };
+  const re = new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+  const rows = await Log.find({ userId, $or: [{ 'activity.name': re }, { 'activity.title': re }] })
+    .sort({ 'start.datetime': -1 }).limit(500).select('activity start end location updatedAt').lean() as any[];
+  const seen = new Set<string>();
+  const recent = rows.filter(r => {
+    const k = `${r.activity?.name}\u0001${r.activity?.title ?? ''}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  }).slice(0, 40).map(r => item(r));
+  return { ok: true as const, recent };
 }

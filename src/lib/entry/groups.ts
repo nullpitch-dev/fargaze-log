@@ -77,3 +77,17 @@ export function rulesFor(
   const required = [...count(a => a.groups!.required ?? []).entries()].filter(([, c]) => c === peers.length).map(([k]) => k);
   return { required, shown: [...new Set([...shown, ...required])], from: 'category' };
 }
+
+/** Still going: a start time and no end time (an all-day record is never open). */
+export function isOpen(doc: any): boolean {
+  const s = doc?.start?.hour, e = doc?.end?.hour;
+  return !!(s && String(s).trim()) && !(e && String(e).trim());
+}
+
+/** The required groups a record lacks (labels). Hyoje, 8 Nov: an open record may lack
+ *  them — a started activity can't always be filled in yet; they are needed to end it. */
+export function missingRequired(doc: any, acts: Parameters<typeof rulesFor>[1]): string[] {
+  const name = doc?.activity?.name;
+  if (!name) return [];
+  return rulesFor(name, acts).required.filter(k => !groupFilled(doc, k)).map(k => ENTRY_GROUPS.find(g => g.key === k)?.label ?? k);
+}

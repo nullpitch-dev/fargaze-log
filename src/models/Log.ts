@@ -2,6 +2,8 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface ILog extends Document {
   userId: string;
+  /** 'app' = made in the entry app (#71): not in the sheet, so its edits need no sheet step. */
+  origin?: string;
   allDay?: boolean;
   sync?: {
     status?: string;
@@ -153,6 +155,7 @@ const drinksItemSchema = {
 
 const LogSchema = new Schema<ILog>({
   userId: { type: String, required: true, index: true },
+  origin: String,
   allDay: Boolean,
   sync: {
     status: String,

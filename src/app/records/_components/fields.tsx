@@ -45,14 +45,17 @@ export function Row({ children, className = '' }: { children: ReactNode; classNa
 export function filterSuggestions(all: string[], text: string, max = 8): string[] {
   const q = text.trim().toLowerCase();
   if (!q) return all.slice(0, max);
-  const starts: string[] = [], has: string[] = [];
+  // The exact value is listed first only when others match too (typing 음료 still shows
+  // 음료 above 구매 - 음료, Hyoje 8 Nov); alone, the list stays closed.
+  const exact: string[] = [], starts: string[] = [], has: string[] = [];
   for (const v of all) {
     const l = v.toLowerCase();
-    if (l === q) continue;
-    if (l.startsWith(q)) starts.push(v); else if (l.includes(q)) has.push(v);
+    if (l === q) exact.push(v);
+    else if (l.startsWith(q)) starts.push(v); else if (l.includes(q)) has.push(v);
     if (starts.length >= max) break;
   }
-  return [...starts, ...has].slice(0, max);
+  const others = [...starts, ...has];
+  return others.length ? [...exact, ...others].slice(0, max) : [];
 }
 
 export function Text({ value, onChange, placeholder, suggest, describe, onPick, className = '', autoFocus, onEnter, onBlur, disabled }: {

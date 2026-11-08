@@ -95,7 +95,7 @@ export async function fillRule(userId: string, rule: any, now = Date.now()): Pro
     const built = buildRecord(occurrenceForm(rule, date, zones), null, ctx);
     if (built.problems.length) { problem = built.problems[0]; continue; }
     const t = new Date(now);
-    docs.push({ ...built.doc, userId, createdAt: t, updatedAt: t, plan: { state: 'open', repeatId: rule._id, occurrence: date } });
+    docs.push({ ...built.doc, userId, origin: 'app', createdAt: t, updatedAt: t, plan: { state: 'open', repeatId: rule._id, occurrence: date } });
   }
   let made = 0;
   if (docs.length) {
