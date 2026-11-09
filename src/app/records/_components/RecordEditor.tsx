@@ -30,13 +30,23 @@ import { PeopleEditor } from './PeopleEditor';
 import { ChangeTable, type Line, type Plain } from './ChangeTable';
 import { relationshipOf } from '@/lib/records/relationship';
 import { rulesFor, type EntryGroup } from '@/lib/entry/groups';
+import { addMinutes, localNow, zoneCodeFor, type ZoneRow } from '@/lib/entry/time';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface Loaded { id: string; form: RecordForm; updatedAt: string; category: string | null; tab: string | null; findRow: string; noSheet?: boolean }
 interface Check { problems: string[]; warnings: string[]; tab: string; findRow: string; moveTo: string | null; lines: Line[]; changes: Plain[]; kind?: 'record' | 'plan' }
 export type EditorMode = 'edit' | 'new' | 'plan';
-interface EntryOptions { groups: EntryGroup[]; activities: { name: string; category: string; groups?: { required?: string[]; shown?: string[] } }[]; labels: string[] }
+interface EntryOptions { groups: EntryGroup[]; activities: { name: string; category: string; groups?: { required?: string[]; shown?: string[] } }[]; labels: string[]; zones: ZoneRow[] }
+
+/** Bowel values kept out of sight until asked for (Hyoje, 9 Nov). */
+const BOWEL_FOLDED = ['길에서', '바지에'];
+/** Minutes between two form points, or null. */
+function minutesBetween(a: RecordForm['start'], b: RecordForm['start']): number | null {
+  if (!a.date || !a.hour || !b.date || !b.hour) return null;
+  const t = (p: RecordForm['start']) => { const [y, m, d] = p.date.split('-').map(Number); const [h, mi] = p.hour.split(':').map(Number); return Date.UTC(y, m - 1, d, h, mi); };
+  return Math.round((t(b) - t(a)) / 60000);
+}
 
 /** An entry group (groups.ts) → the editor's section. */
 const GROUP_SECTION: Record<string, Optional | 'place' | 'notes' | null> = {
@@ -189,6 +199,8 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId }: { id: str
   const router = useRouter();
   const entryMode = mode !== 'edit';
   const [entryOpts, setEntryOpts] = useState<EntryOptions | null>(null);
+  const [laterOpen, setLaterOpen] = useState(false);
+  const [bowelMore, setBowelMore] = useState(false);
   const [presetBox, setPresetBox] = useState<null | { name: string; kind: 'open' | 'moment' | 'length'; minutes: string; error: string; saved: boolean }>(null);
   const [rec, setRec] = useState<Loaded | null>(null);
   const [opts, setOpts] = useState<FormOptions | null>(null);
@@ -216,7 +228,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId }: { id: str
         const [r, o, e] = await Promise.all([
           mode === 'new' ? Promise.resolve(null) : fetch(mode === 'plan' ? `/api/entry/plans/${id}` : `/api/records/${id}`, { cache: 'no-store' }),
           opts ? Promise.resolve(null) : fetch('/api/records/options'),
-          entryMode && !entryOpts ? fetch('/api/entry/rules') : Promise.resolve(null),
+          !entryOpts ? fetch('/api/entry/rules') : Promise.resolve(null),
         ]);
         let rb: any = mode === 'new' ? { id, form: initial, updatedAt: '', category: null, tab: null, findRow: '' } : await r!.json().catch(() => ({}));
         if (r && !r.ok) throw new Error(rb.error ?? `HTTP ${r.status}`);
@@ -316,14 +328,15 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId }: { id: str
 
   // ── Save / delete / undo / tick ─────────────────────────────────────────────
 
-  async function save() {
-    if (!rec || !form || !canSave) return;
+  async function save(override?: RecordForm) {
+    const fm = override ?? form;
+    if (!rec || !fm || (!override && !canSave) || saving) return;
     setSaving(true); setSaveError(null);
     if (entryMode) {
       try {
         const r = mode === 'new'
-          ? await fetch('/api/entry/records', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: formJson({ id, form, presetId }) })
-          : await fetch(`/api/entry/plans/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: formJson({ form, updatedAt: rec.updatedAt }) });
+          ? await fetch('/api/entry/records', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: formJson({ id, form: fm, presetId }) })
+          : await fetch(`/api/entry/plans/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: formJson({ form: fm, updatedAt: rec.updatedAt }) });
         const b = await r.json().catch(() => ({}));
         if (!r.ok) { setSaveError({ text: b.error ?? `HTTP ${r.status}`, problems: b.problems, conflict: r.status === 409 }); return; }
         const saved = new URLSearchParams({ saved: b.kind, id: b.id ?? id });
@@ -338,7 +351,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId }: { id: str
     }
     try {
       const r = await fetch(`/api/records/${id}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: formJson({ form, updatedAt: rec.updatedAt }),
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: formJson({ form: fm, updatedAt: rec.updatedAt }),
       });
       const b = await r.json().catch(() => ({}));
       if (!r.ok) { setSaveError({ text: b.error ?? `HTTP ${r.status}`, problems: b.problems, conflict: r.status === 409 }); return; }
@@ -544,6 +557,36 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId }: { id: str
     patch('cost', { currency: cur, amountKRW: krw(f.cost.amountForeign, r) });
   };
 
+  // Now / Later / End now (Hyoje, 9 Nov): the phone's time, in the list's zone code for it.
+  const nowPoint = (plusMinutes = 0): RecordForm['start'] => {
+    const iana = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London';
+    const l = localNow(iana, Date.now() + plusMinutes * 60_000);
+    return { ...l, timezone: (entryOpts && zoneCodeFor(iana, l.date, l.hour, entryOpts.zones)) || f.start.timezone || '' };
+  };
+  const setStart = (p: RecordForm['start']) => {
+    // Moving the start keeps the length when there is an end.
+    const len = minutesBetween(f.start, f.end);
+    setForm({ ...f, start: p, end: len != null && len >= 0 ? { ...addMinutes(p.date, p.hour, len), timezone: f.end.timezone || p.timezone } : f.end });
+    setLaterOpen(false);
+  };
+  const endNowAndSave = () => {
+    const next = { ...f, end: nowPoint() };
+    setForm(next);
+    save(next);
+  };
+  const planHappened = async (how: 'onTime' | 'done') => {
+    if (!rec) return;
+    setSaving(true); setSaveError(null);
+    try {
+      const r = await fetch(`/api/entry/plans/${id}/confirm`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ updatedAt: rec.updatedAt, how }) });
+      const b = await r.json().catch(() => ({}));
+      if (!r.ok) { setSaveError({ text: b.error ?? `HTTP ${r.status}`, problems: b.problems, conflict: r.status === 409 }); return; }
+      router.push(`/entry?${new URLSearchParams({ saved: 'record', id: b.recordId, from: 'plan' })}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // An end typed without a zone takes the start's zone (Hyoje, 8 Nov); it can still be changed.
   const setPoint = (which: 'start' | 'end', p: Partial<RecordForm['start']>) =>
     patch(which, which === 'end' && !f.end.timezone && f.start.timezone && (p.date || p.hour) ? { ...p, timezone: f.start.timezone } : p);
@@ -554,13 +597,32 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId }: { id: str
       <div className="flex flex-col gap-1">
         <span className="text-xs text-stone-500 dark:text-zinc-400">{which === 'start' ? 'Start' : 'End'}</span>
         <div className="grid grid-cols-2 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,1fr)] gap-2">
-          <input type="date" value={p.date} onChange={e => setPoint(which, { date: e.target.value })} aria-label={`${which} date`} className={`${inputCls} col-span-2 sm:col-span-1`} />
+          <div className="col-span-2 sm:col-span-1 flex items-center gap-2">
+            <input type="date" value={p.date} onChange={e => setPoint(which, { date: e.target.value })} aria-label={`${which} date`} className={`${inputCls} flex-1 min-w-0`} />
+            <span className="w-8 shrink-0 text-xs text-stone-500 dark:text-zinc-400">{wd.slice(0, 3)}</span>
+          </div>
           {pickerTime(p.hour) != null
             ? <input type="time" value={pickerTime(p.hour)!} onChange={e => setPoint(which, { hour: e.target.value })} aria-label={`${which} time`} className={`${inputCls} font-mono`} />
             : <input value={p.hour} onChange={e => setPoint(which, { hour: e.target.value })} placeholder="H:mm" aria-label={`${which} time`} className={`${inputCls} font-mono`} />}
           <Select value={p.timezone} onChange={v => patch(which, { timezone: v })} options={lookups.zones} empty="Zone" />
         </div>
-        <span className="text-xs text-stone-400 dark:text-zinc-500">{wd ? `${wd} (worked out from the date)` : ' '}</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" className={addBtn} onClick={() => (which === 'start' ? setStart(nowPoint()) : setPoint('end', nowPoint()))}>Now</button>
+          {which === 'start' && (
+            <span className="relative">
+              <button type="button" className={addBtn} aria-expanded={laterOpen} onClick={() => setLaterOpen(v => !v)}>Later ▾</button>
+              {laterOpen && (
+                <span className="absolute left-0 top-full mt-1 z-30 flex gap-1 rounded border border-stone-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-1 shadow">
+                  {[10, 30, 60].map(m => (
+                    <button key={m} type="button" className="px-2 py-1 rounded text-xs whitespace-nowrap text-stone-700 dark:text-zinc-200 hover:bg-stone-100 dark:hover:bg-zinc-800" onClick={() => setStart(nowPoint(m))}>
+                      {m < 60 ? `${m} min` : '1 hour'}
+                    </button>
+                  ))}
+                </span>
+              )}
+            </span>
+          )}
+        </div>
       </div>
     );
   };
@@ -656,6 +718,12 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId }: { id: str
           <h1 className="text-lg font-semibold text-stone-800 dark:text-zinc-100">{mode === 'new' ? 'New' : mode === 'plan' ? 'Plan' : 'Edit record'}</h1>
           {mode === 'edit' && <span className="text-xs text-stone-500 dark:text-zinc-400">Tab {rec.tab ?? '(none)'} · <span className="font-mono break-all">{rec.findRow}</span></span>}
           {mode === 'plan' && <span className="text-xs text-stone-500 dark:text-zinc-400">Change anything; a start that has passed makes it a record.</span>}
+          {mode === 'plan' && (
+            <span className="flex flex-wrap gap-2 mt-1">
+              <button onClick={() => planHappened('done')} disabled={saving} className={secondary}>Done as planned</button>
+              <button onClick={() => planHappened('onTime')} disabled={saving} className={secondary}>Started on time</button>
+            </span>
+          )}
         </div>
       </div>
 
@@ -864,9 +932,14 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId }: { id: str
             <Section title={`Bowel${req('bowel')}`} onRemove={removeBtn('bowel')}>
               <div className="sm:w-1/2"><Field label="Amount"><Select value={f.bowel.amount} onChange={v => patch('bowel', { amount: v })} options={opts.bowel.amount} /></Field></div>
               <div className="flex flex-col gap-1"><span className="text-xs text-stone-500 dark:text-zinc-400">Quality</span>
-                <ToggleChips values={f.bowel.quality} options={opts.bowel.quality} onChange={v => patch('bowel', { quality: v })} /></div>
+                <ToggleChips values={f.bowel.quality} onChange={v => patch('bowel', { quality: v })}
+                  options={bowelMore ? opts.bowel.quality : opts.bowel.quality.filter(o => !BOWEL_FOLDED.includes(o) || f.bowel.quality.includes(o))} /></div>
               <div className="flex flex-col gap-1"><span className="text-xs text-stone-500 dark:text-zinc-400">Characteristics</span>
-                <ToggleChips values={f.bowel.characteristics} options={opts.bowel.characteristics} onChange={v => patch('bowel', { characteristics: v })} /></div>
+                <ToggleChips values={f.bowel.characteristics} onChange={v => patch('bowel', { characteristics: v })}
+                  options={bowelMore ? opts.bowel.characteristics : opts.bowel.characteristics.filter(o => !BOWEL_FOLDED.includes(o) || f.bowel.characteristics.includes(o))} /></div>
+              {!bowelMore && [...opts.bowel.quality, ...opts.bowel.characteristics].some(o => BOWEL_FOLDED.includes(o) && !f.bowel.characteristics.includes(o) && !f.bowel.quality.includes(o)) && (
+                <div><button type="button" className="text-xs text-stone-500 dark:text-zinc-400 underline" onClick={() => setBowelMore(true)}>More</button></div>
+              )}
             </Section>
           )}
 
@@ -967,10 +1040,13 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId }: { id: str
 
       {/* Save bar */}
       <div className="fixed bottom-0 inset-x-0 z-40 border-t border-stone-200 dark:border-zinc-700 bg-white/95 dark:bg-zinc-900/95 backdrop-blur">
-        <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center gap-3">
-          <div className="flex-1 min-w-0 text-sm truncate">{status}</div>
+        <div className="max-w-6xl mx-auto px-4 py-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          {/* the status gets a line of its own on a narrow phone, above the three buttons */}
+          <div className="basis-full sm:basis-auto sm:flex-1 min-w-0 text-sm truncate">{status}</div>
+          <span className="flex-1 sm:hidden" />
           <button onClick={goBack} className={secondary}>Cancel</button>
-          <button onClick={save} disabled={!canSave} className={primary}>{saving ? 'Saving…' : entryMode && current?.kind === 'plan' ? 'Save plan' : 'Save'}</button>
+          <button onClick={endNowAndSave} disabled={saving} className={secondary} title="Set the end to now and save">End now</button>
+          <button onClick={() => save()} disabled={!canSave} className={primary}>{saving ? 'Saving…' : entryMode && current?.kind === 'plan' ? 'Save plan' : 'Save'}</button>
         </div>
       </div>
     </div>

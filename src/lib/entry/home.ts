@@ -1,13 +1,14 @@
-// The entry app's home screen (#71, Design §15.7). Server only.
-//   To confirm — plans whose start has passed, oldest first; 'running' while their end is
-//                still to come (Started as planned), 'over' after it (Done as planned)
-//   Open       — records with a start and no end (수면 tonight, a book for weeks), newest first
-//   Today      — today's records in Hyoje's zone, by start
-//   Coming up  — plans in the next 7 days
-//   Presets    — in his order
-//   Recent     — for Copy recent: the latest record of each activity + title among the
-//                last 300 records (about two weeks); typing searches all years (searchRecent)
+// The entry app's home screen (#71, Design §15.7; layout by Hyoje, 9 Nov 2026). Server only.
+//   Coming up   plans starting today, or on an earlier day, not started yet — they stay
+//               until Start now (or Done as planned / Delete on the plan's page)
+//   In progress open records started today, and last night's 수면; past their planned end
+//               they stay until End now (one made from a plan shows its planned end)
+//   Done        records that ended today, whenever they started
+//   Ongoing     open records started before today (books, trips …) — folded on the phone
+//   Presets, Recent (Copy recent: the latest record of each activity + title among the
+//               last 300 records, about two weeks; typing searches all years — searchRecent)
 // Opening it first tops up the repeats and settles "count as done" plans (repeats.ts).
+// Tomorrow onwards: the Calendar (Hyoje, 9 Nov).
 
 import Log from '../../models/Log';
 import LogPlan from '../../models/LogPlan';
@@ -35,37 +36,54 @@ function item(d: any, extra: Record<string, unknown> = {}) {
 const pad = (x: unknown) => String(x ?? '').padStart(2, '0');
 const dateOf = (p: any) => (p?.year && p?.month && p?.day ? `${p.year}-${pad(p.month)}-${pad(p.day)}` : '');
 
+const SLEEP = '수면';
+const isOpenRec = (r: any) => !r?.end?.year || (!!r?.start?.hour && !r?.end?.hour);
+
 export async function home(userId: string, iana = 'Europe/London', now = Date.now()) {
   const refreshed = await refresh(userId, now);
   const today = localNow(iana, now).date;
+  const yesterday = addDays(today, -1);
   const [y, m, d] = today.split('-').map(Number);
 
-  // Plans: every open one that has started, and the next 7 days.
+  // Coming up: open plans whose start day is today or earlier.
   const plans = await LogPlan.find({
     userId, 'plan.state': 'open',
-    // naive local times: the end of the 8th day covers every zone
-    $or: [{ 'start.datetime': { $lte: new Date(Date.parse(addDays(today, COMING_DAYS + 1) + 'T23:59:59Z')) } }, { 'start.datetime': null }],
+    // naive local times: the end of tomorrow covers every zone's today
+    $or: [{ 'start.datetime': { $lte: new Date(Date.parse(addDays(today, 1) + 'T23:59:59Z')) } }, { 'start.datetime': null }],
   }).sort({ 'start.datetime': 1 }).lean() as any[];
-  const toConfirm: any[] = [];
-  const comingUp: any[] = [];
-  for (const p of plans) {
-    const s = instantOf(p.start);
-    if (s == null) continue;
-    const extra = { repeat: !!p.plan?.repeatId, edited: !!p.plan?.edited };
-    if (s <= now) {
-      const e = instantOf(p.end);
-      toConfirm.push(item(p, { ...extra, status: e != null && e > now ? 'running' : 'over' }));
-    } else if (dateOf(p.start) <= addDays(today, COMING_DAYS)) comingUp.push(item(p, extra));
-  }
+  const comingUp = plans
+    .filter(p => dateOf(p.start) && dateOf(p.start) <= today)
+    .map(p => item(p, { repeat: !!p.plan?.repeatId, started: (instantOf(p.start) ?? 0) <= now }));
 
-  const [open, todays, latest] = await Promise.all([
+  const [open, ended, latest] = await Promise.all([
     // Open: no end at all, or a start time without an end time (as the form says).
     Log.find({ userId, 'start.year': { $ne: null }, $or: [{ 'end.year': null }, { 'start.hour': { $nin: [null, ''] }, 'end.hour': { $in: [null, ''] } }] })
-      .sort({ 'start.datetime': -1 }).limit(100).lean(),
-    Log.find({ userId, 'start.year': y, 'start.month': m, 'start.day': d }).sort({ 'start.datetime': 1 }).lean(),
+      .sort({ 'start.datetime': -1 }).limit(200).lean(),
+    Log.find({ userId, 'end.year': y, 'end.month': m, 'end.day': d }).sort({ 'end.datetime': 1 }).lean(),
     Log.find({ userId, 'start.datetime': { $ne: null } }).sort({ 'start.datetime': -1 }).limit(300)
       .select('activity start end location updatedAt').lean(),
   ]);
+
+  // Planned ends of records started from a plan.
+  const openIds = (open as any[]).map(r => r._id);
+  const fromPlans = openIds.length
+    ? await LogPlan.find({ userId, 'plan.recordId': { $in: openIds } }).select('end plan.recordId').lean() as any[]
+    : [];
+  const plannedEnd = new Map(fromPlans.map(p => [String(p.plan.recordId), p.end?.hour ? { date: dateOf(p.end), hour: p.end.hour } : null]));
+
+  const inProgress: any[] = [], ongoing: any[] = [];
+  for (const r of open as any[]) {
+    const day = dateOf(r.start);
+    const it = item(r, { plannedEnd: plannedEnd.get(String(r._id)) ?? null });
+    if (day === today || (day === yesterday && r.activity?.name === SLEEP)) inProgress.push(it);
+    else if (day < today) ongoing.push(it);
+    else inProgress.push(it);           // started later today (a time set ahead by hand)
+  }
+  inProgress.sort((a, b) => `${a.start.date} ${a.start.hour.padStart(5, '0')}`.localeCompare(`${b.start.date} ${b.start.hour.padStart(5, '0')}`));
+
+  // Done: ended today, whenever they started.
+  const done = (ended as any[]).filter(r => !isOpenRec(r)).map(r => item(r));
+
   // Copy recent: the latest record of each activity + title, newest first.
   const seen = new Set<string>();
   const recent = (latest as any[]).filter(r => {
@@ -79,10 +97,10 @@ export async function home(userId: string, iana = 'Europe/London', now = Date.no
     ok: true as const,
     now: new Date(now).toISOString(),
     today,
-    toConfirm,
-    open: (open as any[]).map(r => item(r)),
-    todayRecords: (todays as any[]).map(r => item(r)),
     comingUp,
+    inProgress,
+    done,
+    ongoing,
     recent,
     presets: await listPresets(userId),
     refreshed,

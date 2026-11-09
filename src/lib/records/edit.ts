@@ -29,6 +29,7 @@ import { getArchiveUntil } from '../archiveYear';
 import { buildRecord, fromRecord, type FormContext, type RecordForm } from './form';
 import { sheetChange, deleteRowLines, addRowLines, findRowText, type ChangeLine, type PlainChange } from './sheetCells';
 import { isOpen, missingRequired } from '../entry/groups';
+import { relaxOpen, tightenOnEnd } from '../entry/drafts';
 
 const APP_ONLY = ['Nothing to do in the sheet: this record was made in the app.'];
 const appMade = (doc: any) => doc?.origin === 'app';
@@ -120,8 +121,9 @@ async function prepare(userId: string, id: string, form: RecordForm): Promise<{ 
     problems.push('Another record has the same activity, title, start and end');
   }
 
-  // Ending an open record here: its activity's required groups must be there (#71).
-  if (isOpen(base) && !isOpen(doc) && doc.activity?.name) {
+  // An open record, or one ended here: its activity's required groups (#71). While it
+  // stays open they only warn (drafts.ts); ending it needs them.
+  if ((isOpen(base) || isOpen(doc)) && doc.activity?.name) {
     const acts = await ActivityMaster.find({ userId }).select('name category groups').lean() as any[];
     for (const label of missingRequired(doc, acts)) problems.push(`${label} is required for ${doc.activity.name}`);
   }
@@ -129,7 +131,9 @@ async function prepare(userId: string, id: string, form: RecordForm): Promise<{ 
   const archiveUntil = await getArchiveUntil(userId);
   const change = sheetChange(base, doc, yearTabFor(base, archiveUntil), yearTabFor(doc, archiveUntil));
   if (!change.lines.length) problems.push('Nothing changed');
-  return { ok: true, p: { base, doc, problems: [...new Set(problems)], warnings, title: `Edit: ${findRowText(base)}`, change } };
+  const tight = tightenOnEnd(base, doc, [...new Set(problems)], warnings);
+  const relaxed = relaxOpen(doc, tight.problems, tight.warnings);
+  return { ok: true, p: { base, doc, problems: relaxed.problems, warnings: relaxed.warnings, title: `Edit: ${findRowText(base)}`, change } };
 }
 
 export async function previewEdit(userId: string, id: string, form: RecordForm) {

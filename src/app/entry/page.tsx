@@ -1,12 +1,13 @@
 'use client';
 
-// /entry — the entry app's home (#71 step 2, Design §15.7; agreed with Hyoje 8 Nov 2026).
+// /entry — the entry app's home and the site's landing page (#71 step 2, Design §15.7;
+// layout by Hyoje, 9 Nov 2026).
 //   Presets · + New · Copy recent
-//   To confirm  plans whose start has passed: Started / Done as planned · Adjust · Delete
-//   Open        records with no end: End now
-//   Today       today's records (a tap opens the edit page)
-//   Coming up   plans in the next 7 days (a tap opens Adjust)
-// After a save or a delete, a toast with Undo.
+//   Coming up    today's plans (and earlier ones) not started: Start now; a tap opens the plan
+//   In progress  open records started today, and last night's 수면: End now
+//   Done         records that ended today
+//   Ongoing      open records started before today: End now (folded)
+// Tomorrow onwards is on the Calendar. After a save or a delete, a toast with Undo.
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -14,9 +15,9 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { localNow, zoneCodeFor, type ZoneRow } from '@/lib/entry/time';
 
 interface Point { date: string; hour: string; timezone: string }
-interface Item { id: string; activity: string; category: string; title: string; start: Point; end: Point; place: string; updatedAt: string; status?: 'running' | 'over'; repeat?: boolean }
+interface Item { id: string; activity: string; category: string; title: string; start: Point; end: Point; place: string; updatedAt: string; repeat?: boolean; started?: boolean; plannedEnd?: { date: string; hour: string } | null }
 interface Preset { id: string; name: string; order: number; time: { kind: 'open' | 'moment' | 'length'; minutes: number | null } }
-interface Home { today: string; toConfirm: Item[]; open: Item[]; todayRecords: Item[]; comingUp: Item[]; recent: Item[]; presets: Preset[] }
+interface Home { today: string; comingUp: Item[]; inProgress: Item[]; done: Item[]; ongoing: Item[]; recent: Item[]; presets: Preset[] }
 interface Toast { text: string; undo?: () => Promise<string | null> }
 
 const btn = 'px-3 py-1.5 rounded text-sm border disabled:opacity-40 disabled:cursor-not-allowed';
@@ -137,9 +138,7 @@ function EntryHome() {
     }
   }
 
-  const confirm = (it: Item) => act(`c${it.id}`, () => call(`/api/entry/plans/${it.id}/confirm`, 'POST', { updatedAt: it.updatedAt }), { text: it.status === 'running' ? 'Started: saved as a record' : 'Done: saved as a record' });
-  const del = (it: Item) => act(`d${it.id}`, () => call(`/api/entry/plans/${it.id}`, 'DELETE', { updatedAt: it.updatedAt }),
-    { text: 'Plan deleted', undo: async () => { const r = await call(`/api/entry/plans/${it.id}/restore`, 'POST'); return r.ok ? null : r.b.error ?? 'Undo failed'; } });
+  const startNow = (it: Item) => act(`s${it.id}`, () => call(`/api/entry/plans/${it.id}/confirm`, 'POST', { updatedAt: it.updatedAt, how: 'now', now: nowPoint() }), { text: `${it.activity} started` });
   const endNow = (it: Item) => act(`e${it.id}`, () => call(`/api/entry/records/${it.id}/end`, 'POST', { end: nowPoint(), updatedAt: it.updatedAt }), { text: `${it.activity} ended` });
 
   async function undoToast() {
@@ -183,7 +182,7 @@ function EntryHome() {
   if (!data) return <div className="px-4 py-8 max-w-3xl mx-auto w-full text-sm text-stone-500 dark:text-zinc-400">Loading…</div>;
 
   const today = data.today;
-  const lastPlace = [...data.todayRecords].reverse().find(r => r.place)?.place ?? '';
+  const lastPlace = [...data.done, ...data.inProgress].reverse().find(r => r.place)?.place ?? '';
   const newHref = (extra: Record<string, string> = {}) => `/entry/new?${new URLSearchParams({ ...(lastPlace ? { place: lastPlace } : {}), ...extra })}`;
   const recent = copyQ.trim() ? (found ?? data.recent.filter(r => name(r).toLowerCase().includes(copyQ.trim().toLowerCase()))) : data.recent;
 
@@ -241,53 +240,48 @@ function EntryHome() {
           )}
         </section>
 
-        {data.toConfirm.length > 0 && (
-          <section className="flex flex-col gap-2">
-            <h2 className={heading}>To confirm</h2>
-            <ul className="flex flex-col gap-2">
-              {data.toConfirm.map(it => (
-                <li key={it.id} className="rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/60 p-3 flex flex-col gap-2">
-                  <div className="min-w-0">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-sm font-medium text-amber-900 dark:text-amber-100 truncate">{name(it)}</span>
-                      <span className="shrink-0 text-[11px] rounded px-1.5 py-0.5 bg-amber-200/70 dark:bg-amber-900 text-amber-900 dark:text-amber-200">{it.status === 'running' ? 'under way' : 'over'}</span>
-                    </div>
-                    <span className="block text-xs text-amber-800 dark:text-amber-300 truncate">{when(it, today)}{it.place ? ` · ${it.place}` : ''}{it.repeat ? ' · repeats' : ''}</span>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button onClick={() => confirm(it)} disabled={busy !== null} className={primary}>{it.status === 'running' ? 'Started as planned' : 'Done as planned'}</button>
-                    <Link href={`/entry/plan/${it.id}`} className={secondary}>Adjust</Link>
-                    <button onClick={() => del(it)} disabled={busy !== null} className={secondary}>Delete</button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-
-        {data.open.length > 0 && (
-          <section className="flex flex-col gap-2">
-            <h2 className={heading}>Open</h2>
-            <ul className={card}>
-              {data.open.map(it => row(it,
-                <button onClick={() => endNow(it)} disabled={busy !== null} className={small}>End now</button>,
-                `/records/${it.id}`, `since ${when(it, today).replace(/^(Today|Yesterday|Tomorrow)/, m => m.toLowerCase())}`))}
-            </ul>
-          </section>
-        )}
-
         <section className="flex flex-col gap-2">
-          <h2 className={heading}>Today</h2>
-          {data.todayRecords.length > 0
-            ? <ul className={card}>{data.todayRecords.map(it => row(it, null, `/records/${it.id}`, when(it, today, false)))}</ul>
-            : <p className="text-sm text-stone-500 dark:text-zinc-400">Nothing yet today.</p>}
+          <h2 className={heading}>Coming up</h2>
+          {data.comingUp.length > 0 ? (
+            <ul className={card}>
+              {data.comingUp.map(it => row(it,
+                <button onClick={() => startNow(it)} disabled={busy !== null} className={small}>Start now</button>,
+                `/entry/plan/${it.id}`,
+                `${when(it, today)}${it.repeat ? ' · repeats' : ''}`))}
+            </ul>
+          ) : <p className="text-sm text-stone-500 dark:text-zinc-400">Nothing planned for the rest of today.</p>}
         </section>
 
-        {data.comingUp.length > 0 && (
-          <section className="flex flex-col gap-2">
-            <h2 className={heading}>Coming up</h2>
-            <ul className={card}>{data.comingUp.map(it => row(it, it.repeat ? <span className="text-[11px] text-stone-400 dark:text-zinc-500 pt-0.5">repeats</span> : null, `/entry/plan/${it.id}`))}</ul>
-          </section>
+        <section className="flex flex-col gap-2">
+          <h2 className={heading}>In progress</h2>
+          {data.inProgress.length > 0 ? (
+            <ul className={card}>
+              {data.inProgress.map(it => row(it,
+                <button onClick={() => endNow(it)} disabled={busy !== null} className={small}>End now</button>,
+                `/records/${it.id}`,
+                `since ${when(it, today).replace(/^(Today|Yesterday|Tomorrow)/, m => m.toLowerCase())}${it.plannedEnd ? ` · planned until ${it.plannedEnd.hour}` : ''}`))}
+            </ul>
+          ) : <p className="text-sm text-stone-500 dark:text-zinc-400">Nothing running.</p>}
+        </section>
+
+        <section className="flex flex-col gap-2">
+          <h2 className={heading}>Done</h2>
+          {data.done.length > 0
+            ? <ul className={card}>{data.done.map(it => row(it, null, `/records/${it.id}`, when(it, today, it.start.date !== today)))}</ul>
+            : <p className="text-sm text-stone-500 dark:text-zinc-400">Nothing finished yet today.</p>}
+        </section>
+
+        {data.ongoing.length > 0 && (
+          <details className="group">
+            <summary className={`${heading} cursor-pointer list-none flex items-center gap-1 select-none`}>
+              <span className="inline-block transition-transform group-open:rotate-90">›</span> Ongoing <span className="normal-case tracking-normal font-normal">({data.ongoing.length})</span>
+            </summary>
+            <ul className={`${card} mt-2`}>
+              {data.ongoing.map(it => row(it,
+                <button onClick={() => endNow(it)} disabled={busy !== null} className={small}>End now</button>,
+                `/records/${it.id}`, `since ${when(it, today)}`))}
+            </ul>
+          </details>
         )}
       </div>
 

@@ -27,6 +27,7 @@ import { missingIngredients, describeMissing } from '../records/ingredients';
 import { loadFormContext } from '../records/edit';
 import { buildRecord, fromRecord, type RecordForm } from '../records/form';
 import { isOpen, missingRequired } from './groups';
+import { relaxOpen, tightenOnEnd } from './drafts';
 import { instantOf } from './time';
 
 type Fail = { ok: false; status: number; error: string; problems?: string[] };
@@ -68,10 +69,7 @@ export async function checkEntry(userId: string, form: RecordForm, opts: { base?
   // open record may wait for them (Hyoje, 8 Nov), and End now refuses until they are there.
   if (doc.activity?.name) {
     const acts = await ActivityMaster.find({ userId }).select('name category groups').lean() as any[];
-    for (const label of missingRequired(doc, acts)) {
-      if (isOpen(doc)) warnings.push(`${label} is needed before it ends`);
-      else problems.push(`${label} is required for ${doc.activity.name}`);
-    }
+    for (const label of missingRequired(doc, acts)) problems.push(`${label} is required for ${doc.activity.name}`);
   }
 
   const kind = kindOf(doc, opts.now);
@@ -84,7 +82,10 @@ export async function checkEntry(userId: string, form: RecordForm, opts: { base?
   if (others.some(o => recordKey(o) === recordKey(doc))) {
     problems.push(kind === 'plan' ? 'Another plan has the same activity, title, start and end' : 'Another record has the same activity, title, start and end');
   }
-  return { doc, kind, problems: [...new Set(problems)], warnings };
+  // An open record may wait for what it lacks (drafts.ts); ending it needs everything.
+  const tight = tightenOnEnd(opts.base, doc, [...new Set(problems)], warnings);
+  const relaxed = relaxOpen(doc, tight.problems, tight.warnings);
+  return { doc, kind, problems: relaxed.problems, warnings: relaxed.warnings };
 }
 
 // ── New ──────────────────────────────────────────────────────────────────────
@@ -170,15 +171,27 @@ async function happen(userId: string, plan: any, doc: any, doneBy: 'confirmed' |
 
 const CHANGED = 'This plan was changed since you opened it. Reload and try again.';
 
-/** Started / Done as planned: a record with the plan's own times. */
-export async function confirmPlan(userId: string, id: string, updatedAt: string) {
+/**
+ * A plan happens (Hyoje, 9 Nov):
+ *   'now'    Start now — a record starting now, open (End now later); its planned end is
+ *            kept on the plan, so In progress can show "planned until …"
+ *   'onTime' Started on time — the same, starting at the planned start
+ *   'done'   Done as planned — a record with the plan's own times
+ */
+export async function confirmPlan(userId: string, id: string, updatedAt: string, how: 'now' | 'onTime' | 'done' = 'done', now?: { date: string; hour: string; timezone: string }) {
   const p = await loadPlan(userId, id);
   if (!p) return fail(404, 'This plan no longer exists.');
   if (p.plan?.state !== 'open') return fail(409, p.plan?.state === 'done' ? 'This plan is already a record.' : 'This plan was deleted.');
   if (iso(p.updatedAt) !== updatedAt) return fail(409, CHANGED);
-  if (kindOf(p) === 'plan') return fail(409, 'This plan has not started yet.');
+  const form = fromRecord(p);
+  if (how === 'now') {
+    if (!now?.date || !now?.hour) return fail(400, 'Send now: { date, hour, timezone }.');
+    form.start = { date: now.date, hour: now.hour, timezone: now.timezone || form.start.timezone };
+  }
+  if (how !== 'done') form.end = { date: '', hour: '', timezone: '' };
+  if (how !== 'now' && kindOf(p) === 'plan') return fail(409, 'This plan has not started yet: use Start now.');
   // The lists may have changed since it was planned (a rename, a merge): check again.
-  const c = await checkEntry(userId, fromRecord(p), { base: p, selfId: String(p._id) });
+  const c = await checkEntry(userId, form, { base: p, selfId: String(p._id), now: how === 'now' ? Number.MAX_SAFE_INTEGER : undefined });
   if (c.problems.length) return fail(422, 'Not saved: adjust it first.', c.problems);
   try {
     const recordId = await happen(userId, p, c.doc, 'confirmed');
