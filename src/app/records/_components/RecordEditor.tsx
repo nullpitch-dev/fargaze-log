@@ -205,6 +205,8 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
   const [laterOpen, setLaterOpen] = useState(false);
   // Planned end (Hyoje, 10 Nov): shown read-only ("Planned until 12:00 ✎ ×") until ✎.
   const [plannedOpen, setPlannedOpen] = useState(false);
+  // What it was when ✎ opened it: ↶ puts it back and closes (Hyoje, 10 Nov).
+  const [plannedSnap, setPlannedSnap] = useState<RecordForm['plannedEnd'] | null>(null);
   const [bowelMore, setBowelMore] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const ingredientCache = useRef(new Map<string, string[]>());
@@ -668,6 +670,8 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
   const setPoint = (which: 'start' | 'end' | 'plannedEnd', p: Partial<RecordForm['start']>) =>
     patch(which, which !== 'start' && !f[which].timezone && f.start.timezone && (p.date || p.hour) ? { ...p, timezone: f.start.timezone } : p);
   const clearPlanned = () => { patch('plannedEnd', { date: '', hour: '', timezone: '' }); setPlannedOpen(false); };
+  const openPlanned = () => { setPlannedSnap({ ...f.plannedEnd }); setPlannedOpen(true); };
+  const cancelPlanned = () => { if (plannedSnap) patch('plannedEnd', plannedSnap); setPlannedOpen(false); };
   const point = (which: 'start' | 'end' | 'plannedEnd') => {
     const p = f[which];
     const wd = weekdayText(p.date);
@@ -676,9 +680,15 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
         <div className="flex items-center gap-2">
           <span className="text-xs text-stone-500 dark:text-zinc-400">{which === 'start' ? 'Start' : which === 'end' ? 'End' : 'Planned end'}{wd ? ` · ${wd.slice(0, 3)}` : ''}</span>
           <span className="flex-1" />
-          {which === 'plannedEnd'
-            ? (p.date || p.hour) && <button type="button" className={addBtn} onClick={clearPlanned} aria-label="Remove the planned end">×</button>
-            : nowLater(which)}
+          {which === 'plannedEnd' ? (
+            <span className="flex items-center gap-1.5">
+              {!planning && plannedOpen && <>
+                <button type="button" className={addBtn} onClick={() => setPlannedOpen(false)} aria-label="Done: keep the planned end" title="Done">✓</button>
+                <button type="button" className={addBtn} onClick={cancelPlanned} aria-label="Cancel: put the planned end back" title="Cancel">↶</button>
+              </>}
+              {(p.date || p.hour) && <button type="button" className={addBtn} onClick={clearPlanned} aria-label="Remove the planned end" title="Remove">×</button>}
+            </span>
+          ) : nowLater(which)}
         </div>
         {/* date and time get the room; the zone box shows its code (GMT) on a narrow phone */}
         <div className="grid grid-cols-[minmax(0,125fr)_minmax(0,88fr)_minmax(0,60fr)] sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)] gap-1.5">
@@ -849,11 +859,11 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
             {!planning && (plannedOpen ? point('plannedEnd') : f.plannedEnd.date || f.plannedEnd.hour ? (
               <div className="flex items-center gap-2 text-sm text-stone-600 dark:text-zinc-300">
                 <span>Planned until {f.plannedEnd.date && f.plannedEnd.date !== f.start.date ? `${weekdayText(f.plannedEnd.date)?.slice(0, 3) ?? ''} ${f.plannedEnd.date.slice(8).replace(/^0/, '')} ` : ''}{f.plannedEnd.hour}</span>
-                <button type="button" className={addBtn} onClick={() => setPlannedOpen(true)} aria-label="Change the planned end">✎</button>
+                <button type="button" className={addBtn} onClick={openPlanned} aria-label="Change the planned end">✎</button>
                 <button type="button" className={addBtn} onClick={clearPlanned} aria-label="Remove the planned end">×</button>
               </div>
             ) : entryMode && !f.end.hour && (
-              <div><button type="button" className={addBtn} onClick={() => setPlannedOpen(true)}>+ Planned end</button></div>
+              <div><button type="button" className={addBtn} onClick={openPlanned}>+ Planned end</button></div>
             ))}
             <p className="text-xs text-stone-400 dark:text-zinc-500">{planning
               ? 'A plan: the planned end is when it should end. End is set when it happens.'
