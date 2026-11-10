@@ -46,7 +46,7 @@ function NewEntry() {
         let f: RecordForm;
         if (stamp) { f = { ...blankForm(), start: stamp.start, end: stamp.end }; if (live) setStampNote(stamp.note ?? ''); }
         else if (preset) f = presetForm(preset, now);
-        else if (copy?.form) f = copyForm(copy.form, now, (date, hour) => zoneCodeFor(iana, date, hour, rules.zones ?? []));
+        else if (copy?.form) f = copyForm(copy.form, now, (date, hour) => zoneCodeFor(iana, date, hour, rules.zones ?? []), params.get('from') === 'plan');
         else f = { ...blankForm(), start: now };
         if (!f.activity.crossActivity) f.activity = { ...f.activity, crossActivity: DEFAULT_CROSS };
         if (live) setInitial(f);

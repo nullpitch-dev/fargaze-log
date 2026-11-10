@@ -1,7 +1,7 @@
 // Forms for the entry app (#71). Pure: the phone builds them too.
 
 import type { RecordForm } from '../records/form';
-import { addMinutes } from './time';
+import { addDays, addMinutes, daysBetween } from './time';
 
 export type PresetTime = { kind: 'open' | 'moment' | 'length'; minutes: number | null };
 export interface FormPointValue { date: string; hour: string; timezone: string }
@@ -56,12 +56,18 @@ export function presetForm(p: { form: any; time: PresetTime }, now: FormPointVal
 /** Copy recent (Hyoje, 8–10 Nov): the record's fields, today at the source's time of day
  *  (Now on the form for something happening now; ESOL 수업 keeps its 9:30), still open (no
  *  end). Amounts are kept — Reset on a card clears them; a foreign amount is re-priced at
- *  the Exchange rates list's rate by the form. `zoneAt` gives the zone code for a time today. */
-export function copyForm(src: RecordForm, now: FormPointValue, zoneAt?: (date: string, hour: string) => string | null): RecordForm {
+ *  the Exchange rates list's rate by the form. `zoneAt` gives the zone code for a time today.
+ *  `keepEnd`: a plan copied from Coming up keeps its planned end, moved to today with the
+ *  start (Hyoje, 10 Nov) — a plan's end is part of the plan; a record's end was a measurement. */
+export function copyForm(src: RecordForm, now: FormPointValue, zoneAt?: (date: string, hour: string) => string | null, keepEnd = false): RecordForm {
   const f: RecordForm = JSON.parse(JSON.stringify(src));
   const hour = src.start.hour || '';
   f.start = { date: now.date, hour, timezone: (hour && zoneAt?.(now.date, hour)) || now.timezone };
   f.end = { date: '', hour: '', timezone: '' };
+  if (keepEnd && src.end.hour && src.start.date) {
+    const date = addDays(now.date, daysBetween(src.start.date, src.end.date || src.start.date));
+    f.end = { date, hour: src.end.hour, timezone: zoneAt?.(date, src.end.hour) || src.end.timezone || f.start.timezone };
+  }
   return f;
 }
 

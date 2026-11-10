@@ -4,13 +4,30 @@
 // narrow screen. Half a second's press opens a small menu at the foot of the screen; a
 // right-click does the same on a computer. The tap that ends a long press does nothing,
 // and the phone's own link menu is held back.
+// Chrome on Android also starts selecting the text (and offers Copy and a Google search,
+// Hyoje 10 Nov): CSS user-select alone doesn't always stop it, so a pressable element is
+// marked data-longpress and a selectstart inside one is refused; any selection that got
+// through is cleared when the menu opens.
 
 import { useCallback, useEffect, useRef } from 'react';
 
 const HOLD_MS = 500;
 const SLOP_PX = 10;   // a finger that moves more than this is scrolling, not pressing
 
+let guarded = false;
+function guardSelection() {
+  if (guarded || typeof document === 'undefined') return;
+  guarded = true;
+  document.addEventListener('selectstart', e => {
+    const t = e.target as Node | null;
+    const el = t && (t.nodeType === 1 ? (t as Element) : t.parentElement);
+    if (el?.closest('input, textarea')) return;   // a stamp's note box stays editable
+    if (el?.closest('[data-longpress]')) e.preventDefault();
+  });
+}
+
 export function useLongPress() {
+  useEffect(guardSelection, []);
   const timer = useRef<number | null>(null);
   const fired = useRef(false);
   const from = useRef<{ x: number; y: number } | null>(null);
@@ -22,6 +39,7 @@ export function useLongPress() {
       if (fired.current) return;
       fired.current = true;
       try { navigator.vibrate?.(15); } catch { /* not on every phone */ }
+      try { window.getSelection()?.removeAllRanges(); } catch { /* nothing selected */ }
       onLong();
     };
     return {
@@ -43,7 +61,8 @@ export function useLongPress() {
         e.preventDefault(); e.stopPropagation();
         fired.current = false;
       },
-      style: { WebkitTouchCallout: 'none' } as React.CSSProperties,
+      'data-longpress': '',
+      style: { WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' } as React.CSSProperties,
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
