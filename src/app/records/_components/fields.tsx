@@ -61,7 +61,7 @@ export function filterSuggestions(all: string[], text: string, max = 8): string[
   return others.length ? [...exact, ...others].slice(0, max) : [];
 }
 
-export function Text({ value, onChange, placeholder, suggest, describe, onPick, className = '', autoFocus, onEnter, onBlur, disabled }: {
+export function Text({ value, onChange, placeholder, suggest, describe, onPick, className = '', autoFocus, onEnter, onBlur, disabled, wideList }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
@@ -75,6 +75,9 @@ export function Text({ value, onChange, placeholder, suggest, describe, onPick, 
   onEnter?: () => void;
   onBlur?: () => void;
   disabled?: boolean;
+  /** The suggestions take the width of the nearest positioned parent (e.g. the whole
+   *  Activity : Title row, Hyoje 10 Nov) instead of the box's own. Default off. */
+  wideList?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [hi, setHi] = useState(-1);
@@ -82,7 +85,7 @@ export function Text({ value, onChange, placeholder, suggest, describe, onPick, 
   const items = useMemo(() => (open && suggest ? filterSuggestions(suggest, value) : []), [open, suggest, value]);
   const pick = (v: string) => { onChange(v); onPick?.(v); setOpen(false); setHi(-1); };
   return (
-    <div className={`relative min-w-0 ${className}`}>
+    <div className={`${wideList ? '' : 'relative '}min-w-0 ${className}`}>
       <input
         value={value}
         autoFocus={autoFocus}

@@ -836,9 +836,10 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
 
           <Section title="Activity">
             {/* Denser on the Fold 6 outer screen (Hyoje, 9 Nov): pairs share a row everywhere. */}
-            <div className="grid grid-cols-[minmax(0,3fr)_minmax(0,7fr)] gap-3">
+            {/* relative: the activity suggestions use the whole row, Title included (Hyoje, 10 Nov). */}
+            <div className="relative grid grid-cols-[minmax(0,3fr)_minmax(0,7fr)] gap-3">
               <Field label="Activity" note={f.activity.name.trim() ? (category ? category : 'Not in Activities') : undefined}>
-                <Text value={f.activity.name} onChange={v => patch('activity', { name: v })} suggest={lookups.activityNames} describe={v => lookups.actCat.get(v)} />
+                <Text value={f.activity.name} onChange={v => patch('activity', { name: v })} suggest={lookups.activityNames} describe={v => lookups.actCat.get(v)} wideList />
               </Field>
               <Field label="Title"><Text value={f.activity.title} onChange={v => patch('activity', { title: v })} /></Field>
             </div>
