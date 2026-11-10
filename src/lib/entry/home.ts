@@ -90,11 +90,6 @@ export async function home(userId: string, iana = 'Europe/London', now = Date.no
   const done = (ended as any[]).filter(r => !isOpenRec(r)).map(r => item(r))
     .sort((a, b) => key(b.end).localeCompare(key(a.end)));
 
-  // A new entry starts at the place of the latest thing today (ended, or started and still going).
-  const latestToday = [...done.map(d => ({ at: key(d.end), place: d.place })), ...inProgress.filter(i => i.start.date === today).map(i => ({ at: key(i.start), place: i.place }))]
-    .filter(x => x.place).sort((a, b) => b.at.localeCompare(a.at))[0];
-  const lastPlace = latestToday?.place ?? '';
-
   // Copy recent: the latest record of each activity + title, newest first.
   const seen = new Set<string>();
   const recent = (latest as any[]).filter(r => {
@@ -112,7 +107,6 @@ export async function home(userId: string, iana = 'Europe/London', now = Date.no
     inProgress,
     done,
     ongoing,
-    lastPlace,
     recent,
     presets: await listPresets(userId),
     refreshed,

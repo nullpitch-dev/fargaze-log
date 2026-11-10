@@ -12,12 +12,15 @@ export const addBtn = 'text-xs px-2 py-1 rounded border border-dashed border-sto
 
 // ── Layout ───────────────────────────────────────────────────────────────────
 
-export function Section({ title, onRemove, children }: { title: string; onRemove?: () => void; children: ReactNode }) {
+export function Section({ title, onRemove, onReset, children }: { title: string; onRemove?: () => void; onReset?: () => void; children: ReactNode }) {
   return (
     <section className="bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-700 rounded-lg p-4 shadow-sm">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-500 dark:text-zinc-400">{title}</h2>
-        {onRemove && <button type="button" onClick={onRemove} className={linkBtn} title="Empty this section and hide it">Remove</button>}
+        <span className="flex items-center gap-3">
+          {onReset && <button type="button" onClick={onReset} className={linkBtn} title="Clear what was measured or paid, keep the rest">Reset</button>}
+          {onRemove && <button type="button" onClick={onRemove} className={linkBtn} title="Empty this section and hide it">Remove</button>}
+        </span>
       </div>
       <div className="flex flex-col gap-3">{children}</div>
     </section>

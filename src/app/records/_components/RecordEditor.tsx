@@ -31,7 +31,7 @@ import { ChangeTable, type Line, type Plain } from './ChangeTable';
 import { relationshipOf } from '@/lib/records/relationship';
 import { rulesFor, type EntryGroup } from '@/lib/entry/groups';
 import { addMinutes, localNow, zoneCodeFor, type ZoneRow } from '@/lib/entry/time';
-import { resetValues } from '@/lib/entry/forms';
+import { RESETTABLE, resetSection, type ResettableSection } from '@/lib/entry/forms';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -523,6 +523,8 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied }: {
   const used = opts.used;
   const placeSuggest = entryMode && entryOpts ? [...entryOpts.labels, ...used.places.filter(x => !entryOpts.labels.includes(x))] : used.places;
   const removeBtn = (k: Optional) => (requiredSections.has(k) ? undefined : () => hide(k));
+  // Reset on each card of a copied record (Hyoje, 9 Nov): clears that card's amounts / scores.
+  const resetBtn = (k: ResettableSection) => (mode === 'new' && copied && RESETTABLE.includes(k) ? () => setForm(resetSection(f, k)) : undefined);
 
   // Whole meal: one amount for all the foods, shared evenly — as the sheet's 'A+B' with one
   // amount, which the migration divides (Hyoje, 7 Nov). Off when a record opens.
@@ -724,12 +726,6 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied }: {
         <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <h1 className="text-lg font-semibold text-stone-800 dark:text-zinc-100">{mode === 'new' ? 'New' : mode === 'plan' ? 'Plan' : 'Edit record'}</h1>
           {mode === 'edit' && <span className="text-xs text-stone-500 dark:text-zinc-400">Tab {rec.tab ?? '(none)'} · <span className="font-mono break-all">{rec.findRow}</span></span>}
-          {mode === 'new' && copied && (
-            <span className="flex items-center gap-2 mt-1">
-              <button type="button" className={`${secondary} whitespace-nowrap`} onClick={() => setForm(resetValues(f))}>Reset values</button>
-              <span className="text-xs text-stone-500 dark:text-zinc-400">Clears amounts, scores, body, sleep, bowel and notes from the copy.</span>
-            </span>
-          )}
           {mode === 'plan' && <span className="text-xs text-stone-500 dark:text-zinc-400">Change anything; a start that has passed makes it a record.</span>}
           {mode === 'plan' && (
             <span className="flex flex-wrap gap-2 mt-1">
@@ -818,7 +814,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied }: {
           )}
 
           {shown('cost') && (
-            <Section title={`Cost${req('cost')}`} onRemove={removeBtn('cost')}>
+            <Section title={`Cost${req('cost')}`} onRemove={removeBtn('cost')} onReset={resetBtn('cost')}>
               <Field label="Category">
                 <PickText value={f.cost.category || f.cost.categoryDetail ? `${f.cost.category}\u0000${f.cost.categoryDetail}` : ''}
                   onChange={v => { const [category = '', categoryDetail = ''] = v ? v.split('\u0000') : []; patch('cost', { category, categoryDetail }); }}
@@ -848,7 +844,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied }: {
           )}
 
           {shown('purchase') && (
-            <Section title={`Purchases${req('purchase')}`} onRemove={removeBtn('purchase')}>
+            <Section title={`Purchases${req('purchase')}`} onRemove={removeBtn('purchase')} onReset={resetBtn('purchase')}>
               <ItemList<FormItem> items={f.purchase} onChange={v => set('purchase', v)} blank={blankItem} addLabel="+ Add an item"
                 render={(x, setX) => (
                   <div className="grid grid-cols-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2">
@@ -861,7 +857,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied }: {
           )}
 
           {shown('food') && (
-            <Section title={`Food & drink${req('food')}`} onRemove={removeBtn('food')}>
+            <Section title={`Food & drink${req('food')}`} onRemove={removeBtn('food')} onReset={resetBtn('food')}>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <Field label="Type"><Select value={f.food.type} onChange={v => patch('food', { type: v })} options={ref('food.type')} /></Field>
                 <Field label="Carbs"><Select value={f.food.carbs} onChange={v => patch('food', { carbs: v })} options={ref('nutrient_level')} /></Field>
@@ -907,7 +903,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied }: {
           )}
 
           {shown('exercise') && (
-            <Section title={`Exercise${req('exercise')}`} onRemove={removeBtn('exercise')}>
+            <Section title={`Exercise${req('exercise')}`} onRemove={removeBtn('exercise')} onReset={resetBtn('exercise')}>
               <ItemList<FormExercise> items={f.exercise} onChange={v => set('exercise', v)} blank={blankExercise} addLabel="+ Add an exercise"
                 render={(x, setX) => (
                   <div className="grid grid-cols-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2">
@@ -922,7 +918,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied }: {
           )}
 
           {shown('body') && (
-            <Section title={`Body${req('body')}`} onRemove={removeBtn('body')}>
+            <Section title={`Body${req('body')}`} onRemove={removeBtn('body')} onReset={resetBtn('body')}>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {/* The scale gives weight, muscle mass and body fat %; body fat (kg) is
                     weight × % (Hyoje, 7 Nov). A saved value stays until weight or % change. */}
@@ -939,13 +935,13 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied }: {
           )}
 
           {shown('sleep') && (
-            <Section title={`Sleep${req('sleep')}`} onRemove={removeBtn('sleep')}>
+            <Section title={`Sleep${req('sleep')}`} onRemove={removeBtn('sleep')} onReset={resetBtn('sleep')}>
               <Field label="Quality"><Text value={f.sleep.quality} onChange={v => patch('sleep', { quality: v })} suggest={used.sleep} /></Field>
             </Section>
           )}
 
           {shown('bowel') && (
-            <Section title={`Bowel${req('bowel')}`} onRemove={removeBtn('bowel')}>
+            <Section title={`Bowel${req('bowel')}`} onRemove={removeBtn('bowel')} onReset={resetBtn('bowel')}>
               <div className="flex flex-col gap-1"><span className="text-xs text-stone-500 dark:text-zinc-400">Amount</span>
                 {/* pills like Quality, but one choice (a tap on the chosen one clears it) */}
                 <ToggleChips values={f.bowel.amount ? [f.bowel.amount] : []} options={opts.bowel.amount}
@@ -963,7 +959,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied }: {
           )}
 
           {shown('golf') && (
-            <Section title={`Golf${req('golf')}`} onRemove={removeBtn('golf')}>
+            <Section title={`Golf${req('golf')}`} onRemove={removeBtn('golf')} onReset={resetBtn('golf')}>
               <div className="grid grid-cols-3 gap-3">
                 <Field label="Score"><NumberBox value={f.golf.score} onChange={v => patch('golf', { score: v })} /></Field>
                 <Field label="Approach"><NumberBox value={f.golf.approach} onChange={v => patch('golf', { approach: v })} /></Field>
@@ -994,7 +990,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied }: {
           )}
 
           {shown('income') && (
-            <Section title={`Income${req('income')}`} onRemove={removeBtn('income')}>
+            <Section title={`Income${req('income')}`} onRemove={removeBtn('income')} onReset={resetBtn('income')}>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Before tax"><NumberBox value={f.income.gross} onChange={v => patch('income', { gross: v })} suffix="₩" /></Field>
                 <Field label="After tax"><NumberBox value={f.income.net} onChange={v => patch('income', { net: v })} suffix="₩" /></Field>
@@ -1011,7 +1007,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied }: {
             </div>
           )}
 
-          <Section title="Notes">
+          <Section title="Notes" onReset={resetBtn('notes')}>
             <textarea value={f.notes} onChange={e => set('notes', e.target.value)} rows={3} className={`${inputCls} resize-y`} />
           </Section>
 

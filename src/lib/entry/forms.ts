@@ -71,20 +71,20 @@ export function newEntryId(): string {
   return secs + [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** Reset values (Copy recent, Hyoje 9 Nov): keeps what the record is (activity, title,
- *  place, people, journey, item names) and clears what was measured or paid that time —
- *  amounts, scores, body, sleep, bowel, income, notes. */
-export function resetValues(f: RecordForm): RecordForm {
+/** Reset on a card of a copied record (Hyoje, 9 Nov): keeps what the record is (items,
+ *  units, categories, names) and clears what was measured or paid that time. */
+export type ResettableSection = 'cost' | 'purchase' | 'food' | 'exercise' | 'body' | 'sleep' | 'bowel' | 'golf' | 'income' | 'notes';
+export const RESETTABLE: ResettableSection[] = ['cost', 'purchase', 'food', 'exercise', 'body', 'sleep', 'bowel', 'golf', 'income', 'notes'];
+
+export function resetSection(f: RecordForm, k: ResettableSection): RecordForm {
   const blank = blankForm();
   const noAmount = <T extends { amount: any }>(xs: T[], empty: any) => xs.map(x => ({ ...x, amount: empty }));
-  return {
-    ...f,
-    activity: { ...f.activity, additionalInfo: '' },
-    cost: { ...f.cost, amountKRW: null, amountForeign: null },
-    purchase: noAmount(f.purchase, ''),
-    food: { ...f.food, drinks: noAmount(f.food.drinks, ''), foods: noAmount(f.food.foods, ''), alcohols: noAmount(f.food.alcohols, '') },
-    exercise: noAmount(f.exercise, null).map(x => ({ ...x, loadKg: null })),
-    body: blank.body, sleep: blank.sleep, bowel: blank.bowel, golf: blank.golf, income: blank.income,
-    notes: '',
-  };
+  switch (k) {
+    case 'cost': return { ...f, cost: { ...f.cost, amountKRW: null, amountForeign: null } };
+    case 'purchase': return { ...f, purchase: noAmount(f.purchase, '') };
+    case 'food': return { ...f, food: { ...f.food, drinks: noAmount(f.food.drinks, ''), foods: noAmount(f.food.foods, ''), alcohols: noAmount(f.food.alcohols, '') } };
+    case 'exercise': return { ...f, exercise: noAmount(f.exercise, null).map(x => ({ ...x, loadKg: null })) };
+    case 'notes': return { ...f, notes: '' };
+    default: return { ...f, [k]: blank[k] };
+  }
 }

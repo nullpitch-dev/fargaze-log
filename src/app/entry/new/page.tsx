@@ -3,9 +3,9 @@
 // /entry/new — a new record or plan (#71 step 2, Design §15.7). The #70 form in 'new' mode.
 //   ?preset=<id>  filled from a preset (its time: open / a moment / a usual length)
 //   ?copy=<id>    filled from a record (Copy recent): its fields, starting now, same length
-//   ?place=…      the last place used today (the home screen passes it)
 // Start = now in the phone's zone (the list's code for that zone and day: GMT or BST);
-// Cross activity = 평시 unless the preset or the copied record says otherwise.
+// Cross activity = 평시 unless the preset or the copied record says otherwise; Place starts
+// empty unless the preset or the copied record has one (Hyoje, 9 Nov).
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -42,8 +42,6 @@ function NewEntry() {
         else if (copy?.form) f = copyForm(copy.form, now);
         else f = { ...blankForm(), start: now };
         if (!f.activity.crossActivity) f.activity = { ...f.activity, crossActivity: DEFAULT_CROSS };
-        const place = params.get('place');
-        if (place && !f.location.activity && !copy) f.location = { ...f.location, activity: place };
         if (live) setInitial(f);
       } catch (e: any) {
         if (live) setError(String(e.message ?? e));
