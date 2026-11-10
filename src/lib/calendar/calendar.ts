@@ -165,7 +165,11 @@ export const PLAN_PROJECTION = {
 /** Open plans as events: drawn from start to the planned end (an older plan: its end). */
 export function buildPlanEvents(plans: any[], r: CalendarRange, nowMs: number, filters: EventFilters = {}): CalendarEvent[] {
   const docs = plans.map(p => (p.plannedEnd?.year ? { ...p, end: p.plannedEnd } : p));
-  return buildCalendarEvents(docs, r, nowMs, filters).events.map(e => ({ ...e, plan: true }));
+  const today = zonedDate(nowMs, r.tz);
+  // Overdue: still open after its start (an all-day one: from the day after).
+  return buildCalendarEvents(docs, r, nowMs, filters).events.map(e => ({
+    ...e, plan: true, overdue: e.kind === 'allDay' ? e.startDate < today : !e.future,
+  }));
 }
 
 /** Still going, as Home's In progress / Ongoing say: no end, or a start time without an end time. */
@@ -240,6 +244,8 @@ export interface CalendarEvent {
   /** An open plan from log_plan (#71, Hyoje 10 Nov): drawn to its planned end, striped;
    *  opens the plan in the entry app. */
   plan?: boolean;
+  /** An open plan whose start has passed: still to confirm (red ring and "!" on the calendar). */
+  overdue?: boolean;
   /** A record still going, drawn to its planned end or to now (Hyoje, 10 Nov): the end isn't real
    *  yet, so it is striped like a plan until End is set. */
   untilPlanned?: boolean;

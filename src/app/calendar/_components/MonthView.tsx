@@ -19,11 +19,18 @@ import React, { useEffect, useRef, useState } from 'react';
 import type { CalendarEvent } from '@/lib/calendar/calendar';
 import { type Placed, type ReadingCell, labelOf, layoutWeek, isoWeek } from '../_lib/month-layout';
 import {
-  colorFor, textOn,
+  colorFor, textOn, lookOf, isOverdue, tintOf, inkOf, OVERDUE,
   READING_TINT_LIGHT, READING_TINT_DARK, READING_INK_LIGHT, READING_INK_DARK,
 } from '../_lib/calendar-colors';
 
 const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+/** Columns of a row of dates up to and including today: 0 = all future, dates.length = all past. */
+export function nowColOf(dates: string[], today: string): number {
+  if (!dates.length || today < dates[0]) return 0;
+  if (today > dates[dates.length - 1]) return dates.length;
+  return dates.indexOf(today) + 1;
+}
 
 export interface MonthMetrics { headerH: number; readingH: number; laneH: number; maxLanes: number }
 export const METRICS_WIDE:    MonthMetrics = { headerH: 24, readingH: 18, laneH: 18, maxLanes: 6 };
@@ -149,7 +156,7 @@ export function MonthView({
 
             {w.bars.map(p => (
               <Bar key={`b-${p.event.id}`} p={p} top={laneTop(p.lane)} height={w.laneH}
-                color={colorFor(p.event.category, colors)} compact={compact}
+                color={colorFor(p.event.category, colors)} compact={compact} isDark={isDark} nowCol={nowColOf(w.dates, today)}
                 onClick={() => onOpenEvent(p.event)} onTouchDay={col => onOpenDay(w.dates[col])} />
             ))}
 
@@ -187,12 +194,21 @@ export function isTouch(e: React.MouseEvent): boolean {
   return typeof window !== 'undefined' && !!window.matchMedia?.('(hover: none)').matches;
 }
 
-export function Bar({ p, top, height, color, compact, onClick, onTouchDay, cols = 7 }: {
+export function Bar({ p, top, height, color, compact, onClick, onTouchDay, cols = 7, isDark, nowCol }: {
   p: Placed; top: number; height: number; color: string; compact: boolean; onClick: () => void; cols?: number;
   /** Month view: a touch opens the day under the finger (its column) instead. */
   onTouchDay?: (col: number) => void;
+  isDark: boolean;
+  /** Columns of this row up to and including today (0 = the row is all future, cols = all past). */
+  nowCol: number;
 }) {
   const span = p.endCol - p.startCol + 1;
+  const e = p.event;
+  const look = lookOf(e);
+  const tint = tintOf(color, isDark);
+  // A record still going: tinted up to today, dashed after it.
+  const frac = look === 'going' ? Math.min(1, Math.max(0, (nowCol - p.startCol) / span)) : 1;
+  const r = `${p.continuesBefore ? 0 : 3}px ${p.continuesAfter ? 0 : 3}px ${p.continuesAfter ? 0 : 3}px ${p.continuesBefore ? 0 : 3}px`;
   return (
     <div onClick={e => {
       e.stopPropagation();
@@ -208,13 +224,18 @@ export function Bar({ p, top, height, color, compact, onClick, onTouchDay, cols 
         left: `calc(${(p.startCol / cols) * 100}% + ${p.continuesBefore ? 0 : 2}px)`,
         width: `calc(${(span / cols) * 100}% - ${(p.continuesBefore ? 0 : 2) + (p.continuesAfter ? 0 : 3)}px)`,
         top: top + 1, height: height - 2, lineHeight: `${height - 2}px`,
-        background: color, color: textOn(color), opacity: p.event.future ? 0.55 : 1,
-        // A plan (#71): striped and in italics.
-        ...(p.event.plan || p.event.untilPlanned ? { backgroundImage: 'repeating-linear-gradient(135deg, rgba(255,255,255,.38) 0 3px, transparent 3px 7px)' } : {}),
-        ...(p.event.plan ? { fontStyle: 'italic' } : {}),   // stripes: the end isn't real yet; italics: a plan
-        borderRadius: `${p.continuesBefore ? 0 : 3}px ${p.continuesAfter ? 0 : 3}px ${p.continuesAfter ? 0 : 3}px ${p.continuesBefore ? 0 : 3}px`,
+        // Past, now and plans (calendar-colors.ts): records tinted, plans solid.
+        background: look === 'plan' ? color : frac < 1 ? `linear-gradient(to right, ${tint} ${frac * 100}%, transparent ${frac * 100}%)` : tint,
+        color: look === 'plan' ? textOn(color) : inkOf(isDark),
+        ...(look !== 'plan' && !p.continuesBefore ? { borderLeft: `3px solid ${color}` } : {}),
+        ...(isOverdue(e) ? { boxShadow: `0 0 0 1.5px ${OVERDUE}` } : {}),
+        borderRadius: r,
       }}>
-      {p.continuesBefore ? '‹ ' : ''}{labelOf(p.event)}
+      {frac < 1 && (
+        <span aria-hidden className="absolute inset-y-0 right-0 pointer-events-none"
+          style={{ left: `${frac * 100}%`, border: `1.5px dashed ${color}`, ...(frac > 0 ? { borderLeft: 'none' } : {}), borderRadius: frac > 0 ? `0 ${p.continuesAfter ? 0 : 3}px ${p.continuesAfter ? 0 : 3}px 0` : r }} />
+      )}
+      <span className="relative">{p.continuesBefore ? '‹ ' : ''}{isOverdue(e) ? '! ' : ''}{labelOf(e)}</span>
     </div>
   );
 }
@@ -223,20 +244,26 @@ function Chip({ p, top, height, color, compact, time, showTime, onClick, onTouch
   p: Placed; top: number; height: number; color: string; compact: boolean; time: string; showTime: boolean;
   onClick: () => void; onTouchDay?: () => void;
 }) {
+  // A record: dot and text, as Google does. A plan: the solid colour (#71, Hyoje 10 Nov);
+  // still to confirm: a red ring and "!". Still going: a hollow dot.
+  const look = lookOf(p.event);
+  const plan = look === 'plan';
   return (
     <div onClick={e => { e.stopPropagation(); if (onTouchDay && isTouch(e)) onTouchDay(); else onClick(); }}
       title={`${time} ${labelOf(p.event)}`}
-      className={`absolute cursor-pointer flex items-center gap-1 rounded-sm hover:bg-stone-100 dark:hover:bg-zinc-800 text-stone-700 dark:text-zinc-200 ${
+      className={`absolute cursor-pointer flex items-center gap-1 rounded-sm ${plan ? '' : 'hover:bg-stone-100 dark:hover:bg-zinc-800 text-stone-700 dark:text-zinc-200'} ${
         compact ? 'text-[11px] px-0.5' : 'text-[11px] px-1.5'}`}
       style={{
-        left: `${(p.startCol / 7) * 100}%`, width: `${100 / 7}%`, top, height,
-        opacity: p.event.future ? 0.55 : 1, fontStyle: p.event.plan ? 'italic' : undefined,
+        left: `calc(${(p.startCol / 7) * 100}% + ${plan ? 1 : 0}px)`, width: `calc(${100 / 7}% - ${plan ? 3 : 0}px)`,
+        top: top + (plan ? 1 : 0), height: height - (plan ? 2 : 0),
+        ...(plan ? { background: color, color: textOn(color) } : {}),
+        ...(isOverdue(p.event) ? { boxShadow: `0 0 0 1.5px ${OVERDUE}` } : {}),
       }}>
-      {compact
+      {!plan && (compact
         ? <span className="shrink-0 self-stretch my-[3px] rounded-full" style={{ width: 2, background: color }} />
-        : <span className="shrink-0 rounded-full" style={{ width: 7, height: 7, background: color }} />}
-      {showTime && <span className="shrink-0 tabular-nums text-stone-400 dark:text-zinc-500">{time}</span>}
-      <span className="truncate">{labelOf(p.event)}</span>
+        : <span className="shrink-0 rounded-full" style={look === 'going' ? { width: 7, height: 7, border: `1.5px solid ${color}` } : { width: 7, height: 7, background: color }} />)}
+      {showTime && <span className={`shrink-0 tabular-nums ${plan ? 'opacity-80' : 'text-stone-400 dark:text-zinc-500'}`}>{time}</span>}
+      <span className="truncate">{isOverdue(p.event) ? '! ' : ''}{labelOf(p.event)}</span>
     </div>
   );
 }
@@ -336,15 +363,21 @@ export function DayList({ date, events, reading, tz, colors, isDark, onOpenEvent
         {barsFirst.length === 0 && !plain && <p className="text-xs text-stone-400 dark:text-zinc-500">Nothing recorded.</p>}
         {barsFirst.map(e => (
           <button key={e.id} onClick={() => onOpenEvent(e)}
-            className="flex items-start gap-2 text-xs text-left rounded px-1 -mx-1 py-1 hover:bg-stone-100 dark:hover:bg-zinc-800"
-            style={{ opacity: e.future ? 0.55 : 1 }}>
-            <span className="shrink-0 rounded-full mt-[4px]" style={{ width: 8, height: 8, background: colorFor(e.category, colors) }} />
+            className="flex items-start gap-2 text-xs text-left rounded px-1 -mx-1 py-1 hover:bg-stone-100 dark:hover:bg-zinc-800">
+            {/* A plan: a square in its colour (red ring: still to confirm); still going: hollow. */}
+            <span className={`shrink-0 mt-[4px] ${e.plan ? 'rounded-[2px]' : 'rounded-full'}`} style={{
+              width: 8, height: 8,
+              ...(e.untilPlanned && !e.plan ? { border: `1.5px solid ${colorFor(e.category, colors)}` } : { background: colorFor(e.category, colors) }),
+              ...(isOverdue(e) ? { boxShadow: `0 0 0 1.5px ${OVERDUE}` } : {}),
+            }} />
             <span className="shrink-0 w-[60px] tabular-nums text-[11px] leading-tight text-stone-500 dark:text-zinc-400">
               <span className="block">{whenOf(e)[0]}</span>
               {whenOf(e)[1] && <span className="block">{whenOf(e)[1]}</span>}
             </span>
             <span className="flex-1 min-w-0">
-              <span className="block text-[13px] leading-tight text-stone-800 dark:text-zinc-100 break-words">{labelOf(e)}</span>
+              <span className="block text-[13px] leading-tight text-stone-800 dark:text-zinc-100 break-words">{labelOf(e)}{e.plan
+                ? <span className={`ml-1.5 text-[10px] ${isOverdue(e) ? 'text-red-500' : 'text-stone-400 dark:text-zinc-500'}`}>{isOverdue(e) ? '! to confirm' : 'plan'}</span>
+                : e.untilPlanned ? <span className="ml-1.5 text-[10px] text-stone-400 dark:text-zinc-500">going</span> : null}</span>
               {e.title && e.name && <span className="block text-[10px] text-stone-400 dark:text-zinc-500">{e.name}</span>}
             </span>
           </button>

@@ -53,6 +53,30 @@ export function textOn(hex: string): string {
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.62 ? '#1c1917' : '#ffffff';
 }
 
+// ── Past, now and plans (#71, Hyoje 10 Nov) ──────────────────────────────────
+// Records are quiet: a light tint of the category colour with a coloured left edge
+// and plain text. Plans stand out: the solid colour. A record still going is tinted
+// up to now and dashed from now to its planned end. A plan whose start has passed
+// but that is still open gets a red ring and "!". No stripes, no italics, no fading.
+
+export type Look = 'record' | 'plan' | 'going';
+export const lookOf = (e: { plan?: boolean; untilPlanned?: boolean }): Look =>
+  e.plan ? 'plan' : e.untilPlanned ? 'going' : 'record';
+/** An open plan whose start has passed: still to confirm. */
+export const isOverdue = (e: { plan?: boolean; overdue?: boolean }) => !!e.plan && !!e.overdue;
+export const OVERDUE = '#ef4444';   // red-500, the now line's red
+
+/** `a` mixed into `b`; `t` = share of `a`. Opaque, so grid lines don't show through. */
+export function mixHex(a: string, b: string, t: number): string {
+  const ch = (h: string, i: number) => parseInt(h.replace('#', '').slice(i, i + 2), 16);
+  const out = [0, 2, 4].map(i => Math.round(ch(a, i) * t + ch(b, i) * (1 - t)).toString(16).padStart(2, '0'));
+  return `#${out.join('')}`;
+}
+/** The record tint of a category colour on the light or dark background. */
+export const tintOf = (hex: string, isDark: boolean) => mixHex(hex, isDark ? '#18181b' : '#ffffff', isDark ? 0.4 : 0.22);
+/** Text on a tint. */
+export const inkOf = (isDark: boolean) => (isDark ? '#f4f4f5' : '#1c1917');
+
 /** The Reading & study row. */
 export const READING_TINT_LIGHT = '#ccfbf1';   // teal-100
 export const READING_TINT_DARK  = '#134e4a';   // teal-900

@@ -19,8 +19,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { CalendarEvent } from '@/lib/calendar/calendar';
 import { layoutWeek, labelOf, isBar, isoWeek } from '../_lib/month-layout';
 import { layoutDay, nowMinutes, type Piece } from '../_lib/time-layout';
-import { colorFor, textOn } from '../_lib/calendar-colors';
-import { Bar, ReadingRow } from './MonthView';
+import { colorFor, textOn, lookOf, isOverdue, tintOf, inkOf, OVERDUE } from '../_lib/calendar-colors';
+import { Bar, ReadingRow, nowColOf } from './MonthView';
 
 const STRIP_LANES = 3;
 const BOTTOM_GAP = 16;
@@ -148,7 +148,7 @@ export function TimeGridView({
           )}
           {strip.bars.map(p => (
             <Bar key={p.event.id} p={p} cols={n} top={1 + readingH + p.lane * m.laneH} height={m.laneH}
-              color={colorFor(p.event.category, colors)} compact={compact} onClick={() => onOpenEvent(p.event)} />
+              color={colorFor(p.event.category, colors)} compact={compact} isDark={isDark} nowCol={nowColOf(dates, today)} onClick={() => onOpenEvent(p.event)} />
           ))}
           {strip.more.map((k, c) => k > 0 && (
             <button key={c} onClick={() => onOpenDay(dates[c])}
@@ -181,7 +181,7 @@ export function TimeGridView({
             {dates.map((d, i) => (
               <DayColumn key={d} pieces={days[i]} m={m} colors={colors} isDark={isDark} compact={compact}
                 narrow={n > 1} time={time} last={i === n - 1} onOpenEvent={onOpenEvent}
-                nowMin={d === today ? nowMinutes(nowMs, d, tz) : null} />
+                nowMin={d === today ? nowMinutes(nowMs, d, tz) : null} when={d < today ? 'past' : d > today ? 'future' : 'today'} />
             ))}
           </div>
         </div>
@@ -190,9 +190,10 @@ export function TimeGridView({
   );
 }
 
-function DayColumn({ pieces, m, colors, isDark, compact, narrow, time, last, nowMin, onOpenEvent }: {
+function DayColumn({ pieces, m, colors, isDark, compact, narrow, time, last, nowMin, when, onOpenEvent }: {
   pieces: Piece[]; m: Metrics; colors: Record<string, string>; isDark: boolean; compact: boolean;
   narrow: boolean; time: Intl.DateTimeFormat; last: boolean; nowMin: number | null;
+  when: 'past' | 'today' | 'future';
   onOpenEvent: (e: CalendarEvent) => void;
 }) {
   const px = (min: number) => (min / 60) * m.hourH;
@@ -207,6 +208,12 @@ function DayColumn({ pieces, m, colors, isDark, compact, narrow, time, last, now
           ? (e.end && e.end !== e.start ? `${time.format(new Date(e.start))} – ${time.format(new Date(e.end))}` : time.format(new Date(e.start)))
           : '';
         const twoLines = !compact && h >= 30;
+        // Past, now and plans (calendar-colors.ts): records tinted, plans solid, a record
+        // still going tinted up to now and dashed after it.
+        const look = lookOf(e);
+        const tint = tintOf(color, isDark);
+        const frac = look !== 'going' || when === 'past' ? 1 : when === 'future' ? 0
+          : nowMin === null ? 1 : Math.min(1, Math.max(0, (nowMin - p.top) / Math.max(1, p.bottom - p.top)));
         return (
           <div key={e.id} onClick={() => onOpenEvent(e)}
             title={`${range} ${labelOf(e)}`}
@@ -214,22 +221,26 @@ function DayColumn({ pieces, m, colors, isDark, compact, narrow, time, last, now
             style={{
               top: px(p.top) + 0.5, height: Math.max(h - 1, compact ? 15 : 8),
               left: `calc(${(p.col / p.cols) * 100}% + 1px)`, width: `calc(${(p.span / p.cols) * 100}% - 3px)`,
-              background: color, color: textOn(color), opacity: e.future ? 0.55 : 1,
-              ...(e.plan || e.untilPlanned ? { backgroundImage: 'repeating-linear-gradient(135deg, rgba(255,255,255,.38) 0 3px, transparent 3px 7px)' } : {}),
-        ...(e.plan ? { fontStyle: 'italic' } : {}),   // stripes: the end isn't real yet; italics: a plan
-              boxShadow: `0 0 0 1px ${edge}`,
+              background: look === 'plan' ? color : frac < 1 ? `linear-gradient(to bottom, ${tint} ${frac * 100}%, transparent ${frac * 100}%)` : tint,
+              color: look === 'plan' ? textOn(color) : inkOf(isDark),
+              ...(look !== 'plan' ? { borderLeft: `3px solid ${color}` } : {}),
+              boxShadow: isOverdue(e) ? `0 0 0 1px ${edge}, 0 0 0 2.5px ${OVERDUE}` : `0 0 0 1px ${edge}`,
               borderTopLeftRadius: p.continuesBefore ? 0 : undefined, borderTopRightRadius: p.continuesBefore ? 0 : undefined,
               borderBottomLeftRadius: p.continuesAfter ? 0 : undefined, borderBottomRightRadius: p.continuesAfter ? 0 : undefined,
             }}>
+            {frac < 1 && (
+              <span aria-hidden className="absolute left-0 right-0 bottom-0 pointer-events-none"
+                style={{ top: `${frac * 100}%`, border: `1.5px dashed ${color}`, borderLeft: 'none', ...(frac > 0 ? { borderTop: 'none' } : {}) }} />
+            )}
             {twoLines ? (
               <>
-                <div className="truncate font-medium pt-0.5">{labelOf(e)}</div>
+                <div className="truncate font-medium pt-0.5">{isOverdue(e) ? '! ' : ''}{labelOf(e)}</div>
                 <div className="truncate opacity-80 tabular-nums">{range}</div>
               </>
             ) : (
               <div className="truncate" style={{ lineHeight: `${Math.max(h - 1, compact ? 15 : 8)}px` }}>
                 {!compact && !narrow && <span className="opacity-80 tabular-nums mr-1">{e.start ? time.format(new Date(e.start)) : ''}</span>}
-                {labelOf(e)}
+                {isOverdue(e) ? '! ' : ''}{labelOf(e)}
               </div>
             )}
           </div>
