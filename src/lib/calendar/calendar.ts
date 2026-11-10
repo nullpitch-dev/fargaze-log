@@ -148,6 +148,27 @@ export const CANDIDATE_PROJECTION = {
   'end.hour': 1, 'end.timezone': 1, 'end.timezoneOffset': 1,
 };
 
+/** Plans: the same fields, with the planned end (a plan has no end). */
+export const PLAN_PROJECTION = {
+  ...CANDIDATE_PROJECTION,
+  'plannedEnd.datetime': 1, 'plannedEnd.year': 1, 'plannedEnd.month': 1, 'plannedEnd.day': 1,
+  'plannedEnd.hour': 1, 'plannedEnd.timezone': 1, 'plannedEnd.timezoneOffset': 1,
+};
+
+/** Open plans as events: drawn from start to the planned end (an older plan: its end). */
+export function buildPlanEvents(plans: any[], r: CalendarRange, nowMs: number, filters: EventFilters = {}): CalendarEvent[] {
+  const docs = plans.map(p => (p.plannedEnd?.year ? { ...p, end: p.plannedEnd } : p));
+  return buildCalendarEvents(docs, r, nowMs, filters).events.map(e => ({ ...e, plan: true }));
+}
+
+/** The order buildCalendarEvents gives, for a merged list. */
+export function sortEvents(events: CalendarEvent[]): CalendarEvent[] {
+  return events.sort((x, y) =>
+    x.startDate.localeCompare(y.startDate)
+    || (x.kind === 'allDay' ? 0 : 1) - (y.kind === 'allDay' ? 0 : 1)
+    || (x.start ?? '').localeCompare(y.start ?? ''));
+}
+
 // ── Events ──────────────────────────────────────────────────────────────────
 
 export type EventKind = 'timed' | 'point' | 'allDay';
@@ -165,6 +186,9 @@ export interface CalendarEvent {
   endDate:   string;         // display date it ends on, inclusive
   logged: { start: string; end: string | null };   // as entered, e.g. "2021-07-05 07:30 KST"
   future: boolean;
+  /** An open plan from log_plan (#71, Hyoje 10 Nov): drawn to its planned end, striped;
+   *  opens the plan in the entry app. */
+  plan?: boolean;
 }
 
 export interface CalendarDiagnostics {

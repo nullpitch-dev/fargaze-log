@@ -209,6 +209,8 @@ export function Bar({ p, top, height, color, compact, onClick, onTouchDay, cols 
         width: `calc(${(span / cols) * 100}% - ${(p.continuesBefore ? 0 : 2) + (p.continuesAfter ? 0 : 3)}px)`,
         top: top + 1, height: height - 2, lineHeight: `${height - 2}px`,
         background: color, color: textOn(color), opacity: p.event.future ? 0.55 : 1,
+        // A plan (#71): striped and in italics.
+        ...(p.event.plan ? { backgroundImage: 'repeating-linear-gradient(135deg, rgba(255,255,255,.38) 0 3px, transparent 3px 7px)', fontStyle: 'italic' } : {}),
         borderRadius: `${p.continuesBefore ? 0 : 3}px ${p.continuesAfter ? 0 : 3}px ${p.continuesAfter ? 0 : 3}px ${p.continuesBefore ? 0 : 3}px`,
       }}>
       {p.continuesBefore ? '‹ ' : ''}{labelOf(p.event)}
@@ -227,7 +229,7 @@ function Chip({ p, top, height, color, compact, time, showTime, onClick, onTouch
         compact ? 'text-[11px] px-0.5' : 'text-[11px] px-1.5'}`}
       style={{
         left: `${(p.startCol / 7) * 100}%`, width: `${100 / 7}%`, top, height,
-        opacity: p.event.future ? 0.55 : 1,
+        opacity: p.event.future ? 0.55 : 1, fontStyle: p.event.plan ? 'italic' : undefined,
       }}>
       {compact
         ? <span className="shrink-0 self-stretch my-[3px] rounded-full" style={{ width: 2, background: color }} />

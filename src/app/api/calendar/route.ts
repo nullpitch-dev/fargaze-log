@@ -7,14 +7,17 @@
 // `from` / `to` are DISPLAY dates in `tz`, both inclusive. Returns every record
 // touching the range (events), or per-day counts (shape=days, for the Year
 // view). Logic lives in @/lib/calendar/calendar.
+// Open plans (log_plan, #71) are added to the events, marked plan: true; they are not
+// counted in the Year view.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import connectDB from '@/lib/mongodb';
 import Log from '@/models/Log';
+import LogPlan from '@/models/LogPlan';
 import {
   isValidZone, daySpan, resolveRange, candidateFilter, CANDIDATE_PROJECTION,
-  buildCalendarEvents, countByDay, MAX_RANGE_DAYS,
+  buildCalendarEvents, countByDay, MAX_RANGE_DAYS, PLAN_PROJECTION, buildPlanEvents, sortEvents,
 } from '@/lib/calendar/calendar';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -43,12 +46,13 @@ export async function GET(req: NextRequest) {
 
   const range = resolveRange(from, to, tz);
   const docs  = await Log.find(candidateFilter(userId, range), CANDIDATE_PROJECTION).lean();
-  const { events, diagnostics } = buildCalendarEvents(docs, range, Date.now(), {
+  const filters = {
     excludeCategories: list(sp.get('excludeCategories')),
     crossActivities:   list(sp.get('crossActivities')),
     excludeCrossActivities: list(sp.get('excludeCrossActivities')),
     excludeNames:      list(sp.get('excludeNames')),
-  });
+  };
+  const { events, diagnostics } = buildCalendarEvents(docs, range, Date.now(), filters);
 
   const head = {
     range: { from, to, tz, start: new Date(range.startMs).toISOString(), end: new Date(range.endMs).toISOString() },
@@ -58,5 +62,7 @@ export async function GET(req: NextRequest) {
   if (sp.get('shape') === 'days') {
     return NextResponse.json({ ...head, days: countByDay(events, range), diagnostics });
   }
-  return NextResponse.json({ ...head, diagnostics, events });
+  const plans = await LogPlan.find({ ...candidateFilter(userId, range), 'plan.state': 'open' }, PLAN_PROJECTION).lean();
+  const all = sortEvents([...events, ...buildPlanEvents(plans, range, Date.now(), filters)]);
+  return NextResponse.json({ ...head, total: all.length, diagnostics, events: all });
 }

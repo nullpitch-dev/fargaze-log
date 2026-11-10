@@ -215,6 +215,7 @@ function DayColumn({ pieces, m, colors, isDark, compact, narrow, time, last, now
               top: px(p.top) + 0.5, height: Math.max(h - 1, compact ? 15 : 8),
               left: `calc(${(p.col / p.cols) * 100}% + 1px)`, width: `calc(${(p.span / p.cols) * 100}% - 3px)`,
               background: color, color: textOn(color), opacity: e.future ? 0.55 : 1,
+              ...(e.plan ? { backgroundImage: 'repeating-linear-gradient(135deg, rgba(255,255,255,.38) 0 3px, transparent 3px 7px)', fontStyle: 'italic' } : {}),
               boxShadow: `0 0 0 1px ${edge}`,
               borderTopLeftRadius: p.continuesBefore ? 0 : undefined, borderTopRightRadius: p.continuesBefore ? 0 : undefined,
               borderBottomLeftRadius: p.continuesAfter ? 0 : undefined, borderBottomRightRadius: p.continuesAfter ? 0 : undefined,
