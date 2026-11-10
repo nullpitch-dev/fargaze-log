@@ -14,16 +14,28 @@ import { useCallback, useEffect, useRef } from 'react';
 const HOLD_MS = 500;
 const SLOP_PX = 10;   // a finger that moves more than this is scrolling, not pressing
 
+// Hyoje (10 Nov, again): the menu slides up under the finger that is still down, and the
+// phone's own long press then lands on the menu's title and selects it. So from a press
+// until a moment after it, every selectstart and contextmenu on the page is refused
+// (quietUntil), wherever it lands; text boxes stay editable.
+const QUIET_MS = 1500;
+let quietUntil = 0;
 let guarded = false;
+const elOf = (t: EventTarget | null) => {
+  const n = t as Node | null;
+  return n && (n.nodeType === 1 ? (n as Element) : n.parentElement);
+};
 function guardSelection() {
   if (guarded || typeof document === 'undefined') return;
   guarded = true;
   document.addEventListener('selectstart', e => {
-    const t = e.target as Node | null;
-    const el = t && (t.nodeType === 1 ? (t as Element) : t.parentElement);
+    const el = elOf(e.target);
     if (el?.closest('input, textarea')) return;   // a stamp's note box stays editable
-    if (el?.closest('[data-longpress]')) e.preventDefault();
+    if (Date.now() < quietUntil || el?.closest('[data-longpress]')) e.preventDefault();
   });
+  document.addEventListener('contextmenu', e => {
+    if (Date.now() < quietUntil && !elOf(e.target)?.closest('input, textarea')) e.preventDefault();
+  }, true);
 }
 
 export function useLongPress() {
@@ -39,6 +51,7 @@ export function useLongPress() {
       if (fired.current) return;
       fired.current = true;
       try { navigator.vibrate?.(15); } catch { /* not on every phone */ }
+      quietUntil = Date.now() + QUIET_MS;
       try { window.getSelection()?.removeAllRanges(); } catch { /* nothing selected */ }
       onLong();
     };
@@ -47,12 +60,13 @@ export function useLongPress() {
         fired.current = false;
         if (e.pointerType === 'mouse' && e.button !== 0) return;
         from.current = { x: e.clientX, y: e.clientY };
+        if (e.pointerType !== 'mouse') quietUntil = Date.now() + HOLD_MS + QUIET_MS;
         timer.current = window.setTimeout(fire, HOLD_MS);
       },
       onPointerMove: (e: React.PointerEvent) => {
         if (from.current && Math.hypot(e.clientX - from.current.x, e.clientY - from.current.y) > SLOP_PX) cancel();
       },
-      onPointerUp: cancel,
+      onPointerUp: () => { if (!fired.current) quietUntil = 0; cancel(); },
       onPointerLeave: cancel,
       onPointerCancel: cancel,
       onContextMenu: (e: React.MouseEvent) => { e.preventDefault(); fire(); },
@@ -79,7 +93,9 @@ export function ActionSheet({ title, actions, onClose }: { title: string; action
   }, [onClose]);
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30" onClick={onClose}>
-      <div role="menu" aria-label={title} onClick={e => e.stopPropagation()}
+      <div role="menu" aria-label={title} onClick={e => e.stopPropagation()} data-longpress=""
+        onContextMenu={e => e.preventDefault()}
+        style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
         className="w-full max-w-md m-2 rounded-xl bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-700 shadow-xl overflow-hidden">
         <p className="px-4 pt-3 pb-2 text-xs text-stone-500 dark:text-zinc-400 truncate">{title}</p>
         {actions.map(a => (

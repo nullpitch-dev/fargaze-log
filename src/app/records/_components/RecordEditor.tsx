@@ -862,7 +862,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
                 <button type="button" className={addBtn} onClick={openPlanned} aria-label="Change the planned end">✎</button>
                 <button type="button" className={addBtn} onClick={clearPlanned} aria-label="Remove the planned end">×</button>
               </div>
-            ) : entryMode && !f.end.hour && (
+            ) : !f.end.hour && (entryMode || !f.end.date || !!f.start.hour) && (
               <div><button type="button" className={addBtn} onClick={openPlanned}>+ Planned end</button></div>
             ))}
             <p className="text-xs text-stone-400 dark:text-zinc-500">{planning

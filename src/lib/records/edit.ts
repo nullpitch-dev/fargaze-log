@@ -143,7 +143,7 @@ export async function previewEdit(userId: string, id: string, form: RecordForm) 
   const r = await prepare(userId, id, form);
   if (!r.ok) return r;
   const { problems, warnings, title, change } = r.p;
-  return { ok: true as const, problems, warnings, title, ...change, noSheet: appMade(r.p.base) };
+  return { ok: true as const, problems, warnings, title, ...change, noSheet: appMade(r.p.base) || !change.lines.length };
 }
 
 // ── Save ─────────────────────────────────────────────────────────────────────
@@ -159,7 +159,9 @@ export async function saveEdit(userId: string, id: string, form: RecordForm, upd
 
   const now = new Date();
   const saved = { ...doc, _id: base._id, ...(appMade(base) ? { origin: 'app' } : {}), createdAt: base.createdAt, updatedAt: now };
-  const noSheet = appMade(base);
+  // A sheet record whose only change is its planned end: the sheet has no planned end,
+  // so nothing to do there either (Hyoje, 10 Nov).
+  const noSheet = appMade(base) || !change.lines.length;
   const session = await mongoose.startSession();
   let changeId = '';
   try {

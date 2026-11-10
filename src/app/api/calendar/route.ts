@@ -47,8 +47,9 @@ export async function GET(req: NextRequest) {
   const range = resolveRange(from, to, tz);
   const days  = sp.get('shape') === 'days';
   // The Year view counts records as they are; the other views draw a record still going
-  // to its planned end (untilPlanned).
-  const docs  = await Log.find(candidateFilter(userId, range), days ? CANDIDATE_PROJECTION : PLAN_PROJECTION).lean();
+  // to its planned end, or to now once that has passed or when it has none (untilPlanned),
+  // however long ago it started.
+  const docs  = await Log.find(candidateFilter(userId, range, { going: !days }), days ? CANDIDATE_PROJECTION : PLAN_PROJECTION).lean();
   const filters = {
     excludeCategories: list(sp.get('excludeCategories')),
     crossActivities:   list(sp.get('crossActivities')),

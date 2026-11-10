@@ -121,13 +121,20 @@ export function resolveRange(from: string, to: string, tz: string): CalendarRang
  * loose; buildCalendarEvents makes the exact cut. Naive wall clocks sit up
  * to ±14 h from the true moment, hence the padding.
  */
-export function candidateFilter(userId: string, r: CalendarRange) {
+export function candidateFilter(userId: string, r: CalendarRange, opts: { going?: boolean } = {}) {
   const pad = 15 * HOUR;
   const fromYear = Number(r.from.slice(0, 4));
   const toYear   = Number(r.to.slice(0, 4));
+  // Records still going (#71, Hyoje 10 Nov): drawn up to now, however long ago they started.
+  const going = opts.going ? [
+    { allDay: true, 'end.year': null, 'start.year': { $lte: toYear } },
+    { allDay: { $ne: true }, 'start.datetime': { $lt: new Date(r.endMs + pad) },
+      $or: [{ 'end.year': null }, { 'start.hour': { $nin: [null, ''] }, 'end.hour': { $in: [null, ''] } }] },
+  ] : [];
   return {
     userId,
     $or: [
+      ...going,
       { 'start.datetime': {
           $lt:  new Date(r.endMs + pad),
           $gte: new Date(r.startMs - pad - MAX_TIMED_SPAN_DAYS * DAY),
@@ -161,20 +168,51 @@ export function buildPlanEvents(plans: any[], r: CalendarRange, nowMs: number, f
   return buildCalendarEvents(docs, r, nowMs, filters).events.map(e => ({ ...e, plan: true }));
 }
 
-/** The order buildCalendarEvents gives, for a merged list. */
-/** Records still going with a planned end: drawn to it (untilPlanned). The rest as they are. */
+/** Still going, as Home's In progress / Ongoing say: no end, or a start time without an end time. */
+export function isGoing(d: any): boolean {
+  return !d?.end?.year || (!d?.allDay && !!d?.start?.hour && !d?.end?.hour);
+}
+
+/** Where a record still going is drawn to: its planned end, or now once that has passed
+ *  (or when it has none). Null = nothing to stretch (it starts later than that). */
+function goingUntil(d: any, r: CalendarRange, nowMs: number): any | null {
+  const pe = d.plannedEnd;
+  if (d.allDay) {
+    const s = ymd(d.start?.year, d.start?.month, d.start?.day);
+    const today = zonedDate(nowMs, r.tz);
+    const planned = ymd(pe?.year, pe?.month, pe?.day);
+    const e = planned && planned > today ? planned : today;
+    if (!s || e <= s) return null;
+    const [y, m, dd] = e.split('-').map(Number);
+    return { year: y, month: m, day: dd };
+  }
+  const s = toInstant(d.start?.datetime, d.start?.timezoneOffset);
+  if (s === null) return null;
+  let planned: number | null = null;
+  if (pe?.datetime) planned = toInstant(pe.datetime, pe.timezoneOffset);
+  else if (pe?.year) planned = Date.UTC(pe.year, pe.month - 1, pe.day + 1) - (d.start?.timezoneOffset ?? 0) * HOUR;   // a date only: to the end of that day
+  const e = planned !== null && planned > nowMs ? planned : nowMs;
+  if (e <= s) return null;
+  return { datetime: new Date(e), timezoneOffset: 0 };
+}
+
+/** Records still going: drawn to their planned end, or to now (untilPlanned, striped).
+ *  The rest as they are. */
 export function buildRecordEvents(docs: any[], r: CalendarRange, nowMs: number, filters: EventFilters = {}) {
-  const going = new Set<string>();
+  const going = new Map<string, string | null>();   // id → its logged end, as entered
   const ready = docs.map(d => {
-    if (d.end?.year || !d.plannedEnd?.year) return d;
-    going.add(String(d._id));
-    return { ...d, end: d.plannedEnd };
+    if (!isGoing(d)) return d;
+    const until = goingUntil(d, r, nowMs);
+    if (!until) return d;
+    going.set(String(d._id), loggedLabel(d.end));
+    return { ...d, end: until };
   });
   const out = buildCalendarEvents(ready, r, nowMs, filters);
-  if (going.size) out.events = out.events.map(e => (going.has(e.id) ? { ...e, untilPlanned: true } : e));
+  if (going.size) out.events = out.events.map(e => (going.has(e.id) ? { ...e, untilPlanned: true, logged: { ...e.logged, end: going.get(e.id) ?? null } } : e));
   return out;
 }
 
+/** The order buildCalendarEvents gives, for a merged list. */
 export function sortEvents(events: CalendarEvent[]): CalendarEvent[] {
   return events.sort((x, y) =>
     x.startDate.localeCompare(y.startDate)
@@ -202,7 +240,7 @@ export interface CalendarEvent {
   /** An open plan from log_plan (#71, Hyoje 10 Nov): drawn to its planned end, striped;
    *  opens the plan in the entry app. */
   plan?: boolean;
-  /** A record still going, drawn to its planned end (Hyoje, 10 Nov): the end isn't real
+  /** A record still going, drawn to its planned end or to now (Hyoje, 10 Nov): the end isn't real
    *  yet, so it is striped like a plan until End is set. */
   untilPlanned?: boolean;
 }
