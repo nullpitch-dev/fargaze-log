@@ -27,7 +27,8 @@ const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export interface MonthMetrics { headerH: number; readingH: number; laneH: number; maxLanes: number }
 export const METRICS_WIDE:    MonthMetrics = { headerH: 24, readingH: 18, laneH: 18, maxLanes: 6 };
-export const METRICS_COMPACT: MonthMetrics = { headerH: 20, readingH: 15, laneH: 15, maxLanes: 4 };
+// Fold 6 cover screen (Hyoje, 10 Nov): bigger titles (11 px) on taller lanes.
+export const METRICS_COMPACT: MonthMetrics = { headerH: 20, readingH: 17, laneH: 17, maxLanes: 4 };
 const TIME_MIN_CELL = 110;   // px
 const MIN_LANES = 2;
 const DOW_H = 23;            // the Mon…Sun header strip, border included
@@ -83,9 +84,13 @@ export function MonthView({
   const rowH = avail > 0
     ? Math.max(minRow, Math.floor((avail - DOW_H - FRAME) / weekDates.length))
     : m.headerH + m.readingH + m.maxLanes * m.laneH + 4;          // before the first measure
+  // The lanes fill the whole row (Hyoje, 10 Nov: no empty strip at a day's foot): the
+  // lane count is rounded, and the lanes stretch or shrink a little to fit exactly.
   const weeks = weekDates.map((w, i) => {
-    const lanes = Math.max(MIN_LANES, Math.floor((rowH - m.headerH - (hasReading[i] ? m.readingH : 0) - 4) / m.laneH));
-    return layoutWeek(w, events, reading, lanes, showReading);
+    const free = rowH - m.headerH - (hasReading[i] ? m.readingH : 0) - 1;
+    const lanes = Math.max(MIN_LANES, Math.round(free / m.laneH));
+    const laneH = Math.min(m.laneH * 1.3, free / lanes);
+    return { ...layoutWeek(w, events, reading, lanes, showReading), laneH };
   });
   const time = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 
@@ -104,7 +109,7 @@ export function MonthView({
       {weeks.map((w, wi) => {
         const readingH = w.reading ? m.readingH : 0;
         const height = rowH;
-        const laneTop = (lane: number) => m.headerH + readingH + lane * m.laneH;
+        const laneTop = (lane: number) => m.headerH + readingH + lane * w.laneH;
         return (
           <div key={w.dates[0]} className={`flex ${wi < weeks.length - 1 ? 'border-b border-stone-200 dark:border-zinc-800' : ''}`}
             style={{ height }}>
@@ -143,13 +148,13 @@ export function MonthView({
             )}
 
             {w.bars.map(p => (
-              <Bar key={`b-${p.event.id}`} p={p} top={laneTop(p.lane)} height={m.laneH}
+              <Bar key={`b-${p.event.id}`} p={p} top={laneTop(p.lane)} height={w.laneH}
                 color={colorFor(p.event.category, colors)} compact={compact}
                 onClick={() => onOpenEvent(p.event)} />
             ))}
 
             {w.chips.map(p => (
-              <Chip key={`c-${p.event.id}`} p={p} top={laneTop(p.lane)} height={m.laneH}
+              <Chip key={`c-${p.event.id}`} p={p} top={laneTop(p.lane)} height={w.laneH}
                 color={colorFor(p.event.category, colors)} compact={compact}
                 time={p.event.start ? time.format(new Date(p.event.start)) : ''} showTime={showTime}
                 onClick={() => onOpenEvent(p.event)} />
@@ -158,8 +163,8 @@ export function MonthView({
             {w.more.map((n, c) => n > 0 && (
               <button key={`m-${c}`} onClick={() => onOpenDay(w.dates[c])}
                 className={`absolute text-left truncate font-medium text-stone-500 dark:text-zinc-400 hover:text-stone-900 dark:hover:text-zinc-100 ${
-                  compact ? 'text-[9px] px-0.5' : 'text-[11px] px-1.5'}`}
-                style={{ left: `${(c / 7) * 100}%`, width: `${100 / 7}%`, top: laneTop(w.moreLane), height: m.laneH, lineHeight: `${m.laneH}px` }}>
+                  compact ? 'text-[11px] px-0.5' : 'text-[11px] px-1.5'}`}
+                style={{ left: `${(c / 7) * 100}%`, width: `${100 / 7}%`, top: laneTop(w.moreLane), height: w.laneH, lineHeight: `${w.laneH}px` }}>
                 +{n}{compact ? '' : ' more'}
               </button>
             ))}
@@ -181,7 +186,7 @@ export function Bar({ p, top, height, color, compact, onClick, cols = 7 }: {
   return (
     <div onClick={e => { e.stopPropagation(); onClick(); }}
       title={labelOf(p.event)}
-      className={`absolute cursor-pointer truncate ${compact ? 'text-[9px] px-0.5' : 'text-[11px] px-1.5'}`}
+      className={`absolute cursor-pointer truncate ${compact ? 'text-[11px] px-0.5' : 'text-[11px] px-1.5'}`}
       style={{
         left: `calc(${(p.startCol / cols) * 100}% + ${p.continuesBefore ? 0 : 2}px)`,
         width: `calc(${(span / cols) * 100}% - ${(p.continuesBefore ? 0 : 2) + (p.continuesAfter ? 0 : 3)}px)`,
@@ -202,7 +207,7 @@ function Chip({ p, top, height, color, compact, time, showTime, onClick }: {
     <div onClick={e => { e.stopPropagation(); onClick(); }}
       title={`${time} ${labelOf(p.event)}`}
       className={`absolute cursor-pointer flex items-center gap-1 rounded-sm hover:bg-stone-100 dark:hover:bg-zinc-800 text-stone-700 dark:text-zinc-200 ${
-        compact ? 'text-[9px] px-0.5' : 'text-[11px] px-1.5'}`}
+        compact ? 'text-[11px] px-0.5' : 'text-[11px] px-1.5'}`}
       style={{
         left: `${(p.startCol / 7) * 100}%`, width: `${100 / 7}%`, top, height,
         opacity: p.event.future ? 0.55 : 1,
@@ -237,7 +242,7 @@ export function ReadingRow({ cells, dates, top, height, isDark, compact, onOpenD
         return (
           <div key={dates[i]} onClick={e => { e.stopPropagation(); onOpenDay(dates[i]); }}
             title={c.ongoing.map(labelOf).join('\n')}
-            className={`absolute cursor-pointer truncate flex items-center gap-1 ${compact ? 'text-[9px] px-0.5' : 'text-[10px] px-1.5'}`}
+            className={`absolute cursor-pointer truncate flex items-center gap-1 ${compact ? 'text-[11px] px-0.5' : 'text-[10px] px-1.5'}`}
             style={{
               left: `${(i / cols) * 100}%`, width: `${100 / cols}%`, top, height: height - 1,
               background: tint, color: ink,

@@ -39,7 +39,7 @@ function NewEntry() {
         const preset = presets?.presets?.find((p: any) => p.id === presetId);
         let f: RecordForm;
         if (preset) f = presetForm(preset, now);
-        else if (copy?.form) f = copyForm(copy.form, now);
+        else if (copy?.form) f = copyForm(copy.form, now, (date, hour) => zoneCodeFor(iana, date, hour, rules.zones ?? []));
         else f = { ...blankForm(), start: now };
         if (!f.activity.crossActivity) f.activity = { ...f.activity, crossActivity: DEFAULT_CROSS };
         if (live) setInitial(f);

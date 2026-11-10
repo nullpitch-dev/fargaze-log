@@ -29,6 +29,7 @@ function item(d: any, extra: Record<string, unknown> = {}) {
     start: { date: dateOf(d.start), hour: d.start?.hour ?? '', timezone: d.start?.timezone ?? '' },
     end: { date: dateOf(d.end), hour: d.end?.hour ?? '', timezone: d.end?.timezone ?? '' },
     place: d.location?.activity ?? '',
+    seconds: typeof d.duration?.totalSeconds === 'number' ? d.duration.totalSeconds : null,
     updatedAt: iso(d.updatedAt),
     ...extra,
   };
@@ -64,7 +65,7 @@ export async function home(userId: string, iana = 'Europe/London', now = Date.no
       .sort({ 'start.datetime': -1 }).limit(200).lean(),
     Log.find({ userId, 'end.year': y, 'end.month': m, 'end.day': d }).sort({ 'end.datetime': 1 }).lean(),
     Log.find({ userId, 'start.datetime': { $ne: null } }).sort({ 'start.datetime': -1 }).limit(300)
-      .select('activity start end location updatedAt').lean(),
+      .select('activity start end location duration updatedAt').lean(),
   ]);
 
   // Planned ends of records started from a plan.
@@ -120,7 +121,7 @@ export async function searchRecent(userId: string, q: string) {
   if (!text) return { ok: true as const, recent: [] };
   const re = new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
   const rows = await Log.find({ userId, $or: [{ 'activity.name': re }, { 'activity.title': re }] })
-    .sort({ 'start.datetime': -1 }).limit(500).select('activity start end location updatedAt').lean() as any[];
+    .sort({ 'start.datetime': -1 }).limit(500).select('activity start end location duration updatedAt').lean() as any[];
   const seen = new Set<string>();
   const recent = rows.filter(r => {
     const k = `${r.activity?.name}\u0001${r.activity?.title ?? ''}`;

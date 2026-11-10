@@ -53,13 +53,15 @@ export function presetForm(p: { form: any; time: PresetTime }, now: FormPointVal
   return f;
 }
 
-/** Copy recent (Hyoje, 8 Nov): the record's fields, starting now and still open (no end);
- *  the cost amounts blank, so a foreign amount takes the Exchange rates list's rate. */
-export function copyForm(src: RecordForm, now: FormPointValue): RecordForm {
+/** Copy recent (Hyoje, 8–10 Nov): the record's fields, today at the source's time of day
+ *  (Now on the form for something happening now; ESOL 수업 keeps its 9:30), still open (no
+ *  end). Amounts are kept — Reset on a card clears them; a foreign amount is re-priced at
+ *  the Exchange rates list's rate by the form. `zoneAt` gives the zone code for a time today. */
+export function copyForm(src: RecordForm, now: FormPointValue, zoneAt?: (date: string, hour: string) => string | null): RecordForm {
   const f: RecordForm = JSON.parse(JSON.stringify(src));
-  f.start = { ...now };
+  const hour = src.start.hour || '';
+  f.start = { date: now.date, hour, timezone: (hour && zoneAt?.(now.date, hour)) || now.timezone };
   f.end = { date: '', hour: '', timezone: '' };
-  f.cost = { ...f.cost, amountKRW: null, amountForeign: null };
   return f;
 }
 

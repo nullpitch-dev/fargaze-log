@@ -40,6 +40,8 @@ interface Check { problems: string[]; warnings: string[]; tab: string; findRow: 
 export type EditorMode = 'edit' | 'new' | 'plan';
 interface EntryOptions { groups: EntryGroup[]; activities: { name: string; category: string; groups?: { required?: string[]; shown?: string[] } }[]; labels: string[]; zones: ZoneRow[] }
 
+/** Presets are deferred (Hyoje, 10 Nov): Copy recent covers the need for now. */
+const PRESETS_ON = false;
 /** Bowel values kept out of sight until asked for (Hyoje, 9 Nov). */
 const BOWEL_FOLDED = ['길에서', '바지에'];
 /** Minutes between two form points, or null. */
@@ -203,6 +205,8 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied }: {
   const [laterOpen, setLaterOpen] = useState(false);
   const [bowelMore, setBowelMore] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
+  const ingredientCache = useRef(new Map<string, string[]>());
+  const repriced = useRef(false);
   const [presetBox, setPresetBox] = useState<null | { name: string; kind: 'open' | 'moment' | 'length'; minutes: string; error: string; saved: boolean }>(null);
   const [rec, setRec] = useState<Loaded | null>(null);
   const [opts, setOpts] = useState<FormOptions | null>(null);
@@ -304,6 +308,56 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied }: {
     document.addEventListener('click', onClick, true);
     return () => { window.removeEventListener('beforeunload', onUnload); document.removeEventListener('click', onClick, true); };
   }, [changed]);
+
+  // Copy recent: a foreign amount is priced at the Exchange rates list's rate (Hyoje, 8 Nov).
+  useEffect(() => {
+    if (repriced.current || mode !== 'new' || !copied || !form || !opts) return;
+    repriced.current = true;
+    const c = form.cost;
+    const r = opts.rates.find(x => x.currency === c.currency)?.rateKRW;
+    if (c.currency && typeof c.amountForeign === 'number' && typeof r === 'number') {
+      setForm({ ...form, cost: { ...c, amountKRW: Math.round(c.amountForeign * r) } });
+    }
+  }, [mode, copied, form, opts]);
+
+  // A food or drink typed in full: its ingredients from the latest record with it, while empty (Hyoje, 10 Nov).
+  const foodNames = form ? JSON.stringify([form.food.foods.map(x => [x.item, x.ingredients.length]), form.food.drinks.map(x => [x.item, x.ingredients.length])]) : '';
+  useEffect(() => {
+    if (!form || !opts) return;
+    const known = { foods: new Set(opts.used.foodItems), drinks: new Set(opts.used.drinkItems) };
+    const wanted: { kind: 'foods' | 'drinks'; i: number; item: string }[] = [];
+    for (const kind of ['foods', 'drinks'] as const) {
+      form.food[kind].forEach((x, i) => { const it = x.item.trim(); if (it && !x.ingredients.length && known[kind].has(it)) wanted.push({ kind, i, item: it }); });
+    }
+    if (!wanted.length) return;
+    let live = true;
+    const t = setTimeout(async () => {
+      const found: { kind: 'foods' | 'drinks'; i: number; item: string; ingredients: string[] }[] = [];
+      for (const w of wanted) {
+        const key = `${w.kind}\u0001${w.item}`;
+        let ing = ingredientCache.current.get(key);
+        if (!ing) {
+          const r = await fetch(`/api/entry/ingredients?${new URLSearchParams({ kind: w.kind, item: w.item })}`);
+          const b = await r.json().catch(() => ({}));
+          ing = Array.isArray(b.ingredients) ? b.ingredients : [];
+          ingredientCache.current.set(key, ing!);
+        }
+        if (ing!.length) found.push({ ...w, ingredients: ing! });
+      }
+      if (!live || !found.length) return;
+      setForm(cur => {
+        if (!cur) return cur;
+        const food = { ...cur.food, foods: [...cur.food.foods], drinks: [...cur.food.drinks] };
+        for (const x of found) {
+          const row = food[x.kind][x.i];
+          if (row && row.item.trim() === x.item && !row.ingredients.length) food[x.kind][x.i] = { ...row, ingredients: x.ingredients };
+        }
+        return { ...cur, food };
+      });
+    }, 500);
+    return () => { live = false; clearTimeout(t); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [foodNames, opts]);
 
   const goBack = useCallback(() => {
     if (changed && !window.confirm('Leave without saving? Your changes will be lost.')) return;
@@ -548,7 +602,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied }: {
   // Cost: the rate for a foreign amount.
   const latestRate = (cur: string) => opts.rates.find(r => r.currency === cur)?.rateKRW ?? null;
   const saved = rec.form.cost;
-  const impliedRate = saved.currency && Number(saved.amountForeign) > 0 && Number(saved.amountKRW) > 0
+  const impliedRate = !entryMode && saved.currency && Number(saved.amountForeign) > 0 && Number(saved.amountKRW) > 0
     ? Math.round((Number(saved.amountKRW) / Number(saved.amountForeign)) * 100) / 100 : null;
   const rate: any = rateOverride !== undefined ? rateOverride
     : (f.cost.currency === saved.currency && impliedRate != null ? impliedRate : latestRate(f.cost.currency));
@@ -1011,7 +1065,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied }: {
             <textarea value={f.notes} onChange={e => set('notes', e.target.value)} rows={3} className={`${inputCls} resize-y`} />
           </Section>
 
-          {mode === 'new' && (
+          {mode === 'new' && PRESETS_ON && (
             <div className="flex flex-col gap-2">
               {!presetBox ? (
                 <div><button type="button" className={addBtn} onClick={() => setPresetBox({ name: f.activity.title.trim() || f.activity.name.trim(), kind: f.end.date ? 'length' : 'open', minutes: '', error: '', saved: false })}>Save as preset…</button></div>

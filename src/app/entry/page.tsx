@@ -13,9 +13,10 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { localNow, zoneCodeFor, type ZoneRow } from '@/lib/entry/time';
+import { DetailPanel, formatDuration, type LogEntry } from '@/app/_components/LogDetailPanel';
 
 interface Point { date: string; hour: string; timezone: string }
-interface Item { id: string; activity: string; category: string; title: string; start: Point; end: Point; place: string; updatedAt: string; repeat?: boolean; started?: boolean; plannedEnd?: { date: string; hour: string } | null }
+interface Item { id: string; activity: string; category: string; title: string; start: Point; end: Point; place: string; updatedAt: string; seconds?: number | null; repeat?: boolean; started?: boolean; plannedEnd?: { date: string; hour: string } | null }
 interface Preset { id: string; name: string; order: number; time: { kind: 'open' | 'moment' | 'length'; minutes: number | null } }
 interface Home { today: string; comingUp: Item[]; inProgress: Item[]; done: Item[]; ongoing: Item[]; recent: Item[]; presets: Preset[] }
 interface Toast { text: string; undo?: () => Promise<string | null> }
@@ -26,6 +27,9 @@ const secondary = `${btn} border-stone-300 text-stone-700 hover:bg-stone-50 dark
 const small = 'px-2 py-1 rounded text-xs border border-stone-300 text-stone-700 hover:bg-stone-50 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800 disabled:opacity-40';
 const heading = 'text-xs font-semibold uppercase tracking-widest text-stone-500 dark:text-zinc-400';
 const card = 'bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-700 rounded-lg';
+
+/** Presets are deferred (Hyoje, 10 Nov): Copy recent covers the need for now. */
+const PRESETS_ON = false;
 
 const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MO = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -66,6 +70,14 @@ function EntryHome() {
   const [copyQ, setCopyQ] = useState('');
   const [editPresets, setEditPresets] = useState(false);
   const [found, setFound] = useState<Item[] | null>(null);
+  const [pane, setPane] = useState<LogEntry | null>(null);
+
+  /** Done: a tap opens the record pane (Edit is in it), like the Calendar (Hyoje, 10 Nov). */
+  async function openPane(id: string) {
+    const r = await fetch(`/api/records/${id}?view=1`, { cache: 'no-store' });
+    const b = await r.json().catch(() => ({}));
+    if (r.ok && b.entry) setPane(b.entry); else setToast({ text: b.error ?? 'Could not open the record' });
+  }
   const iana = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London', []);
 
   const load = useCallback(async () => {
@@ -185,10 +197,12 @@ function EntryHome() {
   const newHref = (extra: Record<string, string> = {}) => `/entry/new?${new URLSearchParams(extra)}`;
   const recent = copyQ.trim() ? (found ?? data.recent.filter(r => name(r).toLowerCase().includes(copyQ.trim().toLowerCase()))) : data.recent;
 
-  const row = (it: Item, right: React.ReactNode, href?: string, sub?: string) => (
+  const row = (it: Item, right: React.ReactNode, href?: string | (() => void), sub?: string) => (
     <li key={it.id} className="flex items-start gap-3 px-3 py-2.5 border-t first:border-t-0 border-stone-100 dark:border-zinc-800">
       <div className="flex-1 min-w-0">
-        {href
+        {typeof href === 'function'
+          ? <button type="button" onClick={href} className="block w-full text-left text-sm text-stone-800 dark:text-zinc-100 hover:underline truncate">{name(it)}</button>
+          : href
           ? <Link href={href} className="block text-sm text-stone-800 dark:text-zinc-100 hover:underline truncate">{name(it)}</Link>
           : <span className="block text-sm text-stone-800 dark:text-zinc-100 truncate">{name(it)}</span>}
         <span className="block text-xs text-stone-500 dark:text-zinc-400 truncate">{sub ?? when(it, today)}{it.place ? ` · ${it.place}` : ''}</span>
@@ -204,12 +218,12 @@ function EntryHome() {
         <section className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <h1 className="text-lg font-semibold text-stone-800 dark:text-zinc-100">Entry</h1>
-            {data.presets.length > 0 && (
+            {PRESETS_ON && data.presets.length > 0 && (
               <button onClick={() => setEditPresets(v => !v)} className="text-xs text-stone-500 dark:text-zinc-400 underline">{editPresets ? 'Done' : 'Edit presets'}</button>
             )}
           </div>
           <div className="flex flex-wrap gap-2">
-            {data.presets.map((p, i) => editPresets ? (
+            {PRESETS_ON && data.presets.map((p, i) => editPresets ? (
               <span key={p.id} className="inline-flex items-center gap-1 rounded-full border border-stone-300 dark:border-zinc-600 pl-3 pr-1 py-0.5 text-sm text-stone-700 dark:text-zinc-200">
                 {p.name}
                 <button aria-label={`Move ${p.name} left`} onClick={() => movePreset(i, -1)} disabled={i === 0} className="px-1 text-stone-400 disabled:opacity-30">←</button>
@@ -226,7 +240,6 @@ function EntryHome() {
             <Link href={newHref()} className={primary}>+ New</Link>
             <button onClick={() => setCopyOpen(v => !v)} className={secondary} aria-expanded={copyOpen}>Copy recent</button>
           </div>
-          {data.presets.length === 0 && <p className="text-xs text-stone-400 dark:text-zinc-500">No presets yet: make one with “Save as preset…” at the bottom of the New form.</p>}
           {copyOpen && (
             <div className={`${card} p-2 flex flex-col gap-2`}>
               <input value={copyQ} onChange={e => setCopyQ(e.target.value)} placeholder="Search all records" autoFocus
@@ -266,7 +279,9 @@ function EntryHome() {
         <section className="flex flex-col gap-2">
           <h2 className={heading}>Done</h2>
           {data.done.length > 0
-            ? <ul className={card}>{data.done.map(it => row(it, null, `/records/${it.id}`, when(it, today, it.start.date !== today)))}</ul>
+            ? <ul className={card}>{data.done.map(it => row(it,
+                it.seconds ? <span className="shrink-0 pt-0.5 text-xs tabular-nums text-stone-500 dark:text-zinc-400">{formatDuration(it.seconds)}</span> : null,
+                () => openPane(it.id), when(it, today, it.start.date !== today)))}</ul>
             : <p className="text-sm text-stone-500 dark:text-zinc-400">Nothing finished yet today.</p>}
         </section>
 
@@ -283,6 +298,8 @@ function EntryHome() {
           </details>
         )}
       </div>
+
+      {pane && <DetailPanel entry={pane} onClose={() => setPane(null)} />}
 
       {toast && (
         <div role="status" className="fixed bottom-4 inset-x-4 z-50 mx-auto max-w-md rounded-lg bg-stone-800 dark:bg-zinc-100 text-white dark:text-zinc-900 px-4 py-3 text-sm flex items-center gap-3 shadow-lg">

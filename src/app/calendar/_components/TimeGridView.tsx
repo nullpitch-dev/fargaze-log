@@ -29,7 +29,8 @@ const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 interface Metrics { hourH: number; gutter: number; laneH: number; readingH: number }
 const WIDE:    Metrics = { hourH: 48, gutter: 52, laneH: 18, readingH: 18 };
-const COMPACT: Metrics = { hourH: 40, gutter: 30, laneH: 15, readingH: 15 };
+// Fold 6 cover screen (Hyoje, 10 Nov): bigger titles (11 px), taller all-day lanes and short events.
+const COMPACT: Metrics = { hourH: 40, gutter: 30, laneH: 17, readingH: 17 };
 
 export function TimeGridView({
   dates, events, reading, showReading, today, tz, colors, isDark, compact,
@@ -151,7 +152,7 @@ export function TimeGridView({
           ))}
           {strip.more.map((k, c) => k > 0 && (
             <button key={c} onClick={() => onOpenDay(dates[c])}
-              className={`absolute text-left truncate font-medium text-stone-500 dark:text-zinc-400 hover:text-stone-900 dark:hover:text-zinc-100 ${compact ? 'text-[9px] px-0.5' : 'text-[11px] px-1.5'}`}
+              className={`absolute text-left truncate font-medium text-stone-500 dark:text-zinc-400 hover:text-stone-900 dark:hover:text-zinc-100 ${compact ? 'text-[11px] px-0.5' : 'text-[11px] px-1.5'}`}
               style={{ left: `${(c / n) * 100}%`, width: `${100 / n}%`, top: 1 + readingH + strip.moreLane * m.laneH, height: m.laneH, lineHeight: `${m.laneH}px` }}>
               +{k}{compact ? '' : ' more'}
             </button>
@@ -209,9 +210,9 @@ function DayColumn({ pieces, m, colors, isDark, compact, narrow, time, last, now
         return (
           <div key={e.id} onClick={() => onOpenEvent(e)}
             title={`${range} ${labelOf(e)}`}
-            className={`absolute cursor-pointer overflow-hidden rounded-[3px] leading-tight ${compact ? 'text-[9px] px-0.5' : narrow ? 'text-[10px] px-1' : 'text-[11px] px-1.5'}`}
+            className={`absolute cursor-pointer overflow-hidden rounded-[3px] leading-tight ${compact ? 'text-[11px] px-0.5' : narrow ? 'text-[10px] px-1' : 'text-[11px] px-1.5'}`}
             style={{
-              top: px(p.top) + 0.5, height: Math.max(h - 1, 8),
+              top: px(p.top) + 0.5, height: Math.max(h - 1, compact ? 15 : 8),
               left: `calc(${(p.col / p.cols) * 100}% + 1px)`, width: `calc(${(p.span / p.cols) * 100}% - 3px)`,
               background: color, color: textOn(color), opacity: e.future ? 0.55 : 1,
               boxShadow: `0 0 0 1px ${edge}`,
@@ -224,7 +225,7 @@ function DayColumn({ pieces, m, colors, isDark, compact, narrow, time, last, now
                 <div className="truncate opacity-80 tabular-nums">{range}</div>
               </>
             ) : (
-              <div className="truncate" style={{ lineHeight: `${Math.max(h - 1, 8)}px` }}>
+              <div className="truncate" style={{ lineHeight: `${Math.max(h - 1, compact ? 15 : 8)}px` }}>
                 {!compact && !narrow && <span className="opacity-80 tabular-nums mr-1">{e.start ? time.format(new Date(e.start)) : ''}</span>}
                 {labelOf(e)}
               </div>
