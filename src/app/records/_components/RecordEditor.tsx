@@ -198,7 +198,7 @@ const danger = `${btn} border-red-300 text-red-700 hover:bg-red-50 dark:border-r
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
-export function RecordEditor({ id, mode = 'edit', initial, presetId, copied }: { id: string; mode?: EditorMode; initial?: RecordForm; presetId?: string; copied?: boolean }) {
+export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, stampId }: { id: string; mode?: EditorMode; initial?: RecordForm; presetId?: string; copied?: boolean; stampId?: string }) {
   const router = useRouter();
   const entryMode = mode !== 'edit';
   const [entryOpts, setEntryOpts] = useState<EntryOptions | null>(null);
@@ -391,7 +391,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied }: {
     if (entryMode) {
       try {
         const r = mode === 'new'
-          ? await fetch('/api/entry/records', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: formJson({ id, form: fm, presetId }) })
+          ? await fetch('/api/entry/records', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: formJson({ id, form: fm, presetId, stampId }) })
           : await fetch(`/api/entry/plans/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: formJson({ form: fm, updatedAt: rec.updatedAt }) });
         const b = await r.json().catch(() => ({}));
         if (!r.ok) { setSaveError({ text: b.error ?? `HTTP ${r.status}`, problems: b.problems, conflict: r.status === 409 }); return; }

@@ -177,21 +177,25 @@ const CHANGED = 'This plan was changed since you opened it. Reload and try again
  *            kept on the plan, so In progress can show "planned until …"
  *   'onTime' Started on time — the same, starting at the planned start
  *   'done'   Done as planned — a record with the plan's own times
+ *   'nowDone' Done now — starts and ends now, for things with no length (paying a bill;
+ *            Hyoje, 10 Nov: a long press on Start now)
  */
-export async function confirmPlan(userId: string, id: string, updatedAt: string, how: 'now' | 'onTime' | 'done' = 'done', now?: { date: string; hour: string; timezone: string }) {
+export async function confirmPlan(userId: string, id: string, updatedAt: string, how: 'now' | 'onTime' | 'done' | 'nowDone' = 'done', now?: { date: string; hour: string; timezone: string }) {
   const p = await loadPlan(userId, id);
   if (!p) return fail(404, 'This plan no longer exists.');
   if (p.plan?.state !== 'open') return fail(409, p.plan?.state === 'done' ? 'This plan is already a record.' : 'This plan was deleted.');
   if (iso(p.updatedAt) !== updatedAt) return fail(409, CHANGED);
   const form = fromRecord(p);
-  if (how === 'now') {
+  const atNow = how === 'now' || how === 'nowDone';
+  if (atNow) {
     if (!now?.date || !now?.hour) return fail(400, 'Send now: { date, hour, timezone }.');
     form.start = { date: now.date, hour: now.hour, timezone: now.timezone || form.start.timezone };
   }
-  if (how !== 'done') form.end = { date: '', hour: '', timezone: '' };
-  if (how !== 'now' && kindOf(p) === 'plan') return fail(409, 'This plan has not started yet: use Start now.');
+  if (how === 'nowDone') form.end = { ...form.start };
+  else if (how !== 'done') form.end = { date: '', hour: '', timezone: '' };
+  if (!atNow && kindOf(p) === 'plan') return fail(409, 'This plan has not started yet: use Start now.');
   // The lists may have changed since it was planned (a rename, a merge): check again.
-  const c = await checkEntry(userId, form, { base: p, selfId: String(p._id), now: how === 'now' ? Number.MAX_SAFE_INTEGER : undefined });
+  const c = await checkEntry(userId, form, { base: p, selfId: String(p._id), now: atNow ? Number.MAX_SAFE_INTEGER : undefined });
   if (c.problems.length) return fail(422, 'Not saved: adjust it first.', c.problems);
   try {
     const recordId = await happen(userId, p, c.doc, 'confirmed');
@@ -272,8 +276,9 @@ export async function endRecord(userId: string, id: string, end: { date: string;
   const c = await checkEntry(userId, form, { base, selfId: String(base._id), now: Number.MAX_SAFE_INTEGER });
   if (c.problems.length) return fail(422, 'Can’t end it yet: open the record and fill this in.', c.problems);
   const now = new Date();
+  // Keep origin (Hyoje, 10 Nov: an ended app record asked for sheet steps on its next edit).
   const { _id: _i, createdAt: _c, ...fields } = c.doc;
-  const res = await Log.replaceOne({ _id: base._id, userId, updatedAt: base.updatedAt }, { ...fields, _id: base._id, createdAt: base.createdAt, updatedAt: now }, { timestamps: false } as any);
+  const res = await Log.replaceOne({ _id: base._id, userId, updatedAt: base.updatedAt }, { ...fields, _id: base._id, ...(base.origin ? { origin: base.origin } : {}), createdAt: base.createdAt, updatedAt: now }, { timestamps: false } as any);
   if (!res.matchedCount) return fail(409, 'This record was changed since. Reload and try again.');
   return { ok: true as const, updatedAt: now.toISOString() };
 }

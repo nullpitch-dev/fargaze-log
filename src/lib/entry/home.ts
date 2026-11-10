@@ -5,6 +5,7 @@
 //               they stay until End now (one made from a plan shows its planned end)
 //   Done        records that ended today, whenever they started
 //   Ongoing     open records started before today (books, trips …) — folded on the phone
+//   Stamps      times saved with one tap, waiting to become records (stamps.ts)
 //   Presets, Recent (Copy recent: the latest record of each activity + title among the
 //               last 300 records, about two weeks; typing searches all years — searchRecent)
 // Opening it first tops up the repeats and settles "count as done" plans (repeats.ts).
@@ -14,6 +15,7 @@ import Log from '../../models/Log';
 import LogPlan from '../../models/LogPlan';
 import { refresh } from './repeats';
 import { listPresets } from './presets';
+import { listStamps } from './stamps';
 import { addDays, instantOf, localNow } from './time';
 
 const COMING_DAYS = 7;
@@ -104,6 +106,7 @@ export async function home(userId: string, iana = 'Europe/London', now = Date.no
     ok: true as const,
     now: new Date(now).toISOString(),
     today,
+    stamps: await listStamps(userId),
     comingUp,
     inProgress,
     done,

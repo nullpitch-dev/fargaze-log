@@ -2,23 +2,29 @@
 
 // /entry — the entry app's home and the site's landing page (#71 step 2, Design §15.7;
 // layout by Hyoje, 9 Nov 2026).
-//   Presets · + New · Copy recent
+//   Presets · + New · Copy recent · Stamp
+//   Stamps       times saved with one tap (+ a short note), waiting to become records:
+//                End now; a tap opens New with its times; long press → Edit note / Delete
 //   Coming up    today's plans (and earlier ones) not started: Start now; a tap opens the plan
 //   In progress  open records started today, and last night's 수면: End now
 //   Done         records that ended today
 //   Ongoing      open records started before today: End now (folded)
 // Tomorrow onwards is on the Calendar. After a save or a delete, a toast with Undo.
+// Long press (Hyoje, 10 Nov): on Start now → Done now (starts and ends now: paying a bill);
+// on any title → Copy to new entry.
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { localNow, zoneCodeFor, type ZoneRow } from '@/lib/entry/time';
 import { DetailPanel, formatDuration, type LogEntry } from '@/app/_components/LogDetailPanel';
+import { ActionSheet, useLongPress, type SheetAction } from './_components/LongPress';
 
 interface Point { date: string; hour: string; timezone: string }
 interface Item { id: string; activity: string; category: string; title: string; start: Point; end: Point; place: string; updatedAt: string; seconds?: number | null; repeat?: boolean; started?: boolean; plannedEnd?: { date: string; hour: string } | null }
 interface Preset { id: string; name: string; order: number; time: { kind: 'open' | 'moment' | 'length'; minutes: number | null } }
-interface Home { today: string; comingUp: Item[]; inProgress: Item[]; done: Item[]; ongoing: Item[]; recent: Item[]; presets: Preset[] }
+interface Stamp { id: string; note: string; start: Point; end: Point; updatedAt: string }
+interface Home { today: string; stamps: Stamp[]; comingUp: Item[]; inProgress: Item[]; done: Item[]; ongoing: Item[]; recent: Item[]; presets: Preset[] }
 interface Toast { text: string; undo?: () => Promise<string | null> }
 
 const btn = 'px-3 py-1.5 rounded text-sm border disabled:opacity-40 disabled:cursor-not-allowed';
@@ -71,6 +77,12 @@ function EntryHome() {
   const [editPresets, setEditPresets] = useState(false);
   const [found, setFound] = useState<Item[] | null>(null);
   const [pane, setPane] = useState<LogEntry | null>(null);
+  const [menu, setMenu] = useState<{ title: string; actions: SheetAction[] } | null>(null);
+  const closeMenu = useCallback(() => setMenu(null), []);
+  const press = useLongPress();
+  // The note being typed on a stamp (a new stamp opens it at once; Hyoje 10 Nov).
+  const [noteFor, setNoteFor] = useState<string | null>(null);
+  const [noteText, setNoteText] = useState('');
 
   /** Done: a tap opens the record pane (Edit is in it), like the Calendar (Hyoje, 10 Nov). */
   async function openPane(id: string) {
@@ -151,6 +163,33 @@ function EntryHome() {
   }
 
   const startNow = (it: Item) => act(`s${it.id}`, () => call(`/api/entry/plans/${it.id}/confirm`, 'POST', { updatedAt: it.updatedAt, how: 'now', now: nowPoint() }), { text: `${it.activity} started` });
+  const doneNow = (it: Item) => act(`d${it.id}`, () => call(`/api/entry/plans/${it.id}/confirm`, 'POST', { updatedAt: it.updatedAt, how: 'nowDone', now: nowPoint() }), { text: `${it.activity} done` });
+  // Stamps.
+  async function stamp() {
+    setBusy('stamp');
+    try {
+      const r = await call('/api/entry/stamps', 'POST', { start: nowPoint() });
+      if (!r.ok) { setToast({ text: r.b.error ?? 'Stamp failed' }); return; }
+      const s: Stamp = r.b.stamp;
+      setData(d => d ? { ...d, stamps: [s, ...(d.stamps ?? [])] } : d);
+      setNoteFor(s.id); setNoteText('');
+      setToast({ text: `Stamped ${s.start.hour}`, undo: async () => { const x = await call(`/api/entry/stamps/${s.id}`, 'DELETE'); return x.ok ? null : x.b.error ?? 'Undo failed'; } });
+    } finally { setBusy(null); }
+  }
+  async function saveNote(s: Stamp) {
+    setNoteFor(null);
+    const text = noteText.trim();
+    if (text === s.note) return;
+    setData(d => d ? { ...d, stamps: d.stamps.map(x => x.id === s.id ? { ...x, note: text } : x) } : d);
+    const r = await call(`/api/entry/stamps/${s.id}`, 'PUT', { note: text });
+    if (!r.ok) { setToast({ text: r.b.error ?? 'Could not save the note' }); await load(); }
+  }
+  const endStamp = (s: Stamp) => act(`e${s.id}`, () => call(`/api/entry/stamps/${s.id}`, 'PUT', { end: nowPoint() }), { text: 'Stamp ended' });
+  const deleteStamp = (s: Stamp) => act(`x${s.id}`, () => call(`/api/entry/stamps/${s.id}`, 'DELETE'), b => ({
+    text: 'Stamp deleted',
+    undo: async () => { const x = await call('/api/entry/stamps', 'POST', { restore: b.stamp }); return x.ok ? null : x.b.error ?? 'Undo failed'; },
+  }));
+
   const endNow = (it: Item) => act(`e${it.id}`, () => call(`/api/entry/records/${it.id}/end`, 'POST', { end: nowPoint(), updatedAt: it.updatedAt }), { text: `${it.activity} ended` });
 
   async function undoToast() {
@@ -197,13 +236,23 @@ function EntryHome() {
   const newHref = (extra: Record<string, string> = {}) => `/entry/new?${new URLSearchParams(extra)}`;
   const recent = copyQ.trim() ? (found ?? data.recent.filter(r => name(r).toLowerCase().includes(copyQ.trim().toLowerCase()))) : data.recent;
 
-  const row = (it: Item, right: React.ReactNode, href?: string | (() => void), sub?: string) => (
+  // A long press on a title: Copy to new entry (a plan in Coming up copies from log_plan).
+  const copyMenu = (it: Item, plan = false) => press(() => setMenu({ title: name(it), actions: [
+    { label: 'Copy to new entry', hint: 'Same fields, starting today at its time', run: () => router.push(newHref({ copy: it.id, ...(plan ? { from: 'plan' } : {}) })) },
+  ] }));
+  // A long press on Start now: Done now, for things with no length.
+  const startMenu = (it: Item) => press(() => setMenu({ title: name(it), actions: [
+    { label: 'Done now', hint: 'Starts and ends now — for things with no length, like paying a bill', run: () => doneNow(it) },
+    { label: 'Start now', hint: 'Starts now; End now later', run: () => startNow(it) },
+  ] }));
+
+  const row = (it: Item, right: React.ReactNode, href?: string | (() => void), sub?: string, plan = false) => (
     <li key={it.id} className="flex items-start gap-3 px-3 py-2.5 border-t first:border-t-0 border-stone-100 dark:border-zinc-800">
       <div className="flex-1 min-w-0">
         {typeof href === 'function'
-          ? <button type="button" onClick={href} className="block w-full text-left text-sm text-stone-800 dark:text-zinc-100 hover:underline truncate">{name(it)}</button>
+          ? <button type="button" onClick={href} {...copyMenu(it, plan)} className="block w-full text-left text-sm text-stone-800 dark:text-zinc-100 hover:underline truncate select-none">{name(it)}</button>
           : href
-          ? <Link href={href} className="block text-sm text-stone-800 dark:text-zinc-100 hover:underline truncate">{name(it)}</Link>
+          ? <Link href={href} {...copyMenu(it, plan)} className="block text-sm text-stone-800 dark:text-zinc-100 hover:underline truncate select-none">{name(it)}</Link>
           : <span className="block text-sm text-stone-800 dark:text-zinc-100 truncate">{name(it)}</span>}
         <span className="block text-xs text-stone-500 dark:text-zinc-400 truncate">{sub ?? when(it, today)}{it.place ? ` · ${it.place}` : ''}</span>
       </div>
@@ -239,6 +288,7 @@ function EntryHome() {
           <div className="flex gap-2">
             <Link href={newHref()} className={primary}>+ New</Link>
             <button onClick={() => setCopyOpen(v => !v)} className={secondary} aria-expanded={copyOpen}>Copy recent</button>
+            <button onClick={stamp} disabled={busy !== null} className={secondary} title="Save the time now; fill it in later">Stamp</button>
           </div>
           {copyOpen && (
             <div className={`${card} p-2 flex flex-col gap-2`}>
@@ -252,14 +302,43 @@ function EntryHome() {
           )}
         </section>
 
+        {data.stamps?.length > 0 && (
+          <section className="flex flex-col gap-2">
+            <h2 className={heading}>Stamps</h2>
+            <ul className={card}>
+              {data.stamps.map(s => (
+                <li key={s.id} className="flex items-start gap-3 px-3 py-2.5 border-t first:border-t-0 border-stone-100 dark:border-zinc-800">
+                  <div className="flex-1 min-w-0">
+                    {noteFor === s.id ? (
+                      <form onSubmit={e => { e.preventDefault(); saveNote(s); }}>
+                        <input value={noteText} onChange={e => setNoteText(e.target.value)} onBlur={() => saveNote(s)} autoFocus maxLength={40}
+                          placeholder="Note (optional): 보고, 역으로 …" aria-label="Stamp note"
+                          className="w-full rounded border border-stone-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 px-2 py-1 text-sm text-stone-800 dark:text-zinc-100" />
+                      </form>
+                    ) : (
+                      <Link href={`/entry/new?stamp=${s.id}`} {...press(() => setMenu({ title: s.note || `Stamp ${s.start.hour}`, actions: [
+                          { label: 'Edit note', run: () => { setNoteFor(s.id); setNoteText(s.note); } },
+                          { label: 'Delete', hint: 'The time is lost; Undo on the toast brings it back', run: () => deleteStamp(s) },
+                        ] }))}
+                        className={`block text-sm hover:underline truncate select-none ${s.note ? 'text-stone-800 dark:text-zinc-100' : 'italic text-stone-500 dark:text-zinc-400'}`}>{s.note || 'Stamp'}</Link>
+                    )}
+                    <span className="block text-xs text-stone-500 dark:text-zinc-400 truncate">{s.end.hour ? '' : 'since '}{when({ start: s.start, end: s.end } as Item, today).replace(/^(Today|Yesterday|Tomorrow)/, m => (s.end.hour ? m : m.toLowerCase()))}</span>
+                  </div>
+                  {!s.end.hour && <button onClick={() => endStamp(s)} disabled={busy !== null} className={small}>End now</button>}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         <section className="flex flex-col gap-2">
           <h2 className={heading}>Coming up</h2>
           {data.comingUp.length > 0 ? (
             <ul className={card}>
               {data.comingUp.map(it => row(it,
-                <button onClick={() => startNow(it)} disabled={busy !== null} className={small}>Start now</button>,
+                <button onClick={() => startNow(it)} {...startMenu(it)} disabled={busy !== null} className={`${small} select-none`}>Start now</button>,
                 `/entry/plan/${it.id}`,
-                `${when(it, today)}${it.repeat ? ' · repeats' : ''}`))}
+                `${when(it, today)}${it.repeat ? ' · repeats' : ''}`, true))}
             </ul>
           ) : <p className="text-sm text-stone-500 dark:text-zinc-400">Nothing planned for the rest of today.</p>}
         </section>
@@ -300,6 +379,7 @@ function EntryHome() {
       </div>
 
       {pane && <DetailPanel entry={pane} onClose={() => setPane(null)} />}
+      {menu && <ActionSheet title={menu.title} actions={menu.actions} onClose={closeMenu} />}
 
       {toast && (
         <div role="status" className="fixed bottom-4 inset-x-4 z-50 mx-auto max-w-md rounded-lg bg-stone-800 dark:bg-zinc-100 text-white dark:text-zinc-900 px-4 py-3 text-sm flex items-center gap-3 shadow-lg">
