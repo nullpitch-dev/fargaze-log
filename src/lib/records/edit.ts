@@ -29,7 +29,7 @@ import { getArchiveUntil } from '../archiveYear';
 import { buildRecord, fromRecord, type FormContext, type RecordForm } from './form';
 import { sheetChange, deleteRowLines, addRowLines, findRowText, type ChangeLine, type PlainChange } from './sheetCells';
 import { isOpen, missingRequired } from '../entry/groups';
-import { relaxOpen, tightenOnEnd } from '../entry/drafts';
+import { endAheadToPlanned, plannedEndChanged, relaxOpen, tightenOnEnd } from '../entry/drafts';
 
 const APP_ONLY = ['Nothing to do in the sheet: this record was made in the app.'];
 const appMade = (doc: any) => doc?.origin === 'app';
@@ -99,6 +99,9 @@ async function prepare(userId: string, id: string, form: RecordForm): Promise<{ 
   const doc = { ...built.doc, userId };
   const problems = [...built.problems];
   const warnings = [...built.warnings];
+  // A record made in the app: an End still to come is its planned end (drafts.ts). A sheet
+  // record keeps what was typed, as the sheet has no planned end.
+  if (appMade(base)) endAheadToPlanned(doc, warnings);
 
   // Master lists. An unknown activity is already reported, so its pair is not.
   const checks = (await loadMasterChecks(userId)).filter(c => doc.activity.category || c.def.slug !== 'activity');
@@ -130,7 +133,7 @@ async function prepare(userId: string, id: string, form: RecordForm): Promise<{ 
 
   const archiveUntil = await getArchiveUntil(userId);
   const change = sheetChange(base, doc, yearTabFor(base, archiveUntil), yearTabFor(doc, archiveUntil));
-  if (!change.lines.length) problems.push('Nothing changed');
+  if (!change.lines.length && !plannedEndChanged(base, doc)) problems.push('Nothing changed');
   const tight = tightenOnEnd(base, doc, [...new Set(problems)], warnings);
   const relaxed = relaxOpen(doc, tight.problems, tight.warnings);
   return { ok: true, p: { base, doc, problems: relaxed.problems, warnings: relaxed.warnings, title: `Edit: ${findRowText(base)}`, change } };

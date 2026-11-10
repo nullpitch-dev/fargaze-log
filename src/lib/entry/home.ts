@@ -32,6 +32,7 @@ function item(d: any, extra: Record<string, unknown> = {}) {
     end: { date: dateOf(d.end), hour: d.end?.hour ?? '', timezone: d.end?.timezone ?? '' },
     place: d.location?.activity ?? '',
     seconds: typeof d.duration?.totalSeconds === 'number' ? d.duration.totalSeconds : null,
+    plannedEnd: d.plannedEnd?.year ? { date: dateOf(d.plannedEnd), hour: d.plannedEnd.hour ?? '', timezone: d.plannedEnd.timezone ?? '' } : null,
     updatedAt: iso(d.updatedAt),
     ...extra,
   };
@@ -67,7 +68,7 @@ export async function home(userId: string, iana = 'Europe/London', now = Date.no
       .sort({ 'start.datetime': -1 }).limit(200).lean(),
     Log.find({ userId, 'end.year': y, 'end.month': m, 'end.day': d }).sort({ 'end.datetime': 1 }).lean(),
     Log.find({ userId, 'start.datetime': { $ne: null } }).sort({ 'start.datetime': -1 }).limit(300)
-      .select('activity start end location duration updatedAt').lean(),
+      .select('activity start end plannedEnd location duration updatedAt').lean(),
   ]);
 
   // Planned ends of records started from a plan.
@@ -75,12 +76,13 @@ export async function home(userId: string, iana = 'Europe/London', now = Date.no
   const fromPlans = openIds.length
     ? await LogPlan.find({ userId, 'plan.recordId': { $in: openIds } }).select('end plan.recordId').lean() as any[]
     : [];
-  const plannedEnd = new Map(fromPlans.map(p => [String(p.plan.recordId), p.end?.hour ? { date: dateOf(p.end), hour: p.end.hour } : null]));
+  const plannedEnd = new Map(fromPlans.map(p => [String(p.plan.recordId), p.end?.hour ? { date: dateOf(p.end), hour: p.end.hour, timezone: p.end.timezone ?? '' } : null]));
 
   const inProgress: any[] = [], ongoing: any[] = [];
   for (const r of open as any[]) {
     const day = dateOf(r.start);
-    const it = item(r, { plannedEnd: plannedEnd.get(String(r._id)) ?? null });
+    // Its own planned end (10 Nov); one started from a plan before then: the plan's end.
+    const it = item(r, r.plannedEnd?.year ? {} : { plannedEnd: plannedEnd.get(String(r._id)) ?? null });
     if (day === today || (day === yesterday && r.activity?.name === SLEEP)) inProgress.push(it);
     else if (day < today) ongoing.push(it);
     else inProgress.push(it);           // started later today (a time set ahead by hand)

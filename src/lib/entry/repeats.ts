@@ -63,14 +63,15 @@ export function occurrenceForm(rule: any, date: string, zones: ZoneRow[]): Recor
   const f = mergeForm(rule.form);
   const hour = rule.allDay ? '' : (rule.startTime ?? '');
   f.start = { date, hour, timezone: zoneCodeFor(rule.iana, date, hour || '12:00', zones) ?? '' };
+  // The length makes the planned end (Hyoje, 10 Nov); End stays empty until it happens.
+  f.end = { date: '', hour: '', timezone: '' };
+  f.plannedEnd = { date: '', hour: '', timezone: '' };
   if (rule.minutes != null && !rule.allDay && hour) {
     const e = addMinutes(date, hour, rule.minutes);
-    f.end = { date: e.date, hour: e.hour, timezone: zoneCodeFor(rule.iana, e.date, e.hour, zones) ?? '' };
+    f.plannedEnd = { date: e.date, hour: e.hour, timezone: zoneCodeFor(rule.iana, e.date, e.hour, zones) ?? '' };
   } else if (rule.allDay && rule.minutes != null) {
     const e = addDays(date, Math.max(0, Math.round(rule.minutes / 1440) - 1));
-    f.end = { date: e, hour: '', timezone: f.start.timezone };
-  } else {
-    f.end = { date: '', hour: '', timezone: '' };
+    f.plannedEnd = { date: e, hour: '', timezone: f.start.timezone };
   }
   return f;
 }
@@ -130,8 +131,9 @@ export async function refresh(userId: string, now = Date.now()): Promise<{ made:
       $or: [{ 'start.datetime': { $lte: bound } }, { 'start.datetime': null }],
     }).lean() as any[];
     for (const p of due) {
-      const endAt = instantOf(p.end) ?? instantOf(p.start);
-      const over = p.end?.datetime || !p.end?.year ? endAt : (endAt ?? 0) + 86_400_000;   // an all-day end lasts the whole day
+      const until = p.plannedEnd?.year ? p.plannedEnd : p.end;   // a plan from before 10 Nov has it in end
+      const endAt = instantOf(until) ?? instantOf(p.start);
+      const over = until?.datetime || !until?.year ? endAt : (endAt ?? 0) + 86_400_000;   // an all-day end lasts the whole day
       if (over != null && over <= now && (await settleOne(userId, p, now))) settled++;
     }
   }

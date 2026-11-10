@@ -21,7 +21,7 @@ import { DetailPanel, formatDuration, type LogEntry } from '@/app/_components/Lo
 import { ActionSheet, useLongPress, type SheetAction } from './_components/LongPress';
 
 interface Point { date: string; hour: string; timezone: string }
-interface Item { id: string; activity: string; category: string; title: string; start: Point; end: Point; place: string; updatedAt: string; seconds?: number | null; repeat?: boolean; started?: boolean; plannedEnd?: { date: string; hour: string } | null }
+interface Item { id: string; activity: string; category: string; title: string; start: Point; end: Point; place: string; updatedAt: string; seconds?: number | null; repeat?: boolean; started?: boolean; plannedEnd?: { date: string; hour: string; timezone?: string } | null }
 interface Preset { id: string; name: string; order: number; time: { kind: 'open' | 'moment' | 'length'; minutes: number | null } }
 interface Stamp { id: string; note: string; start: Point; end: Point; updatedAt: string }
 interface Home { today: string; stamps: Stamp[]; comingUp: Item[]; inProgress: Item[]; done: Item[]; ongoing: Item[]; recent: Item[]; presets: Preset[] }
@@ -50,12 +50,19 @@ function dayLabel(date: string, today: string): string {
   if (diff === -1) return 'Yesterday';
   return `${WD[t.getUTCDay()]} ${d} ${MO[m - 1]}${y !== ty ? ` ${y}` : ''}`;
 }
-function when(it: Item, today: string, withDay = true): string {
+function when(it: Item, today: string, withDay = true, planned = true): string {
   const s = it.start.hour ? it.start.hour : 'All day';
-  const moment = it.end.hour === it.start.hour && (!it.end.date || it.end.date === it.start.date);
-  const e = it.end.hour && !moment ? `–${it.end.date && it.end.date !== it.start.date ? `${dayLabel(it.end.date, today)} ` : ''}${it.end.hour}` : '';
+  // A plan has only a planned end (10 Nov): Coming up shows it as its end.
+  const end = !it.end.date && !it.end.hour && planned && it.plannedEnd ? { ...it.plannedEnd, timezone: '' } : it.end;
+  const moment = end.hour === it.start.hour && (!end.date || end.date === it.start.date);
+  const e = end.hour && !moment ? `–${end.date && end.date !== it.start.date ? `${dayLabel(end.date, today)} ` : ''}${end.hour}` : '';
   return `${withDay ? `${dayLabel(it.start.date, today)} · ` : ''}${s}${e}`;
 }
+/** " · until 12:00" for something still going with a planned end (the day when it isn't the start's). */
+const until = (it: Item, today: string) =>
+  it.plannedEnd && (it.plannedEnd.hour || it.plannedEnd.date)
+    ? ` · until ${it.plannedEnd.date && it.plannedEnd.date !== it.start.date ? `${dayLabel(it.plannedEnd.date, today)}${it.plannedEnd.hour ? ' ' : ''}` : ''}${it.plannedEnd.hour}`
+    : '';
 const name = (it: Item) => (it.title ? `${it.activity} · ${it.title}` : it.activity);
 
 async function call(url: string, method: string, body?: unknown): Promise<{ ok: boolean; b: any }> {
@@ -190,6 +197,7 @@ function EntryHome() {
     undo: async () => { const x = await call('/api/entry/stamps', 'POST', { restore: b.stamp }); return x.ok ? null : x.b.error ?? 'Undo failed'; },
   }));
 
+  const endPlanned = (it: Item) => act(`e${it.id}`, () => call(`/api/entry/records/${it.id}/end`, 'POST', { end: { date: it.plannedEnd!.date, hour: it.plannedEnd!.hour, timezone: it.plannedEnd!.timezone || it.start.timezone }, updatedAt: it.updatedAt }), { text: `${it.activity} ended as planned` });
   const endNow = (it: Item) => act(`e${it.id}`, () => call(`/api/entry/records/${it.id}/end`, 'POST', { end: nowPoint(), updatedAt: it.updatedAt }), { text: `${it.activity} ended` });
 
   async function undoToast() {
@@ -244,6 +252,12 @@ function EntryHome() {
   const startMenu = (it: Item) => press(() => setMenu({ title: name(it), actions: [
     { label: 'Done now', hint: 'Starts and ends now — for things with no length, like paying a bill', run: () => doneNow(it) },
     { label: 'Start now', hint: 'Starts now; End now later', run: () => startNow(it) },
+  ] }));
+
+  // A long press on End now: Ended as planned, for when you only remember afterwards.
+  const endMenu = (it: Item) => press(() => setMenu({ title: name(it), actions: [
+    ...(it.plannedEnd && (it.plannedEnd.hour || it.plannedEnd.date) ? [{ label: `Ended as planned (${it.plannedEnd.hour || dayLabel(it.plannedEnd.date, today)})`, hint: 'Ends it at its planned end', run: () => endPlanned(it) }] : []),
+    { label: 'End now', run: () => endNow(it) },
   ] }));
 
   const row = (it: Item, right: React.ReactNode, href?: string | (() => void), sub?: string, plan = false) => (
@@ -348,9 +362,9 @@ function EntryHome() {
           {data.inProgress.length > 0 ? (
             <ul className={card}>
               {data.inProgress.map(it => row(it,
-                <button onClick={() => endNow(it)} disabled={busy !== null} className={small}>End now</button>,
+                <button onClick={() => endNow(it)} {...endMenu(it)} disabled={busy !== null} className={`${small} select-none`}>End now</button>,
                 `/records/${it.id}`,
-                `since ${when(it, today).replace(/^(Today|Yesterday|Tomorrow)/, m => m.toLowerCase())}${it.plannedEnd ? ` · planned until ${it.plannedEnd.hour}` : ''}`))}
+                `since ${when(it, today, true, false).replace(/^(Today|Yesterday|Tomorrow)/, m => m.toLowerCase())}${until(it, today)}`))}
             </ul>
           ) : <p className="text-sm text-stone-500 dark:text-zinc-400">Nothing running.</p>}
         </section>
@@ -371,8 +385,8 @@ function EntryHome() {
             </summary>
             <ul className={`${card} mt-2`}>
               {data.ongoing.map(it => row(it,
-                <button onClick={() => endNow(it)} disabled={busy !== null} className={small}>End now</button>,
-                `/records/${it.id}`, `since ${when(it, today)}`))}
+                <button onClick={() => endNow(it)} {...endMenu(it)} disabled={busy !== null} className={`${small} select-none`}>End now</button>,
+                `/records/${it.id}`, `since ${when(it, today, true, false)}${until(it, today)}`))}
             </ul>
           </details>
         )}

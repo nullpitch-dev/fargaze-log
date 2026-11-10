@@ -13,7 +13,7 @@ export function blankForm(): RecordForm {
   const p = () => ({ date: '', hour: '', timezone: '' });
   return {
     activity: { name: '', title: '', additionalInfo: '', crossActivity: '', relationship: '' },
-    start: p(), end: p(),
+    start: p(), end: p(), plannedEnd: p(),
     location: { activity: '', online: '', other: '' },
     cost: { amountKRW: null, amountForeign: null, currency: '', categoryDetail: '', category: '' },
     purchase: [],
@@ -34,7 +34,7 @@ export function blankForm(): RecordForm {
 export function mergeForm(partial: any): RecordForm {
   const f: any = blankForm();
   for (const [k, v] of Object.entries(partial ?? {})) {
-    if (k === 'start' || k === 'end') continue;
+    if (k === 'start' || k === 'end' || k === 'plannedEnd') continue;
     if (v && typeof v === 'object' && !Array.isArray(v) && f[k] && typeof f[k] === 'object' && !Array.isArray(f[k])) f[k] = { ...f[k], ...v };
     else if (v !== undefined) f[k] = v;
   }
@@ -45,11 +45,12 @@ export function mergeForm(partial: any): RecordForm {
 export function presetForm(p: { form: any; time: PresetTime }, now: FormPointValue): RecordForm {
   const f = mergeForm(p.form);
   f.start = { ...now };
+  f.end = { date: '', hour: '', timezone: '' };
   if (p.time.kind === 'moment') f.end = { ...now };
   else if (p.time.kind === 'length' && p.time.minutes != null) {
     const e = addMinutes(now.date, now.hour, p.time.minutes);
-    f.end = { ...e, timezone: now.timezone };
-  } else f.end = { date: '', hour: '', timezone: '' };
+    f.plannedEnd = { ...e, timezone: now.timezone };   // a usual length is a planned end
+  }
   return f;
 }
 
@@ -57,16 +58,19 @@ export function presetForm(p: { form: any; time: PresetTime }, now: FormPointVal
  *  (Now on the form for something happening now; ESOL 수업 keeps its 9:30), still open (no
  *  end). Amounts are kept — Reset on a card clears them; a foreign amount is re-priced at
  *  the Exchange rates list's rate by the form. `zoneAt` gives the zone code for a time today.
- *  `keepEnd`: a plan copied from Coming up keeps its planned end, moved to today with the
- *  start (Hyoje, 10 Nov) — a plan's end is part of the plan; a record's end was a measurement. */
-export function copyForm(src: RecordForm, now: FormPointValue, zoneAt?: (date: string, hour: string) => string | null, keepEnd = false): RecordForm {
+ *  The planned end travels (Hyoje, 10 Nov): the source's, moved to today with the start —
+ *  ESOL 수업 copies as 9:30, until 12:00; a commute that never had one copies without.
+ *  `fromPlan`: a plan saved before planned ends existed has its plan in End. */
+export function copyForm(src: RecordForm, now: FormPointValue, zoneAt?: (date: string, hour: string) => string | null, fromPlan = false): RecordForm {
   const f: RecordForm = JSON.parse(JSON.stringify(src));
   const hour = src.start.hour || '';
   f.start = { date: now.date, hour, timezone: (hour && zoneAt?.(now.date, hour)) || now.timezone };
   f.end = { date: '', hour: '', timezone: '' };
-  if (keepEnd && src.end.hour && src.start.date) {
-    const date = addDays(now.date, daysBetween(src.start.date, src.end.date || src.start.date));
-    f.end = { date, hour: src.end.hour, timezone: zoneAt?.(date, src.end.hour) || src.end.timezone || f.start.timezone };
+  f.plannedEnd = { date: '', hour: '', timezone: '' };
+  const planned = src.plannedEnd?.date || src.plannedEnd?.hour ? src.plannedEnd : fromPlan ? src.end : null;
+  if (planned && (planned.date || planned.hour) && src.start.date) {
+    const date = addDays(now.date, daysBetween(src.start.date, planned.date || src.start.date));
+    f.plannedEnd = { date, hour: planned.hour, timezone: (planned.hour && zoneAt?.(date, planned.hour)) || planned.timezone || f.start.timezone };
   }
   return f;
 }

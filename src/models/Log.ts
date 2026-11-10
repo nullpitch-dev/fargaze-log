@@ -38,6 +38,7 @@ export interface ILog extends Document {
     hour?: string;
     timezoneOffset?: number;
   };
+  plannedEnd?: ILog['end'] | null;
   duration?: {
     totalSeconds?: number;
   };
@@ -181,6 +182,19 @@ const LogSchema = new Schema<ILog>({
     timezoneOffset: Number,
   },
   end: {
+    timezone: String,
+    datetime: Date,
+    year: Number,
+    month: Number,
+    day: Number,
+    weekday: String,
+    hour: String,
+    timezoneOffset: Number,
+  },
+  /** #71 (Hyoje, 10 Nov): when it was meant to end. A plan has only this (no end); a
+   *  record keeps it from its plan or the record it was copied from, so an open record
+   *  can show "until 12:00" while End stays empty. Not in the sheet, not in any figure. */
+  plannedEnd: {
     timezone: String,
     datetime: Date,
     year: Number,

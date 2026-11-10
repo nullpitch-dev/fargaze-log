@@ -27,6 +27,9 @@ export interface RecordForm {
   activity: { name: string; title: string; additionalInfo: string; crossActivity: string; relationship: string };
   start: FormPoint;
   end: FormPoint;
+  /** When it was meant to end (#71, Hyoje 10 Nov): a plan's end; travels to its record
+   *  and to copies. Empty = none. End stays when it actually ended. */
+  plannedEnd: FormPoint;
   location: { activity: string; online: string; other: string };
   cost: { amountKRW: Num; amountForeign: Num; currency: string; categoryDetail: string; category: string };
   purchase: FormItem[];
@@ -73,6 +76,7 @@ export function fromRecord(doc: any): RecordForm {
     },
     start: point(doc?.start),
     end: point(doc?.end),
+    plannedEnd: point(doc?.plannedEnd),
     location: { activity: s(doc?.location?.activity), online: s(doc?.location?.online), other: s(doc?.location?.other) },
     cost: {
       amountKRW: n(doc?.cost?.amountKRW), amountForeign: n(doc?.cost?.amountForeign), currency: s(doc?.cost?.currency),
@@ -187,8 +191,8 @@ export function buildRecord(form: RecordForm, base: any | null, ctx: FormContext
   // datetime included, even where the stored values are wrong (28 records have
   // broken times) — except its weekday, which the system always calculates from the
   // date (Hyoje, 27 Oct). Only a changed point is worked out again.
-  const point = (p: FormPoint | undefined, which: 'start' | 'end', basePoint: any) => {
-    const label = which === 'start' ? 'Start' : 'End';
+  const point = (p: FormPoint | undefined, which: 'start' | 'end' | 'plannedEnd', basePoint: any) => {
+    const label = which === 'start' ? 'Start' : which === 'end' ? 'End' : 'Planned end';
     const date = t(p?.date);
     const hourIn = t(p?.hour);
     const zone = t(p?.timezone);
@@ -205,7 +209,7 @@ export function buildRecord(form: RecordForm, base: any | null, ctx: FormContext
     };
     if (!date) {
       if (which === 'start') msgs.push('Start date is required');
-      else if (hourIn) msgs.push('End time without an end date');
+      else if (hourIn) msgs.push(`${label} time without a date`);
       return done({ timezone: str(zone), datetime: null, year: null, month: null, day: null, weekday: null, hour: null, timezoneOffset: null, _ms: null as number | null });
     }
     const d = parseDate(date);
@@ -237,6 +241,15 @@ export function buildRecord(form: RecordForm, base: any | null, ctx: FormContext
   const start = point(f?.start, 'start', base?.start);
   const end = point(f?.end, 'end', base?.end);
   const timesOld = !!start?._unchanged && !!end?._unchanged;
+  // Planned end: only when the form has one; empty = none (× on the form removes it).
+  const pe = f?.plannedEnd;
+  const plannedEnd = pe && (t(pe.date) || t(pe.hour)) ? point(pe, 'plannedEnd', base?.plannedEnd) : null;
+  if (plannedEnd?.year && start?.year) {
+    const before = plannedEnd.hour && start.hour
+      ? (plannedEnd._ms ?? 0) - (plannedEnd.timezoneOffset ?? 0) * 3600e3 < (start._ms ?? 0) - (start.timezoneOffset ?? 0) * 3600e3
+      : Date.UTC(plannedEnd.year, plannedEnd.month - 1, plannedEnd.day) < Date.UTC(start.year, start.month - 1, start.day);
+    if (before) flag('Planned end is before start', !!plannedEnd._unchanged && !!start._unchanged);
+  }
 
   const allDay = !start?.hour && !end?.hour;
   let totalSeconds: number | null = null;
@@ -333,6 +346,7 @@ export function buildRecord(form: RecordForm, base: any | null, ctx: FormContext
     },
     start: start ? strip(start) : base?.start ?? null,
     end: end ? strip(end) : base?.end ?? null,
+    plannedEnd: plannedEnd ? strip(plannedEnd) : null,
     duration: { totalSeconds },
     location: { activity: str(f?.location?.activity), online: str(f?.location?.online), other: str(f?.location?.other) },
     cost: {

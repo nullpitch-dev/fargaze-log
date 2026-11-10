@@ -150,14 +150,14 @@ export function MonthView({
             {w.bars.map(p => (
               <Bar key={`b-${p.event.id}`} p={p} top={laneTop(p.lane)} height={w.laneH}
                 color={colorFor(p.event.category, colors)} compact={compact}
-                onClick={() => onOpenEvent(p.event)} />
+                onClick={() => onOpenEvent(p.event)} onTouchDay={col => onOpenDay(w.dates[col])} />
             ))}
 
             {w.chips.map(p => (
               <Chip key={`c-${p.event.id}`} p={p} top={laneTop(p.lane)} height={w.laneH}
                 color={colorFor(p.event.category, colors)} compact={compact}
                 time={p.event.start ? time.format(new Date(p.event.start)) : ''} showTime={showTime}
-                onClick={() => onOpenEvent(p.event)} />
+                onClick={() => onOpenEvent(p.event)} onTouchDay={() => onOpenDay(w.dates[p.startCol])} />
             ))}
 
             {w.more.map((n, c) => n > 0 && (
@@ -179,12 +179,29 @@ export function MonthView({
 // ── Pieces ──────────────────────────────────────────────────────────────────
 
 /** A bar across `span` of `cols` columns. Shared with the Week / Day strip. */
-export function Bar({ p, top, height, color, compact, onClick, cols = 7 }: {
+/** A tap with a finger (Hyoje, 10 Nov): on the phone the month's bars are too small to aim
+ *  at, so a touch anywhere in a day opens that day's list; a mouse click still opens the event. */
+export function isTouch(e: React.MouseEvent): boolean {
+  const t = (e.nativeEvent as any).pointerType;
+  if (t) return t === 'touch' || t === 'pen';
+  return typeof window !== 'undefined' && !!window.matchMedia?.('(hover: none)').matches;
+}
+
+export function Bar({ p, top, height, color, compact, onClick, onTouchDay, cols = 7 }: {
   p: Placed; top: number; height: number; color: string; compact: boolean; onClick: () => void; cols?: number;
+  /** Month view: a touch opens the day under the finger (its column) instead. */
+  onTouchDay?: (col: number) => void;
 }) {
   const span = p.endCol - p.startCol + 1;
   return (
-    <div onClick={e => { e.stopPropagation(); onClick(); }}
+    <div onClick={e => {
+      e.stopPropagation();
+      if (onTouchDay && isTouch(e)) {
+        const box = (e.currentTarget.parentElement ?? e.currentTarget).getBoundingClientRect();
+        const col = Math.min(cols - 1, Math.max(0, Math.floor(((e.clientX - box.left) / box.width) * cols)));
+        onTouchDay(col);
+      } else onClick();
+    }}
       title={labelOf(p.event)}
       className={`absolute cursor-pointer truncate ${compact ? 'text-[11px] px-0.5' : 'text-[11px] px-1.5'}`}
       style={{
@@ -199,12 +216,12 @@ export function Bar({ p, top, height, color, compact, onClick, cols = 7 }: {
   );
 }
 
-function Chip({ p, top, height, color, compact, time, showTime, onClick }: {
+function Chip({ p, top, height, color, compact, time, showTime, onClick, onTouchDay }: {
   p: Placed; top: number; height: number; color: string; compact: boolean; time: string; showTime: boolean;
-  onClick: () => void;
+  onClick: () => void; onTouchDay?: () => void;
 }) {
   return (
-    <div onClick={e => { e.stopPropagation(); onClick(); }}
+    <div onClick={e => { e.stopPropagation(); if (onTouchDay && isTouch(e)) onTouchDay(); else onClick(); }}
       title={`${time} ${labelOf(p.event)}`}
       className={`absolute cursor-pointer flex items-center gap-1 rounded-sm hover:bg-stone-100 dark:hover:bg-zinc-800 text-stone-700 dark:text-zinc-200 ${
         compact ? 'text-[11px] px-0.5' : 'text-[11px] px-1.5'}`}
@@ -284,13 +301,14 @@ export function DayList({ date, events, reading, tz, colors, isDark, onOpenEvent
     return ab - bb || (a.start ?? '').localeCompare(b.start ?? '');
   });
 
-  const whenOf = (e: CalendarEvent) => {
-    if (e.kind === 'allDay') return e.startDate === e.endDate ? 'All day' : `${short(e.startDate)} – ${short(e.endDate)}`;
-    if (!e.start) return '';
+  // Two short lines (Hyoje, 10 Nov: the title gets the room; a longer list is fine).
+  const whenOf = (e: CalendarEvent): [string, string] => {
+    if (e.kind === 'allDay') return e.startDate === e.endDate ? ['All day', ''] : [short(e.startDate), `– ${short(e.endDate)}`];
+    if (!e.start) return ['', ''];
     const s = e.startDate < date ? `${short(e.startDate)} ${time.format(new Date(e.start))}` : time.format(new Date(e.start));
-    if (!e.end || e.end === e.start) return s;
+    if (!e.end || e.end === e.start) return [s, ''];
     const t = e.endDate > date ? `${short(e.endDate)} ${time.format(new Date(e.end))}` : time.format(new Date(e.end));
-    return `${s} – ${t}`;
+    return [s, `– ${t}`];
   };
 
   const ink = isDark ? READING_INK_DARK : READING_INK_LIGHT;
@@ -315,14 +333,17 @@ export function DayList({ date, events, reading, tz, colors, isDark, onOpenEvent
         {barsFirst.length === 0 && !plain && <p className="text-xs text-stone-400 dark:text-zinc-500">Nothing recorded.</p>}
         {barsFirst.map(e => (
           <button key={e.id} onClick={() => onOpenEvent(e)}
-            className="flex items-baseline gap-2 text-xs text-left rounded px-1 -mx-1 py-0.5 hover:bg-stone-100 dark:hover:bg-zinc-800"
+            className="flex items-start gap-2 text-xs text-left rounded px-1 -mx-1 py-1 hover:bg-stone-100 dark:hover:bg-zinc-800"
             style={{ opacity: e.future ? 0.55 : 1 }}>
-            <span className="shrink-0 rounded-full translate-y-[-1px]" style={{ width: 8, height: 8, background: colorFor(e.category, colors) }} />
-            <span className="shrink-0 w-[136px] tabular-nums text-[11px] text-stone-500 dark:text-zinc-400">{whenOf(e)}</span>
-            <span className="truncate text-stone-800 dark:text-zinc-100">{labelOf(e)}</span>
-            {e.title && e.name && (
-              <span className="ml-auto shrink-0 text-[10px] text-stone-400 dark:text-zinc-500">{e.name}</span>
-            )}
+            <span className="shrink-0 rounded-full mt-[4px]" style={{ width: 8, height: 8, background: colorFor(e.category, colors) }} />
+            <span className="shrink-0 w-[60px] tabular-nums text-[11px] leading-tight text-stone-500 dark:text-zinc-400">
+              <span className="block">{whenOf(e)[0]}</span>
+              {whenOf(e)[1] && <span className="block">{whenOf(e)[1]}</span>}
+            </span>
+            <span className="flex-1 min-w-0">
+              <span className="block text-[13px] leading-tight text-stone-800 dark:text-zinc-100 break-words">{labelOf(e)}</span>
+              {e.title && e.name && <span className="block text-[10px] text-stone-400 dark:text-zinc-500">{e.name}</span>}
+            </span>
           </button>
         ))}
       </div>

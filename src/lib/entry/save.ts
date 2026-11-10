@@ -27,7 +27,7 @@ import { missingIngredients, describeMissing } from '../records/ingredients';
 import { loadFormContext } from '../records/edit';
 import { buildRecord, fromRecord, type RecordForm } from '../records/form';
 import { isOpen, missingRequired } from './groups';
-import { relaxOpen, tightenOnEnd } from './drafts';
+import { endAheadToPlanned, relaxOpen, tightenOnEnd } from './drafts';
 import { instantOf } from './time';
 
 type Fail = { ok: false; status: number; error: string; problems?: string[] };
@@ -60,6 +60,8 @@ export async function checkEntry(userId: string, form: RecordForm, opts: { base?
   const doc = { ...built.doc, userId };
   const problems = [...built.problems];
   const warnings = [...built.warnings];
+  // An End still to come is the planned end (Hyoje, 10 Nov; drafts.ts).
+  endAheadToPlanned(doc, warnings, opts.now);
 
   const checks = (await loadMasterChecks(userId)).filter(c => doc.activity?.category || c.def.slug !== 'activity');
   problems.push(...unknownValues(doc, checks));
@@ -186,13 +188,16 @@ export async function confirmPlan(userId: string, id: string, updatedAt: string,
   if (p.plan?.state !== 'open') return fail(409, p.plan?.state === 'done' ? 'This plan is already a record.' : 'This plan was deleted.');
   if (iso(p.updatedAt) !== updatedAt) return fail(409, CHANGED);
   const form = fromRecord(p);
+  // A plan saved before planned ends existed (10 Nov) has its plan in End.
+  if (!form.plannedEnd.date && !form.plannedEnd.hour && (form.end.date || form.end.hour)) form.plannedEnd = { ...form.end };
   const atNow = how === 'now' || how === 'nowDone';
   if (atNow) {
     if (!now?.date || !now?.hour) return fail(400, 'Send now: { date, hour, timezone }.');
     form.start = { date: now.date, hour: now.hour, timezone: now.timezone || form.start.timezone };
   }
   if (how === 'nowDone') form.end = { ...form.start };
-  else if (how !== 'done') form.end = { date: '', hour: '', timezone: '' };
+  else if (how === 'done') form.end = { ...form.plannedEnd };   // Done as planned: it ended when planned
+  else form.end = { date: '', hour: '', timezone: '' };            // started: the planned end stays on the record
   if (!atNow && kindOf(p) === 'plan') return fail(409, 'This plan has not started yet: use Start now.');
   // The lists may have changed since it was planned (a rename, a merge): check again.
   const c = await checkEntry(userId, form, { base: p, selfId: String(p._id), now: atNow ? Number.MAX_SAFE_INTEGER : undefined });
@@ -257,7 +262,9 @@ export async function restorePlan(userId: string, id: string) {
 
 /** For repeats.ts: a "count as done" occurrence whose end has passed. */
 export async function settleOne(userId: string, plan: any, now = Date.now()): Promise<boolean> {
-  const c = await checkEntry(userId, fromRecord(plan), { base: plan, selfId: String(plan._id), now });
+  const form = fromRecord(plan);
+  if (form.plannedEnd.date || form.plannedEnd.hour) form.end = { ...form.plannedEnd };   // it ended as planned
+  const c = await checkEntry(userId, form, { base: plan, selfId: String(plan._id), now });
   if (c.problems.length) return false;         // left in To confirm, where Hyoje sees why
   try { await happen(userId, plan, c.doc, 'auto'); return true; } catch (e: any) { if (e?.conflict) return false; throw e; }
 }

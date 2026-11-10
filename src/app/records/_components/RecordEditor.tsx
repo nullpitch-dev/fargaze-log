@@ -203,6 +203,8 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
   const entryMode = mode !== 'edit';
   const [entryOpts, setEntryOpts] = useState<EntryOptions | null>(null);
   const [laterOpen, setLaterOpen] = useState(false);
+  // Planned end (Hyoje, 10 Nov): shown read-only ("Planned until 12:00 ✎ ×") until ✎.
+  const [plannedOpen, setPlannedOpen] = useState(false);
   const [bowelMore, setBowelMore] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const ingredientCache = useRef(new Map<string, string[]>());
@@ -292,6 +294,20 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
   }, [dirty, form, id, entryMode]);
 
   const current = check && check.for === formKey ? check.data : null;
+
+  // A start still to come makes a plan (in the entry app): a plan has no End, only a
+  // planned end. Worked out here from the phone's clock, so the form changes at once.
+  const planning = (() => {
+    if (!entryMode || !form?.start.date) return false;
+    const l = localNow(Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London');
+    const k = (d: string, h: string) => `${d} ${(h || '').padStart(5, '0')}`;
+    return form.start.hour ? k(form.start.date, form.start.hour) > k(l.date, l.hour) : form.start.date > l.date;
+  })();
+  // An End typed before the start moved ahead becomes the planned end.
+  useEffect(() => {
+    if (!planning || !form || (!form.end.date && !form.end.hour)) return;
+    setForm({ ...form, plannedEnd: form.plannedEnd.date || form.plannedEnd.hour ? form.plannedEnd : form.end, end: { date: '', hour: '', timezone: '' } });
+  }, [planning, form]);
   const checking = dirty && !current && !checkError;
   const canSave = dirty && !!current && current.problems.length === 0 && !saving;
 
@@ -622,9 +638,12 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
     return { ...l, timezone: (entryOpts && zoneCodeFor(iana, l.date, l.hour, entryOpts.zones)) || f.start.timezone || '' };
   };
   const setStart = (p: RecordForm['start']) => {
-    // Moving the start keeps the length when there is an end.
-    const len = minutesBetween(f.start, f.end);
-    setForm({ ...f, start: p, end: len != null && len >= 0 ? { ...addMinutes(p.date, p.hour, len), timezone: f.end.timezone || p.timezone } : f.end });
+    // Moving the start keeps the length when there is an end, and the planned length.
+    const keep = (to: RecordForm['end']) => {
+      const len = minutesBetween(f.start, to);
+      return len != null && len >= 0 ? { ...addMinutes(p.date, p.hour, len), timezone: to.timezone || p.timezone } : to;
+    };
+    setForm({ ...f, start: p, end: keep(f.end), plannedEnd: keep(f.plannedEnd) });
     setLaterOpen(false);
   };
   const endNowAndSave = () => {
@@ -646,17 +665,20 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
   };
 
   // An end typed without a zone takes the start's zone (Hyoje, 8 Nov); it can still be changed.
-  const setPoint = (which: 'start' | 'end', p: Partial<RecordForm['start']>) =>
-    patch(which, which === 'end' && !f.end.timezone && f.start.timezone && (p.date || p.hour) ? { ...p, timezone: f.start.timezone } : p);
-  const point = (which: 'start' | 'end') => {
+  const setPoint = (which: 'start' | 'end' | 'plannedEnd', p: Partial<RecordForm['start']>) =>
+    patch(which, which !== 'start' && !f[which].timezone && f.start.timezone && (p.date || p.hour) ? { ...p, timezone: f.start.timezone } : p);
+  const clearPlanned = () => { patch('plannedEnd', { date: '', hour: '', timezone: '' }); setPlannedOpen(false); };
+  const point = (which: 'start' | 'end' | 'plannedEnd') => {
     const p = f[which];
     const wd = weekdayText(p.date);
     return (
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-stone-500 dark:text-zinc-400">{which === 'start' ? 'Start' : 'End'}{wd ? ` · ${wd.slice(0, 3)}` : ''}</span>
+          <span className="text-xs text-stone-500 dark:text-zinc-400">{which === 'start' ? 'Start' : which === 'end' ? 'End' : 'Planned end'}{wd ? ` · ${wd.slice(0, 3)}` : ''}</span>
           <span className="flex-1" />
-          {nowLater(which)}
+          {which === 'plannedEnd'
+            ? (p.date || p.hour) && <button type="button" className={addBtn} onClick={clearPlanned} aria-label="Remove the planned end">×</button>
+            : nowLater(which)}
         </div>
         {/* date and time get the room; the zone box shows its code (GMT) on a narrow phone */}
         <div className="grid grid-cols-[minmax(0,125fr)_minmax(0,88fr)_minmax(0,60fr)] sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)] gap-1.5">
@@ -823,8 +845,19 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
 
           <Section title="Time">
             {point('start')}
-            {point('end')}
-            <p className="text-xs text-stone-400 dark:text-zinc-500">No times = all day. A start time without an end time = still going (an open record).</p>
+            {planning ? point('plannedEnd') : point('end')}
+            {!planning && (plannedOpen ? point('plannedEnd') : f.plannedEnd.date || f.plannedEnd.hour ? (
+              <div className="flex items-center gap-2 text-sm text-stone-600 dark:text-zinc-300">
+                <span>Planned until {f.plannedEnd.date && f.plannedEnd.date !== f.start.date ? `${weekdayText(f.plannedEnd.date)?.slice(0, 3) ?? ''} ${f.plannedEnd.date.slice(8).replace(/^0/, '')} ` : ''}{f.plannedEnd.hour}</span>
+                <button type="button" className={addBtn} onClick={() => setPlannedOpen(true)} aria-label="Change the planned end">✎</button>
+                <button type="button" className={addBtn} onClick={clearPlanned} aria-label="Remove the planned end">×</button>
+              </div>
+            ) : entryMode && !f.end.hour && (
+              <div><button type="button" className={addBtn} onClick={() => setPlannedOpen(true)}>+ Planned end</button></div>
+            ))}
+            <p className="text-xs text-stone-400 dark:text-zinc-500">{planning
+              ? 'A plan: the planned end is when it should end. End is set when it happens.'
+              : 'No times = all day. A start time without an end time = still going (an open record).'}</p>
           </Section>
 
           <Section title={`Place${req('place')}`}>
