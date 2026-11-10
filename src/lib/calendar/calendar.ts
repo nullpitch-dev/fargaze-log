@@ -148,7 +148,7 @@ export const CANDIDATE_PROJECTION = {
   'end.hour': 1, 'end.timezone': 1, 'end.timezoneOffset': 1,
 };
 
-/** Plans: the same fields, with the planned end (a plan has no end). */
+/** With the planned end: plans (they have no end) and records still going. */
 export const PLAN_PROJECTION = {
   ...CANDIDATE_PROJECTION,
   'plannedEnd.datetime': 1, 'plannedEnd.year': 1, 'plannedEnd.month': 1, 'plannedEnd.day': 1,
@@ -162,6 +162,19 @@ export function buildPlanEvents(plans: any[], r: CalendarRange, nowMs: number, f
 }
 
 /** The order buildCalendarEvents gives, for a merged list. */
+/** Records still going with a planned end: drawn to it (untilPlanned). The rest as they are. */
+export function buildRecordEvents(docs: any[], r: CalendarRange, nowMs: number, filters: EventFilters = {}) {
+  const going = new Set<string>();
+  const ready = docs.map(d => {
+    if (d.end?.year || !d.plannedEnd?.year) return d;
+    going.add(String(d._id));
+    return { ...d, end: d.plannedEnd };
+  });
+  const out = buildCalendarEvents(ready, r, nowMs, filters);
+  if (going.size) out.events = out.events.map(e => (going.has(e.id) ? { ...e, untilPlanned: true } : e));
+  return out;
+}
+
 export function sortEvents(events: CalendarEvent[]): CalendarEvent[] {
   return events.sort((x, y) =>
     x.startDate.localeCompare(y.startDate)
@@ -189,6 +202,9 @@ export interface CalendarEvent {
   /** An open plan from log_plan (#71, Hyoje 10 Nov): drawn to its planned end, striped;
    *  opens the plan in the entry app. */
   plan?: boolean;
+  /** A record still going, drawn to its planned end (Hyoje, 10 Nov): the end isn't real
+   *  yet, so it is striped like a plan until End is set. */
+  untilPlanned?: boolean;
 }
 
 export interface CalendarDiagnostics {

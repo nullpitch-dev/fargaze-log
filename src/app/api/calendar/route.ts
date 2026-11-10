@@ -17,7 +17,7 @@ import Log from '@/models/Log';
 import LogPlan from '@/models/LogPlan';
 import {
   isValidZone, daySpan, resolveRange, candidateFilter, CANDIDATE_PROJECTION,
-  buildCalendarEvents, countByDay, MAX_RANGE_DAYS, PLAN_PROJECTION, buildPlanEvents, sortEvents,
+  buildCalendarEvents, buildRecordEvents, countByDay, MAX_RANGE_DAYS, PLAN_PROJECTION, buildPlanEvents, sortEvents,
 } from '@/lib/calendar/calendar';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -45,21 +45,26 @@ export async function GET(req: NextRequest) {
   await connectDB();
 
   const range = resolveRange(from, to, tz);
-  const docs  = await Log.find(candidateFilter(userId, range), CANDIDATE_PROJECTION).lean();
+  const days  = sp.get('shape') === 'days';
+  // The Year view counts records as they are; the other views draw a record still going
+  // to its planned end (untilPlanned).
+  const docs  = await Log.find(candidateFilter(userId, range), days ? CANDIDATE_PROJECTION : PLAN_PROJECTION).lean();
   const filters = {
     excludeCategories: list(sp.get('excludeCategories')),
     crossActivities:   list(sp.get('crossActivities')),
     excludeCrossActivities: list(sp.get('excludeCrossActivities')),
     excludeNames:      list(sp.get('excludeNames')),
   };
-  const { events, diagnostics } = buildCalendarEvents(docs, range, Date.now(), filters);
+  const { events, diagnostics } = days
+    ? buildCalendarEvents(docs, range, Date.now(), filters)
+    : buildRecordEvents(docs, range, Date.now(), filters);
 
   const head = {
     range: { from, to, tz, start: new Date(range.startMs).toISOString(), end: new Date(range.endMs).toISOString() },
     total: events.length,
   };
 
-  if (sp.get('shape') === 'days') {
+  if (days) {
     return NextResponse.json({ ...head, days: countByDay(events, range), diagnostics });
   }
   const plans = await LogPlan.find({ ...candidateFilter(userId, range), 'plan.state': 'open' }, PLAN_PROJECTION).lean();

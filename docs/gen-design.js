@@ -16,7 +16,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze Log", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Data Design & Requirements Document", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 4.30  |  8 November 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 4.31  |  10 November 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
 );
 C(p([new TextRun({ text: "Structure: ", bold: true }), new TextRun("Part I Foundations · Part II Data · Part III Features · Part IV Operations · Appendices. The body is the complete, always-current source of truth; the changelog below carries one line per version. Work status, open questions and the backlog live in the separate WBS, not here.")]));
 
@@ -75,6 +75,7 @@ C(table(
     ["4.28","7 Nov 2026","67.8 PLACE DETAILS “A - B” DONE (pushed 7 Nov, §15.5.9) and PLACE POINTS PAGE TOOLS (§15.5.10), shaped by Hyoje’s testing the same day. A name uses the point of the longest name that has one (src/lib/places/details.ts); Place points counts each record once under the point it uses, ‘12 (5 with details)’, and the detail names open under the row; renaming a point carries everything under it — records, favourite periods and child points — with a regular-expression sheet step; refused: a child point landing on a name already taken (merge too) and a new name that starts with the old one and “ - ”. Journeys joins legs and finds workplaces by the point’s place. The page: Note out of the table, a Changed column, foldable parts (Places open, the rest folded, remembered per browser), Missing points (3 / 6 / 12 months or all; names with no point listed under A; + Add point, Exclude, Rename) and Excluded with Put back (admin_settings.pointExcluded, §6.13). Rename a name with no point: exact text in Place / From / To and favourite periods, preview, Undo (e.g. ‘Brooklands College 302’ → ‘Brooklands College - 302’). Hyoje does not want Location filled automatically for 이동 records"],
     ["4.29","8 Nov 2026","#70 DONE: STEP 4, THE FIND & REPLACE PAGE (§15.6.3), tested by Hyoje on fargaze-log-test and pushed (15b643a). /records/replace in the gear menu: field, match, Find with values already used, Replace with, optional dates and activity, a Preview button; rows show date · activity · before → after and open the record pane; a Saved screen with Mark repeated and Undo. Items (purchase item and unit, food and drink item) can now be replaced as part of the text; a food or drink part replace is refused when the text appears in any record’s ingredients, which the sheet cell also holds. The step-2 routes had not been saved as built (the preview code sat at /api/records/replace, apply was not routed); now /api/records/replace (fields, used values, apply) and /preview. SHEET STEPS everywhere: the counts to expect in bold, the text to find and to put copied with a click (src/app/_components/SheetSteps.tsx). THE MIDDAY RULE: all-day records resolve 집 / 회사 / 사이트 / 내차 at 12:00 on their date (§15.5.6). Place points Delete now counts records as the list does (a favourite label with the point’s own name no longer blocks it)"],
     ["4.30","8 Nov 2026","#67.5 RENAME AND MERGE FOR THE REFERENCE LISTS (new §15.5.11), asked for by Hyoje on 8 Nov for his People-type clean-up (from an activity perspective to a person perspective: 친목 → 친구, 업무친목 → 업무친구, 업무지인 merged into 업무친구; 경조사 to be split record by record later). The nine reference lists now follow like activities: a new value renames, a value the list already has merges (the old row is deleted, records take the kept value — records are changed, never deleted); preview, one change-list entry, Undo until the next migration (a merge only before the tick). People lists: the dropdown combinations (가족|친목, no records) follow the rename; sheet steps for BB / BC are a regular expression matching the value as a whole | part, run twice; groups that end up side by side with the same method and type (업무친구|업무친구) are left as they are, because the migration reads them as the same people. Undo keeps, per record, exactly which fields changed (extra.hits). Values the code looks for are locked both ways. New src/lib/admin/renameRef.ts. Tested by Hyoje on fargaze-log-test and in production 8 Nov (92a2139). Ingredients, alcohol items and bowel values: after cutover (WBS 67.9). The #71 entry-app design was started and parked the same morning"],
+    ["4.31","10 Nov 2026","THE ENTRY APP (WBS #71, new §15.7), steps 1 and 2 built 8–10 Nov and tested by Hyoje on test.log.fargaze.co: Home at /entry (the landing page) with Coming up, In progress, Done and Ongoing; New, Copy recent and Stamp; plans in log_plan with Start now, Done as planned and Done now; drafts (an open record may wait for its details); the planned end (End is when it ended; plans and records still going carry plannedEnd); repeats (page still to build); presets built and hidden; long-press menus; ingredients filled from the latest record; npm run plans for a Plan tab; the Calendar draws open plans and records still going. Records made in the app carry origin: app (no sheet steps). Next: step 3, offline"],
     ["4.21","26 Oct 2026","DAILY STRIPS FOR DIET AND DRINKING; ONE RULE FOR FUTURE DAYS; MONTHS IN THE CALENDAR (§9.3.3, §9.3.4, §9.3.9). Diet: the Spicy days strip is replaced by Daily diet · carbs — each day coloured by its carbs index (below 4 blue, 4–8 amber, over 8 red), tooltip listing every food- or drink-bearing record of the day (time, meal type, items, 🌶 on a meal rated H, servings in 인분 or a drink-only record’s shared amount), opening upwards; diet.summary gains days. Drinking: a Daily drinking strip under the drinks row (below 4 blue, 4–10 amber, over 10 red), tooltip with the day’s total and each record’s items as logged and drinks; drinking.summary gains rangeStart, rangeEnd and days. Shared colours and band rule in src/app/insights/_lib/day-bands.ts. Strips and calendars in Diet, Drinking, Exercise and Sleep now cover the whole period and draw days from today on as future days (faint, no border, ‘not yet’; futureFrom = localToday()); exercise.summary gains rangeStart / rangeEnd. The calendar pop-up marks months: ‘Oct 1’ in bold on each 1st and on the first day shown, and a stepped line along each month boundary. Checked by Hyoje on 26 Oct"],
   ],
   [1100, 1300, 6960]
@@ -2509,6 +2510,51 @@ C(table(["Step","What","Status"],[
 ],[700,4300,4360]));
 C(spacer());
 
+C(h2("15.7 The Entry App (WBS #71, v4.31)"));
+C(p("Replaces daily entry in the Active sheet: a phone-first app at /entry (the site’s landing page; / redirects there), built in steps on the test database and tried on test.log.fargaze.co (a second Vercel project reading fargaze-log-test). Designed with Hyoje 8–10 Nov; steps 1 and 2 built and tested 8–10 Nov. Offline (step 3) comes next."));
+C(h3("15.7.1 Decisions"));
+C(
+  bullet("New records make no change-list entry; until cutover they live only in the database (the trial uses the test database), and #72 exports them after. A record made in the app carries origin: 'app', so editing it later shows no sheet steps (one ‘nothing to do in the sheet’ line, ticked). End now keeps the mark (bug found and fixed 10 Nov)"),
+  bullet("Field groups per activity (activity_master.groups { required, shown }), category as fallback; seeded by scripts/seed-activity-groups.ts (a group in ≥98% of an activity’s records is required, ≥50% shown, five records or more) with Hyoje’s corrections (8–9 Nov): 음주 requires only alcohols, 영화 a movie, 여행(기간) travel, 구매 cost + purchase (amount may be 0), 선물 / 선물 수령 people, 구매 - 차량 렌트 / 통신기기 a place; 기념 needs no place; 골프 레슨 no cost"),
+  bullet("Drafts: an open record (no end) may be saved without its required groups and incomplete parts (relaxOpen); ending it needs them (tightenOnEnd) — End now refuses with the list"),
+  bullet("Plans live in log_plan, never seen by Insights. A start still to come makes a plan. States open / done / deleted (done and deleted stay as tombstones; Delete has Undo). Coming up: Start now (a long press: Done now — starts and ends now, for things with no length), Started on time, Done as planned, edit (a start moved into the past makes it a record), Delete"),
+  bullet("Planned end (Hyoje, 10 Nov): End is when it actually ended. A plan has only a planned end; it travels to the record on Start, to copies (moved to today) and from repeats. An End still to come — on a plan, or a record ending later — becomes the planned end and End stays empty, so the record stays open (a draft) and shows ‘until 12:00’. Sheet records keep what was typed. The form shows it read-only (‘Planned until 12:00’ ✎ ×; ✓ / ↶ while editing); End now has a long press Ended as planned. No setting per activity (Hyoje wants no more master lists)"),
+  bullet("Repeats (log_repeat, before cutover): daily / weekly (days) / monthly (day), every N, until a date or a count; per rule Ask me or Count as done (a record once its planned end passes, on the next app open). Made 60 days ahead; a rule change replaces untouched occurrences still to come. The Repeats page is still to build"),
+  bullet("Presets were built (open / moment / length kinds) and hidden on 10 Nov (PRESETS_ON = false): Copy recent covers the need"),
+  bullet("Copy recent (and a long press on any title: Copy to new entry): same fields, today at the source’s time of day (Now if needed), End empty, the planned end moved to today; amounts kept, a foreign amount re-priced at today’s list rate; a Reset on each section card of a copy clears it"),
+  bullet("Ingredients: typing a food or drink item fills its ingredients from the latest record of that item (GET /api/entry/ingredients)"),
+  bullet("Stamps (entry_stamps, 10 Nov): one tap saves the time when there is no time to type (talking, driving), with an optional note of a few words (보고, 역으로). Not records: they wait in Stamps on Home (End now; a tap opens New with their times and the note above the form; a long press: Edit note / Delete) and appear nowhere else"),
+  bullet("Calendar: open plans are drawn from start to planned end, striped and in italics, and open in the entry app; a record still going is drawn to its planned end, striped, until End is set. The Year view counts records only. In Month view a touch anywhere in a day opens its day list (a mouse still opens the event)"),
+  bullet("Place starts empty; Place (picker, favourite labels first) + Detail make ‘A - B’. The zone comes from the phone (the list code whose zone and offset match). Google Calendar sync and 심리 측정: after cutover"),
+  bullet("A Plan tab in the Archive file uploads plans: npm run plans (-- --check first): Staging’s checks, End read as the planned end, an open plan already there stops the run; a passed start or missing ingredients only warn"),
+);
+C(h3("15.7.2 Home (/entry)"));
+C(
+  bullet("Top: + New, Copy recent (a searchable list of recent records), Stamp"),
+  bullet("Stamps (only when any), Coming up (today’s plans and overdue ones), In progress (since 9:30 · until 12:00; End now), Done today (duration; a tap opens the record pane with Edit), Ongoing (folded: long-term open records and all-day ones). Newest first"),
+  bullet("Every action has a toast with Undo. Long press (half a second; a right-click on a computer) opens a small menu at the foot of the screen; the phone’s text selection and link menu are held back"),
+);
+C(h3("15.7.3 The Form"));
+C(
+  bullet("The #70 RecordEditor in modes new / plan / edit, with the activity’s rules (required sections marked ‘· required’). Dense phone layout: Activity : Title 3:7, Additional info folded, Cross activity and Relationship in one row, time rows on one line with the weekday, Now and Later (10 / 30 / 60 min) on the label line, Place : Detail 6:4, Online / Someone else’s place 5:5; bowel amount as pills, 길에서 and 바지에 behind More"),
+  bullet("A plan’s form has Planned end instead of End. Buttons: Save, End now (saves at once), Cancel; on a plan Done as planned and Started on time"),
+);
+C(h3("15.7.4 Data and Code"));
+C(
+  bullet("Collections: log_plan (the log schema + plan { state, repeatId, occurrence, edited, recordId, doneBy, doneAt, deletedAt }; unique userId + repeatId + occurrence), log_repeat, entry_presets, entry_stamps. New fields on log: origin, plannedEnd (same shape as end)"),
+  bullet("src/lib/entry/: time.ts, groups.ts, drafts.ts (relaxOpen, tightenOnEnd, endAheadToPlanned), forms.ts (blankForm, copyForm, presetForm, resetSection — pure, safe on the phone), save.ts (checkEntry, createEntry, confirmPlan now / onTime / done / nowDone, adjust, delete, restore, endRecord, settleOne), repeats.ts, presets.ts, stamps.ts, home.ts, reply.ts"),
+  bullet("Routes /api/entry/: home, check, records (+ [id] DELETE = Undo of a new record, [id]/end), rules, plans/[id] (+ confirm, restore), repeats, presets, stamps (+ [id]), recent, ingredients. Pages: src/app/entry (Home, new, plan/[id]); _components/LongPress.tsx. Calendar: buildPlanEvents, buildRecordEvents in src/lib/calendar/calendar.ts. Scripts: seed-activity-groups.ts, upload-plans.ts"),
+);
+C(h3("15.7.5 Order of Work"));
+C(table(["Step","What","Status"],[
+  ["1","Rules on activity_master, the entry API, plans, repeats, presets","Done 8 Nov"],
+  ["2","Home, New, Copy recent, plans, drafts, Stamp, planned end, long-press menus, Calendar plans","Done 9–10 Nov (2a–2b-8, tested by Hyoje). Left: the Repeats page; Required / Shown columns on /admin/activity"],
+  ["3","Offline PWA: service worker, lists on the phone, a queue with phone-made IDs","Next"],
+  ["4","Trial on test.log.fargaze.co entering the same data as Staging; comparison script test vs production","—"],
+  ["5","History / Future import, #72 export, cutover (#74)","—"],
+],[700,4300,4360]));
+C(spacer());
+
 C(new Paragraph({ children: [new TextRun({ text: "Appendices", bold: true, size: 28 })], spacing: { before: 280, after: 140 } }));
 
 // ===== APPENDICES =====
@@ -2711,7 +2757,7 @@ C(table(["Path","Purpose"],[
 C(spacer());
 
 // ===== FOOTER =====
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.30 — 8 November 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.31 — 10 November 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 
 // ===== DOCUMENT ASSEMBLY =====
@@ -2748,6 +2794,6 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-Log-Data-Design-v4.30.docx", buffer);
-  console.log("Wrote FarGaze-Log-Data-Design-v4.30.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-Log-Data-Design-v4.31.docx", buffer);
+  console.log("Wrote FarGaze-Log-Data-Design-v4.31.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });

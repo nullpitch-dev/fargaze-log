@@ -11,7 +11,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Service Concept & Work Breakdown Structure", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 3.30  |  8 November 2026", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 3.31  |  10 November 2026", size: 24 })], spacing: { after: 240 } }),
 );
 
 C(h1("Version History"));
@@ -61,6 +61,7 @@ C(table(["Version","Date","Headline"],[
   ["3.25","27 Oct 2026","#70 step 1 DONE (production check passed; 28 broken-time records fixed in the sheet; full migration recalculated weekdays). Step 2 BUILT: bulk Find & replace API (Design Doc §15.6.3)"],
   ["3.29","8 Nov 2026","#70 EDIT FEATURE DONE: step 4, the Find & replace page, tested on the test database and pushed 8 Nov (Design Doc v4.29 §15.6.3); items can be replaced as part of the text, with a guard for ingredients; sheet steps show bold counts and copy the Find / Replace text with a click; all-day records resolve favourite labels at midday; Place points Delete counts as the list does. Next: #71, the entry app"],
   ["3.30","8 Nov 2026","67.5 DONE: rename and merge for the nine reference lists, past records following (Design Doc v4.30 §15.5.11), for Hyoje’s People-type clean-up (친목 → 친구, 업무친목 → 업무친구, 업무지인 merged into 업무친구); tested on the test database and in production 8 Nov. New 67.9: rename for ingredients, alcohol items and bowel values, the first job after cutover. #71 entry-app design started and parked"],
+  ["3.31","10 Nov 2026","#71 STEPS 1 AND 2 DONE (Design Doc v4.31 §15.7): the entry API (8 Nov) and the /entry pages (9–10 Nov), tested by Hyoje on test.log.fargaze.co — Home with Coming up / In progress / Done / Ongoing, New, Copy recent, Stamp, plans with Start now / Done as planned / Done now, drafts, the planned end, long-press menus, Calendar plans, npm run plans. Left in step 2: the Repeats page, Required / Shown on /admin/activity. Next: step 3, offline"],
   ["3.28","7 Nov 2026","67.8 place details “A - B” DONE (pushed 7 Nov): the longest name with a point wins, counts ‘(N with details)’, renames carry everything under the name. Place points page tools from Hyoje’s testing: Changed column, foldable parts, Missing points with + Add point, Exclude / Put back and Rename for a name with no point (Design Doc v4.28 §15.5.9–15.5.10). Next: #70 step 4, the Find & replace page"],
   ["3.27","7 Nov 2026","#70 step 3 DONE (pushed 7 Nov): the edit page /records/<id> with English labels, checked as you type, plain change lines with an × to put each back, a Saved screen with Mark repeated and Undo, and the Record changes page (brought forward from step 4) in the gear menu with a count. New rules from Hyoje’s testing: Relationship follows People (the sheet’s formula), a people group needs a name, a 이동 record needs its whole journey (Staging too). Step 4 is now the Find & replace page only (Design Doc §15.6)"],
   ["3.26","5 Nov 2026","#70 step 2 DONE. 67.7 place points after Hyoje’s trip DONE: search, tapped places, one Use this point and name button, no sheet steps for place points (Design Doc §15.5.8). 67.8 place details “A - B” AGREED, to build after #70 step 3 (§15.5.9)"],
@@ -122,7 +123,7 @@ C(table(["Phase","Status","Detail"],[
   ["5 — Data Entry","In progress","Started 19 Oct 2026; plan in Design Doc §15 and the Data Entry Plan document. Done: nightly backups + rehearsed restore (22 Oct), sheet survey (23 Oct); #67 in progress (24 Oct). Target cutover on or before 1 Jan 2027"],
 ],[2900,1700,4760]));
 C(spacer());
-C(p([new TextRun({ text: "Current focus: ", bold: true }), new TextRun("Phase 5 (data entry), started 19 Oct after #63 Journeys was completed. Backups are done (22 Oct) and the sheet survey is done (23 Oct). #67, the master lists in the database with one generic admin editor, is in progress: steps 1–4 of 5 done 25 Oct (step 4: the migration refuses unknown values; master loaders removed); on 26 Oct the admin pages gained a gear menu with pinned shortcuts and place points gained record counts, rename and merge, and a map (67.6); rename for the reference lists followed on 8 Nov (67.5, for the People-type clean-up); ingredients, alcohol items and bowel values come after cutover (67.9). #68, the Staging tab and migration, was done on 26 Oct: day to day, new records go up by npm run staging. #69 was reduced the same day: local dev reads the test database, refreshed from the nightly backup, with no sync script. #73, the year rollover, was brought forward and done on 26 Oct so the one hard deadline is safe. #70, the edit feature, was designed on 27 Oct; its single-record and bulk Find & replace APIs are done (5 Nov) and so is the edit page with Record changes (7 Nov); place details (67.8) were done the same day, and the Find & replace page on 8 Nov, which completes #70. Next is #71, the entry app, whose design was started on 8 Nov. Honest estimate for cutover by 1 January: about 55% (#71, the entry app, is the big risk; a slip only moves the date). New widgets wait until after cutover.")]));
+C(p([new TextRun({ text: "Current focus: ", bold: true }), new TextRun("Phase 5 (data entry), started 19 Oct after #63 Journeys was completed. Backups are done (22 Oct) and the sheet survey is done (23 Oct). #67, the master lists in the database with one generic admin editor, is in progress: steps 1–4 of 5 done 25 Oct (step 4: the migration refuses unknown values; master loaders removed); on 26 Oct the admin pages gained a gear menu with pinned shortcuts and place points gained record counts, rename and merge, and a map (67.6); rename for the reference lists followed on 8 Nov (67.5, for the People-type clean-up); ingredients, alcohol items and bowel values come after cutover (67.9). #68, the Staging tab and migration, was done on 26 Oct: day to day, new records go up by npm run staging. #69 was reduced the same day: local dev reads the test database, refreshed from the nightly backup, with no sync script. #73, the year rollover, was brought forward and done on 26 Oct so the one hard deadline is safe. #70, the edit feature, was designed on 27 Oct; its single-record and bulk Find & replace APIs are done (5 Nov) and so is the edit page with Record changes (7 Nov); place details (67.8) were done the same day, and the Find & replace page on 8 Nov, which completes #70. #71, the entry app, was designed on 8 Nov; its steps 1 (API) and 2 (the /entry pages: Home, New, Copy recent, plans, drafts, Stamp, the planned end, Calendar plans) were built and tested 8–10 Nov (Design Doc §15.7); step 3, offline, is next. Honest estimate for cutover by 1 January: about 55% (#71, the entry app, is the big risk; a slip only moves the date). New widgets wait until after cutover.")]));
 
 C(h1("5. Work Breakdown Structure"));
 C(p("\u2705 = Complete   \u2B1C = Pending   DESCOPED = out of MVP scope. Each line states current state, not how it evolved (see the changelog for history)."));
@@ -530,6 +531,7 @@ C(
   bullet("\u2705 69. Test database — reduced 26 Oct: local dev on fargaze-log-test (.env.development.local), refreshed by the restore-to-test workflow; no sync script"),
   bullet("\u2705 70. Edit feature with its change list — test database first, then production. Designed 26–27 Oct (Design Doc §15.6): one form on the record’s own shape (reused by #71), one change-list line per changed cell, deleted records to log_trash, bulk Find & replace for text fields. Steps: 1 single-record API (done 27 Oct) · 2 bulk API (done 5 Nov) · 3 edit page and Record changes (done 7 Nov) · 4 Find & replace page (done 8 Nov) · 5 test, then production (done 8 Nov)"),
   bullet("\u2B1C 71. Entry app: one flexible form (field-group rules per activity, category as fallback, seeded from the survey), offline-first PWA on Android, changeable start / end time zones, on the test database; comparison report against production (replaces old items 1, 2 and 4). Must cover open activities (History sheet) and future plans (Future sheet); 심리 측정 as one more field group with a one-off import of the Happiness tab (recommended, awaiting Hyoje)"),
+  bullet("    71 progress (Design Doc §15.7): 1 entry API (done 8 Nov) · 2 /entry pages (done 9–10 Nov; left: Repeats page, Required / Shown on /admin/activity) · 3 offline PWA (next) · 4 trial on test.log.fargaze.co + comparison script · 5 History / Future import, then #72 and #74"),
   bullet("\u2B1C 72. Nightly export from the database to a spreadsheet, proven on test"),
   bullet("\u2705 73. Year rollover: migration tab names from a setting; in early January merge 2026 into ~2025 → ~2026 and add a 2027 tab — brought forward and done 26 Oct (tab names checked against the stored archive year; wrong-tab records refused; npm run migrate -- --full --rollover; Design Doc §11.8); production check passed 26 Oct; reminders set for 12 Dec, 1 Jan and 2 Jan"),
   bullet("\u2B1C 74. Cutover"),
@@ -647,7 +649,7 @@ C(
 );
 C(spacer());
 
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze — Service Concept & WBS v3.30 — 8 November 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze — Service Concept & WBS v3.31 — 10 November 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 const doc = new Document({
   styles: {
@@ -673,6 +675,6 @@ const doc = new Document({
   sections: [{ properties: { page: PAGE }, children }],
 });
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-WBS-v3.30.docx", buffer);
-  console.log("Wrote FarGaze-WBS-v3.30.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-WBS-v3.31.docx", buffer);
+  console.log("Wrote FarGaze-WBS-v3.31.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });

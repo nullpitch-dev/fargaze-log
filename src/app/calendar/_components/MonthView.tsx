@@ -210,7 +210,8 @@ export function Bar({ p, top, height, color, compact, onClick, onTouchDay, cols 
         top: top + 1, height: height - 2, lineHeight: `${height - 2}px`,
         background: color, color: textOn(color), opacity: p.event.future ? 0.55 : 1,
         // A plan (#71): striped and in italics.
-        ...(p.event.plan ? { backgroundImage: 'repeating-linear-gradient(135deg, rgba(255,255,255,.38) 0 3px, transparent 3px 7px)', fontStyle: 'italic' } : {}),
+        ...(p.event.plan || p.event.untilPlanned ? { backgroundImage: 'repeating-linear-gradient(135deg, rgba(255,255,255,.38) 0 3px, transparent 3px 7px)' } : {}),
+        ...(p.event.plan ? { fontStyle: 'italic' } : {}),   // stripes: the end isn't real yet; italics: a plan
         borderRadius: `${p.continuesBefore ? 0 : 3}px ${p.continuesAfter ? 0 : 3}px ${p.continuesAfter ? 0 : 3}px ${p.continuesBefore ? 0 : 3}px`,
       }}>
       {p.continuesBefore ? '‹ ' : ''}{labelOf(p.event)}
