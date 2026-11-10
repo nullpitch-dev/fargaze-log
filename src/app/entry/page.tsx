@@ -17,7 +17,7 @@ import { localNow, zoneCodeFor, type ZoneRow } from '@/lib/entry/time';
 interface Point { date: string; hour: string; timezone: string }
 interface Item { id: string; activity: string; category: string; title: string; start: Point; end: Point; place: string; updatedAt: string; repeat?: boolean; started?: boolean; plannedEnd?: { date: string; hour: string } | null }
 interface Preset { id: string; name: string; order: number; time: { kind: 'open' | 'moment' | 'length'; minutes: number | null } }
-interface Home { today: string; comingUp: Item[]; inProgress: Item[]; done: Item[]; ongoing: Item[]; recent: Item[]; presets: Preset[] }
+interface Home { today: string; comingUp: Item[]; inProgress: Item[]; done: Item[]; ongoing: Item[]; lastPlace: string; recent: Item[]; presets: Preset[] }
 interface Toast { text: string; undo?: () => Promise<string | null> }
 
 const btn = 'px-3 py-1.5 rounded text-sm border disabled:opacity-40 disabled:cursor-not-allowed';
@@ -182,7 +182,7 @@ function EntryHome() {
   if (!data) return <div className="px-4 py-8 max-w-3xl mx-auto w-full text-sm text-stone-500 dark:text-zinc-400">Loading…</div>;
 
   const today = data.today;
-  const lastPlace = [...data.done, ...data.inProgress].reverse().find(r => r.place)?.place ?? '';
+  const lastPlace = data.lastPlace;
   const newHref = (extra: Record<string, string> = {}) => `/entry/new?${new URLSearchParams({ ...(lastPlace ? { place: lastPlace } : {}), ...extra })}`;
   const recent = copyQ.trim() ? (found ?? data.recent.filter(r => name(r).toLowerCase().includes(copyQ.trim().toLowerCase()))) : data.recent;
 

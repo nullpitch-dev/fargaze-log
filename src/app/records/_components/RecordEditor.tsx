@@ -31,6 +31,7 @@ import { ChangeTable, type Line, type Plain } from './ChangeTable';
 import { relationshipOf } from '@/lib/records/relationship';
 import { rulesFor, type EntryGroup } from '@/lib/entry/groups';
 import { addMinutes, localNow, zoneCodeFor, type ZoneRow } from '@/lib/entry/time';
+import { resetValues } from '@/lib/entry/forms';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -195,12 +196,13 @@ const danger = `${btn} border-red-300 text-red-700 hover:bg-red-50 dark:border-r
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
-export function RecordEditor({ id, mode = 'edit', initial, presetId }: { id: string; mode?: EditorMode; initial?: RecordForm; presetId?: string }) {
+export function RecordEditor({ id, mode = 'edit', initial, presetId, copied }: { id: string; mode?: EditorMode; initial?: RecordForm; presetId?: string; copied?: boolean }) {
   const router = useRouter();
   const entryMode = mode !== 'edit';
   const [entryOpts, setEntryOpts] = useState<EntryOptions | null>(null);
   const [laterOpen, setLaterOpen] = useState(false);
   const [bowelMore, setBowelMore] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
   const [presetBox, setPresetBox] = useState<null | { name: string; kind: 'open' | 'moment' | 'length'; minutes: string; error: string; saved: boolean }>(null);
   const [rec, setRec] = useState<Loaded | null>(null);
   const [opts, setOpts] = useState<FormOptions | null>(null);
@@ -595,37 +597,42 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId }: { id: str
     const wd = weekdayText(p.date);
     return (
       <div className="flex flex-col gap-1">
-        <span className="text-xs text-stone-500 dark:text-zinc-400">{which === 'start' ? 'Start' : 'End'}</span>
-        <div className="grid grid-cols-2 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,1fr)] gap-2">
-          <div className="col-span-2 sm:col-span-1 flex items-center gap-2">
-            <input type="date" value={p.date} onChange={e => setPoint(which, { date: e.target.value })} aria-label={`${which} date`} className={`${inputCls} flex-1 min-w-0`} />
-            <span className="w-8 shrink-0 text-xs text-stone-500 dark:text-zinc-400">{wd.slice(0, 3)}</span>
-          </div>
-          {pickerTime(p.hour) != null
-            ? <input type="time" value={pickerTime(p.hour)!} onChange={e => setPoint(which, { hour: e.target.value })} aria-label={`${which} time`} className={`${inputCls} font-mono`} />
-            : <input value={p.hour} onChange={e => setPoint(which, { hour: e.target.value })} placeholder="H:mm" aria-label={`${which} time`} className={`${inputCls} font-mono`} />}
-          <Select value={p.timezone} onChange={v => patch(which, { timezone: v })} options={lookups.zones} empty="Zone" />
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-stone-500 dark:text-zinc-400">{which === 'start' ? 'Start' : 'End'}{wd ? ` · ${wd.slice(0, 3)}` : ''}</span>
+          <span className="flex-1" />
+          {nowLater(which)}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button type="button" className={addBtn} onClick={() => (which === 'start' ? setStart(nowPoint()) : setPoint('end', nowPoint()))}>Now</button>
-          {which === 'start' && (
-            <span className="relative">
-              <button type="button" className={addBtn} aria-expanded={laterOpen} onClick={() => setLaterOpen(v => !v)}>Later ▾</button>
-              {laterOpen && (
-                <span className="absolute left-0 top-full mt-1 z-30 flex gap-1 rounded border border-stone-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-1 shadow">
-                  {[10, 30, 60].map(m => (
-                    <button key={m} type="button" className="px-2 py-1 rounded text-xs whitespace-nowrap text-stone-700 dark:text-zinc-200 hover:bg-stone-100 dark:hover:bg-zinc-800" onClick={() => setStart(nowPoint(m))}>
-                      {m < 60 ? `${m} min` : '1 hour'}
-                    </button>
-                  ))}
-                </span>
-              )}
-            </span>
-          )}
+        {/* date and time get the room; the zone box shows its code (GMT) on a narrow phone */}
+        <div className="grid grid-cols-[minmax(0,125fr)_minmax(0,88fr)_minmax(0,60fr)] sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)] gap-1.5">
+          <input type="date" value={p.date} onChange={e => setPoint(which, { date: e.target.value })} aria-label={`${which} date`} className={`${inputCls} min-w-0 px-1 text-[13px] sm:text-sm`} />
+          {pickerTime(p.hour) != null
+            ? <input type="time" value={pickerTime(p.hour)!} onChange={e => setPoint(which, { hour: e.target.value })} aria-label={`${which} time`} className={`${inputCls} font-mono min-w-0 px-1 text-[13px] sm:text-sm`} />
+            : <input value={p.hour} onChange={e => setPoint(which, { hour: e.target.value })} placeholder="H:mm" aria-label={`${which} time`} className={`${inputCls} font-mono min-w-0 px-1 text-[13px] sm:text-sm`} />}
+          <Select value={p.timezone} onChange={v => patch(which, { timezone: v })} options={lookups.zones} empty="Zone"
+            className="min-w-0 max-sm:appearance-none max-sm:px-1 max-sm:text-center max-sm:text-[13px]" />
         </div>
       </div>
     );
   };
+  const nowLater = (which: 'start' | 'end') => (
+    <span className="flex items-center gap-1.5">
+      <button type="button" className={addBtn} onClick={() => (which === 'start' ? setStart(nowPoint()) : setPoint('end', nowPoint()))}>Now</button>
+      {which === 'start' && (
+        <span className="relative">
+          <button type="button" className={addBtn} aria-expanded={laterOpen} onClick={() => setLaterOpen(v => !v)}>Later ▾</button>
+          {laterOpen && (
+            <span className="absolute right-0 top-full mt-1 z-30 flex gap-1 rounded border border-stone-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-1 shadow">
+              {[10, 30, 60].map(m => (
+                <button key={m} type="button" className="px-2 py-1 rounded text-xs whitespace-nowrap text-stone-700 dark:text-zinc-200 hover:bg-stone-100 dark:hover:bg-zinc-800" onClick={() => setStart(nowPoint(m))}>
+                  {m < 60 ? `${m} min` : '1 hour'}
+                </button>
+              ))}
+            </span>
+          )}
+        </span>
+      )}
+    </span>
+  );
 
   const wholeOn = whole != null;
   const foodShares = portionsFromAmounts(f.food.foods);
@@ -717,6 +724,12 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId }: { id: str
         <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <h1 className="text-lg font-semibold text-stone-800 dark:text-zinc-100">{mode === 'new' ? 'New' : mode === 'plan' ? 'Plan' : 'Edit record'}</h1>
           {mode === 'edit' && <span className="text-xs text-stone-500 dark:text-zinc-400">Tab {rec.tab ?? '(none)'} · <span className="font-mono break-all">{rec.findRow}</span></span>}
+          {mode === 'new' && copied && (
+            <span className="flex items-center gap-2 mt-1">
+              <button type="button" className={`${secondary} whitespace-nowrap`} onClick={() => setForm(resetValues(f))}>Reset values</button>
+              <span className="text-xs text-stone-500 dark:text-zinc-400">Clears amounts, scores, body, sleep, bowel and notes from the copy.</span>
+            </span>
+          )}
           {mode === 'plan' && <span className="text-xs text-stone-500 dark:text-zinc-400">Change anything; a start that has passed makes it a record.</span>}
           {mode === 'plan' && (
             <span className="flex flex-wrap gap-2 mt-1">
@@ -740,19 +753,22 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId }: { id: str
           )}
 
           <Section title="Activity">
-            <Row>
-              <Field label="Activity" note={f.activity.name.trim() ? (category ? `Category: ${category}` : 'Not in Activities') : undefined}>
+            {/* Denser on the Fold 6 outer screen (Hyoje, 9 Nov): pairs share a row everywhere. */}
+            <div className="grid grid-cols-[minmax(0,3fr)_minmax(0,7fr)] gap-3">
+              <Field label="Activity" note={f.activity.name.trim() ? (category ? category : 'Not in Activities') : undefined}>
                 <Text value={f.activity.name} onChange={v => patch('activity', { name: v })} suggest={lookups.activityNames} describe={v => lookups.actCat.get(v)} />
               </Field>
               <Field label="Title"><Text value={f.activity.title} onChange={v => patch('activity', { title: v })} /></Field>
-            </Row>
-            <Field label="Additional info"><Text value={f.activity.additionalInfo} onChange={v => patch('activity', { additionalInfo: v })} /></Field>
-            <Row>
+            </div>
+            {infoOpen || f.activity.additionalInfo.trim()
+              ? <Field label="Additional info"><Text value={f.activity.additionalInfo} onChange={v => patch('activity', { additionalInfo: v })} /></Field>
+              : <div><button type="button" className={addBtn} onClick={() => setInfoOpen(true)}>+ Additional info</button></div>}
+            <div className="grid grid-cols-2 gap-3">
               <Field label="Cross activity"><Select value={f.activity.crossActivity} onChange={v => patch('activity', { crossActivity: v })} options={ref('activity.crossActivity')} /></Field>
-              <Field label="Relationship" note="Follows People">
+              <Field label="Relationship">
                 <div aria-readonly data-testid="relationship" className="rounded border border-stone-200 dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800 px-2 py-1.5 text-sm text-stone-600 dark:text-zinc-300">{relationshipOf(f.people)}</div>
               </Field>
-            </Row>
+            </div>
           </Section>
 
           <Section title="Time">
@@ -763,22 +779,22 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId }: { id: str
 
           <Section title={`Place${req('place')}`}>
             {entryMode ? (
-              <Row>
-                <Field label="Place" note="집 / 회사 / 사이트 / 내차 or a place's name">
+              <div className="grid grid-cols-[minmax(0,6fr)_minmax(0,4fr)] gap-3">
+                <Field label="Place">
                   <Text value={splitPlace(f.location.activity)[0]} onChange={v => patch('location', { activity: joinPlace(v, splitPlace(f.location.activity)[1]) })}
                     suggest={[...(entryOpts?.labels ?? []), ...used.places.filter(x => !(entryOpts?.labels ?? []).includes(x))]} />
                 </Field>
-                <Field label="Detail" note="Room, shop, course … saved as “Place - Detail”">
+                <Field label="Detail">
                   <Text value={splitPlace(f.location.activity)[1]} onChange={v => patch('location', { activity: joinPlace(splitPlace(f.location.activity)[0], v) })} />
                 </Field>
-              </Row>
+              </div>
             ) : (
               <Field label="Place"><Text value={f.location.activity} onChange={v => patch('location', { activity: v })} suggest={used.places} /></Field>
             )}
-            <Row>
+            <div className="grid grid-cols-2 gap-3">
               <Field label="Online"><Text value={f.location.online} onChange={v => patch('location', { online: v })} suggest={used.online} /></Field>
               <Field label="Someone else’s place"><Text value={f.location.other} onChange={v => patch('location', { other: v })} suggest={used.places} /></Field>
-            </Row>
+            </div>
           </Section>
 
           {shown('people') && (
@@ -930,7 +946,10 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId }: { id: str
 
           {shown('bowel') && (
             <Section title={`Bowel${req('bowel')}`} onRemove={removeBtn('bowel')}>
-              <div className="sm:w-1/2"><Field label="Amount"><Select value={f.bowel.amount} onChange={v => patch('bowel', { amount: v })} options={opts.bowel.amount} /></Field></div>
+              <div className="flex flex-col gap-1"><span className="text-xs text-stone-500 dark:text-zinc-400">Amount</span>
+                {/* pills like Quality, but one choice (a tap on the chosen one clears it) */}
+                <ToggleChips values={f.bowel.amount ? [f.bowel.amount] : []} options={opts.bowel.amount}
+                  onChange={v => patch('bowel', { amount: v.filter(x => x !== f.bowel.amount)[0] ?? '' })} /></div>
               <div className="flex flex-col gap-1"><span className="text-xs text-stone-500 dark:text-zinc-400">Quality</span>
                 <ToggleChips values={f.bowel.quality} onChange={v => patch('bowel', { quality: v })}
                   options={bowelMore ? opts.bowel.quality : opts.bowel.quality.filter(o => !BOWEL_FOLDED.includes(o) || f.bowel.quality.includes(o))} /></div>

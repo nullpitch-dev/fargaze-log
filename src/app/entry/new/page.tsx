@@ -54,7 +54,7 @@ function NewEntry() {
 
   if (error) return <div className="px-4 py-8 max-w-3xl mx-auto w-full text-sm text-red-700 dark:text-red-300">{error}</div>;
   if (!initial) return <div className="px-4 py-8 max-w-3xl mx-auto w-full text-sm text-stone-500 dark:text-zinc-400">Loading…</div>;
-  return <RecordEditor id={id} mode="new" initial={initial} presetId={presetId} />;
+  return <RecordEditor id={id} mode="new" initial={initial} presetId={presetId} copied={!!params.get('copy')} />;
 }
 
 export default function NewEntryPage() {

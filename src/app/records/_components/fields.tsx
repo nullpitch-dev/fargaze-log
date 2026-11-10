@@ -123,11 +123,11 @@ export function Text({ value, onChange, placeholder, suggest, describe, onPick, 
 export interface Opt { value: string; label?: string }
 
 /** A list value. An old value that is no longer in the list stays, marked. */
-export function Select({ value, onChange, options, empty = '—' }: { value: string; onChange: (v: string) => void; options: (string | Opt)[]; empty?: string }) {
+export function Select({ value, onChange, options, empty = '—', className = '' }: { value: string; onChange: (v: string) => void; options: (string | Opt)[]; empty?: string; className?: string }) {
   const opts = options.map(o => (typeof o === 'string' ? { value: o } : o));
   const missing = value !== '' && !opts.some(o => o.value === value);
   return (
-    <select value={value} onChange={e => onChange(e.target.value)} className={`${inputCls} ${missing ? 'border-red-400 dark:border-red-500' : ''}`}>
+    <select value={value} onChange={e => onChange(e.target.value)} className={`${inputCls} ${missing ? 'border-red-400 dark:border-red-500' : ''} ${className}`}>
       <option value="">{empty}</option>
       {missing && <option value={value}>{value} (not in the list)</option>}
       {opts.map(o => <option key={o.value} value={o.value}>{o.label ?? o.value}</option>)}

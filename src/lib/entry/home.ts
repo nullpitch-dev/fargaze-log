@@ -37,6 +37,8 @@ const pad = (x: unknown) => String(x ?? '').padStart(2, '0');
 const dateOf = (p: any) => (p?.year && p?.month && p?.day ? `${p.year}-${pad(p.month)}-${pad(p.day)}` : '');
 
 const SLEEP = '수면';
+/** 'YYYY-MM-DD HH:mm' for ordering; an all-day point sorts at the start of its day. */
+const key = (p: { date: string; hour: string }) => `${p.date} ${(p.hour || '0:00').padStart(5, '0')}`;
 const isOpenRec = (r: any) => !r?.end?.year || (!!r?.start?.hour && !r?.end?.hour);
 
 export async function home(userId: string, iana = 'Europe/London', now = Date.now()) {
@@ -53,7 +55,8 @@ export async function home(userId: string, iana = 'Europe/London', now = Date.no
   }).sort({ 'start.datetime': 1 }).lean() as any[];
   const comingUp = plans
     .filter(p => dateOf(p.start) && dateOf(p.start) <= today)
-    .map(p => item(p, { repeat: !!p.plan?.repeatId, started: (instantOf(p.start) ?? 0) <= now }));
+    .map(p => item(p, { repeat: !!p.plan?.repeatId, started: (instantOf(p.start) ?? 0) <= now }))
+    .sort((a, b) => key(b.start).localeCompare(key(a.start)));
 
   const [open, ended, latest] = await Promise.all([
     // Open: no end at all, or a start time without an end time (as the form says).
@@ -79,10 +82,18 @@ export async function home(userId: string, iana = 'Europe/London', now = Date.no
     else if (day < today) ongoing.push(it);
     else inProgress.push(it);           // started later today (a time set ahead by hand)
   }
-  inProgress.sort((a, b) => `${a.start.date} ${a.start.hour.padStart(5, '0')}`.localeCompare(`${b.start.date} ${b.start.hour.padStart(5, '0')}`));
+  // Newest first in every list (Hyoje, 9 Nov): the older, the lower.
+  inProgress.sort((a, b) => key(b.start).localeCompare(key(a.start)));
+  ongoing.sort((a, b) => key(b.start).localeCompare(key(a.start)));
 
   // Done: ended today, whenever they started.
-  const done = (ended as any[]).filter(r => !isOpenRec(r)).map(r => item(r));
+  const done = (ended as any[]).filter(r => !isOpenRec(r)).map(r => item(r))
+    .sort((a, b) => key(b.end).localeCompare(key(a.end)));
+
+  // A new entry starts at the place of the latest thing today (ended, or started and still going).
+  const latestToday = [...done.map(d => ({ at: key(d.end), place: d.place })), ...inProgress.filter(i => i.start.date === today).map(i => ({ at: key(i.start), place: i.place }))]
+    .filter(x => x.place).sort((a, b) => b.at.localeCompare(a.at))[0];
+  const lastPlace = latestToday?.place ?? '';
 
   // Copy recent: the latest record of each activity + title, newest first.
   const seen = new Set<string>();
@@ -101,6 +112,7 @@ export async function home(userId: string, iana = 'Europe/London', now = Date.no
     inProgress,
     done,
     ongoing,
+    lastPlace,
     recent,
     presets: await listPresets(userId),
     refreshed,
