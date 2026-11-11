@@ -170,6 +170,17 @@ function EntryHome() {
   }
 
   const startNow = (it: Item) => act(`s${it.id}`, () => call(`/api/entry/plans/${it.id}/confirm`, 'POST', { updatedAt: it.updatedAt, how: 'now', now: nowPoint() }), { text: `${it.activity} started` });
+  const startOnTime = (it: Item) => act(`s${it.id}`, () => call(`/api/entry/plans/${it.id}/confirm`, 'POST', { updatedAt: it.updatedAt, how: 'onTime' }), { text: `${it.activity} started at ${it.start.hour}` });
+  const deletePlan = (it: Item) => act(`x${it.id}`, () => call(`/api/entry/plans/${it.id}`, 'DELETE', { updatedAt: it.updatedAt }), {
+    text: 'Plan deleted',
+    undo: async () => { const r = await call(`/api/entry/plans/${it.id}/restore`, 'POST'); return r.ok ? null : r.b.error ?? 'Undo failed'; },
+  });
+  // A record goes to the trash, as on the edit page. One from the sheet also waits on
+  // Record changes until its row is deleted there.
+  const deleteRecord = (it: Item) => act(`x${it.id}`, () => call(`/api/records/${it.id}`, 'DELETE', { updatedAt: it.updatedAt }), b => ({
+    text: b.noSheet ? 'Record deleted' : 'Record deleted — delete its row in the sheet too (Record changes)',
+    undo: async () => { const r = await call(`/api/admin/changes/${b.changeId}/undo`, 'POST'); return r.ok ? null : r.b.error ?? 'Undo failed'; },
+  }));
   const doneNow = (it: Item) => act(`d${it.id}`, () => call(`/api/entry/plans/${it.id}/confirm`, 'POST', { updatedAt: it.updatedAt, how: 'nowDone', now: nowPoint() }), { text: `${it.activity} done` });
   // Stamps.
   async function stamp() {
@@ -244,13 +255,23 @@ function EntryHome() {
   const newHref = (extra: Record<string, string> = {}) => `/entry/new?${new URLSearchParams(extra)}`;
   const recent = copyQ.trim() ? (found ?? data.recent.filter(r => name(r).toLowerCase().includes(copyQ.trim().toLowerCase()))) : data.recent;
 
-  // A long press on a title: Copy to new entry (a plan in Coming up copies from log_plan).
+  // A long press on a title: Copy to new entry, Delete (Hyoje, 11 Nov); a plan in Coming up
+  // copies from log_plan and can also be Started as planned.
   const copyMenu = (it: Item, plan = false) => press(() => setMenu({ title: name(it), actions: [
     { label: 'Copy to new entry', hint: 'Same fields, starting today at its time', run: () => router.push(newHref({ copy: it.id, ...(plan ? { from: 'plan' } : {}) })) },
+    ...(plan ? startedAsPlanned(it) : []),
+    plan
+      ? { label: 'Delete', hint: 'Undo on the toast brings it back', run: () => deletePlan(it) }
+      : { label: 'Delete', hint: 'It goes to the trash; Undo on the toast brings it back', run: () => deleteRecord(it) },
   ] }));
+  // Started as planned: a record from the plan's own start, still going (Hyoje, 11 Nov).
+  const startedAsPlanned = (it: Item) => it.start.hour
+    ? [{ label: `Started as planned (${it.start.hour})`, hint: 'Starts it at its planned start; End now later', run: () => startOnTime(it) }]
+    : [];
   // A long press on Start now: Done now, for things with no length.
   const startMenu = (it: Item) => press(() => setMenu({ title: name(it), actions: [
     { label: 'Done now', hint: 'Starts and ends now — for things with no length, like paying a bill', run: () => doneNow(it) },
+    ...startedAsPlanned(it),
     { label: 'Start now', hint: 'Starts now; End now later', run: () => startNow(it) },
   ] }));
 

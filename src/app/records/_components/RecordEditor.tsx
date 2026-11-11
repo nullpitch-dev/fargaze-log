@@ -31,7 +31,7 @@ import { ChangeTable, type Line, type Plain } from './ChangeTable';
 import { relationshipOf } from '@/lib/records/relationship';
 import { rulesFor, type EntryGroup } from '@/lib/entry/groups';
 import { addMinutes, localNow, zoneCodeFor, type ZoneRow } from '@/lib/entry/time';
-import { RESETTABLE, resetSection, type ResettableSection } from '@/lib/entry/forms';
+import { RESETTABLE, resetSection, HOME_CURRENCY, type ResettableSection } from '@/lib/entry/forms';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -167,9 +167,22 @@ const round3 = (x: number) => Math.round(x * 1000) / 1000;
 /** JSON without the page-only portions. */
 export const formJson = (v: unknown) => JSON.stringify(v, (k, x) => (k === 'portion' ? undefined : x));
 
+/** Ticking Whole meal: portions from the foods' own amounts (equal when those can't tell),
+ *  the whole = their sum. `safe` = nothing typed would be lost (one unit, amounts that add up). */
+function wholeFrom(foods: FormFood[]): { foods: Portioned[]; whole: { amount: number | null; unit: string }; safe: boolean } {
+  const shares = portionsFromAmounts(foods);
+  const out: Portioned[] = foods.map((x, i) => ({ ...x, portion: shares[i] ?? round1(100 / foods.length) }));
+  const units = [...new Set(out.map(x => x.unit.trim()).filter(Boolean))];
+  const nums = out.map(x => Number(String(x.amount).replace(/,/g, '')));
+  const sum = out.length && nums.every(n => Number.isFinite(n) && String(out[0].amount).trim() !== '') ? nums.reduce((a, b) => a + b, 0) : null;
+  return { foods: out, whole: { amount: sum != null ? round3(sum) : null, unit: units.length === 1 ? units[0] : '' }, safe: !out.length || (sum != null && units.length <= 1) };
+}
+
 function shareWhole(foods: Portioned[], w: { amount: any; unit: string }): Portioned[] {
   const n = foods.length;
-  const withP = foods.map(x => (typeof x.portion === 'number' ? x : { ...x, portion: n ? round1(100 / n) : null }));
+  // Only a food without a portion yet gets an equal share; an emptied box stays empty while
+  // it is typed into (Hyoje, 11 Nov: the last digit couldn't be deleted).
+  const withP = foods.map(x => (x.portion === undefined ? { ...x, portion: n ? round1(100 / n) : null } : x));
   const sum = withP.reduce((a, x) => a + (typeof x.portion === 'number' ? x.portion : 0), 0);
   return withP.map(x => ({
     ...x,
@@ -227,6 +240,8 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
   const [resultError, setResultError] = useState('');
   /** The whole-meal amount, when that box is ticked. */
   const [whole, setWhole] = useState<{ amount: any; unit: string } | null>(null);
+  /** The entry app's cost starts in HOME_CURRENCY until KRW is picked (Hyoje, 11 Nov). */
+  const [krwPicked, setKrwPicked] = useState(false);
   /** A rate typed for this record (undefined = the starting rate). */
   const [rateOverride, setRateOverride] = useState<number | string | null | undefined>(undefined);
 
@@ -257,7 +272,15 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
           if (live) setOpts(ob);
         }
         if (!live) return;
-        setRec(rb); setForm(rb.form); setAdded(new Set()); setRateOverride(undefined); setWhole(null); setCheck(null); setSaveError(null); setLoadError('');
+        // Whole meal starts ticked in the entry app (Hyoje, 11 Nov) when nothing typed would be
+        // lost; an existing record opens with it off. The record's own form stays the
+        // baseline (portions are page-only).
+        let form0 = rb.form, whole0: { amount: any; unit: string } | null = null;
+        if (mode !== 'edit' && rb.form?.food) {
+          const w = wholeFrom(rb.form.food.foods ?? []);
+          if (w.safe) { whole0 = w.whole; form0 = { ...rb.form, food: { ...rb.form.food, foods: shareWhole(w.foods, w.whole) } }; }
+        }
+        setRec(rb); setForm(form0); setAdded(new Set()); setRateOverride(undefined); setWhole(whole0); setCheck(null); setSaveError(null); setLoadError(''); setKrwPicked(false);
       } catch (e: any) {
         if (live) setLoadError(String(e.message ?? e));
       }
@@ -558,6 +581,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
 
         <div className="flex flex-wrap gap-2">
           {!gone && <button onClick={() => { setResult(null); setReload(n => n + 1); }} className={secondary}>Open the record</button>}
+          <Link href="/entry" className={secondary}>Entry home</Link>
           <Link href="/calendar" className={secondary}>Calendar</Link>
           <Link href="/search" className={secondary}>Search</Link>
         </div>
@@ -606,13 +630,8 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
   };
   const toggleWhole = (on: boolean) => {
     if (!on) { setWhole(null); patch('food', { foods: f.food.foods.map((x: Portioned) => { const y = { ...x }; delete y.portion; return y; }) }); return; }
-    // Portions start from the foods' own amounts (equal when those can't tell).
-    const shares = portionsFromAmounts(f.food.foods);
-    const foods: Portioned[] = f.food.foods.map((x, i) => ({ ...x, portion: shares[i] ?? round1(100 / f.food.foods.length) }));
-    const units = [...new Set(foods.map(x => x.unit.trim()).filter(Boolean))];
-    const nums = foods.map(x => Number(String(x.amount).replace(/,/g, '')));
-    const sum = foods.length && nums.every(n => Number.isFinite(n) && String(foods[0].amount).trim() !== '') ? nums.reduce((a, b) => a + b, 0) : null;
-    setWholeMeal({ amount: sum != null ? round3(sum) : null, unit: units.length === 1 ? units[0] : '' }, foods);
+    const w = wholeFrom(f.food.foods);
+    setWholeMeal(w.whole, w.foods);
   };
   const fatKg = (weight: unknown, pct: unknown) =>
     typeof weight === 'number' && typeof pct === 'number' ? Math.round(weight * pct / 10) / 10 : null;
@@ -622,12 +641,16 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
   const saved = rec.form.cost;
   const impliedRate = !entryMode && saved.currency && Number(saved.amountForeign) > 0 && Number(saved.amountKRW) > 0
     ? Math.round((Number(saved.amountKRW) / Number(saved.amountForeign)) * 100) / 100 : null;
+  // The currency shown: the form's, or in the entry app HOME_CURRENCY while no amount is
+  // typed and KRW wasn't picked. It goes into the form with the first amount typed.
+  const cur = f.cost.currency || (entryMode && !krwPicked && f.cost.amountKRW == null && f.cost.amountForeign == null
+    && opts.currencies.includes(HOME_CURRENCY) ? HOME_CURRENCY : '');
   const rate: any = rateOverride !== undefined ? rateOverride
-    : (f.cost.currency === saved.currency && impliedRate != null ? impliedRate : latestRate(f.cost.currency));
+    : (cur === saved.currency && impliedRate != null ? impliedRate : latestRate(cur));
   const krw = (foreign: unknown, r: unknown) =>
     typeof foreign === 'number' && typeof r === 'number' && Number.isFinite(foreign * r) ? Math.round(foreign * r) : null;
   const setCurrency = (cur: string) => {
-    if (!cur) { setRateOverride(undefined); patch('cost', { currency: '', amountForeign: null }); return; }
+    if (!cur) { setRateOverride(undefined); setKrwPicked(true); patch('cost', { currency: '', amountForeign: null }); return; }
     const r = latestRate(cur);
     setRateOverride(r);
     patch('cost', { currency: cur, amountKRW: krw(f.cost.amountForeign, r) });
@@ -816,7 +839,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
           {mode === 'plan' && (
             <span className="flex flex-wrap gap-2 mt-1">
               <button onClick={() => planHappened('done')} disabled={saving} className={secondary}>Done as planned</button>
-              <button onClick={() => planHappened('onTime')} disabled={saving} className={secondary}>Started on time</button>
+              <button onClick={() => planHappened('onTime')} disabled={saving} className={secondary}>Started as planned</button>
             </span>
           )}
         </div>
@@ -923,11 +946,11 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
                   from the Exchange rates list (or, for a saved cost, from its own amounts) and
                   may be changed for this record; it is not saved. */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <Field label="Currency"><Select value={f.cost.currency} onChange={setCurrency} options={opts.currencies} empty="— (KRW)" /></Field>
-                {f.cost.currency ? (
+                <Field label="Currency"><Select value={cur} onChange={setCurrency} options={opts.currencies} empty="— (KRW)" /></Field>
+                {cur ? (
                   <>
-                    <Field label={`Amount (${f.cost.currency})`}><NumberBox value={f.cost.amountForeign} onChange={v => patch('cost', { amountForeign: v, amountKRW: krw(v, rate) })} /></Field>
-                    <Field label={`Rate (₩ per 1 ${f.cost.currency})`}><NumberBox value={rate} onChange={v => { setRateOverride(v); patch('cost', { amountKRW: krw(f.cost.amountForeign, v) }); }} /></Field>
+                    <Field label={`Amount (${cur})`}><NumberBox value={f.cost.amountForeign} onChange={v => patch('cost', { currency: cur, amountForeign: v, amountKRW: krw(v, rate) })} /></Field>
+                    <Field label={`Rate (₩ per 1 ${cur})`}><NumberBox value={rate} onChange={v => { setRateOverride(v); patch('cost', { amountKRW: krw(f.cost.amountForeign, v) }); }} /></Field>
                     <Field label="Amount (KRW)" note="Calculated">
                       <div className="rounded border border-stone-200 dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800 px-2 py-1.5 text-sm text-right font-mono text-stone-600 dark:text-zinc-300">
                         {f.cost.amountKRW != null && f.cost.amountKRW !== ('' as any) ? `₩${Number(f.cost.amountKRW).toLocaleString('en-GB')}` : '—'}

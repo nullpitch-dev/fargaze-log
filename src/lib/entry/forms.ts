@@ -3,6 +3,11 @@
 import type { RecordForm } from '../records/form';
 import { addDays, addMinutes, daysBetween } from './time';
 
+/** The currency a new entry's cost starts in (Hyoje, 11 Nov: GBP while living in the UK;
+ *  '' = KRW once back in Korea). Only shown until an amount is typed or KRW is picked; the
+ *  form itself stays empty, so an entry without a cost is untouched. */
+export const HOME_CURRENCY = 'GBP';
+
 export type PresetTime = { kind: 'open' | 'moment' | 'length'; minutes: number | null };
 export interface FormPointValue { date: string; hour: string; timezone: string }
 
