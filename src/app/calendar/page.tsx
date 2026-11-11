@@ -44,9 +44,11 @@ import { SearchResultsView } from './_components/SearchResultsView';
 
 const COMPACT_BELOW = 640;   // px of page width
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-type View = 'day' | 'week' | 'month' | 'year' | 'schedule' | 'search';
+// 3day (Hyoje, 11 Nov): three days from the date (Today → today and the next two); the
+// arrows move one day. Mostly for the phone, where Week is too narrow to read.
+type View = 'day' | '3day' | 'week' | 'month' | 'year' | 'schedule' | 'search';
 const VIEWS: [Exclude<View, 'search'>, string][] = [
-  ['day', 'Day'], ['week', 'Week'], ['month', 'Month'], ['year', 'Year'], ['schedule', 'Schedule'],
+  ['day', 'Day'], ['3day', '3 days'], ['week', 'Week'], ['month', 'Month'], ['year', 'Year'], ['schedule', 'Schedule'],
 ];
 const isView = (v: string | null): v is View => v === 'search' || VIEWS.some(([k]) => k === v);
 
@@ -203,11 +205,13 @@ function CalendarInner() {
   // ── Events for the visible range ──
   const grid = useMemo(() => monthGrid(cursor), [cursor]);
   const week = useMemo(() => weekOf(cursor), [cursor]);
+  const three = useMemo(() => [cursor, addDays(cursor, 1), addDays(cursor, 2)], [cursor]);
   const year = Number(cursor.slice(0, 4));
   const monthFirst = `${cursor.slice(0, 7)}-01`;
   const monthLast = new Date(Date.UTC(year, Number(cursor.slice(5, 7)), 0)).toISOString().slice(0, 10);
   const range = view === 'month' ? { from: grid.from, to: grid.to }
     : view === 'week' ? { from: week[0], to: week[6] }
+    : view === '3day' ? { from: three[0], to: three[2] }
     : view === 'year' ? { from: `${year}-01-01`, to: `${year}-12-31` }
     : view === 'schedule' ? { from: monthFirst, to: monthLast }
     : { from: cursor, to: cursor };
@@ -316,7 +320,7 @@ function CalendarInner() {
 
   // ── Navigation ──
   const shift = (n: number) => {
-    if (view === 'day') return setCursor(addDays(cursor, n));
+    if (view === 'day' || view === '3day') return setCursor(addDays(cursor, n));
     if (view === 'week') return setCursor(addDays(cursor, 7 * n));
     if (view === 'year') return setCursor(`${year + n}-01-01`);
     const [y, m] = cursor.split('-').map(Number);
@@ -355,11 +359,12 @@ function CalendarInner() {
     return () => ctl.abort();
   }, [view, search, tz, filters.hiddenCategories, filters.hiddenCrossActivities, filters.hiddenNames]);
 
-  const unit = view === 'day' ? 'day' : view === 'week' ? 'week' : view === 'year' ? 'year' : 'month';
+  const unit = view === 'day' || view === '3day' ? 'day' : view === 'week' ? 'week' : view === 'year' ? 'year' : 'month';
   const title = view === 'search' ? 'Search' : view === 'year' ? String(year)
     : view === 'month' || view === 'schedule'
     ? fmtDate(`${grid.month}-01`, { month: 'long', year: 'numeric' })
     : view === 'week' ? weekTitle(week[0], week[6])
+    : view === '3day' ? weekTitle(three[0], three[2])
     : fmtDate(cursor, compact
       ? { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }
       : { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -381,7 +386,7 @@ function CalendarInner() {
     ? <MonthView weekDates={grid.weeks} events={others} reading={reading} showReading={filters.showReading}
         month={grid.month} today={today} tz={tz} colors={filters.colors} isDark={isDark} compact={isCompact}
         onOpenDay={setOpenDay} onOpenDate={openDate} onOpenEvent={openEvent} />
-    : <TimeGridView key={view} dates={view === 'week' ? week : [cursor]} events={others} reading={reading}
+    : <TimeGridView key={view} dates={view === 'week' ? week : view === '3day' ? three : [cursor]} events={others} reading={reading}
         showReading={filters.showReading} today={today} tz={tz} colors={filters.colors} isDark={isDark}
         compact={isCompact} onOpenDay={setOpenDay} onOpenDate={openDate} onOpenEvent={openEvent} />;
 

@@ -82,7 +82,10 @@ export function TimeGridView({
   const strip = useMemo(
     () => layoutWeek(dates, events.filter(isBar), reading, STRIP_LANES, showReading),
     [dates, events, reading, showReading]);
-  const days = useMemo(() => dates.map(d => layoutDay(events, d, tz)), [dates, events, tz]);
+  // One line of a title, in minutes at this scale: what layering needs to show it.
+  const labelMin = (compact ? 15 : 14) / (m.hourH / 60);
+  const minMinutes = (compact ? 15 : 8) / (m.hourH / 60);   // the least height a block is drawn
+  const days = useMemo(() => dates.map(d => layoutDay(events, d, tz, labelMin, minMinutes)), [dates, events, tz, labelMin, minMinutes]);
 
   const readingH = strip.reading ? m.readingH : 0;
   const stripH = readingH + strip.lanesUsed * m.laneH + (strip.lanesUsed || readingH ? 4 : 6);
@@ -207,7 +210,14 @@ function DayColumn({ pieces, m, colors, isDark, compact, narrow, time, last, now
         const range = e.start
           ? (e.end && e.end !== e.start ? `${time.format(new Date(e.start))} – ${time.format(new Date(e.end))}` : time.format(new Date(e.start)))
           : '';
-        const twoLines = !compact && h >= 30;
+        // Layering (Hyoje, 11 Nov): indented a step per depth, to the right edge; side by side
+        // only in the rare fallback. A covered title sits below what covers it.
+        const step = narrow ? 16 : 9;                         // % of the day's width per depth
+        const room = 100 - p.depth * step;
+        const left = p.depth * step + (p.col / p.cols) * room;
+        const width = room / p.cols;
+        const below = p.labelTop > p.top;
+        const twoLines = !compact && !below && px(p.labelRoom) >= 30;
         // Past, now and plans (calendar-colors.ts): records tinted, plans solid, a record
         // still going tinted up to now and dashed after it.
         const look = lookOf(e);
@@ -220,7 +230,7 @@ function DayColumn({ pieces, m, colors, isDark, compact, narrow, time, last, now
             className={`absolute cursor-pointer overflow-hidden rounded-[3px] leading-tight ${compact ? 'text-[11px] px-0.5' : narrow ? 'text-[10px] px-1' : 'text-[11px] px-1.5'}`}
             style={{
               top: px(p.top) + 0.5, height: Math.max(h - 1, compact ? 15 : 8),
-              left: `calc(${(p.col / p.cols) * 100}% + 1px)`, width: `calc(${(p.span / p.cols) * 100}% - 3px)`,
+              left: `calc(${left}% + 1px)`, width: `calc(${width}% - 3px)`, zIndex: p.z + 1,
               background: look === 'plan' ? color : frac < 1 ? `linear-gradient(to bottom, ${tint} ${frac * 100}%, transparent ${frac * 100}%)` : tint,
               color: look === 'plan' ? textOn(color) : inkOf(isDark),
               ...(look !== 'plan' ? { borderLeft: `3px solid ${color}` } : {}),
@@ -232,13 +242,18 @@ function DayColumn({ pieces, m, colors, isDark, compact, narrow, time, last, now
               <span aria-hidden className="absolute left-0 right-0 bottom-0 pointer-events-none"
                 style={{ top: `${frac * 100}%`, border: `1.5px dashed ${color}`, borderLeft: 'none', ...(frac > 0 ? { borderTop: 'none' } : {}) }} />
             )}
-            {twoLines ? (
+            {below ? (
+              <div className="truncate" style={{ marginTop: px(p.labelTop - p.top), lineHeight: '14px' }}>
+                {!compact && !narrow && <span className="opacity-80 tabular-nums mr-1">{e.start ? time.format(new Date(e.start)) : ''}</span>}
+                {isOverdue(e) ? '! ' : ''}{labelOf(e)}
+              </div>
+            ) : twoLines ? (
               <>
                 <div className="truncate font-medium pt-0.5">{isOverdue(e) ? '! ' : ''}{labelOf(e)}</div>
                 <div className="truncate opacity-80 tabular-nums">{range}</div>
               </>
             ) : (
-              <div className="truncate" style={{ lineHeight: `${Math.max(h - 1, compact ? 15 : 8)}px` }}>
+              <div className="truncate" style={{ lineHeight: `${Math.min(Math.max(h - 1, compact ? 15 : 8), 16)}px` }}>
                 {!compact && !narrow && <span className="opacity-80 tabular-nums mr-1">{e.start ? time.format(new Date(e.start)) : ''}</span>}
                 {isOverdue(e) ? '! ' : ''}{labelOf(e)}
               </div>
@@ -247,7 +262,7 @@ function DayColumn({ pieces, m, colors, isDark, compact, narrow, time, last, now
         );
       })}
       {nowMin !== null && (
-        <div className="absolute left-0 right-0 pointer-events-none z-10" style={{ top: px(nowMin) }}>
+        <div className="absolute left-0 right-0 pointer-events-none z-[900]" style={{ top: px(nowMin) }}>
           <div className="relative border-t-2 border-red-500">
             <span className="absolute -left-1 -top-[5px] w-2 h-2 rounded-full bg-red-500" />
           </div>

@@ -36,24 +36,39 @@ export default function OfflineSupport() {
     navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
   }, []);
 
-  // On every page and whenever the signal comes back: refresh the saved copies.
+  // Refresh the saved copies: on a page change at most every 5 minutes (battery, Hyoje 11 Nov),
+  // and always when the signal comes back. Files the pages load are saved as they load anyway.
   useEffect(() => {
     if (!on) return;
-    const go = () => navigator.serviceWorker.ready.then(r => setTimeout(() => warm(r), 1500)).catch(() => {});
-    go();
-    window.addEventListener('online', go);
-    return () => window.removeEventListener('online', go);
+    const go = (force: boolean) => {
+      try {
+        const last = Number(localStorage.getItem('fg-warm-pages') || 0);
+        if (!force && Date.now() - last < 5 * 60_000) return;
+        localStorage.setItem('fg-warm-pages', String(Date.now()));
+      } catch { /* storage blocked: refresh anyway */ }
+      navigator.serviceWorker.ready.then(r => setTimeout(() => warm(r), 1500)).catch(() => {});
+    };
+    const back = () => go(true);
+    go(false);
+    window.addEventListener('online', back);
+    return () => window.removeEventListener('online', back);
   }, [on, pathname]);
 
-  // The outbox (slice 2): send on every page, when the signal comes back, and every 30 s
-  // while anything waits.
+  // The outbox (slice 2): send on every page, when the signal comes back, when the app comes
+  // back on screen, and every 30 s while it is on screen (stopped while hidden: battery).
   useEffect(() => {
     if (!on) return;
-    const send = () => { if (listOutbox().some(x => x.state === 'waiting')) flushOutbox(); };
-    send();
+    const send = () => { if (document.visibilityState === 'visible' && listOutbox().some(x => x.state === 'waiting')) flushOutbox(); };
+    let t: ReturnType<typeof setInterval> | null = null;
+    const timer = () => {
+      if (t) { clearInterval(t); t = null; }
+      if (document.visibilityState === 'visible') t = setInterval(send, 30_000);
+    };
+    const seen = () => { timer(); send(); };
+    send(); timer();
     window.addEventListener('online', send);
-    const t = setInterval(send, 30_000);
-    return () => { window.removeEventListener('online', send); clearInterval(t); };
+    document.addEventListener('visibilitychange', seen);
+    return () => { window.removeEventListener('online', send); document.removeEventListener('visibilitychange', seen); if (t) clearInterval(t); };
   }, [on, pathname]);
 
   useEffect(() => {
