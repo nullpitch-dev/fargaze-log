@@ -5,7 +5,10 @@
 //   ?copy=<id>    filled from a record (Copy recent): its fields, starting now, same length
 //   &from=plan    … from a plan in Coming up (a long press on its title: Copy to new entry)
 //   ?stamp=<id>   from a stamp: its start (and end); its note shows above the form, and
-//                 saving takes the stamp off Home's Stamps list
+//                 saving takes the stamp off Home's Stamps list (a stamp still on the phone,
+//                 offline: read from the outbox)
+//   ?outbox=<id>  an entry saved on the phone (offline, #71 step 3), to fix and save again:
+//                 same ID, so it replaces itself in the outbox or is saved once
 // Start = now in the phone's zone (the list's code for that zone and day: GMT or BST);
 // Cross activity = 평시 unless the preset or the copied record says otherwise; Place starts
 // empty unless the preset or the copied record has one (Hyoje, 9 Nov).
@@ -16,29 +19,42 @@ import { RecordEditor } from '@/app/records/_components/RecordEditor';
 import { blankForm, copyForm, newEntryId, presetForm } from '@/lib/entry/forms';
 import { localNow, zoneCodeFor } from '@/lib/entry/time';
 import type { RecordForm } from '@/lib/records/form';
+import { getOutbox, type OutboxItem } from '@/lib/offline/outbox';
 
 const DEFAULT_CROSS = '평시';
 
 function NewEntry() {
   const params = useSearchParams();
-  const id = useMemo(() => newEntryId(), []);
+  const outboxId = params.get('outbox');
+  const queued: OutboxItem | null = useMemo(() => (outboxId ? getOutbox(outboxId) : null), [outboxId]);
+  const id = useMemo(() => queued?.id ?? newEntryId(), [queued]);
   const [initial, setInitial] = useState<RecordForm | null>(null);
   const [error, setError] = useState('');
   const [stampNote, setStampNote] = useState<string | null>(null);
-  const presetId = params.get('preset') ?? undefined;
-  const stampId = params.get('stamp') ?? undefined;
+  const presetId = queued ? queued.body?.presetId ?? undefined : params.get('preset') ?? undefined;
+  const stampId = queued ? queued.body?.stampId ?? undefined : params.get('stamp') ?? undefined;
+  // A stamp saved on the phone and not sent yet.
+  const localStamp = useMemo(() => {
+    const x = !queued && stampId ? getOutbox(stampId) : null;
+    return x?.kind === 'stamp' ? { start: x.body.start, end: x.body.end ?? { date: '', hour: '', timezone: '' }, note: x.body.note ?? '' } : null;
+  }, [queued, stampId]);
 
   useEffect(() => {
     let live = true;
     (async () => {
       try {
+        if (outboxId) {
+          if (!queued) throw new Error('This entry was sent already: find it on Entry or the Calendar.');
+          if (live) setInitial(queued.body.form);
+          return;
+        }
         const iana = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London';
         const copyId = params.get('copy');
         const [rules, presets, copy, stamp] = await Promise.all([
           fetch('/api/entry/rules').then(r => r.json()),
           presetId ? fetch('/api/entry/presets').then(r => r.json()) : Promise.resolve(null),
           stampId ? null : copyId ? fetch(params.get('from') === 'plan' ? `/api/entry/plans/${copyId}` : `/api/records/${copyId}`, { cache: 'no-store' }).then(async r => { const b = await r.json(); if (!r.ok) throw new Error(b.error ?? `HTTP ${r.status}`); return b; }) : Promise.resolve(null),
-          stampId ? fetch(`/api/entry/stamps/${stampId}`, { cache: 'no-store' }).then(async r => { const b = await r.json(); if (!r.ok) throw new Error(b.error ?? `HTTP ${r.status}`); if (b.used) throw new Error('This stamp is a record already.'); return b.stamp; }) : Promise.resolve(null),
+          localStamp ? Promise.resolve(localStamp) : stampId ? fetch(`/api/entry/stamps/${stampId}`, { cache: 'no-store' }).then(async r => { const b = await r.json(); if (!r.ok) throw new Error(b.error ?? `HTTP ${r.status}`); if (b.used) throw new Error('This stamp is a record already.'); return b.stamp; }) : Promise.resolve(null),
         ]);
         const l = localNow(iana);
         const now = { ...l, timezone: zoneCodeFor(iana, l.date, l.hour, rules.zones ?? []) ?? '' };
@@ -55,7 +71,7 @@ function NewEntry() {
       }
     })();
     return () => { live = false; };
-  }, [params, presetId, stampId]);
+  }, [params, presetId, stampId, outboxId, queued, localStamp]);
 
   if (error) return <div className="px-4 py-8 max-w-3xl mx-auto w-full text-sm text-red-700 dark:text-red-300">{error}</div>;
   if (!initial) return <div className="px-4 py-8 max-w-3xl mx-auto w-full text-sm text-stone-500 dark:text-zinc-400">Loading…</div>;
@@ -66,7 +82,8 @@ function NewEntry() {
           From a stamp at {initial.start.hour}{initial.end.hour && initial.end.hour !== initial.start.hour ? `–${initial.end.hour}` : ''}{stampNote ? <> · <span className="font-medium text-stone-800 dark:text-zinc-100">{stampNote}</span></> : ''}
         </p>
       )}
-      <RecordEditor id={id} mode="new" initial={initial} presetId={presetId} copied={!!params.get('copy')} stampId={stampId} />
+      <RecordEditor id={id} mode="new" initial={initial} presetId={presetId} copied={!!params.get('copy')} stampId={stampId}
+        refusal={queued?.state === 'refused' ? { error: queued.error, problems: queued.problems } : undefined} />
     </>
   );
 }

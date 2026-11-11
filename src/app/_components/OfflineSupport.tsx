@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { offlineAllowed } from '@/lib/offline/config';
+import { flushOutbox, listOutbox } from '@/lib/offline/outbox';
 
 /** Ask the worker to save the entry app's pages and data, and the files this page loaded. */
 function warm(reg: ServiceWorkerRegistration) {
@@ -44,6 +45,17 @@ export default function OfflineSupport() {
     return () => window.removeEventListener('online', go);
   }, [on, pathname]);
 
+  // The outbox (slice 2): send on every page, when the signal comes back, and every 30 s
+  // while anything waits.
+  useEffect(() => {
+    if (!on) return;
+    const send = () => { if (listOutbox().some(x => x.state === 'waiting')) flushOutbox(); };
+    send();
+    window.addEventListener('online', send);
+    const t = setInterval(send, 30_000);
+    return () => { window.removeEventListener('online', send); clearInterval(t); };
+  }, [on, pathname]);
+
   useEffect(() => {
     const set = () => setOffline(!navigator.onLine);
     set();
@@ -55,7 +67,7 @@ export default function OfflineSupport() {
   if (!offline) return null;
   return (
     <div role="status" className="sticky top-0 z-50 px-4 py-1 text-xs text-center bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200 border-b border-amber-200 dark:border-amber-900">
-      No signal{on ? ' — Entry shows what was saved last; saving needs a signal for now' : ''}
+      No signal{on ? ' — Entry saves new entries and stamps on the phone' : ''}
     </div>
   );
 }

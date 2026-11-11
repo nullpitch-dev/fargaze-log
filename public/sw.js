@@ -7,13 +7,14 @@
  *   pages /entry, /entry/… network first; no answer within PAGE_WAIT or no signal → the copy
  *                          saved last time. Other pages: network only; offline → a short note.
  *   GET /api/entry/…,      network first; no answer within DATA_WAIT or no signal → the copy
- *   /api/records/options   saved last time, marked x-offline-saved: <ms> so the page can say
- *                          how old it is.
+ *   /api/records/options,  saved last time, marked x-offline-saved: <ms> so the page can say
+ *   /api/records/<id>      how old it is. Home asks for its plans, stamps and recent records
+ *                          to be saved (slice 2), so they open and copy offline.
  *   everything else        untouched (saving, other pages' data, sign-in).
  *
  * Bump VERSION when this file changes in a way old caches must not survive.
  */
-const VERSION = 'v1';
+const VERSION = 'v2';
 const STATIC = `fg-static-${VERSION}`;
 const PAGES = `fg-pages-${VERSION}`;
 const DATA = `fg-data-${VERSION}`;
@@ -27,7 +28,8 @@ const WARM_PAGES = ['/entry', '/entry/new'];
 const WARM_DATA = ['/api/entry/rules', '/api/records/options', '/api/entry/recent'];
 
 const isEntryPage = p => p === '/entry' || p.startsWith('/entry/');
-const isData = p => p.startsWith('/api/entry/') || p === '/api/records/options';
+// A record's form (/api/records/<id>): Copy to new entry works offline for the ones saved.
+const isData = p => p.startsWith('/api/entry/') || p === '/api/records/options' || /^\/api\/records\/[0-9a-f]{24}$/.test(p);
 
 self.addEventListener('install', () => self.skipWaiting());
 

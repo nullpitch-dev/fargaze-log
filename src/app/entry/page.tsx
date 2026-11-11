@@ -19,11 +19,13 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { localNow, zoneCodeFor, type ZoneRow } from '@/lib/entry/time';
 import { DetailPanel, formatDuration, type LogEntry } from '@/app/_components/LogDetailPanel';
 import { ActionSheet, useLongPress, type SheetAction } from './_components/LongPress';
+import { dropOutbox, flushOutbox, isNoSignal, listOutbox, onOutbox, outboxOn, putOutbox, updateOutbox, type OutboxItem } from '@/lib/offline/outbox';
+import { newEntryId } from '@/lib/entry/forms';
 
 interface Point { date: string; hour: string; timezone: string }
 interface Item { id: string; activity: string; category: string; title: string; start: Point; end: Point; place: string; updatedAt: string; seconds?: number | null; repeat?: boolean; started?: boolean; plannedEnd?: { date: string; hour: string; timezone?: string } | null }
 interface Preset { id: string; name: string; order: number; time: { kind: 'open' | 'moment' | 'length'; minutes: number | null } }
-interface Stamp { id: string; note: string; start: Point; end: Point; updatedAt: string }
+interface Stamp { id: string; note: string; start: Point; end: Point; updatedAt: string; /** saved on the phone, not sent yet (offline) */ local?: boolean }
 interface Home { today: string; stamps: Stamp[]; comingUp: Item[]; inProgress: Item[]; done: Item[]; ongoing: Item[]; recent: Item[]; presets: Preset[] }
 interface Toast { text: string; undo?: () => Promise<string | null> }
 
@@ -71,6 +73,26 @@ async function call(url: string, method: string, body?: unknown): Promise<{ ok: 
   return { ok: r.ok, b };
 }
 
+
+/** Offline (#71 step 3): ask the service worker to save the plans, stamps and recent records
+ *  Home shows, so they open and copy with no signal. At most every 20 minutes. */
+function warmItems(h: any) {
+  try {
+    if (!outboxOn() || !navigator.serviceWorker?.controller) return;
+    const last = Number(localStorage.getItem('fg-warm-items') || 0);
+    if (Date.now() - last < 20 * 60_000) return;
+    localStorage.setItem('fg-warm-items', String(Date.now()));
+    const data = [
+      ...(h.comingUp ?? []).map((x: any) => `/api/entry/plans/${x.id}`),
+      ...(h.stamps ?? []).map((x: any) => `/api/entry/stamps/${x.id}`),
+      ...[...(h.inProgress ?? []), ...(h.done ?? []), ...(h.recent ?? []).slice(0, 15)].map((x: any) => `/api/records/${x.id}`),
+    ];
+    navigator.serviceWorker.controller.postMessage({ type: 'warm', data: [...new Set(data)] });
+  } catch { /* nothing saved; fine */ }
+}
+
+const NO_SIGNAL = 'No signal: this button needs one for now — use + New, Copy or Stamp';
+
 function EntryHome() {
   const router = useRouter();
   const params = useSearchParams();
@@ -91,11 +113,19 @@ function EntryHome() {
   const [noteFor, setNoteFor] = useState<string | null>(null);
   const [noteText, setNoteText] = useState('');
 
+  // The outbox (#71 step 3): entries and stamps saved on the phone with no signal.
+  const [outbox, setOutbox] = useState<OutboxItem[]>([]);
+  useEffect(() => { setOutbox(listOutbox()); return onOutbox(() => setOutbox(listOutbox())); }, []);
+
   /** Done: a tap opens the record pane (Edit is in it), like the Calendar (Hyoje, 10 Nov). */
   async function openPane(id: string) {
-    const r = await fetch(`/api/records/${id}?view=1`, { cache: 'no-store' });
-    const b = await r.json().catch(() => ({}));
-    if (r.ok && b.entry) setPane(b.entry); else setToast({ text: b.error ?? 'Could not open the record' });
+    try {
+      const r = await fetch(`/api/records/${id}?view=1`, { cache: 'no-store' });
+      const b = await r.json().catch(() => ({}));
+      if (r.ok && b.entry) setPane(b.entry); else setToast({ text: b.error ?? 'Could not open the record' });
+    } catch (e) {
+      setToast({ text: isNoSignal(e) ? 'No signal: the record opens once there is one' : String((e as any)?.message ?? e) });
+    }
   }
   const iana = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London', []);
 
@@ -114,11 +144,23 @@ function EntryHome() {
       const saved = h.headers.get('x-offline-from-cache') ? Number(h.headers.get('x-offline-saved')) : 0;
       setSavedAt(saved || null);
       setData(hb); setError('');
+      if (!saved) warmItems(hb);
     } catch (e: any) {
       setError(navigator.onLine === false ? 'No signal, and Home hasn’t been saved on this phone yet.' : String(e.message ?? e));
     }
   }, [iana, zones]);
   useEffect(() => { load(); }, [load]);
+
+  // Sent from the outbox: Home again, and a word on how it went.
+  useEffect(() => {
+    const on = (e: Event) => {
+      const d = (e as CustomEvent).detail as { sent: number; refused: number };
+      setToast({ text: [d.sent ? `${d.sent} sent` : '', d.refused ? `${d.refused} not saved — see Waiting to send` : ''].filter(Boolean).join(' · ') });
+      load();
+    };
+    window.addEventListener('fg-outbox-sent', on);
+    return () => window.removeEventListener('fg-outbox-sent', on);
+  }, [load]);
 
   // Copy recent: typing searches every record (all years), not only the latest.
   useEffect(() => {
@@ -135,9 +177,11 @@ function EntryHome() {
 
   // A toast for what the form just did (?saved=record|plan&id=…, ?deleted=<plan id>).
   useEffect(() => {
-    const saved = params.get('saved'), id = params.get('id'), deleted = params.get('deleted');
-    if (!saved && !deleted) return;
-    if (deleted) {
+    const saved = params.get('saved'), id = params.get('id'), deleted = params.get('deleted'), queued = params.get('queued');
+    if (!saved && !deleted && !queued) return;
+    if (queued) {
+      setToast({ text: 'Saved on the phone — it is sent once there is a signal' });
+    } else if (deleted) {
       setToast({ text: 'Plan deleted', undo: async () => { const r = await call(`/api/entry/plans/${deleted}/restore`, 'POST'); return r.ok ? null : r.b.error ?? 'Undo failed'; } });
     } else if (id) {
       const fromPlan = params.get('from') === 'plan';
@@ -146,8 +190,10 @@ function EntryHome() {
         undo: fromPlan ? undefined : async () => { const r = await call(`/api/entry/records/${id}`, 'DELETE'); return r.ok ? null : r.b.error ?? 'Undo failed'; },
       });
     }
-    router.replace('/entry', { scroll: false });
-  }, [params, router]);
+    // Just tidy the address: a router call would ask the server again, and with no signal
+    // that turns into a second full load (#71 step 3).
+    window.history.replaceState(window.history.state, '', '/entry');
+  }, [params]);
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 8000);
@@ -169,6 +215,8 @@ function EntryHome() {
       }
       setToast(typeof done === 'function' ? done(r.b) : done);
       await load();
+    } catch (e) {
+      setToast({ text: isNoSignal(e) ? NO_SIGNAL : String((e as any)?.message ?? e) });
     } finally {
       setBusy(null);
     }
@@ -188,10 +236,21 @@ function EntryHome() {
   }));
   const doneNow = (it: Item) => act(`d${it.id}`, () => call(`/api/entry/plans/${it.id}/confirm`, 'POST', { updatedAt: it.updatedAt, how: 'nowDone', now: nowPoint() }), { text: `${it.activity} done` });
   // Stamps.
+  /** A stamp saved on the phone (no signal): sent later under its own ID. */
+  function stampLocal(start: Point) {
+    const id = newEntryId();
+    putOutbox({ id, kind: 'stamp', url: '/api/entry/stamps', method: 'POST', body: { id, start, note: '' }, label: 'Stamp', when: `${start.date} ${start.hour}` });
+    setNoteFor(id); setNoteText('');
+    setToast({ text: `Stamped ${start.hour} on the phone`, undo: async () => { dropOutbox(id); return null; } });
+  }
   async function stamp() {
+    const start = nowPoint();
+    if (outboxOn() && navigator.onLine === false) { stampLocal(start); return; }
     setBusy('stamp');
     try {
-      const r = await call('/api/entry/stamps', 'POST', { start: nowPoint() });
+      let r: { ok: boolean; b: any };
+      try { r = await call('/api/entry/stamps', 'POST', { start }); }
+      catch (e) { if (outboxOn() && isNoSignal(e)) { stampLocal(start); return; } throw e; }
       if (!r.ok) { setToast({ text: r.b.error ?? 'Stamp failed' }); return; }
       const s: Stamp = r.b.stamp;
       setData(d => d ? { ...d, stamps: [s, ...(d.stamps ?? [])] } : d);
@@ -203,12 +262,17 @@ function EntryHome() {
     setNoteFor(null);
     const text = noteText.trim();
     if (text === s.note) return;
+    if (s.local) { updateOutbox(s.id, x => ({ ...x, body: { ...x.body, note: text } })); return; }
     setData(d => d ? { ...d, stamps: d.stamps.map(x => x.id === s.id ? { ...x, note: text } : x) } : d);
     const r = await call(`/api/entry/stamps/${s.id}`, 'PUT', { note: text });
     if (!r.ok) { setToast({ text: r.b.error ?? 'Could not save the note' }); await load(); }
   }
-  const endStamp = (s: Stamp) => act(`e${s.id}`, () => call(`/api/entry/stamps/${s.id}`, 'PUT', { end: nowPoint() }), { text: 'Stamp ended' });
-  const deleteStamp = (s: Stamp) => act(`x${s.id}`, () => call(`/api/entry/stamps/${s.id}`, 'DELETE'), b => ({
+  const endStamp = (s: Stamp) => s.local
+    ? (updateOutbox(s.id, x => ({ ...x, body: { ...x.body, end: nowPoint() } })), setToast({ text: 'Stamp ended (on the phone)' }))
+    : act(`e${s.id}`, () => call(`/api/entry/stamps/${s.id}`, 'PUT', { end: nowPoint() }), { text: 'Stamp ended' });
+  const deleteStamp = (s: Stamp) => s.local
+    ? (() => { const keep = listOutbox().find(x => x.id === s.id); dropOutbox(s.id); setToast({ text: 'Stamp deleted', undo: async () => { if (keep) putOutbox(keep); return null; } }); })()
+    : act(`x${s.id}`, () => call(`/api/entry/stamps/${s.id}`, 'DELETE'), b => ({
     text: 'Stamp deleted',
     undo: async () => { const x = await call('/api/entry/stamps', 'POST', { restore: b.stamp }); return x.ok ? null : x.b.error ?? 'Undo failed'; },
   }));
@@ -257,6 +321,15 @@ function EntryHome() {
   if (!data) return <div className="px-4 py-8 max-w-3xl mx-auto w-full text-sm text-stone-500 dark:text-zinc-400">Loading…</div>;
 
   const today = data.today;
+  // Offline (#71 step 3): stamps still on the phone first; a stamp a waiting entry was made
+  // from is used already.
+  const usedStamps = new Set(outbox.filter(x => x.kind === 'entry' && x.body?.stampId).map(x => x.body.stampId));
+  const stamps: Stamp[] = [
+    ...outbox.filter(x => x.kind === 'stamp').map(x => ({ id: x.id, note: x.body.note ?? '', start: x.body.start, end: x.body.end ?? { date: '', hour: '', timezone: '' }, updatedAt: '', local: true })).reverse(),
+    ...(data.stamps ?? []),
+  ].filter(st => !usedStamps.has(st.id));
+  const waiting = outbox.filter(x => x.kind === 'entry');
+  const discard = (x: OutboxItem) => { if (window.confirm(`Discard “${x.label}”? It was never sent, so it is lost.`)) dropOutbox(x.id); };
   const newHref = (extra: Record<string, string> = {}) => `/entry/new?${new URLSearchParams(extra)}`;
   const recent = copyQ.trim() ? (found ?? data.recent.filter(r => name(r).toLowerCase().includes(copyQ.trim().toLowerCase()))) : data.recent;
 
@@ -306,7 +379,7 @@ function EntryHome() {
         {savedAt && (
           <p className="text-xs rounded border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950 text-amber-900 dark:text-amber-200 px-3 py-2">
             Saved copy from {new Date(savedAt).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' })} — no signal (or a very slow one).
-            Buttons need a signal for now. <button onClick={load} className="underline">Try again</button>
+            + New, Copy and Stamp save on the phone; the other buttons need a signal. <button onClick={load} className="underline">Try again</button>
           </p>
         )}
         {/* Presets and new */}
@@ -348,11 +421,38 @@ function EntryHome() {
           )}
         </section>
 
-        {data.stamps?.length > 0 && (
+        {(waiting.length > 0 || outbox.length > 0) && (
+          <section className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <h2 className={heading}>Waiting to send</h2>
+              <button onClick={() => flushOutbox()} className="text-xs text-stone-500 dark:text-zinc-400 underline">Send now</button>
+            </div>
+            {waiting.length > 0 ? (
+              <ul className={card}>
+                {waiting.map(x => (
+                  <li key={x.id} data-longpress="" className="flex items-start gap-3 px-3 py-2.5 border-t first:border-t-0 border-stone-100 dark:border-zinc-800 select-none [-webkit-touch-callout:none]">
+                    <div className="flex-1 min-w-0">
+                      <Link href={`/entry/new?outbox=${x.id}`} {...press(() => setMenu({ title: x.label, actions: [
+                          { label: 'Open', hint: 'Check or fix it, then save again', run: () => router.push(`/entry/new?outbox=${x.id}`) },
+                          { label: 'Discard', hint: 'Never sent, so it is lost', run: () => discard(x) },
+                        ] }))}
+                        className="block text-sm text-stone-800 dark:text-zinc-100 hover:underline truncate select-none">{x.label}</Link>
+                      <span className={`block text-xs truncate ${x.state === 'refused' ? 'text-red-700 dark:text-red-300' : 'text-stone-500 dark:text-zinc-400'}`}>
+                        {x.state === 'refused' ? `Not saved: ${x.problems?.[0] ?? x.error ?? 'refused'}` : `${[dayLabel(x.when.split(' ')[0], today), x.when.split(' ')[1]].filter(Boolean).join(' · ')} · on the phone`}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="text-xs text-stone-500 dark:text-zinc-400">Only stamps (below).</p>}
+          </section>
+        )}
+
+        {stamps.length > 0 && (
           <section className="flex flex-col gap-2">
             <h2 className={heading}>Stamps</h2>
             <ul className={card}>
-              {data.stamps.map(s => (
+              {stamps.map(s => (
                 <li key={s.id} data-longpress="" className="flex items-start gap-3 px-3 py-2.5 border-t first:border-t-0 border-stone-100 dark:border-zinc-800 select-none [-webkit-touch-callout:none]">
                   <div className="flex-1 min-w-0">
                     {noteFor === s.id ? (
@@ -368,7 +468,7 @@ function EntryHome() {
                         ] }))}
                         className={`block text-sm hover:underline truncate select-none ${s.note ? 'text-stone-800 dark:text-zinc-100' : 'italic text-stone-500 dark:text-zinc-400'}`}>{s.note || 'Stamp'}</Link>
                     )}
-                    <span className="block text-xs text-stone-500 dark:text-zinc-400 truncate">{s.end.hour ? '' : 'since '}{when({ start: s.start, end: s.end } as Item, today).replace(/^(Today|Yesterday|Tomorrow)/, m => (s.end.hour ? m : m.toLowerCase()))}</span>
+                    <span className="block text-xs text-stone-500 dark:text-zinc-400 truncate">{s.end.hour ? '' : 'since '}{when({ start: s.start, end: s.end } as Item, today).replace(/^(Today|Yesterday|Tomorrow)/, m => (s.end.hour ? m : m.toLowerCase()))}{s.local ? ' · on the phone' : ''}</span>
                   </div>
                   {!s.end.hour && <button onClick={() => endStamp(s)} disabled={busy !== null} className={small}>End now</button>}
                 </li>

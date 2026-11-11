@@ -32,6 +32,7 @@ import { relationshipOf } from '@/lib/records/relationship';
 import { rulesFor, type EntryGroup } from '@/lib/entry/groups';
 import { addMinutes, localNow, zoneCodeFor, type ZoneRow } from '@/lib/entry/time';
 import { RESETTABLE, resetSection, HOME_CURRENCY, type ResettableSection } from '@/lib/entry/forms';
+import { dropOutbox, fetchWithin, isNoSignal, outboxOn, putOutbox } from '@/lib/offline/outbox';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -211,9 +212,14 @@ const danger = `${btn} border-red-300 text-red-700 hover:bg-red-50 dark:border-r
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
-export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, stampId }: { id: string; mode?: EditorMode; initial?: RecordForm; presetId?: string; copied?: boolean; stampId?: string }) {
+export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, stampId, refusal }: { id: string; mode?: EditorMode; initial?: RecordForm; presetId?: string; copied?: boolean; stampId?: string;
+  /** Opened from the outbox after the server refused it (offline, #71 step 3): why. */
+  refusal?: { error?: string; problems?: string[] } }) {
   const router = useRouter();
   const entryMode = mode !== 'edit';
+  // No signal while checking a new entry (#71 step 3): it may be saved on the phone after the
+  // phone's own checks; the server checks it again when it is sent.
+  const [checkOffline, setCheckOffline] = useState(false);
   const [entryOpts, setEntryOpts] = useState<EntryOptions | null>(null);
   const [laterOpen, setLaterOpen] = useState(false);
   // Planned end (Hyoje, 10 Nov): shown read-only ("Planned until 12:00 ✎ ×") until ✎.
@@ -303,20 +309,22 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
     const n = ++seq.current;
     const t = setTimeout(async () => {
       try {
-        const r = await fetch(entryMode ? '/api/entry/check' : `/api/records/${id}/preview`, {
+        const r = await fetchWithin(entryMode ? '/api/entry/check' : `/api/records/${id}/preview`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: formJson({ form }),
-        });
+        }, 8000);
         const b = await r.json().catch(() => ({}));
         if (n !== seq.current) return;
         if (!r.ok) { setCheckError(b.error ?? `HTTP ${r.status}`); return; }
-        setCheckError('');
+        setCheckError(''); setCheckOffline(false);
         setCheck({ for: formJson(form), data: entryMode ? { problems: b.problems ?? [], warnings: b.warnings ?? [], tab: '', findRow: '', moveTo: null, lines: [], changes: [], kind: b.kind } : b });
       } catch (e: any) {
-        if (n === seq.current) setCheckError(String(e.message ?? e));
+        if (n !== seq.current) return;
+        if (mode === 'new' && outboxOn() && isNoSignal(e)) { setCheckOffline(true); setCheckError(''); return; }
+        setCheckError(String(e.message ?? e));
       }
     }, 500);
     return () => clearTimeout(t);
-  }, [dirty, form, id, entryMode]);
+  }, [dirty, form, id, entryMode, mode]);
 
   const current = check && check.for === formKey ? check.data : null;
 
@@ -333,8 +341,20 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
     if (!planning || !form || (!form.end.date && !form.end.hour)) return;
     setForm({ ...form, plannedEnd: form.plannedEnd.date || form.plannedEnd.hour ? form.plannedEnd : form.end, end: { date: '', hour: '', timezone: '' } });
   }, [planning, form]);
-  const checking = dirty && !current && !checkError;
-  const canSave = dirty && !!current && current.problems.length === 0 && !saving;
+  const checking = dirty && !current && !checkError && !checkOffline;
+  // Offline (#71 step 3): the phone's own checks — an activity from the list and a start date.
+  // Everything else is checked by the server when the entry is sent.
+  const offlineProblems = useMemo(() => {
+    if (!checkOffline || !form) return [];
+    const out: string[] = [];
+    const a = form.activity.name.trim();
+    if (!a) out.push('Activity is needed');
+    else if (entryOpts && !entryOpts.activities.some(x => x.name === a)) out.push(`${a} isn’t in Activities`);
+    if (!form.start.date) out.push('Start date is needed');
+    return out;
+  }, [checkOffline, form, entryOpts]);
+  const offlineReady = checkOffline && !current && offlineProblems.length === 0;
+  const canSave = dirty && !saving && (current ? current.problems.length === 0 : offlineReady);
 
   // Unsaved changes: ask before leaving (closing the tab, or a link in the app).
   useEffect(() => {
@@ -430,16 +450,31 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
     if (!rec || !fm || (!override && !canSave) || saving) return;
     setSaving(true); setSaveError(null);
     if (entryMode) {
+      // No signal (#71 step 3): a new entry waits in the outbox on the phone and is sent,
+      // under the same ID, once there is one.
+      const queue = () => {
+        putOutbox({
+          id, kind: 'entry', url: '/api/entry/records', method: 'POST',
+          body: JSON.parse(formJson({ id, form: fm, presetId, stampId })),
+          label: [fm.activity.name.trim(), fm.activity.title.trim()].filter(Boolean).join(' · ') || 'New entry',
+          when: `${fm.start.date} ${fm.start.hour}`.trim(),
+        });
+        router.push(`/entry?queued=${id}`);
+      };
+      if (mode === 'new' && outboxOn() && navigator.onLine === false) { setSaving(false); queue(); return; }
       try {
         const r = mode === 'new'
-          ? await fetch('/api/entry/records', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: formJson({ id, form: fm, presetId, stampId }) })
+          ? await (outboxOn() ? fetchWithin('/api/entry/records', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: formJson({ id, form: fm, presetId, stampId }) }, 12000)
+            : fetch('/api/entry/records', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: formJson({ id, form: fm, presetId, stampId }) }))
           : await fetch(`/api/entry/plans/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: formJson({ form: fm, updatedAt: rec.updatedAt }) });
         const b = await r.json().catch(() => ({}));
         if (!r.ok) { setSaveError({ text: b.error ?? `HTTP ${r.status}`, problems: b.problems, conflict: r.status === 409 }); return; }
+        if (mode === 'new') dropOutbox(id);   // reopened from the outbox and saved with a signal
         const saved = new URLSearchParams({ saved: b.kind, id: b.id ?? id });
         if (mode === 'plan') saved.set('from', 'plan');
         router.push(`/entry?${saved}`);
       } catch (e: any) {
+        if (mode === 'new' && outboxOn() && isNoSignal(e)) { queue(); return; }
         setSaveError({ text: String(e.message ?? e) });
       } finally {
         setSaving(false);
@@ -793,6 +828,12 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
           : 'Will be saved as a record.'}</p>
       )}
       {checking && <p className="text-sm text-stone-500 dark:text-zinc-400">Checking…</p>}
+      {refusal && (
+        <div className="text-sm rounded border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950 text-red-800 dark:text-red-200 px-3 py-2">
+          <p>Saved on the phone with no signal, but not saved when it was sent. Fix it and save again.</p>
+          {refusal.problems?.length ? <ul className="list-disc ml-5 mt-1">{refusal.problems.map((x, i) => <li key={i}>{x}</li>)}</ul> : null}
+        </div>
+      )}
       {checkError && <p className="text-sm text-red-700 dark:text-red-300">The check failed: {checkError}</p>}
       {current && (
         <>
@@ -823,6 +864,9 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
 
   const status = !dirty ? <span className="text-stone-500 dark:text-zinc-400">No changes yet</span>
     : checkError ? <span className="text-red-700 dark:text-red-300">The check failed</span>
+    : checkOffline && !current ? (offlineProblems.length
+      ? <span className="text-red-700 dark:text-red-300">No signal · {offlineProblems[0]}</span>
+      : <span className="text-amber-700 dark:text-amber-300">No signal · saves on the phone, checked when sent</span>)
     : checking ? <span className="text-stone-500 dark:text-zinc-400">Checking…</span>
     : problems.length ? <a href="#check" className="text-red-700 dark:text-red-300 underline">{plural(problems.length, 'problem')}: can’t save yet</a>
     : entryMode ? <span className="text-stone-700 dark:text-zinc-200">Ready{current!.kind === 'plan' ? ' · a plan' : ''}{warnings.length ? <a href="#check" className="text-amber-700 dark:text-amber-300 underline"> · {plural(warnings.length, 'note')}</a> : null}</span>

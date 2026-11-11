@@ -38,11 +38,27 @@ export async function getStamp(userId: string, id: string) {
   return { ok: true as const, stamp: stampItem(s), used: !!s.usedAt };
 }
 
-export async function createStamp(userId: string, start: unknown, note?: unknown) {
+/** A new stamp. `id` made on the phone (offline, #71 step 3): the same id again returns the
+ *  stamp already saved, so a retried upload never makes two. `end` = ended before it was sent. */
+export async function createStamp(userId: string, start: unknown, note?: unknown, id?: unknown, end?: unknown) {
   const p = point(start);
   if (!p) return fail(400, 'Send start: { date: YYYY-MM-DD, hour: H:MM, timezone }.');
-  const s = await EntryStamp.create({ userId, start: p, note: cleanNote(note) });
-  return { ok: true as const, stamp: stampItem(s.toObject()) };
+  if (id != null && !mongoose.isValidObjectId(id)) return fail(400, 'id must be a 24-character hex ID.');
+  if (id) {
+    const there = await EntryStamp.findOne({ _id: id, userId }).lean() as any;
+    if (there) return { ok: true as const, stamp: stampItem(there), already: true };
+  }
+  const e = end && (end as any).hour ? point(end) : null;
+  try {
+    const s = await EntryStamp.create({ ...(id ? { _id: new mongoose.Types.ObjectId(String(id)) } : {}), userId, start: p, end: e, note: cleanNote(note) });
+    return { ok: true as const, stamp: stampItem(s.toObject()), already: false };
+  } catch (err: any) {
+    if (err?.code === 11000 && id) {
+      const there = await EntryStamp.findOne({ _id: id, userId }).lean() as any;
+      if (there) return { ok: true as const, stamp: stampItem(there), already: true };
+    }
+    throw err;
+  }
 }
 
 /** A note, an end (End now), or both. An empty end clears it. */
