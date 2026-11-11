@@ -99,6 +99,8 @@ function EntryHome() {
   }
   const iana = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London', []);
 
+  /** When the Home shown was saved, if it came from the phone's copy (offline). */
+  const [savedAt, setSavedAt] = useState<number | null>(null);
   const load = useCallback(async () => {
     try {
       const [h, z] = await Promise.all([
@@ -108,9 +110,12 @@ function EntryHome() {
       const hb = await h.json().catch(() => ({}));
       if (!h.ok) throw new Error(hb.error ?? `HTTP ${h.status}`);
       if (z) { const zb = await z.json().catch(() => ({})); if (z.ok) setZones(zb.zones ?? []); }
+      // Offline (#71 step 3): the service worker answered with the copy it saved last.
+      const saved = h.headers.get('x-offline-from-cache') ? Number(h.headers.get('x-offline-saved')) : 0;
+      setSavedAt(saved || null);
       setData(hb); setError('');
     } catch (e: any) {
-      setError(String(e.message ?? e));
+      setError(navigator.onLine === false ? 'No signal, and Home hasn’t been saved on this phone yet.' : String(e.message ?? e));
     }
   }, [iana, zones]);
   useEffect(() => { load(); }, [load]);
@@ -298,6 +303,12 @@ function EntryHome() {
   return (
     <div className="flex flex-col flex-1 w-full pb-24">
       <div className="px-4 pt-5 pb-2 max-w-3xl mx-auto w-full flex flex-col gap-4">
+        {savedAt && (
+          <p className="text-xs rounded border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950 text-amber-900 dark:text-amber-200 px-3 py-2">
+            Saved copy from {new Date(savedAt).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' })} — no signal (or a very slow one).
+            Buttons need a signal for now. <button onClick={load} className="underline">Try again</button>
+          </p>
+        )}
         {/* Presets and new */}
         <section className="flex flex-col gap-2">
           <div className="flex items-center justify-between">

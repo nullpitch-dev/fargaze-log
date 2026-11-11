@@ -22,6 +22,7 @@ export default auth((req) => {
 export const config = {
   matcher: [
 		// /privacy is public: Google's OAuth consent screen links to it.
-    '/((?!_next/static|_next/image|favicon.ico|privacy).*)',
+    // sw.js, the manifest and its icons too: the browser fetches them on its own (#71 step 3).
+    '/((?!_next/static|_next/image|favicon.ico|privacy|sw\\.js|manifest\\.webmanifest|icons/).*)',
   ],
 };
