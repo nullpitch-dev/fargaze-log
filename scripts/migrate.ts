@@ -1,7 +1,13 @@
 // Migration: rebuilds the log from the Archive file (Design §11).
 //
-//   npm run migrate                  rebuilds every year tab ('2026', and '2027' from January)
+// ⛔ WRITING IS BLOCKED (Hyoje, 12 Nov 2026): the database is the truth since the entry app went
+// live, and a rebuild deletes every record in the tabs it reloads — records made in the app too.
+// Only --check runs (Hyoje still repeats records in the 2026 tab until #72 export; the check keeps
+// that copy honest). New records from the sheet go up with npm run staging, which only adds.
+// The block can be passed only with --yes-delete-app-records, on purpose long.
+//
 //   npm run migrate -- --check       reads and checks only; writes nothing (safe on production)
+//   npm run migrate                  BLOCKED: rebuilds every year tab
 //   npm run migrate -- --full        also rebuilds the archive tab '~2025' (§11.6)
 //   npm run migrate -- --full --rollover
 //                                    after the January merge (§11.8): reads '~2026' and, if
@@ -39,6 +45,7 @@ const USER_ID = 'hyoje';
 const CHECK = process.argv.includes('--check');
 const FULL = process.argv.includes('--full');
 const ROLLOVER = process.argv.includes('--rollover');
+const UNBLOCK = process.argv.includes('--yes-delete-app-records');
 const START_ROW = 4;
 
 const label = (j: TabJob) => (j.archive ? `${j.tab} (up to ${j.to})` : j.tab);
@@ -47,6 +54,17 @@ const label = (j: TabJob) => (j.archive ? `${j.tab} (up to ${j.to})` : j.tab);
 
 async function main() {
   console.log(`🚀 FarGaze Log migration${CHECK ? ' — CHECK ONLY, nothing is written' : ''}${FULL ? ' — FULL (archive and year tabs)' : ''}${ROLLOVER ? ' — ROLLOVER' : ''}\n`);
+  if (!CHECK && !UNBLOCK) {
+    console.error([
+      '⛔ npm run migrate is blocked: it would delete and reload the records in the year tabs,',
+      '   including every record made in the app (the database is the truth now).',
+      '',
+      '   To check the 2026 tab against the rules:   npm run migrate -- --check',
+      '   To add records from the Staging tab:        npm run staging',
+    ].join('\n'));
+    process.exitCode = 1;
+    return;
+  }
   if (ROLLOVER && !FULL) {
     console.error('⛔ --rollover needs --full: the archive tab has to be rebuilt. Run npm run migrate -- --full --rollover.');
     process.exitCode = 1;
