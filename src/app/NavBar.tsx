@@ -72,18 +72,14 @@ export default function NavBar() {
     }`;
 
   return (
-    <nav className="border-b border-stone-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-6 py-3 flex items-center gap-8 max-[520px]:px-4 max-[520px]:gap-3.5 whitespace-nowrap shadow-sm dark:shadow-none">
+    <nav className="border-b border-stone-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-6 py-3 flex items-center gap-8 max-[520px]:px-3 max-[520px]:gap-2.5 whitespace-nowrap shadow-sm dark:shadow-none">
       {/* Hidden on narrow screens (Fold 6 outer screen, ~344 px), so the bar fits and the page is not zoomed out */}
       <span className="text-sm font-semibold tracking-widest text-stone-400 dark:text-zinc-500 uppercase max-[520px]:hidden">
         FarGaze
       </span>
-      {/* Entry (#71): a pencil on narrow screens, so the bar still fits 344 px */}
-      <Link href="/entry" className={navClass('/entry')} aria-label="Entry">
-        <span className="max-[520px]:hidden">Entry</span>
-        <svg className="hidden max-[520px]:block" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-        </svg>
-      </Link>
+      {/* Today (#71; "Entry" until 12 Nov — Hyoje: the page is about today, entry is a small
+          part of it): a word on every screen, first, as the app's main page. */}
+      <Link href="/entry" className={navClass('/entry')}>Today</Link>
 			<Link href="/calendar" className={navClass('/calendar')}>Calendar</Link>
       <Link href="/insights" className={navClass('/insights')}>Insights</Link>
       <Link href="/search" className={navClass('/search')}>Search</Link>

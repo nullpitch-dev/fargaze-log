@@ -82,7 +82,7 @@ export default function OfflineSupport() {
   if (!offline) return null;
   return (
     <div role="status" className="sticky top-0 z-50 px-4 py-1 text-xs text-center bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200 border-b border-amber-200 dark:border-amber-900">
-      No signal{on ? ' — Entry saves new entries and stamps on the phone' : ''}
+      No signal{on ? ' — Today saves what you do on the phone and sends it later' : ''}
     </div>
   );
 }

@@ -3,6 +3,7 @@
 //   how 'onTime' Started on time: an open record starting at the planned start
 //   how 'done'   Done as planned: a record with the plan's own times
 //   how 'nowDone' Done now: starts and ends now (send now)
+//   recordId?    made on the phone (offline): the record gets it; sent again → { already }
 import { requireUser } from '@/lib/admin/guard';
 import { confirmPlan } from '@/lib/entry/save';
 import { reply, body, type IdCtx } from '@/lib/entry/reply';
@@ -13,5 +14,5 @@ export async function POST(req: Request, { params }: IdCtx) {
   const b = await body(req);
   if (typeof b?.updatedAt !== 'string') return reply({ ok: false, status: 400, error: 'Send { updatedAt, how }' });
   const how = b.how === 'now' || b.how === 'onTime' || b.how === 'nowDone' ? b.how : 'done';
-  return reply(await confirmPlan(g.userId, (await params).id, b.updatedAt, how, b.now));
+  return reply(await confirmPlan(g.userId, (await params).id, b.updatedAt, how, b.now, b.recordId ?? undefined));
 }

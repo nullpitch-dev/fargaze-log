@@ -9,7 +9,7 @@
 // Kept in localStorage: small, survives closing the app, readable at once on load.
 import { offlineAllowed } from './config';
 
-export type OutboxKind = 'entry' | 'stamp';
+export type OutboxKind = 'entry' | 'stamp' | 'action';   // action: slice 3, a button on Today
 export interface OutboxItem {
   id: string;               // the phone's ID for the record / plan / stamp
   kind: OutboxKind;
@@ -22,6 +22,9 @@ export interface OutboxItem {
   state: 'waiting' | 'refused';
   error?: string;
   problems?: string[];
+  /** An action (slice 3): what it does, for Today to show it before it is sent.
+   *  op start / onTime / nowDone on a plan (target), giving recordId; end on a record. */
+  meta?: { op: 'start' | 'onTime' | 'nowDone' | 'end'; target: string; recordId?: string; at: any; item: any };
 }
 
 const KEY = 'fg-outbox-v1';

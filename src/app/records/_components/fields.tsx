@@ -14,15 +14,16 @@ export const addBtn = 'text-xs px-2 py-1 rounded border border-dashed border-sto
 
 export function Section({ title, onRemove, onReset, children }: { title: string; onRemove?: () => void; onReset?: () => void; children: ReactNode }) {
   return (
-    <section className="bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-700 rounded-lg p-4 shadow-sm">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-500 dark:text-zinc-400">{title}</h2>
+    // Denser, with titles and borders that stand out more (Hyoje, 12 Nov).
+    <section className="bg-white dark:bg-zinc-900 border border-stone-300 dark:border-zinc-600 rounded-lg px-3 py-2.5 sm:p-4 shadow-sm">
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-700 dark:text-zinc-200">{title}</h2>
         <span className="flex items-center gap-3">
           {onReset && <button type="button" onClick={onReset} className={linkBtn} title="Clear what was measured or paid, keep the rest">Reset</button>}
           {onRemove && <button type="button" onClick={onRemove} className={linkBtn} title="Empty this section and hide it">Remove</button>}
         </span>
       </div>
-      <div className="flex flex-col gap-3">{children}</div>
+      <div className="flex flex-col gap-2.5">{children}</div>
     </section>
   );
 }
@@ -30,7 +31,7 @@ export function Section({ title, onRemove, onReset, children }: { title: string;
 /** A labelled row. `cols` = how many boxes sit side by side from 640 px. */
 export function Field({ label, note, children }: { label: string; note?: ReactNode; children: ReactNode }) {
   return (
-    <label className="flex flex-col gap-1 min-w-0">
+    <label className="flex flex-col gap-0.5 min-w-0">
       <span className="text-xs text-stone-500 dark:text-zinc-400">{label}</span>
       {children}
       {note && <span className="text-xs text-stone-400 dark:text-zinc-500">{note}</span>}
@@ -39,7 +40,7 @@ export function Field({ label, note, children }: { label: string; note?: ReactNo
 }
 
 export function Row({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 ${className}`}>{children}</div>;
+  return <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 ${className}`}>{children}</div>;
 }
 
 // ── Text with suggestions ────────────────────────────────────────────────────
@@ -235,6 +236,29 @@ export function ToggleChips({ values, options, onChange }: { values: string[]; o
               ? outside ? 'border-red-400 bg-red-50 text-red-800 dark:border-red-500 dark:bg-red-950 dark:text-red-200' : 'border-stone-700 bg-stone-800 text-white dark:border-zinc-300 dark:bg-zinc-200 dark:text-zinc-900'
               : 'border-stone-300 text-stone-600 dark:border-zinc-600 dark:text-zinc-300 hover:bg-stone-50 dark:hover:bg-zinc-800'}`}>
             {o}{outside && ' (not in the list)'}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** One choice as small pills in a grid of `cols` columns (Hyoje, 12 Nov: Food's type and
+ *  levels — one tap instead of a drop-down). A tap on the chosen one clears it; a value not
+ *  in the list shows red, as in ToggleChips. */
+export function OnePills({ value, options, onChange, cols = 1 }: { value: string; options: string[]; onChange: (v: string) => void; cols?: number }) {
+  const all = value && !options.includes(value) ? [...options, value] : options;
+  return (
+    <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+      {all.map(o => {
+        const on = o === value;
+        const outside = on && !options.includes(o);
+        return (
+          <button type="button" key={o} aria-pressed={on} onClick={() => onChange(on ? '' : o)}
+            className={`rounded-full border px-1 py-1 text-xs leading-tight truncate ${on
+              ? outside ? 'border-red-400 bg-red-50 text-red-800 dark:border-red-500 dark:bg-red-950 dark:text-red-200' : 'border-stone-700 bg-stone-800 text-white dark:border-zinc-300 dark:bg-zinc-200 dark:text-zinc-900'
+              : 'border-stone-300 text-stone-600 dark:border-zinc-600 dark:text-zinc-300 hover:bg-stone-50 dark:hover:bg-zinc-800'}`}>
+            {o}
           </button>
         );
       })}

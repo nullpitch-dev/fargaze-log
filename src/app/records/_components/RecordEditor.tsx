@@ -25,7 +25,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { RecordForm, FormFood, FormAlcohol, FormItem, FormExercise } from '@/lib/records/form';
 import type { FormOptions } from '@/lib/records/formOptions';
-import { Field, ItemList, NoteBox, NumberBox, PickText, Row, Section, Select, TagInput, Text, ToggleChips, addBtn, inputCls } from './fields';
+import { Field, ItemList, NoteBox, NumberBox, PickText, Row, Section, Select, TagInput, Text, ToggleChips, OnePills, addBtn, inputCls } from './fields';
 import { PeopleEditor } from './PeopleEditor';
 import { ChangeTable, type Line, type Plain } from './ChangeTable';
 import { relationshipOf } from '@/lib/records/relationship';
@@ -176,7 +176,8 @@ function wholeFrom(foods: FormFood[]): { foods: Portioned[]; whole: { amount: nu
   const units = [...new Set(out.map(x => x.unit.trim()).filter(Boolean))];
   const nums = out.map(x => Number(String(x.amount).replace(/,/g, '')));
   const sum = out.length && nums.every(n => Number.isFinite(n) && String(out[0].amount).trim() !== '') ? nums.reduce((a, b) => a + b, 0) : null;
-  return { foods: out, whole: { amount: sum != null ? round3(sum) : null, unit: units.length === 1 ? units[0] : '' }, safe: !out.length || (sum != null && units.length <= 1) };
+  // Unit: the foods' own one; none yet → 인분 (Hyoje, 12 Nov; can be changed); mixed → empty.
+  return { foods: out, whole: { amount: sum != null ? round3(sum) : null, unit: units.length === 1 ? units[0] : units.length ? '' : '인분' }, safe: !out.length || (sum != null && units.length <= 1) };
 }
 
 function shareWhole(foods: Portioned[], w: { amount: any; unit: string }): Portioned[] {
@@ -630,7 +631,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
 
         <div className="flex flex-wrap gap-2">
           {!gone && <button onClick={() => { setResult(null); setReload(n => n + 1); }} className={secondary}>Open the record</button>}
-          <Link href="/entry" className={secondary}>Entry home</Link>
+          <Link href="/entry" className={secondary}>Today</Link>
           <Link href="/calendar" className={secondary}>Calendar</Link>
           <Link href="/search" className={secondary}>Search</Link>
         </div>
@@ -903,8 +904,8 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
         </div>
       </div>
 
-      <div className="px-4 py-4 max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] gap-4 items-start">
-        <div className="flex flex-col gap-4 min-w-0">
+      <div className="px-3 sm:px-4 py-3 sm:py-4 max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] gap-3 sm:gap-4 items-start">
+        <div className="flex flex-col gap-3 sm:gap-4 min-w-0">
           {saveError && (
             <div className="rounded-lg border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950 p-3 text-sm text-red-800 dark:text-red-200">
               <p>{saveError.text}</p>
@@ -1037,11 +1038,14 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
 
           {shown('food') && (
             <Section title={`Food & drink${req('food')}`} onRemove={removeBtn('food')} onReset={resetBtn('food')}>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <Field label="Type"><Select value={f.food.type} onChange={v => patch('food', { type: v })} options={ref('food.type')} /></Field>
-                <Field label="Carbs"><Select value={f.food.carbs} onChange={v => patch('food', { carbs: v })} options={ref('nutrient_level')} /></Field>
-                <Field label="Fat"><Select value={f.food.fat} onChange={v => patch('food', { fat: v })} options={ref('nutrient_level')} /></Field>
-                <Field label="Spiciness"><Select value={f.food.spiciness} onChange={v => patch('food', { spiciness: v })} options={ref('nutrient_level')} /></Field>
+              {/* Pills in one row (Hyoje, 12 Nov): Type across two columns, the levels one each. */}
+              <div className="grid grid-cols-5 gap-2">
+                <div className="col-span-2 flex flex-col gap-1"><span className="text-xs text-stone-500 dark:text-zinc-400">Type</span>
+                  <OnePills value={f.food.type} options={ref('food.type')} onChange={v => patch('food', { type: v })} cols={3} /></div>
+                {(['carbs', 'fat', 'spiciness'] as const).map(k => (
+                  <div key={k} className="flex flex-col gap-1"><span className="text-xs text-stone-500 dark:text-zinc-400">{k === 'carbs' ? 'Carbs' : k === 'fat' ? 'Fat' : 'Spicy'}</span>
+                    <OnePills value={f.food[k]} options={ref('nutrient_level')} onChange={v => patch('food', { [k]: v })} /></div>
+                ))}
               </div>
               <div className="flex flex-col gap-1">
                 <div className="flex flex-wrap items-center justify-between gap-2">

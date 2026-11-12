@@ -23,7 +23,8 @@ import { dropOutbox, flushOutbox, isNoSignal, listOutbox, onOutbox, outboxOn, pu
 import { newEntryId } from '@/lib/entry/forms';
 
 interface Point { date: string; hour: string; timezone: string }
-interface Item { id: string; activity: string; category: string; title: string; start: Point; end: Point; place: string; updatedAt: string; seconds?: number | null; repeat?: boolean; started?: boolean; plannedEnd?: { date: string; hour: string; timezone?: string } | null }
+interface Item { id: string; activity: string; category: string; title: string; start: Point; end: Point; place: string; updatedAt: string; seconds?: number | null; repeat?: boolean; started?: boolean; plannedEnd?: { date: string; hour: string; timezone?: string } | null;
+  /** changed on the phone, not sent yet (offline slice 3) */ local?: boolean }
 interface Preset { id: string; name: string; order: number; time: { kind: 'open' | 'moment' | 'length'; minutes: number | null } }
 interface Stamp { id: string; note: string; start: Point; end: Point; updatedAt: string; /** saved on the phone, not sent yet (offline) */ local?: boolean }
 interface Home { today: string; stamps: Stamp[]; comingUp: Item[]; inProgress: Item[]; done: Item[]; ongoing: Item[]; recent: Item[]; presets: Preset[] }
@@ -33,8 +34,9 @@ const btn = 'px-3 py-1.5 rounded text-sm border disabled:opacity-40 disabled:cur
 const primary = `${btn} border-stone-800 bg-stone-800 text-white hover:bg-stone-700 dark:border-zinc-200 dark:bg-zinc-200 dark:text-zinc-900 dark:hover:bg-white`;
 const secondary = `${btn} border-stone-300 text-stone-700 hover:bg-stone-50 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800`;
 const small = 'px-2 py-1 rounded text-xs border border-stone-300 text-stone-700 hover:bg-stone-50 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800 disabled:opacity-40';
-const heading = 'text-xs font-semibold uppercase tracking-widest text-stone-500 dark:text-zinc-400';
-const card = 'bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-700 rounded-lg';
+// Titles and borders that stand out more (Hyoje, 12 Nov).
+const heading = 'text-xs font-semibold uppercase tracking-widest text-stone-700 dark:text-zinc-200';
+const card = 'bg-white dark:bg-zinc-900 border border-stone-300 dark:border-zinc-600 rounded-lg';
 
 /** Presets are deferred (Hyoje, 10 Nov): Copy recent covers the need for now. */
 const PRESETS_ON = false;
@@ -74,6 +76,34 @@ async function call(url: string, method: string, body?: unknown): Promise<{ ok: 
 }
 
 
+const NO_POINT: Point = { date: '', hour: '', timezone: '' };
+
+/** Offline slice 3: Today as it will be once the buttons pressed with no signal are sent —
+ *  a started plan is In progress, an ended record is Done. A refused one shows as it was. */
+function withOutbox(h: Home, ob: OutboxItem[]): Home {
+  const acts = ob.filter(x => x.kind === 'action' && x.state === 'waiting' && x.meta);
+  if (!acts.length) return h;
+  let comingUp = [...h.comingUp], inProgress = [...h.inProgress], done = [...h.done], ongoing = [...h.ongoing];
+  for (const a of acts) {
+    const m = a.meta!;
+    if (m.op === 'end') {
+      const from = [...inProgress, ...ongoing].find(x => x.id === m.target) ?? m.item;
+      inProgress = inProgress.filter(x => x.id !== m.target);
+      ongoing = ongoing.filter(x => x.id !== m.target);
+      done = done.filter(x => x.id !== m.target);
+      if (from) done = [{ ...from, end: m.at, seconds: null, local: true }, ...done];
+      continue;
+    }
+    const plan: Item | undefined = comingUp.find(x => x.id === m.target) ?? m.item;
+    comingUp = comingUp.filter(x => x.id !== m.target);
+    if (!plan || !m.recordId || [...inProgress, ...done].some(x => x.id === m.recordId)) continue;
+    const start = m.op === 'onTime' ? plan.start : m.at;
+    const rec: Item = { ...plan, id: m.recordId, start, end: m.op === 'nowDone' ? start : NO_POINT, updatedAt: '', started: true, local: true };
+    if (m.op === 'nowDone') done = [rec, ...done]; else inProgress = [rec, ...inProgress];
+  }
+  return { ...h, comingUp, inProgress, done, ongoing };
+}
+
 /** Offline (#71 step 3): ask the service worker to save the plans, stamps and recent records
  *  Home shows, so they open and copy with no signal. At most every 20 minutes. */
 function warmItems(h: any) {
@@ -92,7 +122,7 @@ function warmItems(h: any) {
   } catch { /* nothing saved; fine */ }
 }
 
-const NO_SIGNAL = 'No signal: this button needs one for now — use + New, Copy or Stamp';
+const NO_SIGNAL = 'No signal: this needs one — Start, End, + New, Copy and Stamp work without';
 
 function EntryHome() {
   const router = useRouter();
@@ -206,7 +236,9 @@ function EntryHome() {
     return { ...l, timezone: (zones && zoneCodeFor(iana, l.date, l.hour, zones)) || '' };
   };
 
-  async function act(key: string, fn: () => Promise<{ ok: boolean; b: any }>, done: Toast | ((b: any) => Toast)) {
+  /** A button's call; `offline` = what to do with no signal instead (slice 3: queue it). */
+  async function act(key: string, fn: () => Promise<{ ok: boolean; b: any }>, done: Toast | ((b: any) => Toast), offline?: () => void) {
+    if (offline && outboxOn() && navigator.onLine === false) { offline(); return; }
     setBusy(key);
     try {
       const r = await fn();
@@ -217,14 +249,43 @@ function EntryHome() {
       setToast(typeof done === 'function' ? done(r.b) : done);
       await load();
     } catch (e) {
+      if (offline && outboxOn() && isNoSignal(e)) { offline(); return; }
       setToast({ text: isNoSignal(e) ? NO_SIGNAL : String((e as any)?.message ?? e) });
     } finally {
       setBusy(null);
     }
   }
 
-  const startNow = (it: Item) => act(`s${it.id}`, () => call(`/api/entry/plans/${it.id}/confirm`, 'POST', { updatedAt: it.updatedAt, how: 'now', now: nowPoint() }), { text: `${it.activity} started` });
-  const startOnTime = (it: Item) => act(`s${it.id}`, () => call(`/api/entry/plans/${it.id}/confirm`, 'POST', { updatedAt: it.updatedAt, how: 'onTime' }), { text: `${it.activity} started at ${it.start.hour}` });
+  /** Queue a button pressed with no signal (slice 3). The time is the press's, not the send's. */
+  function queueAction(it: Item, op: 'start' | 'onTime' | 'nowDone' | 'end', at: Point, url: string, body: any, label: string, recordId?: string) {
+    putOutbox({
+      id: newEntryId(), kind: 'action', url, method: 'POST', body,
+      label: `${label} · ${name(it)}`, when: `${(at.date || it.start.date)} ${at.hour || it.start.hour}`.trim(),
+      meta: { op, target: it.id, recordId, at, item: it },
+    });
+    setToast({ text: `${label} — saved on the phone, sent once there is a signal` });
+  }
+  /** A plan happens; offline the phone names the record, so End now can follow before sending. */
+  function confirm(it: Item, how: 'now' | 'onTime' | 'nowDone', label: string, done: Toast) {
+    const at = how === 'onTime' ? it.start : nowPoint();
+    const op = how === 'now' ? 'start' : how;
+    const queue = () => {
+      const recordId = newEntryId();
+      queueAction(it, op, at, `/api/entry/plans/${it.id}/confirm`, { updatedAt: it.updatedAt, how, ...(how === 'onTime' ? {} : { now: at }), recordId }, label, recordId);
+    };
+    return act(`s${it.id}`, () => call(`/api/entry/plans/${it.id}/confirm`, 'POST', { updatedAt: it.updatedAt, how, ...(how === 'onTime' ? {} : { now: at }) }), done, queue);
+  }
+  /** End a record; one started on the phone (not sent yet) always waits behind its start. */
+  function end(it: Item, at: Point, label: string, done: Toast) {
+    const url = `/api/entry/records/${it.id}/end`;
+    const body = { end: at, updatedAt: it.local ? '' : it.updatedAt };
+    const queue = () => queueAction(it, 'end', at, url, body, label);
+    if (it.local) { if (outboxOn()) queue(); return; }
+    return act(`e${it.id}`, () => call(url, 'POST', body), done, queue);
+  }
+
+  const startNow = (it: Item) => confirm(it, 'now', 'Started', { text: `${it.activity} started` });
+  const startOnTime = (it: Item) => confirm(it, 'onTime', 'Started as planned', { text: `${it.activity} started at ${it.start.hour}` });
   const deletePlan = (it: Item) => act(`x${it.id}`, () => call(`/api/entry/plans/${it.id}`, 'DELETE', { updatedAt: it.updatedAt }), {
     text: 'Plan deleted',
     undo: async () => { const r = await call(`/api/entry/plans/${it.id}/restore`, 'POST'); return r.ok ? null : r.b.error ?? 'Undo failed'; },
@@ -235,7 +296,7 @@ function EntryHome() {
     text: b.noSheet ? 'Record deleted' : 'Record deleted — delete its row in the sheet too (Record changes)',
     undo: async () => { const r = await call(`/api/admin/changes/${b.changeId}/undo`, 'POST'); return r.ok ? null : r.b.error ?? 'Undo failed'; },
   }));
-  const doneNow = (it: Item) => act(`d${it.id}`, () => call(`/api/entry/plans/${it.id}/confirm`, 'POST', { updatedAt: it.updatedAt, how: 'nowDone', now: nowPoint() }), { text: `${it.activity} done` });
+  const doneNow = (it: Item) => confirm(it, 'nowDone', 'Done now', { text: `${it.activity} done` });
   // Stamps.
   /** A stamp saved on the phone (no signal): sent later under its own ID. */
   function stampLocal(start: Point) {
@@ -278,8 +339,8 @@ function EntryHome() {
     undo: async () => { const x = await call('/api/entry/stamps', 'POST', { restore: b.stamp }); return x.ok ? null : x.b.error ?? 'Undo failed'; },
   }));
 
-  const endPlanned = (it: Item) => act(`e${it.id}`, () => call(`/api/entry/records/${it.id}/end`, 'POST', { end: { date: it.plannedEnd!.date, hour: it.plannedEnd!.hour, timezone: it.plannedEnd!.timezone || it.start.timezone }, updatedAt: it.updatedAt }), { text: `${it.activity} ended as planned` });
-  const endNow = (it: Item) => act(`e${it.id}`, () => call(`/api/entry/records/${it.id}/end`, 'POST', { end: nowPoint(), updatedAt: it.updatedAt }), { text: `${it.activity} ended` });
+  const endPlanned = (it: Item) => end(it, { date: it.plannedEnd!.date, hour: it.plannedEnd!.hour, timezone: it.plannedEnd!.timezone || it.start.timezone }, 'Ended as planned', { text: `${it.activity} ended as planned` });
+  const endNow = (it: Item) => end(it, nowPoint(), 'Ended', { text: `${it.activity} ended` });
 
   async function undoToast() {
     if (!toast?.undo) return;
@@ -329,7 +390,8 @@ function EntryHome() {
     ...outbox.filter(x => x.kind === 'stamp').map(x => ({ id: x.id, note: x.body.note ?? '', start: x.body.start, end: x.body.end ?? { date: '', hour: '', timezone: '' }, updatedAt: '', local: true })).reverse(),
     ...(data.stamps ?? []),
   ].filter(st => !usedStamps.has(st.id));
-  const waiting = outbox.filter(x => x.kind === 'entry');
+  const waiting = outbox.filter(x => x.kind === 'entry' || x.kind === 'action');
+  const view = withOutbox(data, outbox);
   const discard = (x: OutboxItem) => { if (window.confirm(`Discard “${x.label}”? It was never sent, so it is lost.`)) dropOutbox(x.id); };
   const newHref = (extra: Record<string, string> = {}) => `/entry/new?${new URLSearchParams(extra)}`;
   const recent = copyQ.trim() ? (found ?? data.recent.filter(r => name(r).toLowerCase().includes(copyQ.trim().toLowerCase()))) : data.recent;
@@ -360,15 +422,23 @@ function EntryHome() {
     { label: 'End now', run: () => endNow(it) },
   ] }));
 
+  // Changed on the phone (slice 3): nothing to open yet; a long press takes it back.
+  const localMenu = (it: Item) => press(() => setMenu({ title: name(it), actions: [
+    { label: 'Take it back', hint: 'Not sent yet: undoes what was pressed on the phone', run: () => {
+      for (const x of listOutbox()) if (x.kind === 'action' && (x.meta?.recordId === it.id || (x.meta?.op === 'end' && x.meta?.target === it.id))) dropOutbox(x.id);
+    } },
+  ] }));
   const row = (it: Item, right: React.ReactNode, href?: string | (() => void), sub?: string, plan = false) => (
-    <li key={it.id} data-longpress="" className="flex items-start gap-3 px-3 py-2.5 border-t first:border-t-0 border-stone-100 dark:border-zinc-800 select-none [-webkit-touch-callout:none]">
+    <li key={it.id} data-longpress="" className="flex items-start gap-3 px-3 py-2.5 border-t first:border-t-0 border-stone-200 dark:border-zinc-700 select-none [-webkit-touch-callout:none]">
       <div className="flex-1 min-w-0">
-        {typeof href === 'function'
+        {it.local
+          ? <span {...localMenu(it)} className="block text-sm text-stone-800 dark:text-zinc-100 truncate">{name(it)}</span>
+          : typeof href === 'function'
           ? <button type="button" onClick={href} {...copyMenu(it, plan)} className="block w-full text-left text-sm text-stone-800 dark:text-zinc-100 hover:underline truncate select-none">{name(it)}</button>
           : href
           ? <Link href={href} {...copyMenu(it, plan)} className="block text-sm text-stone-800 dark:text-zinc-100 hover:underline truncate select-none">{name(it)}</Link>
           : <span className="block text-sm text-stone-800 dark:text-zinc-100 truncate">{name(it)}</span>}
-        <span className="block text-xs text-stone-500 dark:text-zinc-400 truncate">{sub ?? when(it, today)}{it.place ? ` · ${it.place}` : ''}</span>
+        <span className="block text-xs text-stone-500 dark:text-zinc-400 truncate">{sub ?? when(it, today)}{it.place ? ` · ${it.place}` : ''}{it.local ? ' · on the phone' : ''}</span>
       </div>
       {right}
     </li>
@@ -380,13 +450,13 @@ function EntryHome() {
         {savedAt && (
           <p className="text-xs rounded border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950 text-amber-900 dark:text-amber-200 px-3 py-2">
             Saved copy from {new Date(savedAt).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' })} — no signal (or a very slow one).
-            + New, Copy and Stamp save on the phone; the other buttons need a signal. <button onClick={load} className="underline">Try again</button>
+            What you do here is saved on the phone and sent once there is a signal; opening or deleting a record needs one. <button onClick={load} className="underline">Try again</button>
           </p>
         )}
         {/* Presets and new */}
         <section className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <h1 className="text-lg font-semibold text-stone-800 dark:text-zinc-100">Entry</h1>
+            <h1 className="text-lg font-semibold text-stone-800 dark:text-zinc-100">Today</h1>
             {PRESETS_ON && data.presets.length > 0 && (
               <button onClick={() => setEditPresets(v => !v)} className="text-xs text-stone-500 dark:text-zinc-400 underline">{editPresets ? 'Done' : 'Edit presets'}</button>
             )}
@@ -431,13 +501,19 @@ function EntryHome() {
             {waiting.length > 0 ? (
               <ul className={card}>
                 {waiting.map(x => (
-                  <li key={x.id} data-longpress="" className="flex items-start gap-3 px-3 py-2.5 border-t first:border-t-0 border-stone-100 dark:border-zinc-800 select-none [-webkit-touch-callout:none]">
+                  <li key={x.id} data-longpress="" className="flex items-start gap-3 px-3 py-2.5 border-t first:border-t-0 border-stone-200 dark:border-zinc-700 select-none [-webkit-touch-callout:none]">
                     <div className="flex-1 min-w-0">
-                      <Link href={`/entry/new?outbox=${x.id}`} {...press(() => setMenu({ title: x.label, actions: [
-                          { label: 'Open', hint: 'Check or fix it, then save again', run: () => router.push(`/entry/new?outbox=${x.id}`) },
-                          { label: 'Discard', hint: 'Never sent, so it is lost', run: () => discard(x) },
-                        ] }))}
-                        className="block text-sm text-stone-800 dark:text-zinc-100 hover:underline truncate select-none">{x.label}</Link>
+                      {x.kind === 'entry' ? (
+                        <Link href={`/entry/new?outbox=${x.id}`} {...press(() => setMenu({ title: x.label, actions: [
+                            { label: 'Open', hint: 'Check or fix it, then save again', run: () => router.push(`/entry/new?outbox=${x.id}`) },
+                            { label: 'Discard', hint: 'Never sent, so it is lost', run: () => discard(x) },
+                          ] }))}
+                          className="block text-sm text-stone-800 dark:text-zinc-100 hover:underline truncate select-none">{x.label}</Link>
+                      ) : (
+                        <span {...press(() => setMenu({ title: x.label, actions: [
+                            { label: 'Discard', hint: 'Never sent: the plan or record stays as it was', run: () => discard(x) },
+                          ] }))} className="block text-sm text-stone-800 dark:text-zinc-100 truncate select-none">{x.label}</span>
+                      )}
                       <span className={`block text-xs truncate ${x.state === 'refused' ? 'text-red-700 dark:text-red-300' : 'text-stone-500 dark:text-zinc-400'}`}>
                         {x.state === 'refused' ? `Not saved: ${x.problems?.[0] ?? x.error ?? 'refused'}` : `${[dayLabel(x.when.split(' ')[0], today), x.when.split(' ')[1]].filter(Boolean).join(' · ')} · on the phone`}
                       </span>
@@ -454,7 +530,7 @@ function EntryHome() {
             <h2 className={heading}>Stamps</h2>
             <ul className={card}>
               {stamps.map(s => (
-                <li key={s.id} data-longpress="" className="flex items-start gap-3 px-3 py-2.5 border-t first:border-t-0 border-stone-100 dark:border-zinc-800 select-none [-webkit-touch-callout:none]">
+                <li key={s.id} data-longpress="" className="flex items-start gap-3 px-3 py-2.5 border-t first:border-t-0 border-stone-200 dark:border-zinc-700 select-none [-webkit-touch-callout:none]">
                   <div className="flex-1 min-w-0">
                     {noteFor === s.id ? (
                       <form onSubmit={e => { e.preventDefault(); saveNote(s); }}>
@@ -480,9 +556,9 @@ function EntryHome() {
 
         <section className="flex flex-col gap-2">
           <h2 className={heading}>Coming up</h2>
-          {data.comingUp.length > 0 ? (
+          {view.comingUp.length > 0 ? (
             <ul className={card}>
-              {data.comingUp.map(it => row(it,
+              {view.comingUp.map(it => row(it,
                 <button onClick={() => startNow(it)} {...startMenu(it)} disabled={busy !== null} className={`${small} select-none`}>Start now</button>,
                 `/entry/plan/${it.id}`,
                 `${when(it, today)}${it.repeat ? ' · repeats' : ''}`, true))}
@@ -492,9 +568,9 @@ function EntryHome() {
 
         <section className="flex flex-col gap-2">
           <h2 className={heading}>In progress</h2>
-          {data.inProgress.length > 0 ? (
+          {view.inProgress.length > 0 ? (
             <ul className={card}>
-              {data.inProgress.map(it => row(it,
+              {view.inProgress.map(it => row(it,
                 <button onClick={() => endNow(it)} {...endMenu(it)} disabled={busy !== null} className={`${small} select-none`}>End now</button>,
                 `/records/${it.id}`,
                 `since ${when(it, today, true, false).replace(/^(Today|Yesterday|Tomorrow)/, m => m.toLowerCase())}${until(it, today)}`))}
@@ -504,20 +580,20 @@ function EntryHome() {
 
         <section className="flex flex-col gap-2">
           <h2 className={heading}>Done</h2>
-          {data.done.length > 0
-            ? <ul className={card}>{data.done.map(it => row(it,
+          {view.done.length > 0
+            ? <ul className={card}>{view.done.map(it => row(it,
                 it.seconds ? <span className="shrink-0 pt-0.5 text-xs tabular-nums text-stone-500 dark:text-zinc-400">{formatDuration(it.seconds)}</span> : null,
                 () => openPane(it.id), when(it, today, it.start.date !== today)))}</ul>
             : <p className="text-sm text-stone-500 dark:text-zinc-400">Nothing finished yet today.</p>}
         </section>
 
-        {data.ongoing.length > 0 && (
+        {view.ongoing.length > 0 && (
           <details className="group">
             <summary className={`${heading} cursor-pointer list-none flex items-center gap-1 select-none`}>
-              <span className="inline-block transition-transform group-open:rotate-90">›</span> Ongoing <span className="normal-case tracking-normal font-normal">({data.ongoing.length})</span>
+              <span className="inline-block transition-transform group-open:rotate-90">›</span> Ongoing <span className="normal-case tracking-normal font-normal">({view.ongoing.length})</span>
             </summary>
             <ul className={`${card} mt-2`}>
-              {data.ongoing.map(it => row(it,
+              {view.ongoing.map(it => row(it,
                 <button onClick={() => endNow(it)} {...endMenu(it)} disabled={busy !== null} className={`${small} select-none`}>End now</button>,
                 `/records/${it.id}`, `since ${when(it, today, true, false)}${until(it, today)}`))}
             </ul>

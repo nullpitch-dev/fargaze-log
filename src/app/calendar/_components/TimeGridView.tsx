@@ -102,6 +102,30 @@ export function TimeGridView({
     scrolled.current = true;
   }, [dates, today, tz, m.hourH]);
 
+  // ── Hidden events (Hyoje, 12 Nov): a small ▲ / ▼ on a day with events above or below
+  // what the grid shows; a tap scrolls to the nearest one. ──
+  const [shown, setShown] = useState<{ top: number; h: number }>({ top: 0, h: 0 });
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    let raf = 0;
+    const read = () => { raf = 0; setShown({ top: el.scrollTop, h: el.clientHeight }); };
+    const on = () => { if (!raf) raf = requestAnimationFrame(read); };
+    read();
+    el.addEventListener('scroll', on, { passive: true });
+    window.addEventListener('resize', on);
+    return () => { el.removeEventListener('scroll', on); window.removeEventListener('resize', on); if (raf) cancelAnimationFrame(raf); };
+  }, []);
+  const toPx = (min: number) => (min / 60) * m.hourH;
+  const hidden = days.map(ps => {
+    if (!shown.h) return { above: [] as number[], below: [] as number[] };
+    const above = ps.filter(p => toPx(p.bottom) <= shown.top + 2).map(p => toPx(p.top));
+    const below = ps.filter(p => toPx(p.top) >= shown.top + shown.h - 2).map(p => toPx(p.top));
+    return { above, below };
+  });
+  const scrollTo = (y: number) => scrollRef.current?.scrollTo({ top: Math.max(0, y - 24), behavior: 'smooth' });
+  const marker = 'pointer-events-auto ml-auto mr-1 rounded-full px-1.5 text-[10px] leading-4 tabular-nums bg-stone-200/90 text-stone-700 dark:bg-zinc-700/90 dark:text-zinc-100 shadow-sm';
+
   const gutterStyle = { width: m.gutter, flex: `0 0 ${m.gutter}px` };
   const reserve: React.CSSProperties = { scrollbarGutter: 'stable', overflowY: 'hidden' };
 
@@ -164,6 +188,25 @@ export function TimeGridView({
       </div>
 
       {/* Hours */}
+      <div className="relative flex-1 min-h-0 flex flex-col">
+      {(['above', 'below'] as const).map(side => hidden.some(x => x[side].length) && (
+        <div key={side} className={`absolute left-0 right-0 z-[950] flex pointer-events-none ${side === 'above' ? 'top-1' : 'bottom-1'}`} style={reserve}>
+          <div style={gutterStyle} />
+          <div className="flex-1 grid" style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}>
+            {hidden.map((x, i) => (
+              <div key={i} className="flex">
+                {x[side].length > 0 && (
+                  <button type="button" className={marker}
+                    aria-label={`${x[side].length} more ${side === 'above' ? 'earlier' : 'later'}`}
+                    onClick={() => scrollTo(side === 'above' ? Math.max(...x[side]) : Math.min(...x[side]) - shown.h / 2)}>
+                    {side === 'above' ? '▲' : '▼'}{x[side].length > 1 ? ` ${x[side].length}` : ''}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
       <div ref={scrollRef} className="flex-1 overflow-y-auto" style={{ scrollbarGutter: 'stable' }}>
         <div className="flex relative" style={{ height: 24 * m.hourH }}>
           <div className="relative" style={gutterStyle}>
@@ -188,6 +231,7 @@ export function TimeGridView({
             ))}
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

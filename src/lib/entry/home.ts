@@ -6,8 +6,10 @@
 //   Done        records that ended today, whenever they started
 //   Ongoing     open records started before today (books, trips …) — folded on the phone
 //   Stamps      times saved with one tap, waiting to become records (stamps.ts)
-//   Presets, Recent (Copy recent: the latest record of each activity + title among the
-//               last 300 records, about two weeks; typing searches all years — searchRecent)
+//   Presets, Recent (Copy recent: the latest record of each activity + title + place among
+//               the last 300 records, about two weeks; typing searches activity, title and
+//               place over all years — searchRecent. Place since 12 Nov, Hyoje: 커피 음용 at
+//               home and at The Drift, a round at The Drift and at Farleigh, are two each)
 // Opening it first tops up the repeats and settles "count as done" plans (repeats.ts).
 // Tomorrow onwards: the Calendar (Hyoje, 9 Nov).
 
@@ -95,14 +97,8 @@ export async function home(userId: string, iana = 'Europe/London', now = Date.no
   const done = (ended as any[]).filter(r => !isOpenRec(r)).map(r => item(r))
     .sort((a, b) => key(b.end).localeCompare(key(a.end)));
 
-  // Copy recent: the latest record of each activity + title, newest first.
-  const seen = new Set<string>();
-  const recent = (latest as any[]).filter(r => {
-    const k = `${r.activity?.name}\u0001${r.activity?.title ?? ''}`;
-    if (seen.has(k)) return false;
-    seen.add(k);
-    return true;
-  }).slice(0, 40).map(r => item(r));
+  // Copy recent: the latest record of each activity + title + place, newest first.
+  const recent = variants(latest as any[]).slice(0, 40).map(r => item(r));
 
   return {
     ok: true as const,
@@ -119,20 +115,26 @@ export async function home(userId: string, iana = 'Europe/London', now = Date.no
   };
 }
 
+/** One record per activity + title + place (the place without its " - detail"): the latest. */
+function variants(rows: any[]): any[] {
+  const seen = new Set<string>();
+  return rows.filter(r => {
+    const place = String(r.location?.activity ?? '').split(' - ')[0].trim();
+    const k = `${r.activity?.name}\u0001${r.activity?.title ?? ''}\u0001${place}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
 /** Copy recent with a search: every record whose activity or title has the text, the
  *  latest of each activity + title, newest first (all years). */
 export async function searchRecent(userId: string, q: string) {
   const text = q.trim();
   if (!text) return { ok: true as const, recent: [] };
   const re = new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-  const rows = await Log.find({ userId, $or: [{ 'activity.name': re }, { 'activity.title': re }] })
+  const rows = await Log.find({ userId, $or: [{ 'activity.name': re }, { 'activity.title': re }, { 'location.activity': re }] })
     .sort({ 'start.datetime': -1 }).limit(500).select('activity start end location duration updatedAt').lean() as any[];
-  const seen = new Set<string>();
-  const recent = rows.filter(r => {
-    const k = `${r.activity?.name}\u0001${r.activity?.title ?? ''}`;
-    if (seen.has(k)) return false;
-    seen.add(k);
-    return true;
-  }).slice(0, 40).map(r => item(r));
+  const recent = variants(rows).slice(0, 40).map(r => item(r));
   return { ok: true as const, recent };
 }

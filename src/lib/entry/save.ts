@@ -151,9 +151,10 @@ function asRecord(doc: any, recordId: mongoose.Types.ObjectId, now: Date) {
 }
 
 /** Writes the record and marks the plan done, in one transaction. */
-async function happen(userId: string, plan: any, doc: any, doneBy: 'confirmed' | 'auto', session?: mongoose.ClientSession) {
+async function happen(userId: string, plan: any, doc: any, doneBy: 'confirmed' | 'auto', session?: mongoose.ClientSession, givenId?: string) {
   const now = new Date();
-  const recordId = new mongoose.Types.ObjectId();
+  // Offline (#71 step 3): the phone names the record, so it can end it before it is sent.
+  const recordId = givenId ? new mongoose.Types.ObjectId(givenId) : new mongoose.Types.ObjectId();
   const run = async (s: mongoose.ClientSession) => {
     const res = await LogPlan.updateOne(
       { _id: plan._id, userId, 'plan.state': 'open', updatedAt: plan.updatedAt },
@@ -182,11 +183,16 @@ const CHANGED = 'This plan was changed since you opened it. Reload and try again
  *   'nowDone' Done now — starts and ends now, for things with no length (paying a bill;
  *            Hyoje, 10 Nov: a long press on Start now)
  */
-export async function confirmPlan(userId: string, id: string, updatedAt: string, how: 'now' | 'onTime' | 'done' | 'nowDone' = 'done', now?: { date: string; hour: string; timezone: string }) {
+export async function confirmPlan(userId: string, id: string, updatedAt: string, how: 'now' | 'onTime' | 'done' | 'nowDone' = 'done', now?: { date: string; hour: string; timezone: string }, recordId?: string) {
+  if (recordId != null && !mongoose.isValidObjectId(recordId)) return fail(400, 'recordId must be a 24-character hex ID.');
   const p = await loadPlan(userId, id);
   if (!p) return fail(404, 'This plan no longer exists.');
+  // Sent again from the phone's outbox: already done with this very record → fine.
+  if (recordId && p.plan?.state === 'done' && String(p.plan?.recordId) === recordId) return { ok: true as const, recordId, already: true };
   if (p.plan?.state !== 'open') return fail(409, p.plan?.state === 'done' ? 'This plan is already a record.' : 'This plan was deleted.');
-  if (iso(p.updatedAt) !== updatedAt) return fail(409, CHANGED);
+  // From the outbox the plan's version may be older than the server's; the plan being still
+  // open is the check that matters there (the phone's action is the user's latest word).
+  if (iso(p.updatedAt) !== updatedAt && !recordId) return fail(409, CHANGED);
   const form = fromRecord(p);
   // A plan saved before planned ends existed (10 Nov) has its plan in End.
   if (!form.plannedEnd.date && !form.plannedEnd.hour && (form.end.date || form.end.hour)) form.plannedEnd = { ...form.end };
@@ -203,8 +209,8 @@ export async function confirmPlan(userId: string, id: string, updatedAt: string,
   const c = await checkEntry(userId, form, { base: p, selfId: String(p._id), now: atNow ? Number.MAX_SAFE_INTEGER : undefined });
   if (c.problems.length) return fail(422, 'Not saved: adjust it first.', c.problems);
   try {
-    const recordId = await happen(userId, p, c.doc, 'confirmed');
-    return { ok: true as const, recordId: String(recordId) };
+    const made = await happen(userId, p, c.doc, 'confirmed', undefined, recordId);
+    return { ok: true as const, recordId: String(made) };
   } catch (e: any) {
     if (e?.conflict) return fail(409, CHANGED);
     throw e;
@@ -276,7 +282,13 @@ export async function endRecord(userId: string, id: string, end: { date: string;
   if (!mongoose.isValidObjectId(id)) return fail(404, 'Unknown record.');
   const base = await Log.findOne({ _id: id, userId }).lean() as any;
   if (!base) return fail(404, 'This record no longer exists.');
-  if (iso(base.updatedAt) !== updatedAt) return fail(409, 'This record was changed since. Reload and try again.');
+  // Offline (#71 step 3): sent from the outbox (updatedAt '' = made on the phone, unknown):
+  // ended already at this very time → fine; the version check is skipped.
+  const fromPhone = updatedAt === '' || updatedAt === 'phone';
+  const sameEnd = base.end?.year && String(base.end?.hour ?? '') === String(end?.hour ?? '') &&
+    `${base.end.year}-${String(base.end.month).padStart(2, '0')}-${String(base.end.day).padStart(2, '0')}` === end?.date;
+  if (fromPhone && sameEnd) return { ok: true as const, updatedAt: iso(base.updatedAt), already: true };
+  if (!fromPhone && iso(base.updatedAt) !== updatedAt) return fail(409, 'This record was changed since. Reload and try again.');
   if (!isOpen(base) && base.end?.year) return fail(409, 'This record has an end already.');
   const form = fromRecord(base);
   form.end = { date: end?.date ?? '', hour: end?.hour ?? '', timezone: end?.timezone ?? '' };

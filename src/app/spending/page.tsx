@@ -653,11 +653,13 @@ function CostDetailRow({
 
 export default function CostPage() {
   // Date defaults
+  // The 1st of the month six full months back, through today (Hyoje, 12 Nov: entries are live
+  // now). Local dates: toISOString gave UTC, so local midnight on 1 May (summer time) read
+  // as 30 Apr.
   const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-  const defaultFrom = new Date(today.getFullYear(), today.getMonth() - 6, 1).toISOString().slice(0, 10);
-  const defaultTo = yesterday.toISOString().slice(0, 10);
+  const local = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const defaultFrom = local(new Date(today.getFullYear(), today.getMonth() - 6, 1));
+  const defaultTo = local(today);
 
   // Filter state
   const [dateFrom, setDateFrom] = useState(defaultFrom);
