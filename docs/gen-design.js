@@ -16,7 +16,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze Log", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Data Design & Requirements Document", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 4.31  |  10 November 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 4.32  |  12 November 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
 );
 C(p([new TextRun({ text: "Structure: ", bold: true }), new TextRun("Part I Foundations · Part II Data · Part III Features · Part IV Operations · Appendices. The body is the complete, always-current source of truth; the changelog below carries one line per version. Work status, open questions and the backlog live in the separate WBS, not here.")]));
 
@@ -75,6 +75,7 @@ C(table(
     ["4.28","7 Nov 2026","67.8 PLACE DETAILS “A - B” DONE (pushed 7 Nov, §15.5.9) and PLACE POINTS PAGE TOOLS (§15.5.10), shaped by Hyoje’s testing the same day. A name uses the point of the longest name that has one (src/lib/places/details.ts); Place points counts each record once under the point it uses, ‘12 (5 with details)’, and the detail names open under the row; renaming a point carries everything under it — records, favourite periods and child points — with a regular-expression sheet step; refused: a child point landing on a name already taken (merge too) and a new name that starts with the old one and “ - ”. Journeys joins legs and finds workplaces by the point’s place. The page: Note out of the table, a Changed column, foldable parts (Places open, the rest folded, remembered per browser), Missing points (3 / 6 / 12 months or all; names with no point listed under A; + Add point, Exclude, Rename) and Excluded with Put back (admin_settings.pointExcluded, §6.13). Rename a name with no point: exact text in Place / From / To and favourite periods, preview, Undo (e.g. ‘Brooklands College 302’ → ‘Brooklands College - 302’). Hyoje does not want Location filled automatically for 이동 records"],
     ["4.29","8 Nov 2026","#70 DONE: STEP 4, THE FIND & REPLACE PAGE (§15.6.3), tested by Hyoje on fargaze-log-test and pushed (15b643a). /records/replace in the gear menu: field, match, Find with values already used, Replace with, optional dates and activity, a Preview button; rows show date · activity · before → after and open the record pane; a Saved screen with Mark repeated and Undo. Items (purchase item and unit, food and drink item) can now be replaced as part of the text; a food or drink part replace is refused when the text appears in any record’s ingredients, which the sheet cell also holds. The step-2 routes had not been saved as built (the preview code sat at /api/records/replace, apply was not routed); now /api/records/replace (fields, used values, apply) and /preview. SHEET STEPS everywhere: the counts to expect in bold, the text to find and to put copied with a click (src/app/_components/SheetSteps.tsx). THE MIDDAY RULE: all-day records resolve 집 / 회사 / 사이트 / 내차 at 12:00 on their date (§15.5.6). Place points Delete now counts records as the list does (a favourite label with the point’s own name no longer blocks it)"],
     ["4.30","8 Nov 2026","#67.5 RENAME AND MERGE FOR THE REFERENCE LISTS (new §15.5.11), asked for by Hyoje on 8 Nov for his People-type clean-up (from an activity perspective to a person perspective: 친목 → 친구, 업무친목 → 업무친구, 업무지인 merged into 업무친구; 경조사 to be split record by record later). The nine reference lists now follow like activities: a new value renames, a value the list already has merges (the old row is deleted, records take the kept value — records are changed, never deleted); preview, one change-list entry, Undo until the next migration (a merge only before the tick). People lists: the dropdown combinations (가족|친목, no records) follow the rename; sheet steps for BB / BC are a regular expression matching the value as a whole | part, run twice; groups that end up side by side with the same method and type (업무친구|업무친구) are left as they are, because the migration reads them as the same people. Undo keeps, per record, exactly which fields changed (extra.hits). Values the code looks for are locked both ways. New src/lib/admin/renameRef.ts. Tested by Hyoje on fargaze-log-test and in production 8 Nov (92a2139). Ingredients, alcohol items and bowel values: after cutover (WBS 67.9). The #71 entry-app design was started and parked the same morning"],
+    ["4.32","12 Nov 2026","THE ENTRY APP IS IN DAILY USE (§15.7.5–15.7.8). Pilot go-live 10 Nov: Hyoje enters real records in production; the sheet stays the backup until cutover. Step 3 OFFLINE built 11–12 Nov in three slices and switched on in production 12 Nov: a service worker keeps the app and its lists on the phone; new entries, stamps and the buttons on Today (Start, End, Done now, Started / Ended as planned) wait in an outbox with phone-made IDs and are sent in order. Entry renamed TODAY. Calendar: records quiet (tinted), plans solid, records still going dashed after now, unconfirmed plans ringed red; overlapping events layered instead of split; a 3-day view; markers for events above / below; plans open read-only. Back closes pop-ups. Drop-downs became pills or a sheet of pills. Copy recent keeps one row per place. Insights include today (except the per-day widgets). Fixes: Vercel functions moved to Dublin next to Atlas (much faster); the HTTP 500s (a schema clone after use) fixed. Repeats page moved to after cutover"],
     ["4.31","10 Nov 2026","THE ENTRY APP (WBS #71, new §15.7), steps 1 and 2 built 8–10 Nov and tested by Hyoje on test.log.fargaze.co: Home at /entry (the landing page) with Coming up, In progress, Done and Ongoing; New, Copy recent and Stamp; plans in log_plan with Start now, Done as planned and Done now; drafts (an open record may wait for its details); the planned end (End is when it ended; plans and records still going carry plannedEnd); repeats (page still to build); presets built and hidden; long-press menus; ingredients filled from the latest record; npm run plans for a Plan tab; the Calendar draws open plans and records still going. Records made in the app carry origin: app (no sheet steps). Next: step 3, offline"],
     ["4.21","26 Oct 2026","DAILY STRIPS FOR DIET AND DRINKING; ONE RULE FOR FUTURE DAYS; MONTHS IN THE CALENDAR (§9.3.3, §9.3.4, §9.3.9). Diet: the Spicy days strip is replaced by Daily diet · carbs — each day coloured by its carbs index (below 4 blue, 4–8 amber, over 8 red), tooltip listing every food- or drink-bearing record of the day (time, meal type, items, 🌶 on a meal rated H, servings in 인분 or a drink-only record’s shared amount), opening upwards; diet.summary gains days. Drinking: a Daily drinking strip under the drinks row (below 4 blue, 4–10 amber, over 10 red), tooltip with the day’s total and each record’s items as logged and drinks; drinking.summary gains rangeStart, rangeEnd and days. Shared colours and band rule in src/app/insights/_lib/day-bands.ts. Strips and calendars in Diet, Drinking, Exercise and Sleep now cover the whole period and draw days from today on as future days (faint, no border, ‘not yet’; futureFrom = localToday()); exercise.summary gains rangeStart / rangeEnd. The calendar pop-up marks months: ‘Oct 1’ in bold on each 1st and on the first day shown, and a stepped line along each month boundary. Checked by Hyoje on 26 Oct"],
   ],
@@ -2510,8 +2511,8 @@ C(table(["Step","What","Status"],[
 ],[700,4300,4360]));
 C(spacer());
 
-C(h2("15.7 The Entry App (WBS #71, v4.31)"));
-C(p("Replaces daily entry in the Active sheet: a phone-first app at /entry (the site’s landing page; / redirects there), built in steps on the test database and tried on test.log.fargaze.co (a second Vercel project reading fargaze-log-test). Designed with Hyoje 8–10 Nov; steps 1 and 2 built and tested 8–10 Nov. Offline (step 3) comes next."));
+C(h2("15.7 The Entry App (WBS #71, v4.31–4.32)"));
+C(p("Replaces daily entry in the Active sheet: a phone-first app at /entry (the site’s landing page; / redirects there), built in steps on the test database and tried on test.log.fargaze.co (a second Vercel project reading fargaze-log-test). Designed with Hyoje 8–10 Nov; steps 1 and 2 built and tested 8–10 Nov. Pilot go-live 10 Nov: real records in production, the sheet kept as the backup (each app record repeated in the 2026 tab by hand) until #72 export. Step 3, offline, built 11–12 Nov and on in production from 12 Nov. Shown as Today in the menu (12 Nov); the address stays /entry."));
 C(h3("15.7.1 Decisions"));
 C(
   bullet("New records make no change-list entry; until cutover they live only in the database (the trial uses the test database), and #72 exports them after. A record made in the app carries origin: 'app', so editing it later shows no sheet steps (one ‘nothing to do in the sheet’ line, ticked). End now keeps the mark (bug found and fixed 10 Nov)"),
@@ -2519,12 +2520,12 @@ C(
   bullet("Drafts: an open record (no end) may be saved without its required groups and incomplete parts (relaxOpen); ending it needs them (tightenOnEnd) — End now refuses with the list"),
   bullet("Plans live in log_plan, never seen by Insights. A start still to come makes a plan. States open / done / deleted (done and deleted stay as tombstones; Delete has Undo). Coming up: Start now (a long press: Done now — starts and ends now, for things with no length), Started on time, Done as planned, edit (a start moved into the past makes it a record), Delete"),
   bullet("Planned end (Hyoje, 10 Nov): End is when it actually ended. A plan has only a planned end; it travels to the record on Start, to copies (moved to today) and from repeats. An End still to come — on a plan, or a record ending later — becomes the planned end and End stays empty, so the record stays open (a draft) and shows ‘until 12:00’. Sheet records keep what was typed. The form shows it read-only (‘Planned until 12:00’ ✎ ×; ✓ / ↶ while editing); End now has a long press Ended as planned. No setting per activity (Hyoje wants no more master lists)"),
-  bullet("Repeats (log_repeat, before cutover): daily / weekly (days) / monthly (day), every N, until a date or a count; per rule Ask me or Count as done (a record once its planned end passes, on the next app open). Made 60 days ahead; a rule change replaces untouched occurrences still to come. The Repeats page is still to build"),
+  bullet("Repeats (log_repeat): daily / weekly (days) / monthly (day), every N, until a date or a count; per rule Ask me or Count as done (a record once its planned end passes, on the next app open). Made 60 days ahead; a rule change replaces untouched occurrences still to come. The API and the fill on app open exist; the Repeats page moved to after cutover (Hyoje, 10 Nov)"),
   bullet("Presets were built (open / moment / length kinds) and hidden on 10 Nov (PRESETS_ON = false): Copy recent covers the need"),
   bullet("Copy recent (and a long press on any title: Copy to new entry): same fields, today at the source’s time of day (Now if needed), End empty, the planned end moved to today; amounts kept, a foreign amount re-priced at today’s list rate; a Reset on each section card of a copy clears it"),
   bullet("Ingredients: typing a food or drink item fills its ingredients from the latest record of that item (GET /api/entry/ingredients)"),
   bullet("Stamps (entry_stamps, 10 Nov): one tap saves the time when there is no time to type (talking, driving), with an optional note of a few words (보고, 역으로). Not records: they wait in Stamps on Home (End now; a tap opens New with their times and the note above the form; a long press: Edit note / Delete) and appear nowhere else"),
-  bullet("Calendar: open plans are drawn from start to planned end, striped and in italics, and open in the entry app; a record still going is drawn to its planned end, striped, until End is set. The Year view counts records only. In Month view a touch anywhere in a day opens its day list (a mouse still opens the event)"),
+  bullet("Calendar (v4.31; looks changed in v4.32, §15.7.6): open plans are drawn from start to planned end; a record still going is drawn to its planned end, or to now once that has passed or when there is none, however long ago it started. The Year view counts records only. In Month view a touch anywhere in a day opens its day list (a mouse still opens the event)"),
   bullet("Place starts empty; Place (picker, favourite labels first) + Detail make ‘A - B’. The zone comes from the phone (the list code whose zone and offset match). Google Calendar sync and 심리 측정: after cutover"),
   bullet("A Plan tab in the Archive file uploads plans: npm run plans (-- --check first): Staging’s checks, End read as the planned end, an open plan already there stops the run; a passed start or missing ingredients only warn"),
 );
@@ -2545,13 +2546,43 @@ C(
   bullet("src/lib/entry/: time.ts, groups.ts, drafts.ts (relaxOpen, tightenOnEnd, endAheadToPlanned), forms.ts (blankForm, copyForm, presetForm, resetSection — pure, safe on the phone), save.ts (checkEntry, createEntry, confirmPlan now / onTime / done / nowDone, adjust, delete, restore, endRecord, settleOne), repeats.ts, presets.ts, stamps.ts, home.ts, reply.ts"),
   bullet("Routes /api/entry/: home, check, records (+ [id] DELETE = Undo of a new record, [id]/end), rules, plans/[id] (+ confirm, restore), repeats, presets, stamps (+ [id]), recent, ingredients. Pages: src/app/entry (Home, new, plan/[id]); _components/LongPress.tsx. Calendar: buildPlanEvents, buildRecordEvents in src/lib/calendar/calendar.ts. Scripts: seed-activity-groups.ts, upload-plans.ts"),
 );
-C(h3("15.7.5 Order of Work"));
+C(h3("15.7.5 Offline (step 3, 11–12 Nov)"));
+C(p("No signal is common (the ACS campus, trains): Today must work without one. Scope agreed 10 Nov: the entry app only — editing old records (the whole database would have to be on the phone) and the admin pages stay online."));
+C(
+  bullet("Slice 1 — the app opens offline. public/sw.js (a hand-written service worker, VERSION v2): /_next/static cache first; /entry pages network first, the saved copy after 5 s or with no signal; GET /api/entry/*, /api/records/options and /api/records/<id> network first, the saved copy after 8 s, marked x-offline-from-cache / x-offline-saved; other pages offline show a short ‘no signal’ note. Today shows ‘Saved copy from …’. The page asks the worker to refresh its copies at most every 5 minutes and when the signal returns; Today also asks for its plans, stamps, In progress / Done and 15 recent records (every 20 minutes) so Copy works offline, and for every item’s latest ingredients (GET /api/entry/ingredients?all=1)"),
+  bullet("Hosts: src/lib/offline/config.ts OFFLINE_HOSTS — test.log.fargaze.co first, log.fargaze.co from 12 Nov. Anywhere else the page unregisters the worker and deletes its caches: taking a host out of the list and pushing is the off switch (tested). Add to Home screen: app/manifest.ts, start_url /entry, icons"),
+  bullet("Slice 2 — new entries and stamps offline. The outbox (src/lib/offline/outbox.ts, localStorage fg-outbox-v1): items { id, kind entry | stamp | action, url, body, label, when, state waiting | refused, problems, meta }. Sent oldest first on every page, when the signal returns and every 30 s while on screen; a no-signal, server error or lost sign-in stops the run, a refusal (4xx) is marked and the next goes on. The phone names every record, stamp and plan (a 24-hex ID); the server returns what it already has for an ID it has seen, so sending twice never saves twice. With no signal the form checks only what the phone can (an activity from the list, a start date); the server checks the rest when it is sent — a refused entry stays red under ‘Waiting to send’ and reopens with its reasons (/entry/new?outbox=<id>)"),
+  bullet("Slice 3 — Today’s buttons offline: Start now, Started as planned, Done now, End now and Ended as planned are queued with the time of the press. A plan started offline gets its record ID from the phone (confirm { recordId }), so End now can follow before anything is sent; the server skips the version check for these and treats the same start or end sent again as done. Today shows the result at once, marked ‘On phone’; a long press takes it back"),
+  bullet("Tested on production builds in a headless browser with the network cut (Playwright, a minted Auth.js cookie): opening, + New, Stamp, refusals, the four buttons; sent in order with matching IDs"),
+);
+C(h3("15.7.6 Today, the Form and the Calendar (11–12 Nov)"));
+C(
+  bullet("‘Entry’ renamed Today (Hyoje: the page is about today; entry is a small part): the first item in the menu on every screen. Denser rows; card borders 1.5 px with more contrast; section titles and sub-headings (Foods, Drinks, Alcohol …) bolder"),
+  bullet("Title long press: Copy to new entry, Started as planned (plans), Delete (a plan with Undo; a record to the trash with Undo — a sheet record also waits on Record changes). After a save Back does not reopen the form. A new cost starts in HOME_CURRENCY (GBP; '' = KRW after returning to Korea) until an amount is typed. Whole meal amount starts ticked (unit 인분) when nothing typed would be lost"),
+  bullet("Choices: pills when a list is short (Choice: up to 6 values of up to 6 characters — Food type, carbs, fat, spiciness, Cross activity, People how / type, Journey purpose / method / return type); otherwise a sheet of pills from the foot of the screen with a search box over 15 values (PickerSheet), never the phone’s own picker. Journey: From / To one row; Return type only for 귀가 to 집"),
+  bullet("Copy recent: one row per activity + title + place (커피 음용 at home and at The Drift are two); the search matches the place too. Suggestions (people, places, items …) ranked by use in the last 12 months, then ever"),
+  bullet("Back closes pop-ups (src/app/_components/useBackToClose.ts): a menu, the record pane or the day list adds a history entry; every close goes through Back; a calendar view change is a step Back undoes, the arrows and Today are not"),
+  bullet("Calendar looks: records a light tint of the category colour with a coloured left edge; plans the solid colour; a record still going tinted to now and dashed to its planned end; an open plan whose start has passed ringed red with ‘!’. Overlapping events layered by start time (indented a step, to the right edge); a covered title moves below what covers it; side by side only when there is no room for a line. A 3-day view (today and the next two; arrows move one day). ▲ / ▼ markers for events above or below what is shown. Plans open read-only in the record pane (Edit goes to the plan)"),
+  bullet("Insights: the default period ends today; Sleep, Bowel, Drinking, Diet and Journeys still stop at yesterday (an unfinished day would lower their per-day figures). Spending: from the 1st of the month six back, through today"),
+);
+C(h3("15.7.7 Fixes and Infrastructure (11–12 Nov)"));
+C(
+  bullet("Speed: Atlas is in Ireland (eu-west-1) but Vercel ran the functions in Washington (iad1); vercel.json regions [dub1] puts both projects next to the database — every query several times faster"),
+  bullet("The HTTP 500s on /api/entry/home: ‘Cannot create DocumentArrayElement schematype without a parent’ — LogPlan cloned Log’s schema at import, and Mongoose 9 cannot clone a schema with document arrays once it has been used (a warm instance had used Log). Log.ts now makes the copy (LogPlanBaseSchema) before the model is compiled. src/lib/mongodb.ts also forgets a failed connect, uses a pool of 5 and gives up in 8 s"),
+  bullet("Battery: the outbox check runs only while the app is on screen; refreshes are throttled"),
+);
+C(h3("15.7.8 Running Before Cutover"));
+C(
+  bullet("Hyoje uses Today in production; with no signal the outbox holds the work. Each app record is repeated by hand in the 2026 tab (never in Staging: a duplicate would follow). No npm run migrate on the 2026 tab — it would replace app records with sheet rows"),
+  bullet("At the January rollover (or any full migration) app records and planned ends on sheet records would be deleted: the routine must change with #74"),
+);
+C(h3("15.7.9 Order of Work"));
 C(table(["Step","What","Status"],[
   ["1","Rules on activity_master, the entry API, plans, repeats, presets","Done 8 Nov"],
-  ["2","Home, New, Copy recent, plans, drafts, Stamp, planned end, long-press menus, Calendar plans","Done 9–10 Nov (2a–2b-8, tested by Hyoje). Left: the Repeats page; Required / Shown columns on /admin/activity"],
-  ["3","Offline PWA: service worker, lists on the phone, a queue with phone-made IDs","Next"],
-  ["4","Trial on test.log.fargaze.co entering the same data as Staging; comparison script test vs production","—"],
-  ["5","History / Future import, #72 export, cutover (#74)","—"],
+  ["2","Home, New, Copy recent, plans, drafts, Stamp, planned end, long-press menus, Calendar plans","Done 9–10 Nov (tested by Hyoje). Left: Required / Shown columns on /admin/activity; the Repeats page after cutover"],
+  ["3","Offline PWA: service worker, lists on the phone, a queue with phone-made IDs","Done 11–12 Nov (§15.7.5); on in production 12 Nov"],
+  ["4","Trial on test.log.fargaze.co entering the same data as Staging; comparison script test vs production","Replaced by the pilot: real use in production since 10 Nov"],
+  ["5","History / Future import, #72 export, cutover (#74)","Next: #72 export first (Hyoje, 12 Nov: it ends the double entry)"],
 ],[700,4300,4360]));
 C(spacer());
 
@@ -2622,6 +2653,13 @@ C(table(["Path","Purpose"],[
   ["src/models/AdminSettings.ts","(v4.20) admin_settings: { userId, pins } (§6.13)"],
   ["src/app/admin/_components/PointPicker.tsx","(v4.20) Map pop-up: draggable pin, tap to move, 📍 Here (locate), Map / Satellite, Apply this point"],
   ["src/app/_components/google-maps.ts","(v4.20) loadGoogleMaps and getMapsKey, shared by JourneyMap and PointPicker"],
+  ["public/sw.js","(v4.32) The offline service worker (§15.7.5): static files cache first; /entry pages and the entry data network first with the saved copy as fallback; refresh on request (warm)"],
+  ["src/lib/offline/config.ts","(v4.32) OFFLINE_HOSTS — where the worker runs (test.log and log.fargaze.co); elsewhere it is removed: the off switch"],
+  ["src/lib/offline/outbox.ts","(v4.32) The outbox: entries, stamps and actions saved on the phone, sent in order (flushOutbox), refused ones kept"],
+  ["src/app/_components/OfflineSupport.tsx","(v4.32) Registers the worker, asks it to refresh, sends the outbox, shows the No signal bar"],
+  ["src/app/_components/useBackToClose.ts","(v4.32) Back closes a pop-up: dismiss(after) and closeModalThen"],
+  ["src/app/manifest.ts","(v4.32) Add to Home screen: FarGaze, start_url /entry, icons in public/icons"],
+  ["vercel.json","(v4.32) regions [dub1]: the functions run in Dublin, next to Atlas in Ireland"],
   ["src/app/NavBar.tsx","(v4.20) Gear button opens the menu (All master lists + pins); under 520 px the FARGAZE word is hidden and the links sit closer"],
   ["src/lib/admin/usage.ts","(v4.17) computeUsage: records per row (distinct records across specs) and values used in records but missing from the list (v4.20) Counts without record IDs where the specs open no arrays (one pass across Place / From / To and similar), breakdown per labelled spec, favourite-place labels resolved for viaFavorites lists, no orphans when refuseUnknown is false (v4.28) placeDetails: each record once under the point it uses, details and detailNames per row; missingPoints"],
   ["src/lib/admin/write.ts","(v4.17) addRow / editRow / deleteRow: parseInput (text, number, coords, zone + local time → true instant), locked and fixed columns, duplicates, favourite-place periods, confirmNew, rowUsage, sheetSteps, master_change logging (v4.20) deleteRow refuses a place point that a favourite-place period names"],
@@ -2732,9 +2770,9 @@ C(table(["Path","Purpose"],[
   ["src/app/calendar/_components/CalendarFilters.tsx","(v4.11) Time zone, activity type, Reading & study, categories with the colour palette, folded Hidden activities"],
   ["src/app/calendar/_components/MonthPicker.tsx","(v4.11) Year + month picker on the title"],
   ["src/app/calendar/_lib/month-layout.ts","(v4.11) Pure: month grid, lanes for any column count (Month rows and the Week/Day strip), bars vs chips, reading cells, filters, isoWeek, readingProgress"],
-  ["src/app/calendar/_lib/time-layout.ts","(v4.11) Pure: per-day pieces, clusters, columns and widening; nowMinutes; weekOf"],
+  ["src/app/calendar/_lib/time-layout.ts","(v4.11) Pure: per-day pieces, nowMinutes, weekOf (v4.32) layoutDay layers overlapping pieces (depth, labelTop; side by side only as a fallback) instead of columns"],
   ["src/app/calendar/_lib/calendar-colors.ts","(v4.11) The 13-key palette, default family colours, textOn, reading tints"],
-  ["src/lib/calendar/calendar.ts","(v4.11) Pure event logic: zone helpers (Intl only), toInstant, resolveRange, candidateFilter, buildCalendarEvents, countByDay"],
+  ["src/lib/calendar/calendar.ts","(v4.11) Pure event logic: zone helpers (Intl only), toInstant, resolveRange, candidateFilter, buildCalendarEvents, countByDay (v4.31) buildPlanEvents, buildRecordEvents (v4.32) isGoing — records still going drawn to now; overdue plans"],
   ["src/lib/calendar/search.ts","(v4.11) Pure search rules: field lists, parseTerms, parseConditions, buildSearchFilter, limits"],
   ["src/app/api/calendar/route.ts","(v4.11) GET events / per-day counts"],
   ["src/app/api/calendar/options/route.ts","(v4.11) Filter options and the long-record check"],
@@ -2757,7 +2795,7 @@ C(table(["Path","Purpose"],[
 C(spacer());
 
 // ===== FOOTER =====
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.31 — 10 November 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.32 — 12 November 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 
 // ===== DOCUMENT ASSEMBLY =====
@@ -2794,6 +2832,6 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-Log-Data-Design-v4.31.docx", buffer);
-  console.log("Wrote FarGaze-Log-Data-Design-v4.31.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-Log-Data-Design-v4.32.docx", buffer);
+  console.log("Wrote FarGaze-Log-Data-Design-v4.32.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });
