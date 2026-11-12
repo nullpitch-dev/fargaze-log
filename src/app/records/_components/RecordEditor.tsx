@@ -229,6 +229,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
   const [bowelMore, setBowelMore] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const ingredientCache = useRef(new Map<string, string[]>());
+  const allIngredients = useRef<Record<string, Record<string, string[]>> | null>(null);
   const repriced = useRef(false);
   const [presetBox, setPresetBox] = useState<null | { name: string; kind: 'open' | 'moment' | 'length'; minutes: string; error: string; saved: boolean }>(null);
   const [rec, setRec] = useState<Loaded | null>(null);
@@ -356,10 +357,15 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
   const offlineReady = checkOffline && !current && offlineProblems.length === 0;
   const canSave = dirty && !saving && (current ? current.problems.length === 0 : offlineReady);
 
-  // Unsaved changes: ask before leaving (closing the tab, or a link in the app).
+  // Unsaved changes: ask before leaving (closing the tab, or a link in the app) — not when
+  // leaving because it was just saved: with no signal the move to Home is a full page load,
+  // which asked "Leave site?" (Hyoje, 12 Nov).
+  const leaving = useRef(false);
+  /** After a save: Home replaces the form in history, so Back doesn't reopen it (12 Nov). */
+  const leaveTo = (href: string) => { leaving.current = true; router.replace(href); };
   useEffect(() => {
     if (!changed) return;
-    const onUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    const onUnload = (e: BeforeUnloadEvent) => { if (leaving.current) return; e.preventDefault(); e.returnValue = ''; };
     const onClick = (e: MouseEvent) => {
       const a = (e.target as HTMLElement)?.closest?.('a[href]') as HTMLAnchorElement | null;
       if (!a || a.target === '_blank' || a.getAttribute('href')?.startsWith('#')) return;
@@ -398,9 +404,17 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
         const key = `${w.kind}\u0001${w.item}`;
         let ing = ingredientCache.current.get(key);
         if (!ing) {
-          const r = await fetch(`/api/entry/ingredients?${new URLSearchParams({ kind: w.kind, item: w.item })}`);
-          const b = await r.json().catch(() => ({}));
-          ing = Array.isArray(b.ingredients) ? b.ingredients : [];
+          try {
+            const r = await fetch(`/api/entry/ingredients?${new URLSearchParams({ kind: w.kind, item: w.item })}`);
+            const b = await r.json().catch(() => ({}));
+            ing = Array.isArray(b.ingredients) ? b.ingredients : [];
+          } catch {
+            // No signal (#71 step 3): the whole list the phone keeps (saved by Home).
+            if (!allIngredients.current) {
+              allIngredients.current = await fetch('/api/entry/ingredients?all=1').then(r => r.json()).catch(() => ({}));
+            }
+            ing = allIngredients.current?.[w.kind]?.[w.item] ?? [];
+          }
           ingredientCache.current.set(key, ing!);
         }
         if (ing!.length) found.push({ ...w, ingredients: ing! });
@@ -459,7 +473,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
           label: [fm.activity.name.trim(), fm.activity.title.trim()].filter(Boolean).join(' · ') || 'New entry',
           when: `${fm.start.date} ${fm.start.hour}`.trim(),
         });
-        router.push(`/entry?queued=${id}`);
+        leaveTo(`/entry?queued=${id}`);
       };
       if (mode === 'new' && outboxOn() && navigator.onLine === false) { setSaving(false); queue(); return; }
       try {
@@ -472,7 +486,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
         if (mode === 'new') dropOutbox(id);   // reopened from the outbox and saved with a signal
         const saved = new URLSearchParams({ saved: b.kind, id: b.id ?? id });
         if (mode === 'plan') saved.set('from', 'plan');
-        router.push(`/entry?${saved}`);
+        leaveTo(`/entry?${saved}`);
       } catch (e: any) {
         if (mode === 'new' && outboxOn() && isNoSignal(e)) { queue(); return; }
         setSaveError({ text: String(e.message ?? e) });
@@ -504,7 +518,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
         const r = await fetch(`/api/entry/plans/${id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ updatedAt: rec.updatedAt }) });
         const b = await r.json().catch(() => ({}));
         if (!r.ok) { setSaveError({ text: b.error ?? `HTTP ${r.status}`, conflict: r.status === 409 }); return; }
-        router.push(`/entry?deleted=${id}`);
+        leaveTo(`/entry?deleted=${id}`);
       } finally {
         setSaving(false);
       }
@@ -718,7 +732,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
       const r = await fetch(`/api/entry/plans/${id}/confirm`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ updatedAt: rec.updatedAt, how }) });
       const b = await r.json().catch(() => ({}));
       if (!r.ok) { setSaveError({ text: b.error ?? `HTTP ${r.status}`, problems: b.problems, conflict: r.status === 409 }); return; }
-      router.push(`/entry?${new URLSearchParams({ saved: 'record', id: b.recordId, from: 'plan' })}`);
+      leaveTo(`/entry?${new URLSearchParams({ saved: 'record', id: b.recordId, from: 'plan' })}`);
     } finally {
       setSaving(false);
     }

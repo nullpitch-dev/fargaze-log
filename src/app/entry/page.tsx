@@ -83,6 +83,7 @@ function warmItems(h: any) {
     if (Date.now() - last < 20 * 60_000) return;
     localStorage.setItem('fg-warm-items', String(Date.now()));
     const data = [
+      '/api/entry/ingredients?all=1',   // the ingredient fill with no signal
       ...(h.comingUp ?? []).map((x: any) => `/api/entry/plans/${x.id}`),
       ...(h.stamps ?? []).map((x: any) => `/api/entry/stamps/${x.id}`),
       ...[...(h.inProgress ?? []), ...(h.done ?? []), ...(h.recent ?? []).slice(0, 15)].map((x: any) => `/api/records/${x.id}`),

@@ -11,6 +11,7 @@
 
 import React from 'react';
 import { createPortal } from 'react-dom';
+import { useBackToClose } from '@/app/_components/useBackToClose';
 
 export function ModalShell({ title, onClose, children, actions }: {
   title: string;
@@ -19,16 +20,18 @@ export function ModalShell({ title, onClose, children, actions }: {
   /** Optional controls placed before the ×, e.g. the Calendar's ‹ › day arrows (#59). */
   actions?: React.ReactNode;
 }) {
+  // Back closes it (Hyoje, 12 Nov). Callers that close it and move on use closeModalThen.
+  const dismiss = useBackToClose(onClose);
   if (typeof document === 'undefined') return null;
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={() => dismiss()}>
       <div className="w-full max-w-lg bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-700 rounded-xl shadow-xl p-4 flex flex-col gap-3"
         onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium text-stone-900 dark:text-zinc-50 uppercase tracking-wide">{title}</p>
           <div className="flex items-center gap-1">
             {actions}
-            <button onClick={onClose}
+            <button onClick={() => dismiss()}
               className="text-stone-400 dark:text-zinc-500 hover:text-stone-700 dark:hover:text-zinc-200 text-lg leading-none ml-1">×</button>
           </div>
         </div>

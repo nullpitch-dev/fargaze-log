@@ -41,6 +41,7 @@ import { weekOf } from './_lib/time-layout';
 import { DetailPanel, type LogEntry } from '@/app/_components/LogDetailPanel';
 import { SearchBox, type SearchSpec, EMPTY_SEARCH, isEmptySearch } from './_components/SearchBox';
 import { SearchResultsView } from './_components/SearchResultsView';
+import { closeModalThen } from '@/app/_components/useBackToClose';
 
 const COMPACT_BELOW = 640;   // px of page width
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -112,9 +113,12 @@ function CalendarInner() {
   const cursor = urlDate && DATE_RE.test(urlDate) ? urlDate : today;
   const urlView = params.get('view');
   const view: View = isView(urlView) ? urlView : 'month';
+  // Back (Hyoje, 12 Nov): a change of view is a step Back undoes (Month → a day → Back = Month);
+  // the arrows and Today only replace, so Back doesn't walk through every day looked at.
   const go = useCallback((d: string, v: View) => {
-    router.replace(`/calendar?view=${v}&date=${d}`, { scroll: false });
-  }, [router]);
+    const href = `/calendar?view=${v}&date=${d}`;
+    if (v !== view) router.push(href, { scroll: false }); else router.replace(href, { scroll: false });
+  }, [router, view]);
   const setCursor = useCallback((d: string) => go(d, view), [go, view]);
 
   // ── Search in the address ──
@@ -312,7 +316,7 @@ function CalendarInner() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft') stepDay(-1);
       else if (e.key === 'ArrowRight') stepDay(1);
-      else if (e.key === 'Escape') setOpenDay(null);
+      else if (e.key === 'Escape') closeModalThen(() => {});   // through Back: no entry left behind
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -509,7 +513,7 @@ function CalendarInner() {
             <>
               {dayLoading && <span className="text-[10px] text-stone-400 dark:text-zinc-500 mr-1">Loading…</span>}
               {view !== 'day' && (
-                <button onClick={() => { const d = openDay; setOpenDay(null); openDate(d); }}
+                <button onClick={() => { const d = openDay; closeModalThen(() => openDate(d)); }}
                   className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline mr-1">
                   Open day ›
                 </button>

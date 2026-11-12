@@ -10,6 +10,7 @@
 // through is cleared when the menu opens.
 
 import { useCallback, useEffect, useRef } from 'react';
+import { useBackToClose } from '@/app/_components/useBackToClose';
 
 const HOLD_MS = 500;
 const SLOP_PX = 10;   // a finger that moves more than this is scrolling, not pressing
@@ -86,26 +87,28 @@ export interface SheetAction { label: string; hint?: string; run: () => void }
 
 /** The menu a long press opens: a title, the actions, and Cancel. */
 export function ActionSheet({ title, actions, onClose }: { title: string; actions: SheetAction[]; onClose: () => void }) {
+  // Back closes it; an action runs once the Back has landed (useBackToClose).
+  const dismiss = useBackToClose(onClose);
   useEffect(() => {
-    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') dismiss(); };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [onClose]);
+  }, [dismiss]);
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30" onClick={() => dismiss()}>
       <div role="menu" aria-label={title} onClick={e => e.stopPropagation()} data-longpress=""
         onContextMenu={e => e.preventDefault()}
         style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
         className="w-full max-w-md m-2 rounded-xl bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-700 shadow-xl overflow-hidden">
         <p className="px-4 pt-3 pb-2 text-xs text-stone-500 dark:text-zinc-400 truncate">{title}</p>
         {actions.map(a => (
-          <button key={a.label} role="menuitem" onClick={() => { onClose(); a.run(); }}
+          <button key={a.label} role="menuitem" onClick={() => dismiss(a.run)}
             className="block w-full text-left px-4 py-3 border-t border-stone-100 dark:border-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-800">
             <span className="block text-sm text-stone-800 dark:text-zinc-100">{a.label}</span>
             {a.hint && <span className="block text-xs text-stone-500 dark:text-zinc-400">{a.hint}</span>}
           </button>
         ))}
-        <button onClick={onClose} className="block w-full px-4 py-3 border-t border-stone-200 dark:border-zinc-700 text-sm font-medium text-stone-600 dark:text-zinc-300 hover:bg-stone-50 dark:hover:bg-zinc-800">Cancel</button>
+        <button onClick={() => dismiss()} className="block w-full px-4 py-3 border-t border-stone-200 dark:border-zinc-700 text-sm font-medium text-stone-600 dark:text-zinc-300 hover:bg-stone-50 dark:hover:bg-zinc-800">Cancel</button>
       </div>
     </div>
   );

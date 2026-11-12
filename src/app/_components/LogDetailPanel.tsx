@@ -10,7 +10,9 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
+import { useBackToClose } from './useBackToClose';
 
 export interface LogEntry {
   _id: string;
@@ -152,10 +154,14 @@ function DetailSection({ title, children }: { title: string; children: React.Rea
 export function DetailPanel({ entry, onClose }: { entry: LogEntry; onClose: () => void }) {
   const s = entry.start;
   const e = entry.end;
+  // Back closes the pane (Hyoje, 12 Nov); Edit opens its page once that Back has landed.
+  const router = useRouter();
+  const dismiss = useBackToClose(onClose);
+  const editHref = entry.plan ? `/entry/plan/${entry._id}` : `/records/${entry._id}`;
 
   if (typeof document === 'undefined') return null;
   return createPortal(
-    <div className="fixed inset-0 z-[60] flex justify-end" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex justify-end" onClick={() => dismiss()}>
       <div
         className="relative w-full max-w-md bg-white dark:bg-zinc-900 border-l border-stone-200 dark:border-zinc-700 overflow-y-auto shadow-2xl"
         onClick={ev => ev.stopPropagation()}
@@ -173,13 +179,14 @@ export function DetailPanel({ entry, onClose }: { entry: LogEntry; onClose: () =
           </div>
           <div className="flex items-center gap-3 shrink-0">
           <Link
-            href={entry.plan ? `/entry/plan/${entry._id}` : `/records/${entry._id}`}
+            href={editHref}
+            onClick={ev => { ev.preventDefault(); dismiss(() => router.push(editHref)); }}
             className="text-xs px-2 py-1 rounded border border-stone-300 dark:border-zinc-600 text-stone-700 dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800"
           >
             Edit
           </Link>
           <button
-            onClick={onClose}
+            onClick={() => dismiss()}
             aria-label="Close"
             className="text-stone-500 dark:text-zinc-300 hover:text-stone-900 dark:hover:text-zinc-50 dark:text-zinc-200 transition-colors text-lg leading-none mt-0.5"
           >
