@@ -19,6 +19,10 @@ export interface LogEntry {
   activity?: { category?: string; name?: string; title?: string; additionalInfo?: string; crossActivity?: string; relationship?: string };
   start?: { year?: number; month?: number; day?: number; weekday?: string; hour?: string; timezone?: string; timezoneOffset?: number };
   end?: { year?: number; month?: number; day?: number; weekday?: string; hour?: string; timezone?: string };
+  /** Plans (log_plan) and records still going: when it is planned to end (#71). */
+  plannedEnd?: { year?: number; month?: number; day?: number; weekday?: string; hour?: string; timezone?: string };
+  /** A plan, not a record: read-only here too; Edit opens the plan in the entry app (Hyoje, 11 Nov). */
+  plan?: boolean;
   duration?: { totalSeconds?: number };
   location?: { activity?: string; online?: string; other?: string };
   cost?: { amountKRW?: number; amountForeign?: number; currency?: string; categoryDetail?: string; category?: string };
@@ -161,6 +165,7 @@ export function DetailPanel({ entry, onClose }: { entry: LogEntry; onClose: () =
           <div>
             <p className="text-sm font-medium text-stone-800 dark:text-zinc-100">
               {entry.activity?.name ?? '—'}
+              {entry.plan && <span className="ml-2 align-middle text-[10px] font-normal px-1.5 py-0.5 rounded bg-stone-100 dark:bg-zinc-800 text-stone-500 dark:text-zinc-400">Plan</span>}
             </p>
             {entry.activity?.title && (
               <p className="text-xs text-stone-500 dark:text-zinc-400 mt-0.5">{entry.activity.title}</p>
@@ -168,7 +173,7 @@ export function DetailPanel({ entry, onClose }: { entry: LogEntry; onClose: () =
           </div>
           <div className="flex items-center gap-3 shrink-0">
           <Link
-            href={`/records/${entry._id}`}
+            href={entry.plan ? `/entry/plan/${entry._id}` : `/records/${entry._id}`}
             className="text-xs px-2 py-1 rounded border border-stone-300 dark:border-zinc-600 text-stone-700 dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800"
           >
             Edit
@@ -198,6 +203,7 @@ export function DetailPanel({ entry, onClose }: { entry: LogEntry; onClose: () =
           <DetailSection title="Time">
             <DetailRow label="Start" value={s?.year ? pointText(s) : '—'} />
             <DetailRow label="End" value={e?.year ? pointText(e) : undefined} />
+            <DetailRow label="Planned end" value={!e?.year && entry.plannedEnd?.year ? pointText(entry.plannedEnd) : undefined} />
             <DetailRow label="Duration" value={formatDuration(entry.duration?.totalSeconds)} />
           </DetailSection>
 

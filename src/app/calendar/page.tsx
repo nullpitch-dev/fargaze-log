@@ -265,8 +265,8 @@ function CalendarInner() {
   // ── Record detail (the Search pane) ──
   const [record, setRecord] = useState<LogEntry | null>(null);
   const openEvent = useCallback((e: CalendarEvent) => {
-    if (e.plan) { router.push(`/entry/plan/${e.id}`); return; }   // a plan opens in the entry app
-    fetch(`/api/calendar/record?id=${encodeURIComponent(e.id)}`)
+    // A plan opens read-only too (Hyoje, 11 Nov); its Edit goes to the entry app.
+    fetch(`/api/calendar/record?id=${encodeURIComponent(e.id)}${e.plan ? '&plan=1' : ''}`)
       .then(r => r.json())
       .then(d => { if (!d.error) setRecord(d); })
       .catch(() => {});

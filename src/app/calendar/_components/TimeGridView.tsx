@@ -212,7 +212,7 @@ function DayColumn({ pieces, m, colors, isDark, compact, narrow, time, last, now
           : '';
         // Layering (Hyoje, 11 Nov): indented a step per depth, to the right edge; side by side
         // only in the rare fallback. A covered title sits below what covers it.
-        const step = narrow ? 16 : 9;                         // % of the day's width per depth
+        const step = narrow ? 10 : 5;                         // % of the day's width per depth (smaller: Hyoje, 11 Nov)
         const room = 100 - p.depth * step;
         const left = p.depth * step + (p.col / p.cols) * room;
         const width = room / p.cols;
