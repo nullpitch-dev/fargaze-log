@@ -169,7 +169,7 @@ function PickerSheet({ value, options, empty, missing, onPick, onClose }: {
   const search = options.length > 15;
   const list = q.trim() ? options.filter(o => (o.label ?? o.value).toLowerCase().includes(q.trim().toLowerCase())) : options;
   const pick = (v: string) => dismiss(() => onPick(v));
-  const pill = (on: boolean, red = false) => `rounded-full border px-2 py-1.5 text-sm leading-tight truncate ${on
+  const pill = (on: boolean, red = false) => `shrink-0 rounded-full border px-2 py-1.5 text-sm leading-tight truncate ${on
     ? red ? 'border-red-400 bg-red-50 text-red-800 dark:border-red-500 dark:bg-red-950 dark:text-red-200' : 'border-stone-700 bg-stone-800 text-white dark:border-zinc-300 dark:bg-zinc-200 dark:text-zinc-900'
     : 'border-stone-300 text-stone-700 dark:border-zinc-600 dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800'}`;
   if (typeof document === 'undefined') return null;
@@ -183,12 +183,17 @@ function PickerSheet({ value, options, empty, missing, onPick, onClose }: {
             <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search" className={inputCls} />
           </div>
         )}
-        <div className="overflow-y-auto p-3 grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
-          {!q && <button type="button" onClick={() => pick('')} className={`${pill(value === '')} border-dashed`}>{empty}</button>}
-          {missing && !q && <button type="button" onClick={() => pick(value)} className={pill(true, true)}>{value}</button>}
-          {list.map(o => (
-            <button type="button" key={o.value} onClick={() => pick(o.value)} className={pill(o.value === value)}>{o.label ?? o.value}</button>
-          ))}
+        {/* The list scrolls; each row keeps its height (Hyoje, 12 Nov: a long list — time
+            zones — squeezed every row into the sheet, cutting the labels in half). */}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <div className="p-3 grid gap-2 auto-rows-max" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+            {!q && <button type="button" onClick={() => pick('')} className={`${pill(value === '')} border-dashed`}>{empty}</button>}
+            {missing && !q && <button type="button" onClick={() => pick(value)} className={pill(true, true)}>{value}</button>}
+            {list.map(o => (
+              <button type="button" key={o.value} onClick={() => pick(o.value)} className={pill(o.value === value)}
+                ref={o.value === value ? (el => { if (el && !q) el.scrollIntoView({ block: 'center' }); }) : undefined}>{o.label ?? o.value}</button>
+            ))}
+          </div>
         </div>
         <button type="button" onClick={() => dismiss()}
           className="border-t border-stone-200 dark:border-zinc-700 py-3 text-sm font-medium text-stone-600 dark:text-zinc-300">Cancel</button>
