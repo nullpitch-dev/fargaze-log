@@ -5,6 +5,8 @@
 // text through (the server says when it isn't a number), chips, and item lists.
 
 import { useId, useMemo, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import { useBackToClose } from '@/app/_components/useBackToClose';
 
 export const inputCls = 'w-full min-w-0 bg-white dark:bg-zinc-900 border border-stone-300 dark:border-zinc-600 rounded px-2 py-1.5 text-sm text-stone-900 dark:text-zinc-50 placeholder-stone-400 dark:placeholder-zinc-500 focus:outline-none focus:border-stone-500 dark:focus:border-zinc-400 dark:[color-scheme:dark]';
 export const linkBtn = 'text-xs text-stone-500 dark:text-zinc-400 hover:text-stone-800 dark:hover:text-zinc-100';
@@ -134,14 +136,65 @@ export interface Opt { value: string; label?: string }
 
 /** A list value. An old value that is no longer in the list stays, marked. */
 export function Select({ value, onChange, options, empty = '—', className = '' }: { value: string; onChange: (v: string) => void; options: (string | Opt)[]; empty?: string; className?: string }) {
+  // Not the phone's own picker (Hyoje, 12 Nov: "so ugly", a full screen of radio rows): a
+  // button that opens a sheet of pills — one tap, a few rows (PickerSheet).
   const opts = options.map(o => (typeof o === 'string' ? { value: o } : o));
   const missing = value !== '' && !opts.some(o => o.value === value);
+  const [open, setOpen] = useState(false);
+  const shown = value === '' ? '' : opts.find(o => o.value === value)?.label ?? value;
   return (
-    <select value={value} onChange={e => onChange(e.target.value)} className={`${inputCls} ${missing ? 'border-red-400 dark:border-red-500' : ''} ${className}`}>
-      <option value="">{empty}</option>
-      {missing && <option value={value}>{value} (not in the list)</option>}
-      {opts.map(o => <option key={o.value} value={o.value}>{o.label ?? o.value}</option>)}
-    </select>
+    <>
+      <button type="button" onClick={() => setOpen(true)}
+        className={`${inputCls} flex items-center justify-between gap-1 text-left ${missing ? 'border-red-400 dark:border-red-500' : ''} ${className}`}>
+        <span className={`truncate ${value === '' ? 'text-stone-400 dark:text-zinc-500' : ''}`}>{value === '' ? empty : shown}{missing ? ' (not in the list)' : ''}</span>
+        <span aria-hidden className="shrink-0 text-[10px] text-stone-400 dark:text-zinc-500">▾</span>
+      </button>
+      {open && (
+        <PickerSheet value={value} options={opts} empty={empty} missing={missing}
+          onPick={v => onChange(v)} onClose={() => setOpen(false)} />
+      )}
+    </>
+  );
+}
+
+/** The sheet behind Select: pills in a grid sized to the longest label (4 → 1 per row), the
+ *  current one filled, the empty choice first; a search box for long lists. Back closes it. */
+function PickerSheet({ value, options, empty, missing, onPick, onClose }: {
+  value: string; options: Opt[]; empty: string; missing: boolean; onPick: (v: string) => void; onClose: () => void;
+}) {
+  const dismiss = useBackToClose(onClose);
+  const [q, setQ] = useState('');
+  const longest = Math.max(0, ...options.map(o => [...(o.label ?? o.value)].length));
+  const cols = longest <= 4 ? 4 : longest <= 8 ? 3 : longest <= 14 ? 2 : 1;
+  const search = options.length > 15;
+  const list = q.trim() ? options.filter(o => (o.label ?? o.value).toLowerCase().includes(q.trim().toLowerCase())) : options;
+  const pick = (v: string) => dismiss(() => onPick(v));
+  const pill = (on: boolean, red = false) => `rounded-full border px-2 py-1.5 text-sm leading-tight truncate ${on
+    ? red ? 'border-red-400 bg-red-50 text-red-800 dark:border-red-500 dark:bg-red-950 dark:text-red-200' : 'border-stone-700 bg-stone-800 text-white dark:border-zinc-300 dark:bg-zinc-200 dark:text-zinc-900'
+    : 'border-stone-300 text-stone-700 dark:border-zinc-600 dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800'}`;
+  if (typeof document === 'undefined') return null;
+  return createPortal(
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/40" onClick={() => dismiss()}>
+      <div onClick={e => e.stopPropagation()}
+        className="w-full sm:max-w-md max-h-[70dvh] flex flex-col rounded-t-2xl sm:rounded-2xl bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-700 shadow-xl">
+        <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-stone-300 dark:bg-zinc-600 sm:hidden" />
+        {search && (
+          <div className="px-3 pt-3">
+            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search" className={inputCls} />
+          </div>
+        )}
+        <div className="overflow-y-auto p-3 grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+          {!q && <button type="button" onClick={() => pick('')} className={`${pill(value === '')} border-dashed`}>{empty}</button>}
+          {missing && !q && <button type="button" onClick={() => pick(value)} className={pill(true, true)}>{value}</button>}
+          {list.map(o => (
+            <button type="button" key={o.value} onClick={() => pick(o.value)} className={pill(o.value === value)}>{o.label ?? o.value}</button>
+          ))}
+        </div>
+        <button type="button" onClick={() => dismiss()}
+          className="border-t border-stone-200 dark:border-zinc-700 py-3 text-sm font-medium text-stone-600 dark:text-zinc-300">Cancel</button>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
