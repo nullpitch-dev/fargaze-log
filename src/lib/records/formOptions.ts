@@ -45,24 +45,31 @@ const CACHE_MS = 10 * 60 * 1000;
 const usedCache = new Map<string, { at: number; used: FormOptions['used'] }>();
 
 /** Values of one record path, most used first. `unwind` = the array to open first. */
-async function usedValues(userId: string, path: string, unwind?: string): Promise<{ v: string; n: number }[]> {
-  const pipeline: any[] = [{ $match: { userId } }, { $project: { _id: 0, x: `$${unwind ?? path}` } }];
+async function usedValues(userId: string, path: string, unwind?: string): Promise<{ v: string; n: number; r: number }[]> {
+  // r = uses in the last 12 months (Hyoje, 12 Nov: names from years ago led the People
+  // suggestions; seven years of history outweighed what he does now).
+  const since = new Date(Date.now() - 365 * 86400_000);
+  const pipeline: any[] = [{ $match: { userId } }, { $project: { _id: 0, at: '$start.datetime', x: `$${unwind ?? path}` } }];
   if (unwind) {
-    pipeline.push({ $unwind: '$x' }, { $project: { x: `$x.${path.slice(unwind.length + 1)}` } });
+    pipeline.push({ $unwind: '$x' }, { $project: { at: 1, x: `$x.${path.slice(unwind.length + 1)}` } });
   }
   pipeline.push(
     { $match: { x: { $type: 'string', $ne: '' } } },
-    { $group: { _id: '$x', n: { $sum: 1 } } },
+    { $group: { _id: '$x', n: { $sum: 1 }, r: { $sum: { $cond: [{ $gte: ['$at', since] }, 1, 0] } } } },
   );
   const rows = await Log.aggregate(pipeline).allowDiskUse(true);
-  return (rows as any[]).map(r => ({ v: String(r._id), n: r.n }));
+  return (rows as any[]).map(r => ({ v: String(r._id), n: r.n, r: r.r }));
 }
 
-/** Several paths merged into one list, most used first. */
-function merge(...lists: { v: string; n: number }[][]): string[] {
-  const m = new Map<string, number>();
-  for (const l of lists) for (const { v, n } of l) m.set(v, (m.get(v) ?? 0) + n);
-  return [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ko')).map(([v]) => v);
+/** Several paths merged into one list: most used in the last 12 months first, then most used
+ *  ever, then by name. */
+function merge(...lists: { v: string; n: number; r?: number }[][]): string[] {
+  const m = new Map<string, { n: number; r: number }>();
+  for (const l of lists) for (const { v, n, r = 0 } of l) {
+    const c = m.get(v) ?? { n: 0, r: 0 };
+    m.set(v, { n: c.n + n, r: c.r + r });
+  }
+  return [...m.entries()].sort((a, b) => b[1].r - a[1].r || b[1].n - a[1].n || a[0].localeCompare(b[0], 'ko')).map(([v]) => v);
 }
 
 async function loadUsed(userId: string): Promise<FormOptions['used']> {

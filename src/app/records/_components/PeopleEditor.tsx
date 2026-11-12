@@ -9,7 +9,7 @@
 // of entries with the same method and type, as the sheet's people cells show them.
 
 import type { FormPerson } from '@/lib/records/form';
-import { Field, Select, TagInput, addBtn, linkBtn } from './fields';
+import { Choice, Field, TagInput, addBtn, linkBtn } from './fields';
 
 interface Group { method: string; category: string; names: string[] }
 
@@ -44,8 +44,9 @@ export function PeopleEditor({ people, onChange, methods, categories, names }: {
       {groups.map((g, i) => (
         <div key={i} className="rounded border border-stone-200 dark:border-zinc-700 bg-stone-50/60 dark:bg-zinc-800/50 p-2 flex flex-col gap-2">
           <div className="grid grid-cols-2 gap-2">
-            <Field label="How"><Select value={g.method} onChange={v => set(i, { method: v })} options={methods} /></Field>
-            <Field label="Type"><Select value={g.category} onChange={v => set(i, { category: v })} options={categories} /></Field>
+            {/* Pills when the list is short (Hyoje, 12 Nov); a drop-down otherwise. */}
+            <Field label="How" group><Choice value={g.method} onChange={v => set(i, { method: v })} options={methods} cols={2} /></Field>
+            <Field label="Type" group><Choice value={g.category} onChange={v => set(i, { category: v })} options={categories} cols={2} /></Field>
           </div>
           <div className="flex flex-col gap-1">
             <span className="text-xs text-stone-500 dark:text-zinc-400">Names</span>

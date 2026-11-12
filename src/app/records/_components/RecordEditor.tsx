@@ -25,7 +25,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { RecordForm, FormFood, FormAlcohol, FormItem, FormExercise } from '@/lib/records/form';
 import type { FormOptions } from '@/lib/records/formOptions';
-import { Field, ItemList, NoteBox, NumberBox, PickText, Row, Section, Select, TagInput, Text, ToggleChips, OnePills, addBtn, inputCls } from './fields';
+import { Choice, Field, ItemList, NoteBox, NumberBox, PickText, Row, Section, Select, TagInput, Text, ToggleChips, OnePills, addBtn, inputCls } from './fields';
 import { PeopleEditor } from './PeopleEditor';
 import { ChangeTable, type Line, type Plain } from './ChangeTable';
 import { relationshipOf } from '@/lib/records/relationship';
@@ -932,7 +932,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
               ? <Field label="Additional info"><Text value={f.activity.additionalInfo} onChange={v => patch('activity', { additionalInfo: v })} /></Field>
               : <div><button type="button" className={addBtn} onClick={() => setInfoOpen(true)}>+ Additional info</button></div>}
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Cross activity"><Select value={f.activity.crossActivity} onChange={v => patch('activity', { crossActivity: v })} options={ref('activity.crossActivity')} /></Field>
+              <Field label="Cross activity" group><Choice value={f.activity.crossActivity} onChange={v => patch('activity', { crossActivity: v })} options={ref('activity.crossActivity')} cols={2} /></Field>
               <Field label="Relationship">
                 <div aria-readonly data-testid="relationship" className="rounded border border-stone-200 dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800 px-2 py-1.5 text-sm text-stone-600 dark:text-zinc-300">{relationshipOf(f.people)}</div>
               </Field>
@@ -984,15 +984,23 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
 
           {shown('transport') && (
             <Section title={`Journey${req('transport')}`} onRemove={journeyNeeded ? undefined : removeBtn('transport')}>
-              <Row>
+              {/* One row each on the phone too (Hyoje, 12 Nov). Return type only for 귀가 to 집
+                  (the one case that needs it), or when the record has one already. */}
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
                 <Field label="From"><Text value={f.transport.from} onChange={v => patch('transport', { from: v })} suggest={placeSuggest} /></Field>
                 <Field label="To"><Text value={f.transport.to} onChange={v => patch('transport', { to: v })} suggest={placeSuggest} /></Field>
-              </Row>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <Field label="Purpose"><Select value={f.transport.purpose} onChange={v => patch('transport', { purpose: v })} options={ref('transport.purpose')} /></Field>
-                <Field label="Method"><Select value={f.transport.method} onChange={v => patch('transport', { method: v })} options={ref('transport.method')} /></Field>
-                <Field label="Return type"><Select value={f.transport.returnType} onChange={v => patch('transport', { returnType: v })} options={ref('transport.returnType')} /></Field>
               </div>
+              {(() => {
+                const home = f.transport.to.trim() === '집' || f.transport.to.trim().startsWith('집 - ');
+                const needReturn = (home && f.transport.purpose === '귀가') || !!f.transport.returnType;
+                return (
+                  <div className={`grid gap-2.5 sm:gap-3 ${needReturn ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                    <Field label="Purpose" group><Choice value={f.transport.purpose} onChange={v => patch('transport', { purpose: v })} options={ref('transport.purpose')} cols={2} /></Field>
+                    <Field label="Method" group><Choice value={f.transport.method} onChange={v => patch('transport', { method: v })} options={ref('transport.method')} cols={2} /></Field>
+                    {needReturn && <Field label="Return type" group><Choice value={f.transport.returnType} onChange={v => patch('transport', { returnType: v })} options={ref('transport.returnType')} cols={1} maxLen={8} /></Field>}
+                  </div>
+                );
+              })()}
             </Section>
           )}
 

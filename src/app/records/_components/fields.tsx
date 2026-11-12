@@ -29,13 +29,16 @@ export function Section({ title, onRemove, onReset, children }: { title: string;
 }
 
 /** A labelled row. `cols` = how many boxes sit side by side from 640 px. */
-export function Field({ label, note, children }: { label: string; note?: ReactNode; children: ReactNode }) {
+export function Field({ label, note, children, group }: { label: string; note?: ReactNode; children: ReactNode;
+  /** Holds pills (Choice): a plain box, not a <label> — a tap between pills would press the first. */
+  group?: boolean }) {
+  const Tag = group ? 'div' : 'label';
   return (
-    <label className="flex flex-col gap-0.5 min-w-0">
+    <Tag className="flex flex-col gap-0.5 min-w-0">
       <span className="text-xs text-stone-500 dark:text-zinc-400">{label}</span>
       {children}
       {note && <span className="text-xs text-stone-400 dark:text-zinc-500">{note}</span>}
-    </label>
+    </Tag>
   );
 }
 
@@ -241,6 +244,17 @@ export function ToggleChips({ values, options, onChange }: { values: string[]; o
       })}
     </div>
   );
+}
+
+/** One choice: pills when the list is short enough to show at once (one tap; Hyoje, 12 Nov),
+ *  a drop-down otherwise. Short = at most `maxPills` values, none longer than `maxLen`. */
+export function Choice({ value, options, onChange, empty, maxPills = 6, maxLen = 6, cols = 3 }: {
+  value: string; options: string[]; onChange: (v: string) => void; empty?: string; maxPills?: number; maxLen?: number;
+  /** Pills per row at most. */ cols?: number;
+}) {
+  const pills = options.length > 0 && options.length <= maxPills && options.every(o => [...o].length <= maxLen);
+  if (!pills) return <Select value={value} onChange={onChange} options={options} empty={empty} />;
+  return <OnePills value={value} options={options} onChange={onChange} cols={Math.min(options.length, cols)} />;
 }
 
 /** One choice as small pills in a grid of `cols` columns (Hyoje, 12 Nov: Food's type and

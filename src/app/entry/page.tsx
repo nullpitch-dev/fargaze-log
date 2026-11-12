@@ -432,7 +432,7 @@ function EntryHome() {
     } },
   ] }));
   const row = (it: Item, right: React.ReactNode, href?: string | (() => void), sub?: string, plan = false) => (
-    <li key={it.id} data-longpress="" className="flex items-start gap-3 px-3 py-2.5 border-t first:border-t-0 border-stone-200 dark:border-zinc-700 select-none [-webkit-touch-callout:none]">
+    <li key={it.id} data-longpress="" className="flex items-start gap-3 px-3 py-1.5 border-t first:border-t-0 border-stone-200 dark:border-zinc-700 select-none [-webkit-touch-callout:none]">
       <div className="flex-1 min-w-0">
         {it.local
           ? <span {...localMenu(it)} className="block text-sm text-stone-800 dark:text-zinc-100 truncate">{name(it)}</span>
@@ -441,7 +441,7 @@ function EntryHome() {
           : href
           ? <Link href={href} {...copyMenu(it, plan)} className="block text-sm text-stone-800 dark:text-zinc-100 hover:underline truncate select-none">{name(it)}</Link>
           : <span className="block text-sm text-stone-800 dark:text-zinc-100 truncate">{name(it)}</span>}
-        <span className="block text-xs text-stone-500 dark:text-zinc-400 truncate">{sub ?? when(it, today)}{it.place ? ` · ${it.place}` : ''}{it.local && <span className={onPhone}>On phone</span>}</span>
+        <span className="block text-xs leading-4 text-stone-500 dark:text-zinc-400 truncate">{sub ?? when(it, today)}{it.place ? ` · ${it.place}` : ''}{it.local && <span className={onPhone}>On phone</span>}</span>
       </div>
       {right}
     </li>
@@ -504,7 +504,7 @@ function EntryHome() {
             {waiting.length > 0 ? (
               <ul className={card}>
                 {waiting.map(x => (
-                  <li key={x.id} data-longpress="" className="flex items-start gap-3 px-3 py-2.5 border-t first:border-t-0 border-stone-200 dark:border-zinc-700 select-none [-webkit-touch-callout:none]">
+                  <li key={x.id} data-longpress="" className="flex items-start gap-3 px-3 py-1.5 border-t first:border-t-0 border-stone-200 dark:border-zinc-700 select-none [-webkit-touch-callout:none]">
                     <div className="flex-1 min-w-0">
                       {x.kind === 'entry' ? (
                         <Link href={`/entry/new?outbox=${x.id}`} {...press(() => setMenu({ title: x.label, actions: [
@@ -533,7 +533,7 @@ function EntryHome() {
             <h2 className={heading}>Stamps</h2>
             <ul className={card}>
               {stamps.map(s => (
-                <li key={s.id} data-longpress="" className="flex items-start gap-3 px-3 py-2.5 border-t first:border-t-0 border-stone-200 dark:border-zinc-700 select-none [-webkit-touch-callout:none]">
+                <li key={s.id} data-longpress="" className="flex items-start gap-3 px-3 py-1.5 border-t first:border-t-0 border-stone-200 dark:border-zinc-700 select-none [-webkit-touch-callout:none]">
                   <div className="flex-1 min-w-0">
                     {noteFor === s.id ? (
                       <form onSubmit={e => { e.preventDefault(); saveNote(s); }}>
@@ -548,7 +548,7 @@ function EntryHome() {
                         ] }))}
                         className={`block text-sm hover:underline truncate select-none ${s.note ? 'text-stone-800 dark:text-zinc-100' : 'italic text-stone-500 dark:text-zinc-400'}`}>{s.note || 'Stamp'}</Link>
                     )}
-                    <span className="block text-xs text-stone-500 dark:text-zinc-400 truncate">{s.end.hour ? '' : 'since '}{when({ start: s.start, end: s.end } as Item, today).replace(/^(Today|Yesterday|Tomorrow)/, m => (s.end.hour ? m : m.toLowerCase()))}{s.local && <span className={onPhone}>On phone</span>}</span>
+                    <span className="block text-xs leading-4 text-stone-500 dark:text-zinc-400 truncate">{s.end.hour ? '' : 'since '}{when({ start: s.start, end: s.end } as Item, today).replace(/^(Today|Yesterday|Tomorrow)/, m => (s.end.hour ? m : m.toLowerCase()))}{s.local && <span className={onPhone}>On phone</span>}</span>
                   </div>
                   {!s.end.hour && <button onClick={() => endStamp(s)} disabled={busy !== null} className={small}>End now</button>}
                 </li>

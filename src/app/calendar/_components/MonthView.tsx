@@ -370,7 +370,7 @@ export function DayList({ date, events, reading, tz, colors, isDark, onOpenEvent
               ...(e.untilPlanned && !e.plan ? { border: `1.5px solid ${colorFor(e.category, colors)}` } : { background: colorFor(e.category, colors) }),
               ...(isOverdue(e) ? { boxShadow: `0 0 0 1.5px ${OVERDUE}` } : {}),
             }} />
-            <span className="shrink-0 w-[60px] tabular-nums text-[11px] leading-tight text-stone-500 dark:text-zinc-400">
+            <span className="shrink-0 w-[76px] tabular-nums text-[11px] leading-tight text-stone-500 dark:text-zinc-400">
               <span className="block">{whenOf(e)[0]}</span>
               {whenOf(e)[1] && <span className="block">{whenOf(e)[1]}</span>}
             </span>
