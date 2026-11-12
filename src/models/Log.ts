@@ -292,6 +292,12 @@ LogSchema.index({ userId: 1, 'start.datetime': -1 });
 LogSchema.index({ userId: 1, 'duration.totalSeconds': -1 });
 
 // The entry app's plans (log_plan, #71) are records of the same shape.
-export { LogSchema };
+// log_plan's schema starts as a copy of this one (LogPlan.ts). The copy is made here, before
+// the model is compiled or used: Mongoose 9 can't clone a schema with document arrays once
+// it has been used ("Cannot create DocumentArrayElement schematype without a parent" — the
+// HTTP 500s on /api/entry/home whenever a warm instance had used Log first; Hyoje, 12 Nov).
+const LogPlanBaseSchema = LogSchema.clone();
+
+export { LogSchema, LogPlanBaseSchema };
 
 export default mongoose.models.Log || mongoose.model<ILog>('Log', LogSchema);

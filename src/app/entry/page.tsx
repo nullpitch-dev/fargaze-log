@@ -36,7 +36,9 @@ const secondary = `${btn} border-stone-300 text-stone-700 hover:bg-stone-50 dark
 const small = 'px-2 py-1 rounded text-xs border border-stone-300 text-stone-700 hover:bg-stone-50 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800 disabled:opacity-40';
 // Titles and borders that stand out more (Hyoje, 12 Nov).
 const heading = 'text-xs font-semibold uppercase tracking-widest text-stone-700 dark:text-zinc-200';
-const card = 'bg-white dark:bg-zinc-900 border border-stone-300 dark:border-zinc-600 rounded-lg';
+const card = 'bg-white dark:bg-zinc-900 border-[1.5px] border-stone-400 dark:border-zinc-500 rounded-lg';   // outer line only; rows keep their thin lines
+/** Changed or saved on the phone, not sent yet (offline): a badge that stands out (Hyoje, 12 Nov). */
+const onPhone = 'ml-1.5 inline-block align-[1px] rounded px-1 py-px text-[10px] font-semibold uppercase tracking-wide bg-amber-200 text-amber-900 dark:bg-amber-500/25 dark:text-amber-200';
 
 /** Presets are deferred (Hyoje, 10 Nov): Copy recent covers the need for now. */
 const PRESETS_ON = false;
@@ -284,8 +286,9 @@ function EntryHome() {
     return act(`e${it.id}`, () => call(url, 'POST', body), done, queue);
   }
 
+  // The waiting list says only Started or Ended (Hyoje, 12 Nov); the kind still travels.
   const startNow = (it: Item) => confirm(it, 'now', 'Started', { text: `${it.activity} started` });
-  const startOnTime = (it: Item) => confirm(it, 'onTime', 'Started as planned', { text: `${it.activity} started at ${it.start.hour}` });
+  const startOnTime = (it: Item) => confirm(it, 'onTime', 'Started', { text: `${it.activity} started at ${it.start.hour}` });
   const deletePlan = (it: Item) => act(`x${it.id}`, () => call(`/api/entry/plans/${it.id}`, 'DELETE', { updatedAt: it.updatedAt }), {
     text: 'Plan deleted',
     undo: async () => { const r = await call(`/api/entry/plans/${it.id}/restore`, 'POST'); return r.ok ? null : r.b.error ?? 'Undo failed'; },
@@ -296,7 +299,7 @@ function EntryHome() {
     text: b.noSheet ? 'Record deleted' : 'Record deleted — delete its row in the sheet too (Record changes)',
     undo: async () => { const r = await call(`/api/admin/changes/${b.changeId}/undo`, 'POST'); return r.ok ? null : r.b.error ?? 'Undo failed'; },
   }));
-  const doneNow = (it: Item) => confirm(it, 'nowDone', 'Done now', { text: `${it.activity} done` });
+  const doneNow = (it: Item) => confirm(it, 'nowDone', 'Ended', { text: `${it.activity} done` });
   // Stamps.
   /** A stamp saved on the phone (no signal): sent later under its own ID. */
   function stampLocal(start: Point) {
@@ -339,7 +342,7 @@ function EntryHome() {
     undo: async () => { const x = await call('/api/entry/stamps', 'POST', { restore: b.stamp }); return x.ok ? null : x.b.error ?? 'Undo failed'; },
   }));
 
-  const endPlanned = (it: Item) => end(it, { date: it.plannedEnd!.date, hour: it.plannedEnd!.hour, timezone: it.plannedEnd!.timezone || it.start.timezone }, 'Ended as planned', { text: `${it.activity} ended as planned` });
+  const endPlanned = (it: Item) => end(it, { date: it.plannedEnd!.date, hour: it.plannedEnd!.hour, timezone: it.plannedEnd!.timezone || it.start.timezone }, 'Ended', { text: `${it.activity} ended as planned` });
   const endNow = (it: Item) => end(it, nowPoint(), 'Ended', { text: `${it.activity} ended` });
 
   async function undoToast() {
@@ -438,7 +441,7 @@ function EntryHome() {
           : href
           ? <Link href={href} {...copyMenu(it, plan)} className="block text-sm text-stone-800 dark:text-zinc-100 hover:underline truncate select-none">{name(it)}</Link>
           : <span className="block text-sm text-stone-800 dark:text-zinc-100 truncate">{name(it)}</span>}
-        <span className="block text-xs text-stone-500 dark:text-zinc-400 truncate">{sub ?? when(it, today)}{it.place ? ` · ${it.place}` : ''}{it.local ? ' · on the phone' : ''}</span>
+        <span className="block text-xs text-stone-500 dark:text-zinc-400 truncate">{sub ?? when(it, today)}{it.place ? ` · ${it.place}` : ''}{it.local && <span className={onPhone}>On phone</span>}</span>
       </div>
       {right}
     </li>
@@ -515,7 +518,7 @@ function EntryHome() {
                           ] }))} className="block text-sm text-stone-800 dark:text-zinc-100 truncate select-none">{x.label}</span>
                       )}
                       <span className={`block text-xs truncate ${x.state === 'refused' ? 'text-red-700 dark:text-red-300' : 'text-stone-500 dark:text-zinc-400'}`}>
-                        {x.state === 'refused' ? `Not saved: ${x.problems?.[0] ?? x.error ?? 'refused'}` : `${[dayLabel(x.when.split(' ')[0], today), x.when.split(' ')[1]].filter(Boolean).join(' · ')} · on the phone`}
+                        {x.state === 'refused' ? `Not saved: ${x.problems?.[0] ?? x.error ?? 'refused'}` : <>{[dayLabel(x.when.split(' ')[0], today), x.when.split(' ')[1]].filter(Boolean).join(' · ')}<span className={onPhone}>On phone</span></>}
                       </span>
                     </div>
                   </li>
@@ -545,7 +548,7 @@ function EntryHome() {
                         ] }))}
                         className={`block text-sm hover:underline truncate select-none ${s.note ? 'text-stone-800 dark:text-zinc-100' : 'italic text-stone-500 dark:text-zinc-400'}`}>{s.note || 'Stamp'}</Link>
                     )}
-                    <span className="block text-xs text-stone-500 dark:text-zinc-400 truncate">{s.end.hour ? '' : 'since '}{when({ start: s.start, end: s.end } as Item, today).replace(/^(Today|Yesterday|Tomorrow)/, m => (s.end.hour ? m : m.toLowerCase()))}{s.local ? ' · on the phone' : ''}</span>
+                    <span className="block text-xs text-stone-500 dark:text-zinc-400 truncate">{s.end.hour ? '' : 'since '}{when({ start: s.start, end: s.end } as Item, today).replace(/^(Today|Yesterday|Tomorrow)/, m => (s.end.hour ? m : m.toLowerCase()))}{s.local && <span className={onPhone}>On phone</span>}</span>
                   </div>
                   {!s.end.hour && <button onClick={() => endStamp(s)} disabled={busy !== null} className={small}>End now</button>}
                 </li>

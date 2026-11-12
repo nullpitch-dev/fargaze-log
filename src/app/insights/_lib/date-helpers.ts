@@ -27,22 +27,21 @@ export function currentWeekStr(): string {
   return `${d.getFullYear()}-W${String(wNum).padStart(2, '0')}`;
 }
 
-// Default Period: the month ending yesterday.
-// On 6 Oct → 6 Sep – 5 Oct; on 1 Oct → 1 Sep – 30 Sep.
-// The start is today's day number in the previous month, clamped to that
-// month's last day (31 Mar → 28 Feb).
+// Default Period: the month ending today (entries are live since 12 Nov 2026; until then it
+// ended yesterday, when the data came in by a daily migration). On 12 Nov → 13 Oct – 12 Nov;
+// on 31 Mar → 1 Mar – 31 Mar. The start is the day after today's day number in the previous
+// month, that day clamped to the month's last day.
+// Widgets whose per-day figures an unfinished day would drag down still stop at yesterday
+// themselves: Sleep, Bowel, Drinking, Diet, Journeys.
 export function defaultPeriodFrom(): string {
   const now = new Date();
-  const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-  d.setDate(Math.min(now.getDate(), lastDay));
+  const lastDay = new Date(now.getFullYear(), now.getMonth(), 0).getDate();   // the previous month's
+  const d = new Date(now.getFullYear(), now.getMonth() - 1, Math.min(now.getDate(), lastDay) + 1);
   return localDateStr(d);
 }
 
 export function defaultPeriodTo(): string {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  return localDateStr(d);
+  return localDateStr(new Date());
 }
 
 export function defaultTimePeriod(mode: TimeMode): string {

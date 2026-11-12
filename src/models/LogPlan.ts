@@ -7,9 +7,10 @@
 // the same reason.
 
 import mongoose, { Schema } from 'mongoose';
-import { LogSchema } from './Log';
+import { LogPlanBaseSchema } from './Log';
 
-const LogPlanSchema = LogSchema.clone();
+// The copy of Log's schema made in Log.ts before Log is used (see there: the 500s of 12 Nov).
+const LogPlanSchema = LogPlanBaseSchema;
 LogPlanSchema.add({
   plan: {
     state: { type: String, enum: ['open', 'done', 'deleted'], default: 'open' },

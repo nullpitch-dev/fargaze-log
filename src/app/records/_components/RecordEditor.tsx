@@ -213,6 +213,9 @@ const danger = `${btn} border-red-300 text-red-700 hover:bg-red-50 dark:border-r
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
+/** A heading inside a section — Foods, Drinks, Alcohol … (Hyoje, 12 Nov: stand out more). */
+const subhead = 'text-xs font-semibold text-stone-700 dark:text-zinc-200';
+
 export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, stampId, refusal }: { id: string; mode?: EditorMode; initial?: RecordForm; presetId?: string; copied?: boolean; stampId?: string;
   /** Opened from the outbox after the server refused it (offline, #71 step 3): why. */
   refusal?: { error?: string; problems?: string[] } }) {
@@ -1040,16 +1043,16 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
             <Section title={`Food & drink${req('food')}`} onRemove={removeBtn('food')} onReset={resetBtn('food')}>
               {/* Pills in one row (Hyoje, 12 Nov): Type across two columns, the levels one each. */}
               <div className="grid grid-cols-5 gap-2">
-                <div className="col-span-2 flex flex-col gap-1"><span className="text-xs text-stone-500 dark:text-zinc-400">Type</span>
+                <div className="col-span-2 flex flex-col gap-1"><span className={subhead}>Type</span>
                   <OnePills value={f.food.type} options={ref('food.type')} onChange={v => patch('food', { type: v })} cols={3} /></div>
                 {(['carbs', 'fat', 'spiciness'] as const).map(k => (
-                  <div key={k} className="flex flex-col gap-1"><span className="text-xs text-stone-500 dark:text-zinc-400">{k === 'carbs' ? 'Carbs' : k === 'fat' ? 'Fat' : 'Spicy'}</span>
+                  <div key={k} className="flex flex-col gap-1"><span className={subhead}>{k === 'carbs' ? 'Carbs' : k === 'fat' ? 'Fat' : 'Spicy'}</span>
                     <OnePills value={f.food[k]} options={ref('nutrient_level')} onChange={v => patch('food', { [k]: v })} /></div>
                 ))}
               </div>
               <div className="flex flex-col gap-1">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-xs text-stone-500 dark:text-zinc-400">Foods</span>
+                  <span className={subhead}>Foods</span>
                   <label className="inline-flex items-center gap-1.5 text-xs text-stone-600 dark:text-zinc-300 cursor-pointer">
                     <input type="checkbox" checked={wholeOn} onChange={e => toggleWhole(e.target.checked)} className="accent-stone-700 dark:accent-zinc-300" />
                     Whole meal amount
@@ -1067,9 +1070,9 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
                 )}
                 {foodRows('foods')}
               </div>
-              <div className="flex flex-col gap-1"><span className="text-xs text-stone-500 dark:text-zinc-400">Drinks</span>{foodRows('drinks')}</div>
+              <div className="flex flex-col gap-1"><span className={subhead}>Drinks</span>{foodRows('drinks')}</div>
               <div className="flex flex-col gap-1">
-                <span className="text-xs text-stone-500 dark:text-zinc-400">Alcohol</span>
+                <span className={subhead}>Alcohol</span>
                 <ItemList<FormAlcohol> items={f.food.alcohols} onChange={v => patch('food', { alcohols: v })} blank={blankAlcohol} addLabel="+ Add alcohol"
                   render={(x, setX) => (
                     <div className="flex flex-col gap-2">
@@ -1125,14 +1128,14 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
 
           {shown('bowel') && (
             <Section title={`Bowel${req('bowel')}`} onRemove={removeBtn('bowel')} onReset={resetBtn('bowel')}>
-              <div className="flex flex-col gap-1"><span className="text-xs text-stone-500 dark:text-zinc-400">Amount</span>
+              <div className="flex flex-col gap-1"><span className={subhead}>Amount</span>
                 {/* pills like Quality, but one choice (a tap on the chosen one clears it) */}
                 <ToggleChips values={f.bowel.amount ? [f.bowel.amount] : []} options={opts.bowel.amount}
                   onChange={v => patch('bowel', { amount: v.filter(x => x !== f.bowel.amount)[0] ?? '' })} /></div>
-              <div className="flex flex-col gap-1"><span className="text-xs text-stone-500 dark:text-zinc-400">Quality</span>
+              <div className="flex flex-col gap-1"><span className={subhead}>Quality</span>
                 <ToggleChips values={f.bowel.quality} onChange={v => patch('bowel', { quality: v })}
                   options={bowelMore ? opts.bowel.quality : opts.bowel.quality.filter(o => !BOWEL_FOLDED.includes(o) || f.bowel.quality.includes(o))} /></div>
-              <div className="flex flex-col gap-1"><span className="text-xs text-stone-500 dark:text-zinc-400">Characteristics</span>
+              <div className="flex flex-col gap-1"><span className={subhead}>Characteristics</span>
                 <ToggleChips values={f.bowel.characteristics} onChange={v => patch('bowel', { characteristics: v })}
                   options={bowelMore ? opts.bowel.characteristics : opts.bowel.characteristics.filter(o => !BOWEL_FOLDED.includes(o) || f.bowel.characteristics.includes(o))} /></div>
               {!bowelMore && [...opts.bowel.quality, ...opts.bowel.characteristics].some(o => BOWEL_FOLDED.includes(o) && !f.bowel.characteristics.includes(o) && !f.bowel.quality.includes(o)) && (
