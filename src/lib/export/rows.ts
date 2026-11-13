@@ -23,7 +23,7 @@ export const COL_ID = 87;          // CJ
 export const COL_PLANNED_END = 88; // CK
 export const FIRST_ROW = 4;
 /** Bump when the row layout changes: every tab is then rewritten on the next run. */
-export const ROW_FORMAT = 1;
+export const ROW_FORMAT = 2;
 
 // Columns written as numbers (when the whole cell is one plain number), so sums work in the
 // sheet. Everything else, times included ('9:30'), is written as text exactly as stored.
@@ -31,7 +31,8 @@ const NUMERIC = new Set([
   8, 9, 10, 13, 15, 16, 17, 20,      // dates and offsets
   21, 22, 23, 24,                    // V–Y duration parts
   29, 30,                            // cost KRW / foreign
-  64, 65, 66, 67,                    // body
+  64, 65, 66,                        // body (BP body fat % stays text: the Template copies the
+                                     // 2026 tab's percent format, which would show 15.3 as 1530%)
   76, 77, 78, 79, 80,                // golf, income
 ]);
 const PLAIN_NUMBER = /^-?(0|[1-9]\d*)(\.\d+)?$/;
