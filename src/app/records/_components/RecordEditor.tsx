@@ -780,6 +780,12 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
   };
   const nowLater = (which: 'start' | 'end') => (
     <span className="flex items-center gap-1.5">
+      {/* = Start (13 Nov): no duration, for a moment's activity recorded afterwards */}
+      {which === 'end' && (
+        <button type="button" className={addBtn} disabled={!f.start.date}
+          onClick={() => patch('end', { date: f.start.date, hour: f.start.hour, timezone: f.start.timezone })}
+          aria-label="End at the start time (no duration)" title="End at the start time (no duration)">= Start</button>
+      )}
       <button type="button" className={addBtn} onClick={() => (which === 'start' ? setStart(nowPoint()) : setPoint('end', nowPoint()))}>Now</button>
       {which === 'start' && (
         <span className="relative">

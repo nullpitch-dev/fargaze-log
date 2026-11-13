@@ -17,7 +17,7 @@ export const addBtn = 'text-xs px-2 py-1 rounded border border-dashed border-sto
 export function Section({ title, onRemove, onReset, children }: { title: string; onRemove?: () => void; onReset?: () => void; children: ReactNode }) {
   return (
     // Denser, with titles and borders that stand out more (Hyoje, 12 Nov).
-    <section className="bg-white dark:bg-zinc-900 border-[1.5px] border-stone-400 dark:border-zinc-500 rounded-lg px-3 py-2.5 sm:p-4 shadow-sm">
+    <section className="bg-white dark:bg-zinc-900 border-[1.5px] sm:border border-stone-400 dark:border-zinc-500 rounded-lg px-3 py-2.5 sm:p-4 shadow-sm">
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-700 dark:text-zinc-200">{title}</h2>
         <span className="flex items-center gap-3">

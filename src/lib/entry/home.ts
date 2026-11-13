@@ -93,9 +93,10 @@ export async function home(userId: string, iana = 'Europe/London', now = Date.no
   inProgress.sort((a, b) => key(b.start).localeCompare(key(a.start)));
   ongoing.sort((a, b) => key(b.start).localeCompare(key(a.start)));
 
-  // Done: ended today, whenever they started.
+  // Done: ended today, whenever they started; newest START first, like the other lists
+  // (Hyoje, 13 Nov; it was by end time).
   const done = (ended as any[]).filter(r => !isOpenRec(r)).map(r => item(r))
-    .sort((a, b) => key(b.end).localeCompare(key(a.end)));
+    .sort((a, b) => key(b.start).localeCompare(key(a.start)));
 
   // Copy recent: the latest record of each activity + title + place, newest first.
   const recent = variants(latest as any[]).slice(0, 40).map(r => item(r));

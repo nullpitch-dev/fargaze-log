@@ -36,7 +36,7 @@ const secondary = `${btn} border-stone-300 text-stone-700 hover:bg-stone-50 dark
 const small = 'px-2 py-1 rounded text-xs border border-stone-300 text-stone-700 hover:bg-stone-50 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800 disabled:opacity-40';
 // Titles and borders that stand out more (Hyoje, 12 Nov).
 const heading = 'text-xs font-semibold uppercase tracking-widest text-stone-700 dark:text-zinc-200';
-const card = 'bg-white dark:bg-zinc-900 border-[1.5px] border-stone-400 dark:border-zinc-500 rounded-lg';   // outer line only; rows keep their thin lines
+const card = 'bg-white dark:bg-zinc-900 border-[1.5px] sm:border border-stone-400 dark:border-zinc-500 rounded-lg';   // outer line only (1.5 px on a phone, 1 px on a computer, 13 Nov); rows keep their thin lines
 /** Changed or saved on the phone, not sent yet (offline): a badge that stands out (Hyoje, 12 Nov). */
 const onPhone = 'ml-1.5 inline-block align-[1px] rounded px-1 py-px text-[10px] font-semibold uppercase tracking-wide bg-amber-200 text-amber-900 dark:bg-amber-500/25 dark:text-amber-200';
 
@@ -103,6 +103,9 @@ function withOutbox(h: Home, ob: OutboxItem[]): Home {
     const rec: Item = { ...plan, id: m.recordId, start, end: m.op === 'nowDone' ? start : NO_POINT, updatedAt: '', started: true, local: true };
     if (m.op === 'nowDone') done = [rec, ...done]; else inProgress = [rec, ...inProgress];
   }
+  // Done by start time, newest first (13 Nov), the phone's rows included.
+  const k = (p: Point) => `${p.date} ${(p.hour || '0:00').padStart(5, '0')}`;
+  done.sort((a, b) => k(b.start).localeCompare(k(a.start)));
   return { ...h, comingUp, inProgress, done, ongoing };
 }
 
@@ -344,6 +347,8 @@ function EntryHome() {
 
   const endPlanned = (it: Item) => end(it, { date: it.plannedEnd!.date, hour: it.plannedEnd!.hour, timezone: it.plannedEnd!.timezone || it.start.timezone }, 'Ended', { text: `${it.activity} ended as planned` });
   const endNow = (it: Item) => end(it, nowPoint(), 'Ended', { text: `${it.activity} ended` });
+  /** No duration: ends at its own start (a thing done in a moment, recorded afterwards). */
+  const endAtStart = (it: Item) => end(it, { date: it.start.date, hour: it.start.hour, timezone: it.start.timezone }, 'Ended', { text: `${it.activity} ended at its start` });
 
   async function undoToast() {
     if (!toast?.undo) return;
@@ -419,9 +424,11 @@ function EntryHome() {
     { label: 'Start now', hint: 'Starts now; End now later', run: () => startNow(it) },
   ] }));
 
-  // A long press on End now: Ended as planned, for when you only remember afterwards.
+  // A long press on End now: Ended as planned, for when you only remember afterwards;
+  // Ended at start (13 Nov) for a moment's activity recorded afterwards (no duration).
   const endMenu = (it: Item) => press(() => setMenu({ title: name(it), actions: [
     ...(it.plannedEnd && (it.plannedEnd.hour || it.plannedEnd.date) ? [{ label: `Ended as planned (${it.plannedEnd.hour || dayLabel(it.plannedEnd.date, today)})`, hint: 'Ends it at its planned end', run: () => endPlanned(it) }] : []),
+    ...(it.start.hour ? [{ label: `Ended at start (${it.start.hour})`, hint: 'No duration: ends at its start time', run: () => endAtStart(it) }] : []),
     { label: 'End now', run: () => endNow(it) },
   ] }));
 
