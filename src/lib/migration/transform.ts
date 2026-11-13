@@ -6,7 +6,10 @@ import BowelScore from '../../models/BowelScore';
 // Remove thousand-separator commas and parse as number
 export function parseNumber(val: string): number | null {
   if (!val || val.trim() === '' || val === '#NUM!' || val === '#N/A') return null;
-  const cleaned = val.replace(/,/g, '').trim();
+  let cleaned = val.replace(/,/g, '').trim();
+  // Accounting format shows a negative number in brackets: (81000) = -81000 (#72 export, 13 Nov).
+  const bracketed = /^\(\s*([0-9.]+)\s*\)$/.exec(cleaned);
+  if (bracketed) cleaned = `-${bracketed[1]}`;
   const num = parseFloat(cleaned);
   return isNaN(num) ? null : num;
 }
