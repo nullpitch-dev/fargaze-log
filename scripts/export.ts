@@ -42,7 +42,7 @@ import Log from '../src/models/Log';
 import {
   recordRow, displayed, compareRecords, yearOf, isYearTab, roundTripDiffs, ROW_FORMAT, FIRST_ROW, type Cell,
 } from '../src/lib/export/rows';
-import { sheetsClient, listTabInfo, writeYearTab, readYearTab } from '../src/lib/export/sheets';
+import { sheetsClient, listTabInfo, writeYearTab, readYearTab, call } from '../src/lib/export/sheets';
 import { findRowText } from '../src/lib/records/sheetCells';
 
 const USER_ID = 'hyoje';
@@ -199,7 +199,7 @@ async function main() {
   else if (YEARS.length) todo = YEARS;
   else {
     const present = tabs.filter(t => isYearTab(t.title)).map(t => Number(t.title));
-    const res = present.length ? await api.spreadsheets.values.batchGet({ spreadsheetId: fileId, ranges: present.map(y => `'${y}'!CK1`) }) : null;
+    const res = present.length ? await call('reading the fingerprints', () => api.spreadsheets.values.batchGet({ spreadsheetId: fileId, ranges: present.map(y => `'${y}'!CK1`) })) : null;
     const stored = new Map(present.map((y, k) => [y, String(res?.data.valueRanges?.[k]?.values?.[0]?.[0] ?? '')]));
     // A year with records whose fingerprint differs, or a tab left with no records.
     todo = [...new Set([...years, ...present])].sort().filter(y => {
@@ -215,10 +215,10 @@ async function main() {
     // Each tab is checked before it is written: a row the migration would refuse is reported.
     check(y, rows.map(displayed));
     await writeYearTab(api, fileId, y, rows, tabs, stamp);
-    await api.spreadsheets.values.update({
+    await call(`${y}: fingerprint`, () => api.spreadsheets.values.update({
       spreadsheetId: fileId, range: `'${y}'!CK1`, valueInputOption: 'RAW',
       requestBody: { values: [[rows.length ? fingerprint(rows) : 'empty']] },
-    });
+    }));
     say(`   ${y}: ${rows.length} rows`);
   }
 
