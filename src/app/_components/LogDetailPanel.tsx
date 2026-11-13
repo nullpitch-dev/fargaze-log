@@ -158,9 +158,12 @@ export function DetailPanel({ entry, onClose }: { entry: LogEntry; onClose: () =
   // Back closes the pane (Hyoje, 12 Nov); Edit opens its page once that Back has landed.
   const router = useRouter();
   const dismiss = useBackToClose(onClose);
-  const editHref = entry.plan ? `/entry/plan/${entry._id}` : `/records/${entry._id}`;
+  // Opened from the Calendar, a new entry or a plan returns there after saving (13 Nov).
+  const here = typeof window !== 'undefined' ? window.location.pathname + window.location.search : '';
+  const back = here.startsWith('/calendar') ? `back=${encodeURIComponent(here)}` : '';
+  const editHref = entry.plan ? `/entry/plan/${entry._id}${back ? `?${back}` : ''}` : `/records/${entry._id}`;
   // Copy (13 Nov): a new entry with the same fields, today at the source's time (as Copy recent).
-  const copyHref = `/entry/new?copy=${entry._id}${entry.plan ? '&from=plan' : ''}`;
+  const copyHref = `/entry/new?copy=${entry._id}${entry.plan ? '&from=plan' : ''}${back ? `&${back}` : ''}`;
 
   if (typeof document === 'undefined') return null;
   return createPortal(

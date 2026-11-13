@@ -37,6 +37,7 @@ import { MonthPicker } from './_components/MonthPicker';
 import { TimeGridView } from './_components/TimeGridView';
 import { YearView } from './_components/YearView';
 import { ScheduleView } from './_components/ScheduleView';
+import { NewMenu } from './_components/NewMenu';
 import { weekOf } from './_lib/time-layout';
 import { DetailPanel, type LogEntry } from '@/app/_components/LogDetailPanel';
 import { SearchBox, type SearchSpec, EMPTY_SEARCH, isEmptySearch } from './_components/SearchBox';
@@ -453,6 +454,8 @@ function CalendarInner() {
         )}
 
         <div className="ml-auto flex items-center gap-2">
+          {/* + New ▾ (13 Nov): new entry, Copy recent, Stamp — back to the Calendar after saving */}
+          {view !== 'search' && <NewMenu compact={compact} />}
           {!compact && <SearchBox value={search} onSubmit={runSearch} />}
           {compact && view !== 'search' && (
             <button onClick={() => setSearchOpen(o => !o)} aria-label="Search"

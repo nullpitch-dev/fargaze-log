@@ -143,7 +143,12 @@ async function openPlans(userId: string, re?: RegExp) {
  *  latest of each activity + title, newest first (all years); open plans that match first. */
 export async function searchRecent(userId: string, q: string) {
   const text = q.trim();
-  if (!text) return { ok: true as const, recent: [] };
+  // No text: the default list, as Today's (the Calendar's + New menu asks for it, 13 Nov).
+  if (!text) {
+    const latest = await Log.find({ userId, 'start.datetime': { $ne: null } }).sort({ 'start.datetime': -1 }).limit(300)
+      .select('activity start end plannedEnd location duration updatedAt').lean() as any[];
+    return { ok: true as const, recent: [...await openPlans(userId), ...variants(latest).slice(0, 40).map(r => item(r))] };
+  }
   const re = new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
   const rows = await Log.find({ userId, $or: [{ 'activity.name': re }, { 'activity.title': re }, { 'location.activity': re }] })
     .sort({ 'start.datetime': -1 }).limit(500).select('activity start end location duration updatedAt').lean() as any[];

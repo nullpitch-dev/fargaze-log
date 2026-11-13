@@ -370,6 +370,12 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
   const leaving = useRef(false);
   /** After a save: Home replaces the form in history, so Back doesn't reopen it (12 Nov). */
   const leaveTo = (href: string) => { leaving.current = true; router.replace(href); };
+  /** Opened from the Calendar (13 Nov): ?back=/calendar?… — saving returns there instead of Today. */
+  const backTo = (): string | null => {
+    if (typeof window === 'undefined') return null;
+    const b = new URLSearchParams(window.location.search).get('back');
+    return b && b.startsWith('/') && !b.startsWith('//') ? b : null;
+  };
   useEffect(() => {
     if (!changed) return;
     const onUnload = (e: BeforeUnloadEvent) => { if (leaving.current) return; e.preventDefault(); e.returnValue = ''; };
@@ -480,7 +486,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
           label: [fm.activity.name.trim(), fm.activity.title.trim()].filter(Boolean).join(' · ') || 'New entry',
           when: `${fm.start.date} ${fm.start.hour}`.trim(),
         });
-        leaveTo(`/entry?queued=${id}`);
+        leaveTo(backTo() ?? `/entry?queued=${id}`);
       };
       if (mode === 'new' && outboxOn() && navigator.onLine === false) { setSaving(false); queue(); return; }
       try {
@@ -493,7 +499,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
         if (mode === 'new') dropOutbox(id);   // reopened from the outbox and saved with a signal
         const saved = new URLSearchParams({ saved: b.kind, id: b.id ?? id });
         if (mode === 'plan') saved.set('from', 'plan');
-        leaveTo(`/entry?${saved}`);
+        leaveTo(backTo() ?? `/entry?${saved}`);
       } catch (e: any) {
         if (mode === 'new' && outboxOn() && isNoSignal(e)) { queue(); return; }
         setSaveError({ text: String(e.message ?? e) });
@@ -525,7 +531,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
         const r = await fetch(`/api/entry/plans/${id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ updatedAt: rec.updatedAt }) });
         const b = await r.json().catch(() => ({}));
         if (!r.ok) { setSaveError({ text: b.error ?? `HTTP ${r.status}`, conflict: r.status === 409 }); return; }
-        leaveTo(`/entry?deleted=${id}`);
+        leaveTo(backTo() ?? `/entry?deleted=${id}`);
       } finally {
         setSaving(false);
       }
@@ -743,7 +749,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
       const r = await fetch(`/api/entry/plans/${id}/confirm`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ updatedAt: rec.updatedAt, how }) });
       const b = await r.json().catch(() => ({}));
       if (!r.ok) { setSaveError({ text: b.error ?? `HTTP ${r.status}`, problems: b.problems, conflict: r.status === 409 }); return; }
-      leaveTo(`/entry?${new URLSearchParams({ saved: 'record', id: b.recordId, from: 'plan' })}`);
+      leaveTo(backTo() ?? `/entry?${new URLSearchParams({ saved: 'record', id: b.recordId, from: 'plan' })}`);
     } finally {
       setSaving(false);
     }
