@@ -20,6 +20,8 @@ export function NewMenu({ compact }: { compact: boolean }) {
   const [rows, setRows] = useState<Row[] | null>(null);
   const box = useRef<HTMLDivElement>(null);
   // Placed under the button, kept on screen (on a phone the button can sit at the left edge).
+  // No keyboard popping up on a phone until the search box is tapped.
+  const touch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
   const [at, setAt] = useState<{ top: number; left: number; width: number } | null>(null);
   const place = () => {
     const r = box.current?.getBoundingClientRect();
@@ -36,12 +38,13 @@ export function NewMenu({ compact }: { compact: boolean }) {
     if (!open) return;
     const down = (e: PointerEvent) => { if (!box.current?.contains(e.target as Node)) setOpen(false); };
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
-    const shut = () => setOpen(false);
+    // A phone's keyboard opening resizes and scrolls the page: the menu follows, it doesn't
+    // close (it closed at once on the phone, 13 Nov).
     document.addEventListener('pointerdown', down);
     document.addEventListener('keydown', key);
-    window.addEventListener('resize', shut);
-    window.addEventListener('scroll', shut);
-    return () => { document.removeEventListener('pointerdown', down); document.removeEventListener('keydown', key); window.removeEventListener('resize', shut); window.removeEventListener('scroll', shut); };
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => { document.removeEventListener('pointerdown', down); document.removeEventListener('keydown', key); window.removeEventListener('resize', place); window.removeEventListener('scroll', place, true); };
   }, [open]);
 
   // Copy recent: the default list, or a search after a short pause.
@@ -68,7 +71,7 @@ export function NewMenu({ compact }: { compact: boolean }) {
       {open && at && (
         <div style={{ position: 'fixed', top: at.top, left: at.left, width: at.width }} className="z-40 rounded-lg border border-stone-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 shadow-lg p-2 flex flex-col gap-2">
           <p className="text-[11px] font-semibold uppercase tracking-widest text-stone-500 dark:text-zinc-400 px-1">Copy recent</p>
-              <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search all records" autoFocus
+              <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search all records" autoFocus={!touch}
                 className="w-full rounded border border-stone-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm text-stone-800 dark:text-zinc-100" />
               <ul className="max-h-72 overflow-y-auto">
                 {rows === null && <li className="px-2 py-1.5 text-xs text-stone-500 dark:text-zinc-400">Loading…</li>}

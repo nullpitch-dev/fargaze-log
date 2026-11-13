@@ -449,7 +449,8 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
 
   const goBack = useCallback(() => {
     if (changed && !window.confirm('Leave without saving? Your changes will be lost.')) return;
-    if (entryMode) { router.push('/entry'); return; }
+    // Opened from the Calendar: Cancel goes back there too (13 Nov).
+    if (entryMode) { const b = backTo(); if (b) { leaving.current = true; router.replace(b); } else router.push('/entry'); return; }
     if (window.history.length > 1) router.back(); else router.push('/calendar');
   }, [changed, router, entryMode]);
 
