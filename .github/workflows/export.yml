@@ -1,0 +1,93 @@
+# .github/workflows/export.yml
+# #72 Nightly export of the database to the export spreadsheet (scripts/export.ts).
+#
+# Runs at 02:53 UTC, half an hour after the backup, and on demand from the Actions tab
+# ("Run workflow", with a choice: changed years / all years / check only). It rewrites only
+# the year tabs whose rows changed. The run's summary page shows the report; a problem (a row
+# the migration would refuse or that doesn't read back as its record) fails the run, and a
+# failed run emails Hyoje.
+#
+# Secrets (repo Settings → Secrets and variables → Actions):
+#   BACKUP_MONGODB_URI           the READ-ONLY database user (shared with the backup)
+#   GOOGLE_SERVICE_ACCOUNT_JSON  the whole service account key file (the one in myfiles/)
+#   SPREADSHEET_ID_EXPORT        the export file's id (from its address: /d/<id>/edit)
+#
+# Keep-alive: GitHub switches scheduled workflows off after 60 days without repository
+# activity. On the 1st of each month the keepalive job switches this workflow and the backup
+# back on, which restarts the count.
+
+name: Nightly export
+
+on:
+  schedule:
+    - cron: '53 2 * * *'
+    - cron: '17 3 1 * *'   # keep-alive, 1st of the month
+  workflow_dispatch:
+    inputs:
+      what:
+        description: 'What to run'
+        type: choice
+        default: changed years
+        options: [changed years, all years, check only]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: export
+  cancel-in-progress: false
+
+jobs:
+  export:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '53 2 * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Write the service account key
+        env:
+          KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          test -n "$KEY" || { echo "Secret GOOGLE_SERVICE_ACCOUNT_JSON is empty"; exit 1; }
+          mkdir -p myfiles
+          printf '%s' "$KEY" > myfiles/export-sa.json
+          chmod 600 myfiles/export-sa.json
+
+      - name: Export
+        env:
+          MONGODB_URI: ${{ secrets.BACKUP_MONGODB_URI }}
+          SPREADSHEET_ID_EXPORT: ${{ secrets.SPREADSHEET_ID_EXPORT }}
+          GOOGLE_SERVICE_ACCOUNT_FILE: export-sa.json
+          WHAT: ${{ inputs.what }}
+        run: |
+          case "$WHAT" in
+            "all years")  npx tsx --tsconfig tsconfig.json scripts/export.ts --all ;;
+            "check only") npx tsx --tsconfig tsconfig.json scripts/export.ts --check ;;
+            *)            npx tsx --tsconfig tsconfig.json scripts/export.ts ;;
+          esac
+
+      - name: Remove the key
+        if: always()
+        run: rm -f myfiles/export-sa.json
+
+  keepalive:
+    if: github.event.schedule == '17 3 1 * *'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Switch the scheduled workflows back on
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for wf in backup.yml export.yml; do
+            gh api -X PUT "repos/${{ github.repository }}/actions/workflows/$wf/enable" && echo "$wf on"
+          done
