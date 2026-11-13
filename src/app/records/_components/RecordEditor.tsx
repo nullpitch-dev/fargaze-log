@@ -240,6 +240,9 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
   const [opts, setOpts] = useState<FormOptions | null>(null);
   const [form, setForm] = useState<RecordForm | null>(null);
   const [added, setAdded] = useState<Set<Optional>>(new Set());
+  // Removed by hand (13 Nov): a section the activity shows by default (its 'shown' groups) stays
+  // hidden after Remove until it is added again.
+  const [removed, setRemoved] = useState<Set<Optional>>(new Set());
   const [loadError, setLoadError] = useState('');
   const [reload, setReload] = useState(0);
   const [check, setCheck] = useState<{ for: string; data: Check } | null>(null);
@@ -291,7 +294,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
           const w = wholeFrom(rb.form.food.foods ?? []);
           if (w.safe) { whole0 = w.whole; form0 = { ...rb.form, food: { ...rb.form.food, foods: shareWhole(w.foods, w.whole) } }; }
         }
-        setRec(rb); setForm(form0); setAdded(new Set()); setRateOverride(undefined); setWhole(whole0); setCheck(null); setSaveError(null); setLoadError(''); setKrwPicked(false);
+        setRec(rb); setForm(form0); setAdded(new Set()); setRemoved(new Set()); setRateOverride(undefined); setWhole(whole0); setCheck(null); setSaveError(null); setLoadError(''); setKrwPicked(false);
       } catch (e: any) {
         if (live) setLoadError(String(e.message ?? e));
       }
@@ -665,8 +668,12 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
   const ruleSections = new Set((rules?.shown ?? []).map(k => GROUP_SECTION[k]).filter(Boolean));
   const requiredSections = new Set((rules?.required ?? []).map(k => GROUP_SECTION[k]).filter(Boolean));
   const req = (k: string) => (requiredSections.has(k as any) ? ' · required' : '');
-  const shown = (k: Optional) => added.has(k) || hasData(f, k) || (k === 'transport' && journeyNeeded) || ruleSections.has(k);
-  const hide = (k: Optional) => { setForm(prev => (prev ? cleared(prev, k) : prev)); setAdded(s => { const n = new Set(s); n.delete(k); return n; }); };
+  const shown = (k: Optional) => added.has(k) || hasData(f, k) || (k === 'transport' && journeyNeeded) || (ruleSections.has(k) && !removed.has(k));
+  const hide = (k: Optional) => {
+    setForm(prev => (prev ? cleared(prev, k) : prev));
+    setAdded(s => { const n = new Set(s); n.delete(k); return n; });
+    setRemoved(s => new Set(s).add(k));
+  };
   const ref = (name: string) => opts.ref[name] ?? [];
   const category = lookups.actCat.get(f.activity.name.trim());
   const used = opts.used;
@@ -1202,7 +1209,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-xs text-stone-500 dark:text-zinc-400 mr-1">Add a section:</span>
               {hidden.map(o => (
-                <button key={o.key} type="button" onClick={() => setAdded(s => new Set(s).add(o.key))} className={addBtn}>+ {o.title}</button>
+                <button key={o.key} type="button" onClick={() => { setAdded(s => new Set(s).add(o.key)); setRemoved(s => { const n = new Set(s); n.delete(o.key); return n; }); }} className={addBtn}>+ {o.title}</button>
               ))}
             </div>
           )}

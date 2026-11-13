@@ -67,7 +67,7 @@ export function filterSuggestions(all: string[], text: string, max = 8): string[
   return others.length ? [...exact, ...others].slice(0, max) : [];
 }
 
-export function Text({ value, onChange, placeholder, suggest, describe, onPick, className = '', autoFocus, onEnter, onBlur, disabled, wideList }: {
+export function Text({ value, onChange, placeholder, suggest, describe, onPick, className = '', autoFocus, onEnter, onBlur, disabled, wideList, keepOpen }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
@@ -84,12 +84,15 @@ export function Text({ value, onChange, placeholder, suggest, describe, onPick, 
   /** The suggestions take the width of the nearest positioned parent (e.g. the whole
    *  Activity : Title row, Hyoje 10 Nov) instead of the box's own. Default off. */
   wideList?: boolean;
+  /** The suggestions stay open after a pick, for adding several in a row (TagInput, 13 Nov).
+   *  Default off. */
+  keepOpen?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [hi, setHi] = useState(-1);
   const id = useId();
   const items = useMemo(() => (open && suggest ? filterSuggestions(suggest, value) : []), [open, suggest, value]);
-  const pick = (v: string) => { onChange(v); onPick?.(v); setOpen(false); setHi(-1); };
+  const pick = (v: string) => { onChange(v); onPick?.(v); setOpen(!!keepOpen); setHi(-1); };
   return (
     <div className={`${wideList ? '' : 'relative '}min-w-0 ${className}`}>
       <input
@@ -103,7 +106,7 @@ export function Text({ value, onChange, placeholder, suggest, describe, onPick, 
           else if (e.key === 'ArrowUp' && items.length) { e.preventDefault(); setHi(h => Math.max(-1, h - 1)); }
           else if (e.key === 'Enter') {
             if (hi >= 0 && items[hi]) { e.preventDefault(); pick(items[hi]); }
-            else if (onEnter) { e.preventDefault(); onEnter(); }
+            else if (onEnter) { e.preventDefault(); onEnter(); if (keepOpen) setOpen(true); }
           } else if (e.key === 'Escape') setOpen(false);
         }}
         placeholder={placeholder}
@@ -381,7 +384,7 @@ export function TagInput({ values, onChange, suggest, describe, known, placehold
         </span>
       ))}
       <Text value={draft} onChange={setDraft} suggest={rest} describe={describe} onPick={add} onEnter={() => add(draft)}
-        placeholder={placeholder} className="w-36 flex-none" />
+        placeholder={placeholder} className="w-36 flex-none" keepOpen />
     </div>
   );
 }

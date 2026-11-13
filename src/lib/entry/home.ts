@@ -98,8 +98,9 @@ export async function home(userId: string, iana = 'Europe/London', now = Date.no
   const done = (ended as any[]).filter(r => !isOpenRec(r)).map(r => item(r))
     .sort((a, b) => key(b.start).localeCompare(key(a.start)));
 
-  // Copy recent: the latest record of each activity + title + place, newest first.
-  const recent = variants(latest as any[]).slice(0, 40).map(r => item(r));
+  // Copy recent: open plans first (soonest first, 13 Nov), then the latest record of each
+  // activity + title + place, newest first.
+  const recent = [...await openPlans(userId), ...variants(latest as any[]).slice(0, 40).map(r => item(r))];
 
   return {
     ok: true as const,
@@ -128,14 +129,24 @@ function variants(rows: any[]): any[] {
   });
 }
 
+/** Open plans for Copy recent (13 Nov): one per activity + title + place, soonest first,
+ *  marked plan (a copy reads it from log_plan: &from=plan). */
+async function openPlans(userId: string, re?: RegExp) {
+  const rows = await LogPlan.find({
+    userId, 'plan.state': 'open',
+    ...(re ? { $or: [{ 'activity.name': re }, { 'activity.title': re }, { 'location.activity': re }] } : {}),
+  }).sort({ 'start.datetime': 1 }).limit(200).select('activity start end plannedEnd location duration updatedAt').lean() as any[];
+  return variants(rows).slice(0, 20).map(r => item(r, { plan: true }));
+}
+
 /** Copy recent with a search: every record whose activity or title has the text, the
- *  latest of each activity + title, newest first (all years). */
+ *  latest of each activity + title, newest first (all years); open plans that match first. */
 export async function searchRecent(userId: string, q: string) {
   const text = q.trim();
   if (!text) return { ok: true as const, recent: [] };
   const re = new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
   const rows = await Log.find({ userId, $or: [{ 'activity.name': re }, { 'activity.title': re }, { 'location.activity': re }] })
     .sort({ 'start.datetime': -1 }).limit(500).select('activity start end location duration updatedAt').lean() as any[];
-  const recent = variants(rows).slice(0, 40).map(r => item(r));
+  const recent = [...await openPlans(userId, re), ...variants(rows).slice(0, 40).map(r => item(r))];
   return { ok: true as const, recent };
 }

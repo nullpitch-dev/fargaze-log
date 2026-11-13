@@ -6,7 +6,8 @@
 // one layer ABOVE ModalShell (z-60), so it can open from the Calendar's day
 // pop-up. Search looks and behaves exactly as before.
 // (5 Nov, #70 step 3) English labels — the app is meant to be global; the data stays
-// as written — and an Edit button that opens the record's edit page (/records/<id>).
+// as written — and an Edit button that opens the record's edit page (/records/<id>), plus Copy
+// (13 Nov) that opens a new entry copied from it (/entry/new?copy=<id>).
 
 import React from 'react';
 import Link from 'next/link';
@@ -158,6 +159,8 @@ export function DetailPanel({ entry, onClose }: { entry: LogEntry; onClose: () =
   const router = useRouter();
   const dismiss = useBackToClose(onClose);
   const editHref = entry.plan ? `/entry/plan/${entry._id}` : `/records/${entry._id}`;
+  // Copy (13 Nov): a new entry with the same fields, today at the source's time (as Copy recent).
+  const copyHref = `/entry/new?copy=${entry._id}${entry.plan ? '&from=plan' : ''}`;
 
   if (typeof document === 'undefined') return null;
   return createPortal(
@@ -178,6 +181,13 @@ export function DetailPanel({ entry, onClose }: { entry: LogEntry; onClose: () =
             )}
           </div>
           <div className="flex items-center gap-3 shrink-0">
+          <Link
+            href={copyHref}
+            onClick={ev => { ev.preventDefault(); dismiss(() => router.push(copyHref)); }}
+            className="text-xs px-2 py-1 rounded border border-stone-300 dark:border-zinc-600 text-stone-700 dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800"
+          >
+            Copy
+          </Link>
           <Link
             href={editHref}
             onClick={ev => { ev.preventDefault(); dismiss(() => router.push(editHref)); }}

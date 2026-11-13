@@ -23,7 +23,7 @@ import { dropOutbox, flushOutbox, isNoSignal, listOutbox, onOutbox, outboxOn, pu
 import { newEntryId } from '@/lib/entry/forms';
 
 interface Point { date: string; hour: string; timezone: string }
-interface Item { id: string; activity: string; category: string; title: string; start: Point; end: Point; place: string; updatedAt: string; seconds?: number | null; repeat?: boolean; started?: boolean; plannedEnd?: { date: string; hour: string; timezone?: string } | null;
+interface Item { plan?: boolean; id: string; activity: string; category: string; title: string; start: Point; end: Point; place: string; updatedAt: string; seconds?: number | null; repeat?: boolean; started?: boolean; plannedEnd?: { date: string; hour: string; timezone?: string } | null;
   /** changed on the phone, not sent yet (offline slice 3) */ local?: boolean }
 interface Preset { id: string; name: string; order: number; time: { kind: 'open' | 'moment' | 'length'; minutes: number | null } }
 interface Stamp { id: string; note: string; start: Point; end: Point; updatedAt: string; /** saved on the phone, not sent yet (offline) */ local?: boolean }
@@ -36,6 +36,7 @@ const secondary = `${btn} border-stone-300 text-stone-700 hover:bg-stone-50 dark
 const small = 'px-2 py-1 rounded text-xs border border-stone-300 text-stone-700 hover:bg-stone-50 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800 disabled:opacity-40';
 // Titles and borders that stand out more (Hyoje, 12 Nov).
 const heading = 'text-xs font-semibold uppercase tracking-widest text-stone-700 dark:text-zinc-200';
+const planTag = 'shrink-0 self-center text-[10px] px-1.5 py-0.5 rounded bg-stone-100 dark:bg-zinc-800 text-stone-500 dark:text-zinc-400';
 const card = 'bg-white dark:bg-zinc-900 border-[1.5px] sm:border border-stone-400 dark:border-zinc-500 rounded-lg';   // outer line only (1.5 px on a phone, 1 px on a computer, 13 Nov); rows keep their thin lines
 /** Changed or saved on the phone, not sent yet (offline): a badge that stands out (Hyoje, 12 Nov). */
 const onPhone = 'ml-1.5 inline-block align-[1px] rounded px-1 py-px text-[10px] font-semibold uppercase tracking-wide bg-amber-200 text-amber-900 dark:bg-amber-500/25 dark:text-amber-200';
@@ -121,7 +122,7 @@ function warmItems(h: any) {
       '/api/entry/ingredients?all=1',   // the ingredient fill with no signal
       ...(h.comingUp ?? []).map((x: any) => `/api/entry/plans/${x.id}`),
       ...(h.stamps ?? []).map((x: any) => `/api/entry/stamps/${x.id}`),
-      ...[...(h.inProgress ?? []), ...(h.done ?? []), ...(h.recent ?? []).slice(0, 15)].map((x: any) => `/api/records/${x.id}`),
+      ...[...(h.inProgress ?? []), ...(h.done ?? []), ...(h.recent ?? []).filter((x: any) => !x.plan).slice(0, 15)].map((x: any) => `/api/records/${x.id}`),
     ];
     navigator.serviceWorker.controller.postMessage({ type: 'warm', data: [...new Set(data)] });
   } catch { /* nothing saved; fine */ }
@@ -495,7 +496,8 @@ function EntryHome() {
               <input value={copyQ} onChange={e => setCopyQ(e.target.value)} placeholder="Search all records" autoFocus
                 className="w-full rounded border border-stone-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm text-stone-800 dark:text-zinc-100" />
               <ul className="max-h-72 overflow-y-auto">
-                {recent.map(r => row(r, null, newHref({ copy: r.id })))}
+                {/* open plans first, tagged Plan (13 Nov) */}
+                {recent.map(r => row(r, r.plan ? <span className={planTag}>Plan</span> : null, newHref({ copy: r.id, ...(r.plan ? { from: 'plan' } : {}) }), undefined, !!r.plan))}
                 {recent.length === 0 && <li className="px-3 py-2 text-sm text-stone-500 dark:text-zinc-400">Nothing matches.</li>}
               </ul>
             </div>
