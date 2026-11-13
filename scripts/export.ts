@@ -143,7 +143,9 @@ async function main() {
     : ALL ? 'all years' : YEARS.length ? `years ${YEARS.join(', ')}` : 'changed years';
   say(`📤 FarGaze Log export — ${mode}${TEST ? ' — TEST' : ''}`);
 
-  await mongoose.connect(process.env.MONGODB_URI!, { autoIndex: false });
+  // MONGODB_DB names the database when the address doesn't (the Action's read-only address
+  // is the backup's, which has no database name in it).
+  await mongoose.connect(process.env.MONGODB_URI!, { autoIndex: false, ...(process.env.MONGODB_DB ? { dbName: process.env.MONGODB_DB } : {}) });
   const dbName = mongoose.connection.db!.databaseName;
   say(`✅ Database: ${dbName}`);
   if (TEST && !/test/.test(dbName)) throw new Error(`--test but the database is '${dbName}'. Check .env.development.local.`);
