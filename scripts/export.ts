@@ -91,6 +91,7 @@ function report(title: string, problems: string[]) {
 
 // ── --compare: the hand-kept year tab in the Archive file against the database ──
 
+const FILLED = /\.ingredients: .+ → Not Defined$/;
 const keyOf = (d: any) => [d.start?.year, d.start?.month, d.start?.day, d.start?.hour ?? '', d.activity?.name ?? ''].join('|');
 const dayNum = (d: any) => (d.start?.year ?? 0) * 10000 + (d.start?.month ?? 0) * 100 + (d.start?.day ?? 0);
 
@@ -107,6 +108,8 @@ async function compareTab(year: number, checks: MasterCheck[]) {
   const left = new Map<string, any[]>();
   for (const d of db) left.set(keyOf(d), [...(left.get(keyOf(d)) ?? []), d]);
   const onlySheet: string[] = [], different: string[] = [];
+  const fields = new Map<string, number>();
+  let filledOnly = 0;
   for (const { d, row } of sheet) {
     const cands = left.get(keyOf(d)) ?? [];
     if (!cands.length) { onlySheet.push(`row ${row}: ${findRowText(d)}`); continue; }
@@ -114,12 +117,19 @@ async function compareTab(year: number, checks: MasterCheck[]) {
     let best = 0, bestDiffs = roundTripDiffs(cands[0], d);
     cands.forEach((c, k) => { const x = roundTripDiffs(c, d); if (x.length < bestDiffs.length) { best = k; bestDiffs = x; } });
     const [match] = cands.splice(best, 1);
-    if (bestDiffs.length) different.push(`row ${row}: ${findRowText(match)}: ${bestDiffs.join('; ')}`);
+    // Ingredients the fill scripts added to an item typed without brackets are not a difference.
+    const real = bestDiffs.filter(x => !FILLED.test(x));
+    if (bestDiffs.length && !real.length) filledOnly++;
+    if (!real.length) continue;
+    different.push(`row ${row}: ${findRowText(match)}: ${real.join('; ')}`);
+    for (const x of real) { const f = x.split(':')[0].replace(/\[\d+\]/g, ''); fields.set(f, (fields.get(f) ?? 0) + 1); }
   }
   const onlyDb = [...left.values()].flat().sort(compareRecords).map(d => `${findRowText(d)}${d.origin === 'app' ? ' (app)' : ''}`);
   report('In the sheet, not in the database', onlySheet);
   report('In the database, not in the sheet', onlyDb);
+  if (filledOnly) say(`ℹ️  ${filledOnly} record(s) differ only by ingredients the fill scripts added (the sheet has the item without brackets): expected, not listed.`);
   report('Different (database → sheet)', different);
+  if (fields.size) say(`   by field: ${[...fields].sort((a, b) => b[1] - a[1]).map(([f, n]) => `${f} ${n}`).join(', ')}`);
   if (!onlySheet.length && !onlyDb.length && !different.length && !prepared.refused.length) say('✅ The tab and the database agree.');
   return onlySheet.length + onlyDb.length + different.length + prepared.refused.length;
 }

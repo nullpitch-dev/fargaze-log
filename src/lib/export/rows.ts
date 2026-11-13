@@ -48,13 +48,13 @@ export function durationParts(total: unknown): [number, number, number, number] 
   return [Math.floor(s / 86400), Math.floor((s % 86400) / 3600), Math.floor((s % 3600) / 60), s % 60];
 }
 
-/** '1h 30m', '2d 3h', '45m', '0m'. */
+/** '1h 30m', '2d 3h', '45m'; '' for zero (as Hyoje's sheet). */
 export function durationText(total: unknown): string {
   const p = durationParts(total);
   if (!p) return '';
   const [d, h, m] = p;
   const out = [d ? `${d}d` : '', h ? `${h}h` : '', m ? `${m}m` : ''].filter(Boolean).join(' ');
-  return out || (p[3] ? `${p[3]}s` : '0m');
+  return out || (p[3] ? `${p[3]}s` : '');
 }
 
 /** CK: '2026-11-16 12:00' (+ ' (zone)' when it differs from the start zone); '' when none. */
