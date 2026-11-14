@@ -795,7 +795,9 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
 
   const wholeOn = whole != null;
   // Food, drink and alcohol rows (14 Nov): short boxes so a row fits a narrow phone.
-  const amtW = 'w-12 shrink-0', unitW = 'w-14 shrink-0', pctW = 'w-12 shrink-0';
+  // Unit 48 px (14 Nov: more room for the food's name); alcohol's unit is a drop-down with ▾,
+  // so it keeps 56 px.
+  const amtW = 'w-12 shrink-0', unitW = 'w-12 shrink-0', selectW = 'w-14 shrink-0', pctW = 'w-12 shrink-0';
   const foodShares = portionsFromAmounts(f.food.foods);
   const portionSum = f.food.foods.reduce((a, x) => a + (typeof (x as Portioned).portion === 'number' ? Number((x as Portioned).portion) : 0), 0);
   const foodRows = (kind: 'drinks' | 'foods') => (
@@ -1080,7 +1082,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
                       <div className="flex gap-1.5">
                         <div className="flex-1 min-w-0"><PickText value={x.item} onChange={v => setX({ item: v, unit: lookups.alcoholUnits(v).includes(x.unit) ? x.unit : '' })} options={lookups.alcoholItems.map(a => ({ value: a }))} placeholder="Alcohol" /></div>
                         <Text value={x.amount} onChange={v => setX({ amount: v })} placeholder="Amt" className={amtW} />
-                        <div className={unitW}><Select value={x.unit} onChange={v => setX({ unit: v })} options={lookups.alcoholUnits(x.item)} empty="Unit" /></div>
+                        <div className={selectW}><Select value={x.unit} onChange={v => setX({ unit: v })} options={lookups.alcoholUnits(x.item)} empty="Unit" /></div>
                       </div>
                       <NoteBox value={x.note} onChange={v => setX({ note: v })} />
                     </div>
