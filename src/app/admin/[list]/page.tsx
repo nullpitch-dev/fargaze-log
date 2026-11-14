@@ -4,11 +4,10 @@
 // row, values used in records but missing from the list, add / edit / delete in
 // place (step 2), rename / move / merge with a preview and Undo for activities and
 // cost categories (step 3), and the changes made since a chosen date with their
-// sheet ticks. Long lists (indexBy) get an alphabet bar: ㄱ–ㅎ, A–Z and #.
+// Undo (sheet ticks went with the freeze, 14 Nov 2026). Long lists (indexBy) get an alphabet bar: ㄱ–ㅎ, A–Z and #.
 // A point column (place points) gets a Map column and 📍 Here (PointPicker).
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { StepList } from '@/app/_components/SheetSteps';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { PointPicker, locate, type LatLng, type Located } from '../_components/PointPicker';
@@ -24,8 +23,6 @@ interface Change {
   before: Record<string, unknown> | null;
   after: Record<string, unknown> | null;
   recordsChanged: number;
-  sheetSteps: string[];
-  sheetDone: boolean;
   undoneAt: string | null;
   undoOf: string | null;
   createdAt: string;
@@ -224,8 +221,6 @@ export default function AdminListPage() {
   // Renaming a name with no point (7 Nov): the name as logged, the new text, its preview.
   const [nameRename, setNameRename] = useState<{ from: string; to: string; preview: NamePreview | null; error: string } | null>(null);
 
-  // Place points (5 Nov): nothing reads the PlaceCoord tab, so most changes need no sheet step.
-  const repeatNote = (b: { sheetNeeded?: boolean }) => (b.sheetNeeded === false ? ' Nothing to do in the sheet.' : ' Repeat it in the sheet, then tick it below.');
   const pointOf = (c: Cell): LatLng | null => (c && typeof c === 'object' && 'lat' in c ? { lat: c.lat, lng: c.lng } : null);
   const draftPoint = (text: string): LatLng | null => {
     const m = text.trim().match(/^(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)$/);
@@ -242,7 +237,7 @@ export default function AdminListPage() {
     const b = await r.json().catch(() => ({}));
     setPicker(null);
     if (!r.ok) { setRowError(b.error ?? `HTTP ${r.status}`); return; }
-    setNotice(`Point saved for ${rowLabel(data!.list.columns.filter(c => !c.narrow), row)}.${repeatNote(b)}`);
+    setNotice(`Point saved for ${rowLabel(data!.list.columns.filter(c => !c.narrow), row)}.`);
     setReload(n => n + 1);
   }
 
@@ -290,7 +285,7 @@ export default function AdminListPage() {
         return;
       }
       setEditing(null);
-      setNotice(`${isNew ? 'Added.' : 'Saved.'}${repeatNote(b)}`);
+      setNotice(`${isNew ? 'Added.' : 'Saved.'}`);
       setReload(n => n + 1);
     } finally {
       setSaving(false);
@@ -322,7 +317,7 @@ export default function AdminListPage() {
       });
       const b = await r.json().catch(() => ({}));
       if (!r.ok) { setRowError(b.error ?? `HTTP ${r.status}`); return; }
-      setNotice(`Done: ${preview.data.title}, ${recs(b.recordsChanged)} changed.${repeatNote(b)}`);
+      setNotice(`Done: ${preview.data.title}, ${recs(b.recordsChanged)} changed.`);
       setPreview(null); setEditing(null); setCatForm(null);
       setReload(n => n + 1);
     } finally {
@@ -337,9 +332,7 @@ export default function AdminListPage() {
       const r = await fetch(`/api/admin/changes/${ch._id}/undo`, { method: 'POST' });
       const b = await r.json().catch(() => ({}));
       if (!r.ok) { setRowError(b.error ?? `HTTP ${r.status}`); return; }
-      setNotice(b.sheetNeeded
-        ? 'Undone. Repeat the undo in the sheet, then tick it below.'
-        : 'Undone. Nothing to do in the sheet: it had not been repeated there yet.');
+      setNotice('Undone.');
       setReload(n => n + 1);
     } finally {
       setBusy(null);
@@ -356,26 +349,8 @@ export default function AdminListPage() {
       const r = await fetch(`/api/admin/lists/${encodeURIComponent(slug)}/${row._id}`, { method: 'DELETE' });
       const b = await r.json().catch(() => ({}));
       if (!r.ok) { setRowError(b.error ?? `HTTP ${r.status}`); return; }
-      setNotice(`Deleted.${repeatNote(b)}`);
+      setNotice(`Deleted.`);
       setReload(n => n + 1);
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  // Ticks (or unticks) a change as repeated in the sheet, then reloads the list.
-  async function setSheetDone(id: string, sheetDone: boolean) {
-    setBusy(id);
-    try {
-      const r = await fetch(`/api/admin/changes/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sheetDone }),
-      });
-      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? `HTTP ${r.status}`);
-      setReload(n => n + 1);
-    } catch (e: any) {
-      setError(String(e.message ?? e));
     } finally {
       setBusy(null);
     }
@@ -432,7 +407,7 @@ export default function AdminListPage() {
       if (!r.ok) throw new Error(b.error ?? `HTTP ${r.status}`);
       if (!confirm) { setNameRename(x => (x ? { ...x, preview: b.preview } : x)); return; }
       setNameRename(null);
-      setNotice(`Renamed ${nameRename.from} → ${nameRename.to}: ${recs(b.recordsChanged)} changed.${repeatNote(b)}`);
+      setNotice(`Renamed ${nameRename.from} → ${nameRename.to}: ${recs(b.recordsChanged)} changed.`);
       setReload(x => x + 1);
     } catch (e: any) {
       setNameRename(x => (x ? { ...x, error: String(e.message ?? e) } : x));
@@ -629,14 +604,12 @@ export default function AdminListPage() {
             <p className="font-medium text-stone-900 dark:text-zinc-50">{pv.title}</p>
             <p className="mt-1 text-stone-700 dark:text-zinc-200">
               {pv.counts.total === 0
-                ? 'No record says it: only favourite-place periods and the sheet change.'
+                ? 'No record says it: only favourite-place periods change.'
                 : <>{recs(pv.counts.total)} ({pv.counts.first === pv.counts.last ? pv.counts.first : `${pv.counts.first}–${pv.counts.last}`}) will change: {pv.counts.byTab.filter(t => t.n).map(t => `${t.n.toLocaleString()} in ${t.tab}`).join(', ')}.</>}
             </p>
             {pv.warnings.length > 0 && (
               <ul className="mt-1 text-amber-800 dark:text-amber-300">{pv.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>
             )}
-            <p className="mt-3 text-xs text-stone-500 dark:text-zinc-400 uppercase tracking-widest">Then in the sheet</p>
-            <StepList steps={pv.sheetSteps} className="mt-1 text-xs text-stone-700 dark:text-zinc-200 space-y-0.5" />
             <div className="mt-3 flex gap-4 items-center">
               <button
                 onClick={() => nameRenameCall(true)}
@@ -776,7 +749,7 @@ export default function AdminListPage() {
               <p className="font-medium text-stone-900 dark:text-zinc-50">{preview.data.title}</p>
               <p className="mt-1 text-stone-700 dark:text-zinc-200">
                 {preview.data.counts.total === 0
-                  ? 'No record uses it: only the list and the sheet change.'
+                  ? 'No record uses it: only the list changes.'
                   : <>{recs(preview.data.counts.total)} ({preview.data.counts.first === preview.data.counts.last ? preview.data.counts.first : `${preview.data.counts.first}–${preview.data.counts.last}`}) will change: {preview.data.counts.byTab.filter(t => t.n).map(t => `${t.n.toLocaleString()} in ${t.tab}`).join(', ')}.</>}
               </p>
               {preview.data.warnings.length > 0 && (
@@ -784,8 +757,6 @@ export default function AdminListPage() {
                   {preview.data.warnings.map((w, i) => <li key={i}>{w}</li>)}
                 </ul>
               )}
-              <p className="mt-3 text-xs text-stone-500 dark:text-zinc-400 uppercase tracking-widest">Then in the sheet</p>
-              <StepList steps={preview.data.sheetSteps} className="mt-1 text-xs text-stone-700 dark:text-zinc-200 space-y-0.5" />
               <div className="mt-3 flex gap-4 items-center">
                 <button
                   onClick={confirmPreview}
@@ -961,7 +932,7 @@ export default function AdminListPage() {
           <section className="mt-8">
             <PartHeading
               title="Changes since"
-              count={foldable && !fold.changes ? `${data.since}${data.changes.some(c => !c.sheetDone && c.sheetSteps.length) ? ' · some to repeat in the sheet' : ''}` : undefined}
+              count={foldable && !fold.changes ? data.since : undefined}
               open={fold.changes} foldable={foldable} onToggle={() => toggle('changes')}
             >
               <input
@@ -982,7 +953,6 @@ export default function AdminListPage() {
                       <th className="text-left font-medium px-3 py-2 w-24">Change</th>
                       <th className="text-left font-medium px-3 py-2">What</th>
                       <th className="text-right font-medium px-3 py-2 w-20">Records</th>
-                      <th className="text-right font-medium px-3 py-2 w-36">Sheet</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1001,30 +971,8 @@ export default function AdminListPage() {
                             {ch.before && ch.after && <span className="text-stone-400 dark:text-zinc-500"> → </span>}
                             {ch.after && <span>{valuesText(ch.after, columns)}</span>}
                           </>}
-                          {!ch.sheetDone && ch.sheetSteps.length > 0 && (
-                            <StepList steps={ch.sheetSteps} className="mt-0.5 text-xs text-amber-800 dark:text-amber-300" />
-                          )}
                         </td>
                         <td className="px-3 py-1.5 text-right font-mono text-xs text-stone-600 dark:text-zinc-300">{ch.recordsChanged ? ch.recordsChanged.toLocaleString() : '—'}</td>
-                        <td className="px-3 py-1.5 text-right text-xs">
-                          {ch.sheetDone ? (
-                            <span className="text-stone-500 dark:text-zinc-400 whitespace-nowrap">
-                              ✓ repeated{' '}
-                              <button
-                                onClick={() => setSheetDone(ch._id, false)}
-                                disabled={busy === ch._id}
-                                title="Mark as not yet repeated in the sheet"
-                                className="text-stone-400 dark:text-zinc-500 hover:text-stone-700 dark:hover:text-zinc-200 underline disabled:opacity-40"
-                              >undo</button>
-                            </span>
-                          ) : (
-                            <button
-                              onClick={() => setSheetDone(ch._id, true)}
-                              disabled={busy === ch._id}
-                              className="whitespace-nowrap px-2 py-1 rounded border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950 hover:bg-amber-100 dark:hover:bg-amber-900 disabled:opacity-40"
-                            >Mark repeated</button>
-                          )}
-                        </td>
                       </tr>
                     ))}
                   </tbody>

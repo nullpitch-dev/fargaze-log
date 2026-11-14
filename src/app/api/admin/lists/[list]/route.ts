@@ -35,8 +35,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ list: st
   const needsZones = def.columns.some(c => c.type === 'zoneTime');
   const [usage, changes, zones] = await Promise.all([
     computeUsage(def, userId, rows),
-    // Unticked changes always show, however old; ticked ones only since the date.
-    MasterChange.find({ userId, list: def.slug, $or: [{ createdAt: { $gte: since } }, { sheetDone: false }] })
+    // The changes since the date (nothing waits for the sheet since the freeze, 14 Nov).
+    MasterChange.find({ userId, list: def.slug, createdAt: { $gte: since } })
       .sort({ createdAt: -1 })
       .select('-recordIds -userId -__v')
       .lean(),

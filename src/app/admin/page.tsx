@@ -12,7 +12,6 @@ interface ListSummary {
   group: string;
   rows: number;
   lastChange: string | null;
-  pendingSheet: number;
   pinned: boolean;
 }
 
@@ -20,7 +19,6 @@ const fmtDate = (iso: string | null) => (iso ? iso.slice(0, 10) : '—');
 
 export default function AdminHome() {
   const [lists, setLists] = useState<ListSummary[] | null>(null);
-  const [pending, setPending] = useState(0);
   const [error, setError] = useState('');
   const [pinError, setPinError] = useState('');
 
@@ -45,7 +43,7 @@ export default function AdminHome() {
   useEffect(() => {
     fetch('/api/admin/lists')
       .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
-      .then(d => { setLists(d.lists); setPending(d.pendingSheet); })
+      .then(d => setLists(d.lists))
       .catch(e => setError(String(e.message ?? e)));
   }, []);
 
@@ -55,14 +53,8 @@ export default function AdminHome() {
     <div className="flex flex-col flex-1 px-4 py-8 max-w-4xl mx-auto w-full">
       <h1 className="text-lg font-semibold text-stone-800 dark:text-zinc-100 mb-1">Master lists</h1>
       <p className="text-sm text-stone-500 dark:text-zinc-400 mb-6">
-        The database holds these lists. Repeat every change in the sheet by hand until cutover.
+        The database holds these lists.
       </p>
-
-      {pending > 0 && (
-        <div className="mb-6 px-4 py-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg text-amber-800 dark:text-amber-300 text-sm">
-          {pending} change{pending === 1 ? '' : 's'} not yet repeated in the sheet. The migration will not run until each is ticked.
-        </div>
-      )}
 
       {error && (
         <div className="mb-6 px-4 py-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm">
@@ -89,7 +81,6 @@ export default function AdminHome() {
                   <th className="text-left font-medium pr-4 py-2">List</th>
                   <th className="text-right font-medium px-4 py-2 w-20">Rows</th>
                   <th className="text-right font-medium px-4 py-2 w-32">Last change</th>
-                  <th className="text-right font-medium px-4 py-2 w-28">Sheet</th>
                 </tr>
               </thead>
               <tbody>
@@ -116,11 +107,6 @@ export default function AdminHome() {
                     </td>
                     <td className="px-4 py-2 text-right font-mono text-xs text-stone-600 dark:text-zinc-300">{l.rows.toLocaleString()}</td>
                     <td className="px-4 py-2 text-right font-mono text-xs text-stone-500 dark:text-zinc-400">{fmtDate(l.lastChange)}</td>
-                    <td className="px-4 py-2 text-right text-xs">
-                      {l.pendingSheet > 0
-                        ? <span className="text-amber-700 dark:text-amber-400">{l.pendingSheet} to repeat</span>
-                        : <span className="text-stone-300 dark:text-zinc-600">—</span>}
-                    </td>
                   </tr>
                 ))}
               </tbody>

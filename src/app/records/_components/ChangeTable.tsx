@@ -74,7 +74,7 @@ export function ChangeTable({ tab, findRow, moveTo, lines, changes, cellsOpen = 
               </li>
             ))}
           </ul>
-          <details open={cellsOpen} className="group">
+          {sheet.length > 0 && <details open={cellsOpen} className="group">
             <summary className="cursor-pointer text-xs text-stone-500 dark:text-zinc-400 hover:text-stone-800 dark:hover:text-zinc-100">
               Sheet cells ({sheet.length}) · tab <b className="font-medium">{tab ?? '(none)'}</b>{moveTo && moveTo !== tab && <> → <b className="font-medium">{moveTo}</b></>}
             </summary>
@@ -82,7 +82,7 @@ export function ChangeTable({ tab, findRow, moveTo, lines, changes, cellsOpen = 
               Find the row: <span className="font-mono text-stone-800 dark:text-zinc-100 break-all">{findRow}</span>
             </p>
             <CellList lines={sheet} withWhat={false} />
-          </details>
+          </details>}
         </>
       ) : (
         <>

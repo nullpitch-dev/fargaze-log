@@ -2,9 +2,11 @@ import { Schema, model, models } from 'mongoose';
 
 // One document per change made on the admin pages (#67).
 //
-// Before cutover the sheet holds the truth for records, so every change made here
-// must be repeated in the sheet by hand. `sheetDone` is that tick; while any change
-// is unticked, the migration refuses to run.
+// Before the freeze the sheet held the truth for records, so every change made here had to
+// be repeated in the sheet by hand (`sheetDone` was that tick, and an unticked change blocked
+// the migrations). The sheet was frozen at midnight 13/14 Nov 2026 (#74): since then every
+// change is saved as done, with no steps (the hook below), and nothing waits for the sheet.
+// The fields stay so older entries keep their history.
 //
 //   kind     add | edit | delete | rename | merge
 //   list     the admin list slug (src/lib/admin/lists.ts)
@@ -41,6 +43,14 @@ const MasterChangeSchema = new Schema(
   },
   { timestamps: true, collection: 'master_change' }
 );
+
+// The sheet is frozen: nothing is ever left to repeat there (14 Nov 2026).
+function frozen(doc: any) {
+  doc.sheetDone = true;
+  doc.sheetDoneAt = doc.sheetDoneAt ?? new Date();
+  doc.sheetSteps = [];
+}
+MasterChangeSchema.pre('validate', function () { frozen(this); });
 
 MasterChangeSchema.index({ userId: 1, list: 1, createdAt: -1 });
 MasterChangeSchema.index({ userId: 1, sheetDone: 1 });

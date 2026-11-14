@@ -3,15 +3,13 @@
 // /records/replace — Find & replace in records (#70 step 4, Design §15.6.3; agreed with
 // Hyoje 7–8 Nov). Pick a field, what to find and what to put; optionally only some
 // records (a date range, an activity). Preview lists the records (date · activity ·
-// before → after) and the sheet steps; Confirm writes one change-list entry; the Saved
-// screen has Mark repeated and Undo, as on the edit page. A preview row opens the record
+// before → after); Confirm writes one change-list entry; the Saved screen has Undo (the sheet
+// steps and Mark repeated went with the freeze, 14 Nov 2026). A preview row opens the record
 // pane (8 Nov: going to the edit page lost the preview), with its Edit link.
 // API: GET /api/records/replace (fields; ?field=&q= used values), POST …/preview, POST.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ChangeTable, type Line } from '../_components/ChangeTable';
-import { StepList } from '@/app/_components/SheetSteps';
 import { DetailPanel, type LogEntry } from '@/app/_components/LogDetailPanel';
 
 type Mode = 'whole' | 'part';
@@ -20,9 +18,9 @@ interface Row { id: string; day: string; activity: string; tab: string; findRow:
 interface Preview {
   title: string; problems: string[]; records: number; places: number; skipped: number;
   byTab: { tab: string; n: number }[]; rows: Row[]; more: number;
-  steps: string[]; lines: (Line & { tab: string; findRow: string })[];
+  steps: string[]; lines: unknown[];
 }
-interface Saved { changeId: string; records: number; places: number; preview: Preview; sheetDone: boolean; undone: string }
+interface Saved { changeId: string; records: number; places: number; preview: Preview; undone: string }
 
 const GROUPS: [string, string[]][] = [
   ['Text', ['title', 'additionalInfo', 'online', 'other']],
@@ -36,7 +34,6 @@ const label = 'block text-xs font-medium text-stone-500 dark:text-zinc-400 mb-1'
 const btn = 'px-3 py-1.5 rounded text-sm border disabled:opacity-40 disabled:cursor-not-allowed';
 const primary = 'px-4 py-2 rounded-lg text-sm font-medium bg-stone-800 dark:bg-zinc-200 text-white dark:text-zinc-900 hover:bg-stone-900 dark:hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed';
 const secondary = `${btn} border-stone-300 text-stone-700 hover:bg-stone-50 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800`;
-const tickBtn = `${btn} border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950 hover:bg-amber-100 dark:hover:bg-amber-900`;
 const n = (x: number) => x.toLocaleString('en-GB');
 const plural = (x: number, w: string) => `${n(x)} ${w}${x === 1 ? '' : 's'}`;
 
@@ -52,32 +49,6 @@ function Marked({ text, part, tone }: { text: string; part: string; tone: 'old' 
 }
 
 /** A filtered replace has a tab and row on each line: one table per record. */
-function byRecord(lines: Preview['lines']) {
-  const out: { tab: string; findRow: string; lines: Line[] }[] = [];
-  for (const l of lines) {
-    const last = out[out.length - 1];
-    if (last && last.tab === l.tab && last.findRow === l.findRow) last.lines.push(l);
-    else out.push({ tab: l.tab, findRow: l.findRow, lines: [l] });
-  }
-  return out;
-}
-
-function SheetPart({ p, open }: { p: Preview; open: boolean }) {
-  return (
-    <details open={open} className="rounded-lg border border-stone-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-4 py-3">
-      <summary className="cursor-pointer text-xs font-semibold uppercase tracking-widest text-stone-500 dark:text-zinc-400">Then in the sheet</summary>
-      <div className="mt-3 flex flex-col gap-3">
-        {p.steps.length > 0 && <StepList steps={p.steps} className="text-sm text-stone-700 dark:text-zinc-200 space-y-1" />}
-        {p.lines.length > 0 && (
-          <>
-            <p className="text-sm text-stone-600 dark:text-zinc-300">With a filter, Sheets can’t Find &amp; Replace only these rows: change each record’s cell by hand.</p>
-            {byRecord(p.lines).map((r, i) => <ChangeTable key={i} tab={r.tab} findRow={r.findRow} lines={r.lines} />)}
-          </>
-        )}
-      </div>
-    </details>
-  );
-}
 
 export default function FindReplacePage() {
   const [fields, setFields] = useState<Field[] | null>(null);
@@ -153,19 +124,9 @@ export default function FindReplacePage() {
       const r = await fetch('/api/records/replace', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...req, expectPlaces: preview.places }) });
       const b = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error([b.error ?? `HTTP ${r.status}`, ...(b.problems ?? [])].join(' '));
-      setSaved({ changeId: b.changeId, records: b.records, places: b.places, preview, sheetDone: false, undone: '' });
+      setSaved({ changeId: b.changeId, records: b.records, places: b.places, preview, undone: '' });
       window.scrollTo({ top: 0 });
     } catch (e: any) { setFail(String(e.message ?? e)); } finally { setBusy(false); }
-  }
-
-  async function tick(done: boolean) {
-    if (!saved) return;
-    setBusy(true);
-    try {
-      const r = await fetch(`/api/admin/changes/${saved.changeId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sheetDone: done }) });
-      const b = await r.json().catch(() => ({}));
-      if (!r.ok) setFail(b.error ?? `HTTP ${r.status}`); else setSaved({ ...saved, sheetDone: done });
-    } finally { setBusy(false); }
   }
 
   async function undo() {
@@ -175,7 +136,7 @@ export default function FindReplacePage() {
       const r = await fetch(`/api/admin/changes/${saved.changeId}/undo`, { method: 'POST' });
       const b = await r.json().catch(() => ({}));
       if (!r.ok) setFail(b.error ?? `HTTP ${r.status}`);
-      else setSaved({ ...saved, undone: b.sheetNeeded ? 'Undone. You had repeated it in the sheet, so the undo is waiting in Record changes: repeat it there too.' : 'Undone. Nothing to do in the sheet: it had not been repeated there.' });
+      else setSaved({ ...saved, undone: 'Undone.' });
     } finally { setBusy(false); }
   }
 
@@ -191,16 +152,10 @@ export default function FindReplacePage() {
       <div className="flex flex-col flex-1 px-4 py-6 max-w-3xl mx-auto w-full gap-4">
         <h1 className="text-lg font-semibold text-stone-800 dark:text-zinc-100">Find &amp; replace</h1>
         <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200">
-          {saved.undone || <>Saved: {p.title}. {plural(saved.records, 'record')} changed ({plural(saved.places, 'place')}). Now repeat it in the sheet, then press Mark repeated.</>}
+          {saved.undone || <>Saved: {p.title}. {plural(saved.records, 'record')} changed ({plural(saved.places, 'place')}).</>}
         </div>
         {fail && <p className="text-sm text-red-700 dark:text-red-300">{fail}</p>}
-        {!saved.undone && <SheetPart p={p} open />}
         <div className="flex flex-wrap items-center gap-2">
-          {!saved.undone && (saved.sheetDone ? (
-            <span className="text-sm text-stone-600 dark:text-zinc-300">✓ Repeated in the sheet{' '}
-              <button onClick={() => tick(false)} disabled={busy} className="text-xs underline text-stone-400 hover:text-stone-700 dark:text-zinc-500 dark:hover:text-zinc-200">untick</button>
-            </span>
-          ) : <button onClick={() => tick(true)} disabled={busy} className={tickBtn}>Mark repeated</button>)}
           {!saved.undone && <button onClick={undo} disabled={busy} className={secondary}>Undo</button>}
           <button onClick={again} className={secondary}>Another Find &amp; replace</button>
           <Link href="/records/changes" className={secondary}>Record changes</Link>
@@ -339,7 +294,6 @@ export default function FindReplacePage() {
               {preview.more > 0 && <p className="px-4 py-2 text-xs text-stone-500 dark:text-zinc-400">and {n(preview.more)} more</p>}
             </div>
           )}
-          {!blocked && <SheetPart p={preview} open={false} />}
         </div>
       )}
 

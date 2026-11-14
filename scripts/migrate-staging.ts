@@ -5,7 +5,7 @@
 //   npm run staging -- --check    reads and checks only; writes nothing (safe on production)
 //
 // Nothing is written unless every check passes:
-//   1. a change on /admin not yet ticked as repeated in the sheet stops the run;
+//   1. (until the freeze, 14 Nov 2026: a change on /admin not yet repeated in the sheet stopped the run);
 //   2. every Staging row passes the same checks as the daily migration;
 //   3. a food or drink without ingredients (written without brackets) stops the run:
 //      the fill scripts run only with a full migration, so Staging needs them typed;
@@ -27,7 +27,7 @@ dotenv.config({ path: path.join(process.cwd(), '.env.local') });
 import mongoose from 'mongoose';
 import { loadValidLevel2, loadBowelVocabulary } from '../src/lib/migration/transform';
 import { loadMasterChecks, prepareSheet, refusalReport } from '../src/lib/migration/checkRecords';
-import { getSheetData, waitingChanges } from '../src/lib/migration/sheet';
+import { getSheetData } from '../src/lib/migration/sheet';
 import {
   recordKey, describe, duplicatesWithin, alreadyThere, existingQuery, yearTabFor, missingFromYearTab, KEY_FIELDS,
   type Located,
@@ -53,12 +53,7 @@ async function main() {
   const problems: string[] = [];            // anything here stops a real run
   const stop = (title: string, lines: string[]) => { problems.push(title); console.error(`\n⛔ ${title}`); lines.forEach(l => console.error(l)); };
 
-  // 1. The change list.
-  const waiting = await waitingChanges(USER_ID);
-  if (waiting.length) {
-    stop(`${waiting.length} change(s) on /admin are not yet repeated in the sheet.`, [
-      ...waiting, 'Repeat each in the sheet and tick it on /admin, then run again.']);
-  }
+  // 1. (The change-list check went with the freeze, 14 Nov 2026: nothing waits for the sheet.)
 
   // 2. Read and check the Staging rows.
   await loadValidLevel2(USER_ID);

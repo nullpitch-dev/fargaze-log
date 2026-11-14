@@ -37,7 +37,7 @@ import mongoose from 'mongoose';
 import { loadValidLevel2, loadBowelVocabulary } from '../src/lib/migration/transform';
 import { loadMasterChecks, prepareSheet, refusalReport, type PreparedSheet } from '../src/lib/migration/checkRecords';
 import Log from '../src/models/Log';
-import { getSheetData, listTabs, waitingChanges } from '../src/lib/migration/sheet';
+import { getSheetData, listTabs } from '../src/lib/migration/sheet';
 import { planTabs, clearFilter, wrongTab, archiveTabName, type TabJob } from '../src/lib/yearTabs';
 import { getArchiveUntil, setArchiveUntil } from '../src/lib/archiveYear';
 
@@ -76,14 +76,7 @@ async function main() {
   console.log('✅ Connected to MongoDB:', mongoose.connection.db!.databaseName);
 
   // Gate 1. No override: repeat each change in the sheet and tick it on /admin (or Undo it).
-  const waiting = await waitingChanges(USER_ID);
-  if (waiting.length) {
-    console.error(`\n${CHECK ? '⚠️ ' : '⛔ Stopped:'} ${waiting.length} change(s) on /admin are not yet repeated in the sheet.${CHECK ? ' A real run would stop here.' : ' Nothing was deleted.'}`);
-    waiting.forEach(w => console.error(w));
-    console.error('Repeat each in the sheet and tick it on /admin, then run the migration again.');
-    process.exitCode = 1;
-    if (!CHECK) return;
-  }
+  // (Gate 1, changes waiting for the sheet, went with the freeze, 14 Nov 2026.)
 
   // Gate 2. Which tabs to read: the Archive file's tab names against the stored year.
   const stored = await getArchiveUntil(USER_ID);
@@ -145,7 +138,7 @@ async function main() {
       console.log(`\n🔍 ${label(job)}: ${now} records in the database now; a real run would put back ${prepared[i].docs.length}.`);
     }
     if (plan.rolloverTo) console.log(`\n🔍 A real run would then set the archive year to ${plan.rolloverTo} (${archiveTabName(plan.rolloverTo)}).`);
-    console.log(refused || waiting.length ? '\n⚠️  Check finished with problems (above).' : '\n✅ Check passed. Nothing was written.');
+    console.log(refused ? '\n⚠️  Check finished with problems (above).' : '\n✅ Check passed. Nothing was written.');
     return;
   }
 

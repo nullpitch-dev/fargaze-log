@@ -345,7 +345,7 @@ export async function undoPlaceChange(def: ListDef, userId: string, ch: any):
   }
 
   // Logged already ticked because nothing needed repeating: the undo needs nothing either.
-  const sheetNeeded = !!ch.sheetDone && !ch.extra?.noSheet;
+  const sheetNeeded: boolean = false; // the sheet is frozen (14 Nov 2026): an undo has nothing to repeat there
   // Only a rename reaches here once ticked (undoBlocked), so its reverse is a rename.
   const sheetSteps = sheetNeeded
     ? placeSteps({ action: 'rename', from: p.to, to: p.from }, ch.extra.counts as PlaceCounts)
@@ -504,7 +504,7 @@ async function undoNameRename(userId: string, ch: any):
   if (favIds.length && await FavoritePlace.countDocuments({ _id: { $in: favIds }, userId, name: p.to.key }) !== favIds.length) {
     return fail(409, 'Undo is no longer possible: a favourite-place period has changed since. Make the opposite change instead.');
   }
-  const sheetNeeded = !!ch.sheetDone && !ch.extra?.noSheet;
+  const sheetNeeded: boolean = false; // the sheet is frozen (14 Nov 2026): an undo has nothing to repeat there
   const sheetSteps = sheetNeeded
     ? placeSteps({ action: 'rename', from: p.to, to: p.from }, ch.extra.counts as PlaceCounts, true)
     : ['Nothing to do in the sheet: this was undone before it was repeated there.'];

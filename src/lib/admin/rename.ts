@@ -412,7 +412,6 @@ export function undoBlocked(ch: any): string | null {
   if (ch.undoneAt) return 'Already undone.';
   if (ch.undoOf) return 'This is an undo; make the change again instead.';
   if (!ch.extra?.plan) return 'This change has no plan to undo.';
-  if (ch.kind === 'merge' && ch.sheetDone && !ch.extra?.noSheet) return 'A merge can be undone only before it is repeated in the sheet: after that, the sheet can’t tell its rows apart.';
   return null;
 }
 
@@ -464,7 +463,7 @@ export async function undoChange(userId: string, changeId: string, defOf: (slug:
   const reverse: Plan = p.mode === 'category'
     ? { ...p, from: p.to, to: p.from }
     : { ...p, from: p.to, to: p.from };
-  const sheetNeeded = !!ch.sheetDone;
+  const sheetNeeded: boolean = false; // the sheet is frozen (14 Nov 2026): an undo has nothing to repeat there
   const counts = ch.extra.counts as Counts;
   const masterRows = p.mode === 'category' ? p.rowIds.length : 1;
   // Only renames and moves reach here once repeated in the sheet (undoBlocked), so

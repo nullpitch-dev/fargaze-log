@@ -404,7 +404,7 @@ export async function undoReplace(userId: string, ch: any) {
   if (still !== items.length) {
     return fail(409, `Undo is no longer possible: ${n(items.length - still)} of the ${n(items.length)} records have been changed or rebuilt by a migration since. Replace back instead.`);
   }
-  const sheetNeeded = !!ch.sheetDone && !ch.extra?.noSheet && SHEET_IS_TRUTH;
+  const sheetNeeded: boolean = false; // the sheet is frozen (14 Nov 2026): an undo has nothing to repeat there
   const now = new Date();
   const lines = items.map(i => ({ tab: i.tab, findRow: i.findRow, column: colName(f), what: 'Changed back', before: i.cellAfter, after: i.cellBefore }));
   const session = await mongoose.startSession();

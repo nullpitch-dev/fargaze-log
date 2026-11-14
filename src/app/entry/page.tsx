@@ -300,7 +300,7 @@ function EntryHome() {
   // A record goes to the trash, as on the edit page. One from the sheet also waits on
   // Record changes until its row is deleted there.
   const deleteRecord = (it: Item) => act(`x${it.id}`, () => call(`/api/records/${it.id}`, 'DELETE', { updatedAt: it.updatedAt }), b => ({
-    text: b.noSheet ? 'Record deleted' : 'Record deleted — delete its row in the sheet too (Record changes)',
+    text: 'Record deleted',
     undo: async () => { const r = await call(`/api/admin/changes/${b.changeId}/undo`, 'POST'); return r.ok ? null : r.b.error ?? 'Undo failed'; },
   }));
   const doneNow = (it: Item) => confirm(it, 'nowDone', 'Ended', { text: `${it.activity} done` });

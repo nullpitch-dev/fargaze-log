@@ -28,11 +28,10 @@ type Values = Record<string, CellValue>;
 
 const fail = (status: number, error: string): WriteResult => ({ ok: false, status, error });
 
-/** A list whose sheet tab nothing reads (place points): its change is logged as already
- *  repeated, so it never blocks a migration. */
-function logged(def: ListDef, steps: string[]): { sheetSteps: string[]; sheetDone?: boolean; sheetDoneAt?: Date } {
-  if (!def.sheet.tabUnused) return { sheetSteps: steps };
-  return { sheetSteps: [`Nothing to do in the sheet: the ${def.sheet.where} is no longer read.`], sheetDone: true, sheetDoneAt: new Date() };
+/** Since the freeze (14 Nov 2026) nothing is repeated in the sheet: every change is logged as
+ *  done, with no steps (MasterChange's hook does the same for every writer). */
+function logged(_def: ListDef, _steps: string[]): { sheetSteps: string[]; sheetDone: boolean; sheetDoneAt: Date } {
+  return { sheetSteps: [], sheetDone: true, sheetDoneAt: new Date() };
 }
 const records = (n: number) => `${n.toLocaleString()} record${n === 1 ? '' : 's'} use${n === 1 ? 's' : ''}`;
 

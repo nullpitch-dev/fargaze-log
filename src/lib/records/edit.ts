@@ -245,7 +245,7 @@ export async function undoRecordChange(userId: string, ch: any) {
   const blocked = recordUndoBlocked(ch);
   if (blocked) return fail(409, blocked);
   const archiveUntil = await getArchiveUntil(userId);
-  const sheetNeeded = !!ch.sheetDone && !ch.extra?.noSheet;
+  const sheetNeeded: boolean = false; // the sheet is frozen (14 Nov 2026): an undo has nothing to repeat there
   const now = new Date();
   const nothing = ['Nothing to do in the sheet: this was undone before it was repeated there.'];
 
@@ -322,10 +322,8 @@ export async function undoRecordChange(userId: string, ch: any) {
 
 export async function listRecordChanges(userId: string, opts: { since?: Date | null; limit?: number }) {
   const limit = Math.min(Math.max(opts.limit ?? 100, 1), 500);
-  // Every unticked change, however old, plus the ticked ones since the date asked.
-  const or: any[] = [{ sheetDone: false }];
-  if (opts.since) or.push({ createdAt: { $gte: opts.since } });
-  const rows = await MasterChange.find({ userId, list: RECORDS_LIST, $or: or })
+  // The changes since the date asked (the sheet is frozen: nothing waits, 14 Nov).
+  const rows = await MasterChange.find({ userId, list: RECORDS_LIST, ...(opts.since ? { createdAt: { $gte: opts.since } } : {}) })
     .sort({ createdAt: -1 }).limit(limit)
     .select('kind rowId recordsChanged sheetDone sheetDoneAt undoneAt undoOf createdAt extra.title extra.tab extra.findRow extra.moveTo extra.lines extra.changes extra.steps extra.places').lean() as any[];
   return rows.map(r => ({

@@ -4,8 +4,8 @@
 //   - English labels (the app is meant to be global; the data stays as written)
 //   - checked as you type: each change is sent to the preview half a second after the
 //     last key; problems block Save, warnings don't
-//   - after Save or Delete, a result screen: the lines to repeat in the sheet, Mark
-//     repeated and Undo
+//   - after Save or Delete, a result screen with Undo (until the freeze, 14 Nov 2026, it
+//     also listed the lines to repeat in the sheet, with Mark repeated)
 //   - items don't move; people are cards with name chips (free text, suggestions)
 //   - one column with a sticky Save bar on narrow screens; the check beside the form
 //     from 1024 px
@@ -555,22 +555,6 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
     }
   }
 
-  async function tick(sheetDone: boolean) {
-    if (!result) return;
-    const changeId = result.undone ? result.undone.changeId : result.changeId;
-    setBusy(true); setResultError('');
-    try {
-      const r = await fetch(`/api/admin/changes/${changeId}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sheetDone }),
-      });
-      const b = await r.json().catch(() => ({}));
-      if (!r.ok) { setResultError(b.error ?? `HTTP ${r.status}`); return; }
-      setResult(result.undone ? { ...result, undone: { ...result.undone, sheetDone } } : { ...result, sheetDone });
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function undo() {
     if (!result) return;
     if (!window.confirm(result.kind === 'saved' ? 'Undo this edit? The record goes back to how it was.' : 'Undo the delete? The record comes back.')) return;
@@ -591,8 +575,6 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
   if (result) {
     const gone = result.kind === 'deleted' && !result.undone;
     const u = result.undone;
-    const showSheet = !result.noSheet && (!u || u.sheetNeeded);
-    const done = u ? u.sheetDone : result.sheetDone;
     return (
       <div className="flex flex-col flex-1 px-4 py-6 max-w-3xl mx-auto w-full gap-4">
         <div>
@@ -600,44 +582,11 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
             {result.undone ? (result.kind === 'saved' ? 'Edit undone' : 'Delete undone') : result.kind === 'saved' ? 'Saved' : 'Deleted'}
           </h1>
           <p className="text-sm text-stone-600 dark:text-zinc-300 mt-1">
-            {result.noSheet
-              ? u ? 'Undone. Nothing to do in the sheet.'
-                : `${result.kind === 'saved' ? 'Saved' : 'In the trash'}. Nothing to do in the sheet.`
-              : u
-              ? u.sheetNeeded
-                ? result.kind === 'saved'
-                  ? 'The record is back as it was. You had repeated the edit in the sheet, so undo it there too: make the changes below there, then press Mark repeated.'
-                  : 'The record is back. You had deleted the row in the sheet, so add it back there as below, then press Mark repeated.'
-                : 'The record is back as it was. Nothing to do in the sheet: the change had not been repeated there.'
-              : result.kind === 'saved'
-                ? 'Repeat these changes in the sheet, then press Mark repeated. Until then, the migrations wait.'
-                : 'The record is in the trash. Delete the row in the sheet, then press Mark repeated. Until then, the migrations wait.'}
+            {u ? 'The record is back as it was.' : result.kind === 'saved' ? 'The record is saved.' : 'The record is in the trash.'}
           </p>
-          {!done && !result.noSheet && (
-            <p className="text-xs text-stone-500 dark:text-zinc-400 mt-1">
-              No time now? It waits on <Link href="/records/changes" className="underline">Record changes</Link> (gear menu ⚙), with Mark repeated and Undo.
-            </p>
-          )}
         </div>
-
-        {showSheet && (
-          <div className="bg-white dark:bg-zinc-900 border border-stone-200 dark:border-zinc-700 rounded-lg p-4 shadow-sm flex flex-col gap-3">
-            {u ? <ChangeTable tab={u.tab} findRow={u.findRow} moveTo={u.moveTo} lines={u.lines} changes={u.changes} /> : <ChangeTable tab={result.tab} findRow={result.findRow} moveTo={result.moveTo} lines={result.lines} changes={result.changes} />}
-            <div className="flex flex-wrap items-center gap-2">
-              {done ? (
-                <span className="text-sm text-stone-600 dark:text-zinc-300">
-                  ✓ Repeated in the sheet{' '}
-                  <button onClick={() => tick(false)} disabled={busy} className="text-xs underline text-stone-400 hover:text-stone-700 dark:text-zinc-500 dark:hover:text-zinc-200">untick</button>
-                </span>
-              ) : (
-                <button onClick={() => tick(true)} disabled={busy}
-                  className={`${btn} border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950 hover:bg-amber-100 dark:hover:bg-amber-900`}>Mark repeated</button>
-              )}
-              {!u && <button onClick={undo} disabled={busy} className={secondary}>{result.kind === 'saved' ? 'Undo this edit' : 'Undo the delete'}</button>}
-            </div>
-          </div>
-        )}
-        {result.noSheet && !u && (
+        {/* Nothing to repeat in the sheet since the freeze (14 Nov 2026): just Undo. */}
+        {!u && (
           <div><button onClick={undo} disabled={busy} className={secondary}>{result.kind === 'saved' ? 'Undo this edit' : 'Undo the delete'}</button></div>
         )}
         {resultError && <p className="text-sm text-red-700 dark:text-red-300">{resultError}</p>}

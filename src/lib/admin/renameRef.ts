@@ -468,7 +468,7 @@ export async function undoRefChange(def: ListDef, userId: string, ch: any):
     if (!c.mergeInto && !(await model.exists({ _id: c.id, ...scope, value: c.to }))) return fail(409, `Undo is no longer possible: the combination ${c.to} has changed since.`);
   }
 
-  const sheetNeeded = !!ch.sheetDone;
+  const sheetNeeded: boolean = false; // the sheet is frozen (14 Nov 2026): an undo has nothing to repeat there
   const counts = ch.extra.counts as RefCounts;
   const sheetSteps = sheetNeeded
     ? refSteps(sh, swapped(p), counts.columns)
