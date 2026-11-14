@@ -12,6 +12,8 @@ import {
   parsePeople,
   computeTotalSeconds,
   weekdayOf,
+  splitPlus,
+  splitListRaw,
 } from './transform';
 
 // Column indices (0-based)
@@ -186,17 +188,14 @@ export function rowToDocument(row: any[], userId: string): any {
   // zipMultiValueWithPlusSplit can turn "A+B" into two entries, so repeat
   // each load/style across its own split items. Amount is divided by the
   // splitter; load and style are NOT — a 10kg bag is 10kg for both halves.
-  const exItemTokens = get(row, C.EXERCISE_ITEM)
-    .split(',')
-    .map(s => s.trim())
-    .filter(s => s !== '');
-  const loadTokens = get(row, C.EXERCISE_LOAD).split(',').map(s => s.trim());
-  const styleTokens = get(row, C.EXERCISE_STYLE).split(',').map(s => s.trim());
+  const exItemTokens = splitListRaw(get(row, C.EXERCISE_ITEM)).filter(s => s !== '');
+  const loadTokens = splitListRaw(get(row, C.EXERCISE_LOAD));
+  const styleTokens = splitListRaw(get(row, C.EXERCISE_STYLE));
 
   const loadPerItem: string[] = [];
   const stylePerItem: string[] = [];
   exItemTokens.forEach((tok, i) => {
-    const splits = tok.split('+').filter(s => s.trim() !== '').length || 1;
+    const splits = splitPlus(tok).length || 1;
     for (let k = 0; k < splits; k++) {
       loadPerItem.push(loadTokens[i] ?? '');
       stylePerItem.push(styleTokens[i] ?? '');

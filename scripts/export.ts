@@ -35,7 +35,7 @@ dotenv.config({ path: path.join(process.cwd(), '.env.local') });
 if (TEST) dotenv.config({ path: path.join(process.cwd(), '.env.development.local'), override: true });
 
 import mongoose from 'mongoose';
-import { loadValidLevel2, loadBowelVocabulary } from '../src/lib/migration/transform';
+import { loadValidLevel2, loadBowelVocabulary, useCellSeparators } from '../src/lib/migration/transform';
 import { loadMasterChecks, prepareSheet, type MasterCheck } from '../src/lib/migration/checkRecords';
 import { getSheetData } from '../src/lib/migration/sheet';
 import Log from '../src/models/Log';
@@ -154,6 +154,8 @@ async function main() {
   await loadValidLevel2(USER_ID);
   await loadBowelVocabulary(USER_ID);
   const checks = await loadMasterChecks(USER_ID);
+  // The Archive file's tab is read with the sheet's separators; the export file with its own.
+  useCellSeparators(COMPARE ? 'sheet' : 'export');
 
   if (COMPARE) {
     const n = await compareTab(COMPARE, checks);

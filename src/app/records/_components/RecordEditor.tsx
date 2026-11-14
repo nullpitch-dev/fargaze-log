@@ -601,8 +601,8 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
           </h1>
           <p className="text-sm text-stone-600 dark:text-zinc-300 mt-1">
             {result.noSheet
-              ? u ? 'Undone. This record was made in the app: nothing to do in the sheet.'
-                : `${result.kind === 'saved' ? 'Saved' : 'In the trash'}. This record was made in the app: nothing to do in the sheet.`
+              ? u ? 'Undone. Nothing to do in the sheet.'
+                : `${result.kind === 'saved' ? 'Saved' : 'In the trash'}. Nothing to do in the sheet.`
               : u
               ? u.sheetNeeded
                 ? result.kind === 'saved'

@@ -31,13 +31,17 @@ import { sheetChange, deleteRowLines, addRowLines, findRowText, type ChangeLine,
 import { isOpen, missingRequired } from '../entry/groups';
 import { endAheadToPlanned, plannedEndChanged, relaxOpen, tightenOnEnd } from '../entry/drafts';
 
-const APP_ONLY = ['Nothing to do in the sheet: this record was made in the app.'];
-const appMade = (doc: any) => doc?.origin === 'app';
+const APP_ONLY = ['Nothing to do in the sheet.'];
+/** No sheet step: made in the app, or any record once the sheet is frozen. */
+const appMade = (doc: any) => !SHEET_IS_TRUTH || doc?.origin === 'app';
 
 export const RECORDS_LIST = 'records';
 
-/** Until cutover (#74) the sheet is the truth: list values can't hold its separators. */
-export const SHEET_IS_TRUTH = true;
+/** Until the freeze the sheet was the truth: list values couldn't hold its separators, and every
+ *  edit of a sheet record had steps to repeat in the sheet. The 2026 tab was frozen at midnight
+ *  13/14 Nov 2026 (#74): since then no record change has a sheet step, and lists may hold
+ *  , + | (the export file separates with • and ‖). */
+export const SHEET_IS_TRUTH = false;
 
 type Fail = { ok: false; status: number; error: string; problems?: string[] };
 const fail = (status: number, error: string, problems?: string[]): Fail => ({ ok: false, status, error, ...(problems ? { problems } : {}) });
@@ -101,7 +105,7 @@ async function prepare(userId: string, id: string, form: RecordForm): Promise<{ 
   const warnings = [...built.warnings];
   // A record made in the app: an End still to come is its planned end (drafts.ts). A sheet
   // record keeps what was typed, as the sheet has no planned end.
-  if (appMade(base)) endAheadToPlanned(doc, warnings);
+  if (base?.origin === 'app') endAheadToPlanned(doc, warnings); // sheet records keep their End
 
   // Master lists. An unknown activity is already reported, so its pair is not.
   const checks = (await loadMasterChecks(userId)).filter(c => doc.activity.category || c.def.slug !== 'activity');
@@ -158,7 +162,7 @@ export async function saveEdit(userId: string, id: string, form: RecordForm, upd
   if (problems.length) return fail(422, 'The record was not saved.', problems);
 
   const now = new Date();
-  const saved = { ...doc, _id: base._id, ...(appMade(base) ? { origin: 'app' } : {}), createdAt: base.createdAt, updatedAt: now };
+  const saved = { ...doc, _id: base._id, ...(base?.origin === 'app' ? { origin: 'app' } : {}), createdAt: base.createdAt, updatedAt: now };
   // A sheet record whose only change is its planned end: the sheet has no planned end,
   // so nothing to do there either (Hyoje, 10 Nov).
   const noSheet = appMade(base) || !change.lines.length;

@@ -61,11 +61,18 @@ export const itemText = (x: any, withIngredients: boolean) => {
   const ings = withIngredients ? realIngredients(x) : [];
   return ings.length ? `${s(x?.item)}(${ings.join('|')})` : s(x?.item);
 };
-/** A comma list whose empty tail is dropped (the sheet can't hold an empty last value). */
-const joinList = (vals: string[]) => {
+/** The separators inside a cell. The sheet's (Archive file, Staging, the change list) and the
+ *  export file's (#72, 13 Nov: items can hold commas and '+' after the freeze). Ingredients
+ *  stay 'item(a|b)' in both: they come from the ingredient list, which never holds '|'. */
+export interface CellSeps { list: string; group: string; bowel: string }
+export const SHEET_SEPS: CellSeps = { list: ', ', group: '|', bowel: '+' };
+export const EXPORT_SEPS: CellSeps = { list: ' • ', group: ' ‖ ', bowel: ' • ' };
+
+/** A list whose empty tail is dropped (the sheet can't hold an empty last value). */
+const joinList = (vals: string[], sep = SHEET_SEPS.list) => {
   const v = [...vals];
   while (v.length && v[v.length - 1] === '') v.pop();
-  return v.join(', ');
+  return v.join(sep);
 };
 
 interface GroupField { i: number; label: string; key: string; noun: string }
@@ -83,9 +90,9 @@ const GROUPS: ItemGroup[] = [
   group('exercise', 'Exercise', false, [[69, 'item', 'Exercise item'], [70, 'amount', 'Exercise amount'], [71, 'unit', 'Exercise unit'], [72, 'loadKg', 'Load (kg)'], [73, 'setStyle', 'Style']]),
 ];
 
-const groupCell = (g: ItemGroup, f: GroupField) => (doc: any) => {
+const groupCell = (g: ItemGroup, f: GroupField) => (doc: any, sp: CellSeps = SHEET_SEPS) => {
   const items = arr(get(doc, g.path));
-  return f.key === 'item' ? items.map(x => itemText(x, g.ingredients)).join(', ') : joinList(items.map(x => s(x?.[f.key])));
+  return f.key === 'item' ? items.map(x => itemText(x, g.ingredients)).join(sp.list) : joinList(items.map(x => s(x?.[f.key])), sp.list);
 };
 
 // People: consecutive entries with the same method and category form one '|' group.
@@ -101,7 +108,7 @@ export function peopleGroups(doc: any): PeopleGroup[] {
   return out;
 }
 
-interface Column { i: number; label: string; cell: (doc: any) => string; calculated?: boolean; group?: string; part?: string }
+interface Column { i: number; label: string; cell: (doc: any, sp?: CellSeps) => string; calculated?: boolean; group?: string; part?: string }
 
 // A start or end cell puts back the whole point (date, time, zone).
 const partOf = (path: string) => (/^(start|end)\./.test(path) ? path.split('.')[0] : path);
@@ -139,17 +146,17 @@ const COLUMNS: Column[] = [
   scalar(38, 'Carbs', 'food.carbs'),
   scalar(39, 'Fat', 'food.fat'),
   scalar(40, 'Spiciness', 'food.spiciness'),
-  { i: 53, label: 'People method', cell: (d: any) => oneIfSame(peopleGroups(d).map(g => g.method)).join('|'), group: 'people', part: 'people' },
-  { i: 54, label: 'People type', cell: (d: any) => oneIfSame(peopleGroups(d).map(g => g.category)).join('|'), group: 'people', part: 'people' },
-  { i: 55, label: 'People', cell: (d: any) => peopleGroups(d).map(g => g.targets.join(', ')).join('|'), group: 'people', part: 'people' },
+  { i: 53, label: 'People method', cell: (d: any, sp = SHEET_SEPS) => oneIfSame(peopleGroups(d).map(g => g.method)).join(sp.group), group: 'people', part: 'people' },
+  { i: 54, label: 'People type', cell: (d: any, sp = SHEET_SEPS) => oneIfSame(peopleGroups(d).map(g => g.category)).join(sp.group), group: 'people', part: 'people' },
+  { i: 55, label: 'People', cell: (d: any, sp = SHEET_SEPS) => peopleGroups(d).map(g => g.targets.join(sp.list)).join(sp.group), group: 'people', part: 'people' },
   scalar(56, 'From', 'transport.from'),
   scalar(57, 'To', 'transport.to'),
   scalar(58, 'Purpose', 'transport.purpose'),
   scalar(59, 'Transport', 'transport.method'),
   scalar(60, 'Return type', 'transport.returnType'),
   scalar(61, 'Bowel amount', 'bowel.amount'),
-  { i: 62, label: 'Bowel quality', cell: (d: any) => arr(d?.bowel?.quality).join('+'), part: 'bowel.quality' },
-  { i: 63, label: 'Bowel characteristics', cell: (d: any) => arr(d?.bowel?.characteristics).join('+'), part: 'bowel.characteristics' },
+  { i: 62, label: 'Bowel quality', cell: (d: any, sp = SHEET_SEPS) => arr(d?.bowel?.quality).join(sp.bowel), part: 'bowel.quality' },
+  { i: 63, label: 'Bowel characteristics', cell: (d: any, sp = SHEET_SEPS) => arr(d?.bowel?.characteristics).join(sp.bowel), part: 'bowel.characteristics' },
   scalar(64, 'Weight', 'body.weight'),
   scalar(65, 'Muscle', 'body.muscleMass'),
   scalar(66, 'Body fat', 'body.bodyFat'),
@@ -171,9 +178,9 @@ const COLUMNS: Column[] = [
 const colName = (c: { i: number; label: string }) => `${colLetter(c.i)} ${c.label}`;
 const byIndex = new Map(COLUMNS.map(c => [c.i, c]));
 
-/** Every column the database fills, as the sheet would show it. */
-export function sheetCells(doc: any): { column: string; i: number; value: string; calculated?: boolean }[] {
-  return COLUMNS.map(c => ({ column: colName(c), i: c.i, value: c.cell(doc), calculated: c.calculated }));
+/** Every column the database fills, as the sheet would show it (or the export file, with EXPORT_SEPS). */
+export function sheetCells(doc: any, sp: CellSeps = SHEET_SEPS): { column: string; i: number; value: string; calculated?: boolean }[] {
+  return COLUMNS.map(c => ({ column: colName(c), i: c.i, value: c.cell(doc, sp), calculated: c.calculated }));
 }
 
 // ── Finding the row ──────────────────────────────────────────────────────────

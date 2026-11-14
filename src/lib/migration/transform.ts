@@ -29,12 +29,27 @@ export function parseString(val: string): string | null {
   return val.trim();
 }
 
+// ── Cell separators ──────────────────────────────────────────────────────────
+// The sheet's: ',' between items, '+' joins items that share one amount, '|' between people
+// groups, '+' between bowel values. The export file's (#72, 13 Nov): '•' between items and
+// bowel values, '‖' between people groups, no '+' meaning — so items may hold ',' '+' '|'.
+// Ingredients stay 'item(a|b)' in both. Only the export script switches to 'export'.
+interface ReadSeps { list: string; plus: string | null; group: string; bowel: string }
+const READ_SHEET: ReadSeps = { list: ',', plus: '+', group: '|', bowel: '+' };
+const READ_EXPORT: ReadSeps = { list: '•', plus: null, group: '‖', bowel: '•' };
+let SEP: ReadSeps = READ_SHEET;
+export function useCellSeparators(kind: 'sheet' | 'export') { SEP = kind === 'export' ? READ_EXPORT : READ_SHEET; }
+/** A token split on the '+' that joins items sharing one amount (none in the export file). */
+export const splitPlus = (tok: string) => (SEP.plus ? tok.split(SEP.plus) : [tok]).map(s => s.trim()).filter(s => s !== '');
+/** A list cell's raw tokens, empty ones kept (load and style are matched by position). */
+export const splitListRaw = (val: string) => (val ?? '').split(SEP.list).map(s => s.trim());
+
 // Parse a "+"-joined multi-value cell into a list ("무름+설사" → ["무름", "설사"]).
 // Empty or error cells return undefined so no field is stored at all.
 export function parsePlusList(val: string): string[] | undefined {
   const s = parseString(val);
   if (s === null) return undefined;
-  const items = s.split('+').map(t => t.trim()).filter(t => t !== '');
+  const items = s.split(SEP.bowel).map(t => t.trim()).filter(t => t !== '');
   return items.length > 0 ? items : undefined;
 }
 
@@ -99,7 +114,10 @@ export function weekdayOf(year: number | null | undefined, month: number | null 
 // Split comma-separated string into array, filter empty
 export function splitComma(val: string): string[] {
   if (!val || val.trim() === '') return [];
-  return val.split(',').map(s => s.trim()).filter(s => s !== '');
+  const parts = val.split(SEP.list).map(s => s.trim());
+  // The export file keeps an empty value in the middle of a list (a food with no note before
+  // one with a note); the sheet never could, so there empty values are dropped as before.
+  return SEP === READ_EXPORT ? parts : parts.filter(s => s !== '');
 }
 
 // Zip item/amount/unit arrays into array of objects
@@ -130,7 +148,7 @@ export function zipMultiValueWithPlusSplit(
   const unitArr = splitComma(units);
   if (itemArr.length === 0) return [];
   return itemArr.flatMap((item, i) => {
-    const subItems = item.split('+').map(s => s.trim()).filter(s => s !== '');
+    const subItems = splitPlus(item);
     if (subItems.length <= 1) {
       return [{ item, amount: amountArr[i] ?? '', unit: unitArr[i] ?? '' }];
     }
@@ -158,7 +176,7 @@ export function zipFoodValue(
   const noteArr = splitComma(notes);
   if (itemArr.length === 0) return [];
   return itemArr.flatMap((item, i) => {
-    const subItems = item.split('+').map(s => s.trim()).filter(s => s !== '');
+    const subItems = splitPlus(item);
     if (subItems.length <= 1) {
       return [{
         item,
@@ -188,9 +206,9 @@ export function parsePeople(
 ): Array<{ method: string; category: string; target: string }> {
   if (!methods && !categories && !targets) return [];
 
-  const methodGroups = (methods || '').split('|').map(s => s.trim());
-  const categoryGroups = (categories || '').split('|').map(s => s.trim());
-  const targetGroups = (targets || '').split('|').map(s => s.trim());
+  const methodGroups = (methods || '').split(SEP.group).map(s => s.trim());
+  const categoryGroups = (categories || '').split(SEP.group).map(s => s.trim());
+  const targetGroups = (targets || '').split(SEP.group).map(s => s.trim());
 
   const result: Array<{ method: string; category: string; target: string }> = [];
 

@@ -368,8 +368,11 @@ export async function applyReplace(userId: string, req: ReplaceRequest & { expec
         before: { field: p.f.key, mode: p.mode, from: p.from, to: p.to, dateFrom: req.dateFrom ?? null, dateTo: req.dateTo ?? null, activity: t(req.activity) || null },
         after: null,
         recordsChanged: p.changing.length, recordIds: p.changing.map(h => h.id),
-        sheetSteps: p.filtered ? p.lines.map(l => `${l.tab} · ${l.findRow} · ${l.column}: ${l.before} → ${l.after}`) : p.steps,
+        sheetSteps: !SHEET_IS_TRUTH ? ['Nothing to do in the sheet.'] : p.filtered ? p.lines.map(l => `${l.tab} · ${l.findRow} · ${l.column}: ${l.before} → ${l.after}`) : p.steps,
+        // After the freeze (13 Nov) there is nothing to repeat in the sheet.
+        ...(!SHEET_IS_TRUTH ? { sheetDone: true, sheetDoneAt: now } : {}),
         extra: {
+          noSheet: !SHEET_IS_TRUTH,
           title: p.title, steps: p.steps, lines: p.lines, places,
           // What Undo needs: each record's field before and after, and when it was saved.
           items: p.changing.map(h => ({ id: h.id, path: h.path, before: h.before, after: h.after, tab: h.tab, findRow: h.findRow, cellBefore: h.cellBefore, cellAfter: h.cellAfter })),
@@ -401,7 +404,7 @@ export async function undoReplace(userId: string, ch: any) {
   if (still !== items.length) {
     return fail(409, `Undo is no longer possible: ${n(items.length - still)} of the ${n(items.length)} records have been changed or rebuilt by a migration since. Replace back instead.`);
   }
-  const sheetNeeded = !!ch.sheetDone;
+  const sheetNeeded = !!ch.sheetDone && !ch.extra?.noSheet && SHEET_IS_TRUTH;
   const now = new Date();
   const lines = items.map(i => ({ tab: i.tab, findRow: i.findRow, column: colName(f), what: 'Changed back', before: i.cellAfter, after: i.cellBefore }));
   const session = await mongoose.startSession();
@@ -416,7 +419,7 @@ export async function undoReplace(userId: string, ch: any) {
       const [u] = await MasterChange.create([{
         userId, list: RECORDS_LIST, kind: 'replace', rowId: null,
         before: ch.before, after: null, recordsChanged: items.length, recordIds: ids,
-        sheetSteps: sheetNeeded ? lines.map(l => `${l.tab} · ${l.findRow} · ${l.column}: ${l.before} → ${l.after}`) : ['Nothing to do in the sheet: this was undone before it was repeated there.'],
+        sheetSteps: sheetNeeded ? lines.map(l => `${l.tab} · ${l.findRow} · ${l.column}: ${l.before} → ${l.after}`) : [SHEET_IS_TRUTH ? 'Nothing to do in the sheet: this was undone before it was repeated there.' : 'Nothing to do in the sheet.'],
         sheetDone: !sheetNeeded, sheetDoneAt: sheetNeeded ? null : now, undoOf: ch._id,
         extra: { title: `Undo: ${ch.extra?.title ?? ''}`, steps: [], lines: sheetNeeded ? lines : [], field: f.key, afterUpdatedAt: now },
       }], { session });

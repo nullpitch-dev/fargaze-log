@@ -8,13 +8,15 @@
 //                      differs from the start zone)
 // E, CG, CH (Google Calendar sync) stay empty: the sync from the sheet stops at cutover.
 //
-// The cells come from sheetCells() (#70), the same writing the edit feature uses, so a row read
-// back by the migration (rowToDocument) gives the same record. Calculated here: the weekday
+// The cells come from sheetCells() (#70) with the export file's separators (13 Nov): ' • '
+// between items, ' ‖ ' between people groups, ingredients 'item(a|b)' — so items may hold
+// , + |. Read back by the migration's reader in its 'export' mode (useCellSeparators), a row
+// gives the same record. Calculated here: the weekday
 // (L, S) and the duration (V–Z: days, hours, minutes, seconds, and a '1h 30m' text).
 //
 // A record goes to the tab of its LOCAL start year (start.year).
 
-import { sheetCells, colLetter } from '../records/sheetCells';
+import { sheetCells, colLetter, EXPORT_SEPS } from '../records/sheetCells';
 import { weekdayOf } from '../migration/transform';
 
 /** Columns A–CK. */
@@ -23,7 +25,7 @@ export const COL_ID = 87;          // CJ
 export const COL_PLANNED_END = 88; // CK
 export const FIRST_ROW = 4;
 /** Bump when the row layout changes: every tab is then rewritten on the next run. */
-export const ROW_FORMAT = 2;
+export const ROW_FORMAT = 3; // 3: • and ‖ separators (13 Nov)
 
 // Columns written as numbers (when the whole cell is one plain number), so sums work in the
 // sheet. Everything else, times included ('9:30'), is written as text exactly as stored.
@@ -69,7 +71,7 @@ export function plannedEndText(doc: any): string {
 /** The record as a row A–CK, ready for the Sheets API (valueInputOption RAW). */
 export function recordRow(doc: any): Cell[] {
   const row: Cell[] = new Array(EXPORT_WIDTH).fill('');
-  for (const c of sheetCells(doc)) row[c.i] = c.value;
+  for (const c of sheetCells(doc, EXPORT_SEPS)) row[c.i] = c.value;
   row[11] = weekdayOf(doc?.start?.year, doc?.start?.month, doc?.start?.day) ?? '';
   row[18] = weekdayOf(doc?.end?.year, doc?.end?.month, doc?.end?.day) ?? '';
   const parts = durationParts(doc?.duration?.totalSeconds);

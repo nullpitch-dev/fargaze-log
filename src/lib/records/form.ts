@@ -154,6 +154,10 @@ const num = (v: unknown, label: string, problems: string[]): number | null => {
 const SEP_COMMA = /,/;
 const SEP_PLUS = /[,+]/;
 const SEP_FOOD = /[,+|()]/;
+/** After the freeze (13 Nov) only the export file's separators are refused; a food or drink
+ *  name still can't hold brackets (its ingredients go in them). */
+const SEP_EXPORT = /[•‖]/;
+const BRACKETS = /[()]/;
 
 const ORD = (i: number) => {
   const k = i + 1;
@@ -281,6 +285,10 @@ export function buildRecord(form: RecordForm, base: any | null, ctx: FormContext
       const chars = (re: RegExp) => [',', '+', '|', '(', ')'].filter(c => re.test(c)).join(' ');
       if (itemSep.test(item)) flag(`${label} '${item}': the sheet splits this item on ${chars(itemSep)} — not allowed until cutover`, old);
       for (const [k, v] of others) if (SEP_COMMA.test(v)) flag(`${label} '${item}', ${k} '${v}': the sheet splits this cell on , — not allowed until cutover`, old);
+    } else {
+      if (SEP_EXPORT.test(item)) flag(`${label} '${item}': • and ‖ are kept for separating items`, old);
+      if (itemSep === SEP_FOOD && BRACKETS.test(item)) flag(`${label} '${item}': brackets are kept for ingredients`, old);
+      for (const [k, v] of others) if (SEP_EXPORT.test(v)) flag(`${label} '${item}', ${k} '${v}': • and ‖ are kept for separating items`, old);
     }
     return true;
   };
@@ -314,6 +322,10 @@ export function buildRecord(form: RecordForm, base: any | null, ctx: FormContext
         for (const [k, v] of [['method', x.method], ['category', x.category], ['person', x.target]] as const) {
           if (/[,|]/.test(v)) problems.push(`People, ${ORD(x.i)} entry: the ${k} '${v}' can't hold , or | until cutover`);
         }
+      } else {
+        for (const [k, v] of [['method', x.method], ['category', x.category], ['person', x.target]] as const) {
+          if (SEP_EXPORT.test(v)) problems.push(`People, ${ORD(x.i)} entry: the ${k} '${v}' can't hold • or ‖`);
+        }
       }
       return true;
     })
@@ -331,6 +343,7 @@ export function buildRecord(form: RecordForm, base: any | null, ctx: FormContext
   const plusList = (label: string, v: string[] | undefined) => {
     const items = (v ?? []).map(t).filter(Boolean);
     if (ctx.sheetIsTruth) for (const x of items) if (/[+,]/.test(x)) problems.push(`${label} '${x}' can't hold + or , until cutover`);
+    else for (const x of items) if (SEP_EXPORT.test(x)) problems.push(`${label} '${x}' can't hold • or ‖`);
     return items.length ? items : undefined;
   };
 
