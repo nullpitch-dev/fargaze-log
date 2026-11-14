@@ -38,6 +38,8 @@ export interface FormOptions {
     drinkItems: string[]; foodItems: string[]; foodUnits: string[];
     exerciseItems: string[]; exerciseUnits: string[]; setStyles: string[];
     sleep: string[]; cities: string[]; themes: string[];
+    /** Activity names, most used in the last 30 days first (14 Nov). */
+    activities: string[];
   };
 }
 
@@ -45,10 +47,11 @@ const CACHE_MS = 10 * 60 * 1000;
 const usedCache = new Map<string, { at: number; used: FormOptions['used'] }>();
 
 /** Values of one record path, most used first. `unwind` = the array to open first. */
-async function usedValues(userId: string, path: string, unwind?: string): Promise<{ v: string; n: number; r: number }[]> {
+async function usedValues(userId: string, path: string, unwind?: string, days = 365): Promise<{ v: string; n: number; r: number }[]> {
   // r = uses in the last 12 months (Hyoje, 12 Nov: names from years ago led the People
-  // suggestions; seven years of history outweighed what he does now).
-  const since = new Date(Date.now() - 365 * 86400_000);
+  // suggestions; seven years of history outweighed what he does now). Activities: the last
+  // 30 days (14 Nov: rarely used ones led the list).
+  const since = new Date(Date.now() - days * 86400_000);
   const pipeline: any[] = [{ $match: { userId } }, { $project: { _id: 0, at: '$start.datetime', x: `$${unwind ?? path}` } }];
   if (unwind) {
     pipeline.push({ $unwind: '$x' }, { $project: { at: 1, x: `$x.${path.slice(unwind.length + 1)}` } });
@@ -77,7 +80,7 @@ async function loadUsed(userId: string): Promise<FormOptions['used']> {
   if (hit && Date.now() - hit.at < CACHE_MS) return hit.used;
   const [
     locAct, locOther, trFrom, trTo, online, people, pItem, pUnit,
-    dItem, dUnit, fItem, fUnit, eItem, eUnit, eStyle, sleep, city, theme, points,
+    dItem, dUnit, fItem, fUnit, eItem, eUnit, eStyle, sleep, city, theme, points, acts,
   ] = await Promise.all([
     usedValues(userId, 'location.activity'), usedValues(userId, 'location.other'),
     usedValues(userId, 'transport.from'), usedValues(userId, 'transport.to'),
@@ -90,6 +93,7 @@ async function loadUsed(userId: string): Promise<FormOptions['used']> {
     usedValues(userId, 'exercise.setStyle', 'exercise'),
     usedValues(userId, 'sleep.quality'), usedValues(userId, 'travel.city'), usedValues(userId, 'travel.theme'),
     PlaceCoord.find({ userId }).select('name').lean(),
+    usedValues(userId, 'activity.name', undefined, 30),
   ]);
   const pointNames = (points as any[]).map(p => ({ v: String(p.name), n: 0 }));
   const used: FormOptions['used'] = {
@@ -100,6 +104,7 @@ async function loadUsed(userId: string): Promise<FormOptions['used']> {
     drinkItems: merge(dItem), foodItems: merge(fItem), foodUnits: merge(dUnit, fUnit),
     exerciseItems: merge(eItem), exerciseUnits: merge(eUnit), setStyles: merge(eStyle),
     sleep: merge(sleep), cities: merge(city), themes: merge(theme),
+    activities: merge(acts),
   };
   usedCache.set(userId, { at: Date.now(), used });
   return used;
@@ -121,7 +126,12 @@ export async function loadFormOptions(userId: string): Promise<FormOptions> {
   for (const r of refs as any[]) ref[r.listName]?.push(String(r.value));
   const bowelBy = (field: string) => (bowel as any[]).filter(b => b.field === field).map(b => String(b.value));
   return {
-    activities: (acts as any[]).map(a => ({ name: a.name, category: a.category })),
+    // Most used in the last 30 days first, then most used ever, then the rest by category (14 Nov).
+    activities: (() => {
+      const rank = new Map(used.activities.map((v, i) => [v, i]));
+      const all = (acts as any[]).map(a => ({ name: a.name, category: a.category }));
+      return all.map((a, i) => ({ a, i })).sort((x, y) => (rank.get(x.a.name) ?? 1e9) - (rank.get(y.a.name) ?? 1e9) || x.i - y.i).map(x => x.a);
+    })(),
     zones: (zones as any[]).map(z => ({ code: z.code, offset: z.offsetUTC, city: z.city })),
     costs: (costs as any[]).map(c => ({ category: c.category, categoryDetail: c.categoryDetail })),
     currencies: [...new Set((rates as any[]).map(r => String(r.currency)))],

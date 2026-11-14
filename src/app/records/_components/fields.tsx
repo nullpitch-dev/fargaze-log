@@ -54,8 +54,9 @@ export function Row({ children, className = '' }: { children: ReactNode; classNa
 export function filterSuggestions(all: string[], text: string, max = 8): string[] {
   const q = text.trim().toLowerCase();
   if (!q) return all.slice(0, max);
-  // The exact value is listed first only when others match too (typing 음료 still shows
-  // 음료 above 구매 - 음료, Hyoje 8 Nov); alone, the list stays closed.
+  // The exact value is listed first (typing 음료 still shows 음료 above 구매 - 음료, Hyoje
+  // 8 Nov), and alone too (14 Nov: 계 showed 계란 but 계란 showed nothing — a tap on it is
+  // how a finished word is added, as on the phone's keyboard Enter may not reach the box).
   const exact: string[] = [], starts: string[] = [], has: string[] = [];
   for (const v of all) {
     const l = v.toLowerCase();
@@ -64,7 +65,7 @@ export function filterSuggestions(all: string[], text: string, max = 8): string[
     if (starts.length >= max) break;
   }
   const others = [...starts, ...has];
-  return others.length ? [...exact, ...others].slice(0, max) : [];
+  return [...exact, ...others].slice(0, max);
 }
 
 export function Text({ value, onChange, placeholder, suggest, describe, onPick, className = '', autoFocus, onEnter, onBlur, disabled, wideList, keepOpen }: {
@@ -247,13 +248,31 @@ export function NoteBox({ value, onChange }: { value: string; onChange: (v: stri
   return <Text value={value} onChange={onChange} placeholder="Note" autoFocus={open && !value} />;
 }
 
+/** Ingredients with "+ Note" beside the box (food and drink, Hyoje 14 Nov): the note opens
+ *  below when wanted or already written. */
+export function IngredientsNote({ values, onChange, suggest, describe, known, note, onNote }: {
+  values: string[]; onChange: (v: string[]) => void; suggest?: string[];
+  describe?: (v: string) => string | undefined; known?: Set<string>;
+  note: string; onNote: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const shown = open || !!note;
+  return (
+    <div className="flex flex-col gap-2">
+      <TagInput values={values} onChange={onChange} suggest={suggest} describe={describe} known={known} placeholder="Add an ingredient…"
+        extra={!shown && <button type="button" onClick={() => setOpen(true)} className="text-xs text-stone-500 dark:text-zinc-400 hover:text-stone-800 dark:hover:text-zinc-100 whitespace-nowrap">+ Note</button>} />
+      {shown && <Text value={note} onChange={onNote} placeholder="Note" autoFocus={open && !note} />}
+    </div>
+  );
+}
+
 // ── Number ───────────────────────────────────────────────────────────────────
 
 /**
  * Holds what is typed. A number goes to the form as a number; anything else goes as
  * the text, so the check can say "'7o' is not a number" instead of dropping it.
  */
-export function NumberBox({ value, onChange, placeholder, suffix }: { value: number | null | string; onChange: (v: any) => void; placeholder?: string; suffix?: string }) {
+export function NumberBox({ value, onChange, placeholder, suffix, className = '' }: { value: number | null | string; onChange: (v: any) => void; placeholder?: string; suffix?: string; className?: string }) {
   const shown = value == null ? '' : String(value);
   // `sent` = what this box last handed out; a different value came from outside
   // (reload, Remove) and replaces the text.
@@ -261,8 +280,10 @@ export function NumberBox({ value, onChange, placeholder, suffix }: { value: num
   if (shown !== st.sent) setSt({ text: shown, sent: shown });
   const text = st.text;
   const bad = text.trim() !== '' && !Number.isFinite(Number(text.replace(/,/g, '').trim()));
+  // A narrow box (className with a width, 14 Nov) keeps its suffix tight.
+  const narrow = /\bw-\d/.test(className);
   return (
-    <div className="relative">
+    <div className={`relative ${className}`}>
       <input
         value={text}
         inputMode="decimal"
@@ -274,9 +295,9 @@ export function NumberBox({ value, onChange, placeholder, suffix }: { value: num
           setSt({ text: t, sent: out == null ? '' : String(out) });
           onChange(out);
         }}
-        className={`${inputCls} text-right font-mono ${suffix ? 'pr-9' : ''} ${bad ? 'border-red-400 dark:border-red-500' : ''}`}
+        className={`${inputCls} text-right font-mono ${suffix ? (narrow ? 'pl-1 pr-4' : 'pr-9') : narrow ? 'px-1' : ''} ${bad ? 'border-red-400 dark:border-red-500' : ''}`}
       />
-      {suffix && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-stone-400 dark:text-zinc-500 pointer-events-none">{suffix}</span>}
+      {suffix && <span className={`absolute ${narrow ? 'right-1' : 'right-2'} top-1/2 -translate-y-1/2 text-xs text-stone-400 dark:text-zinc-500 pointer-events-none`}>{suffix}</span>}
     </div>
   );
 }
@@ -345,8 +366,10 @@ export function OnePills({ value, options, onChange, cols = 1 }: { value: string
  * Free values as chips: tap one to change it, × to remove it, and a box to add more
  * (with suggestions). `known` marks a chip red when it is not in that list.
  */
-export function TagInput({ values, onChange, suggest, describe, known, placeholder = 'Add…' }: {
+export function TagInput({ values, onChange, suggest, describe, known, placeholder = 'Add…', extra }: {
   values: string[];
+  /** Shown after the box, on the same line (food and drink: "+ Note", 14 Nov). */
+  extra?: ReactNode;
   onChange: (v: string[]) => void;
   suggest?: string[];
   describe?: (v: string) => string | undefined;
@@ -385,6 +408,7 @@ export function TagInput({ values, onChange, suggest, describe, known, placehold
       ))}
       <Text value={draft} onChange={setDraft} suggest={rest} describe={describe} onPick={add} onEnter={() => add(draft)}
         placeholder={placeholder} className="w-36 flex-none" keepOpen />
+      {extra}
     </div>
   );
 }

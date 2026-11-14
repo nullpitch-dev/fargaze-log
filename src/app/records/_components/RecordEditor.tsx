@@ -25,7 +25,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { RecordForm, FormFood, FormAlcohol, FormItem, FormExercise } from '@/lib/records/form';
 import type { FormOptions } from '@/lib/records/formOptions';
-import { Choice, Field, ItemList, NoteBox, NumberBox, PickText, Row, Section, Select, TagInput, Text, ToggleChips, OnePills, addBtn, inputCls } from './fields';
+import { Choice, Field, IngredientsNote, ItemList, NoteBox, NumberBox, PickText, Row, Section, Select, TagInput, Text, ToggleChips, OnePills, addBtn, inputCls } from './fields';
 import { PeopleEditor } from './PeopleEditor';
 import { ChangeTable, type Line, type Plain } from './ChangeTable';
 import { relationshipOf } from '@/lib/records/relationship';
@@ -164,6 +164,14 @@ function putBack(form: RecordForm, orig: RecordForm, part: string): RecordForm {
 // never saved, and left out of the change check. Amount = whole × portion ÷ all portions.
 type Portioned = FormFood & { portion?: number | string | null };
 const round1 = (x: number) => Math.round(x * 10) / 10;
+/** 'YYYY-MM-DD' ± days, and the days from one to the other (14 Nov: End follows Start). */
+const addDays = (date: string, n: number) => {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+const daysBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400_000);
+const minutesOf = (hour: string) => { const m = /^(\d{1,2}):(\d{2})/.exec(hour); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
 const round3 = (x: number) => Math.round(x * 1000) / 1000;
 /** JSON without the page-only portions. */
 export const formJson = (v: unknown) => JSON.stringify(v, (k, x) => (k === 'portion' ? undefined : x));
@@ -172,7 +180,7 @@ export const formJson = (v: unknown) => JSON.stringify(v, (k, x) => (k === 'port
  *  the whole = their sum. `safe` = nothing typed would be lost (one unit, amounts that add up). */
 function wholeFrom(foods: FormFood[]): { foods: Portioned[]; whole: { amount: number | null; unit: string }; safe: boolean } {
   const shares = portionsFromAmounts(foods);
-  const out: Portioned[] = foods.map((x, i) => ({ ...x, portion: shares[i] ?? round1(100 / foods.length) }));
+  const out: Portioned[] = foods.map((x, i) => ({ ...x, portion: shares[i] ?? 100 / foods.length }));
   const units = [...new Set(out.map(x => x.unit.trim()).filter(Boolean))];
   const nums = out.map(x => Number(String(x.amount).replace(/,/g, '')));
   const sum = out.length && nums.every(n => Number.isFinite(n) && String(out[0].amount).trim() !== '') ? nums.reduce((a, b) => a + b, 0) : null;
@@ -184,7 +192,7 @@ function shareWhole(foods: Portioned[], w: { amount: any; unit: string }): Porti
   const n = foods.length;
   // Only a food without a portion yet gets an equal share; an emptied box stays empty while
   // it is typed into (Hyoje, 11 Nov: the last digit couldn't be deleted).
-  const withP = foods.map(x => (x.portion === undefined ? { ...x, portion: n ? round1(100 / n) : null } : x));
+  const withP = foods.map(x => (x.portion === undefined ? { ...x, portion: n ? 100 / n : null } : x));
   const sum = withP.reduce((a, x) => a + (typeof x.portion === 'number' ? x.portion : 0), 0);
   return withP.map(x => ({
     ...x,
@@ -197,7 +205,7 @@ function shareWhole(foods: Portioned[], w: { amount: any; unit: string }): Porti
 function portionsFromAmounts(foods: FormFood[]): (number | null)[] {
   const nums = foods.map(x => (String(x.amount).trim() === '' ? NaN : Number(String(x.amount).replace(/,/g, ''))));
   const sum = nums.reduce((a, b) => a + b, 0);
-  return nums.map(v => (foods.length > 1 && Number.isFinite(sum) && sum > 0 ? round1((v / sum) * 100) : null));
+  return nums.map(v => (foods.length > 1 && Number.isFinite(sum) && sum > 0 ? (v / sum) * 100 : null));
 }
 
 const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? one : many}`;
@@ -706,8 +714,26 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
   };
 
   // An end typed without a zone takes the start's zone (Hyoje, 8 Nov); it can still be changed.
-  const setPoint = (which: 'start' | 'end' | 'plannedEnd', p: Partial<RecordForm['start']>) =>
-    patch(which, which !== 'start' && !f[which].timezone && f.start.timezone && (p.date || p.hour) ? { ...p, timezone: f.start.timezone } : p);
+  const setPoint = (which: 'start' | 'end' | 'plannedEnd', p: Partial<RecordForm['start']>) => {
+    // Dates follow the start (Hyoje, 14 Nov): a new start date moves End's and Planned end's
+    // dates by the same number of days; a time typed into an End with no date takes the
+    // start's date (the next day when that would end before the start, e.g. 23:00 → 1:00).
+    if (which === 'start' && p.date && p.date !== f.start.date) {
+      const shift = f.start.date ? daysBetween(f.start.date, p.date) : null;
+      const follow = (x: RecordForm['end']) =>
+        x.date && shift != null ? { ...x, date: addDays(x.date, shift) }
+        : !x.date && x.hour ? { ...x, date: p.date! }
+        : x;
+      setForm({ ...f, start: { ...f.start, ...p }, end: follow(f.end), plannedEnd: follow(f.plannedEnd) });
+      return;
+    }
+    let q = p;
+    if (which !== 'start' && p.hour && !f[which].date && !p.date && f.start.date) {
+      const before = f.start.hour && minutesOf(p.hour) != null && minutesOf(f.start.hour) != null && minutesOf(p.hour)! < minutesOf(f.start.hour)!;
+      q = { ...q, date: before ? addDays(f.start.date, 1) : f.start.date };
+    }
+    patch(which, which !== 'start' && !f[which].timezone && f.start.timezone && (q.date || q.hour) ? { ...q, timezone: f.start.timezone } : q);
+  };
   const clearPlanned = () => { patch('plannedEnd', { date: '', hour: '', timezone: '' }); setPlannedOpen(false); };
   const openPlanned = () => { setPlannedSnap({ ...f.plannedEnd }); setPlannedOpen(true); };
   const cancelPlanned = () => { if (plannedSnap) patch('plannedEnd', plannedSnap); setPlannedOpen(false); };
@@ -768,6 +794,8 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
   );
 
   const wholeOn = whole != null;
+  // Food, drink and alcohol rows (14 Nov): short boxes so a row fits a narrow phone.
+  const amtW = 'w-12 shrink-0', unitW = 'w-14 shrink-0', pctW = 'w-12 shrink-0';
   const foodShares = portionsFromAmounts(f.food.foods);
   const portionSum = f.food.foods.reduce((a, x) => a + (typeof (x as Portioned).portion === 'number' ? Number((x as Portioned).portion) : 0), 0);
   const foodRows = (kind: 'drinks' | 'foods') => (
@@ -778,24 +806,20 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
       addLabel={kind === 'drinks' ? '+ Add a drink' : '+ Add a food'}
       render={(x, setX, i) => (
         <div className="flex flex-col gap-2">
-          <div className={kind === 'foods'
-            ? 'grid grid-cols-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.9fr)] gap-2'
-            : 'grid grid-cols-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2'}>
-            <Text value={x.item} onChange={v => setX({ item: v })} suggest={kind === 'drinks' ? used.drinkItems : used.foodItems} placeholder={kind === 'drinks' ? 'Drink' : 'Food'} className={kind === 'foods' ? 'col-span-3 sm:col-span-1' : 'col-span-2 sm:col-span-1'} />
-            <Text value={x.amount} onChange={v => setX({ amount: v })} placeholder="Amount" disabled={kind === 'foods' && wholeOn} />
-            <Text value={x.unit} onChange={v => setX({ unit: v })} suggest={used.foodUnits} placeholder="Unit" disabled={kind === 'foods' && wholeOn} />
+          {/* One row even on a narrow phone (Hyoje, 14 Nov): the name takes the room; amount,
+              unit and portion are short (0.5 · 인분 · 25%). */}
+          <div className="relative flex gap-1.5">
+            <Text value={x.item} onChange={v => setX({ item: v })} suggest={kind === 'drinks' ? used.drinkItems : used.foodItems} placeholder={kind === 'drinks' ? 'Drink' : 'Food'} className="flex-1" wideList />
+            <Text value={x.amount} onChange={v => setX({ amount: v })} placeholder="Amt" disabled={kind === 'foods' && wholeOn} className={amtW} />
+            <Text value={x.unit} onChange={v => setX({ unit: v })} suggest={used.foodUnits} placeholder="Unit" disabled={kind === 'foods' && wholeOn} className={unitW} wideList />
             {kind === 'foods' && (wholeOn
-              ? <NumberBox value={(x as Portioned).portion ?? null} onChange={v => setX({ portion: v } as any)} placeholder="Portion" suffix="%" />
-              : <div title="Portion: this food's share of the meal" className="rounded border border-stone-200 dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800 px-2 py-1.5 text-sm text-right font-mono text-stone-500 dark:text-zinc-400">
-                  {foodShares[i] != null ? `${foodShares[i]}%` : '—'}
+              ? <NumberBox value={typeof (x as Portioned).portion === 'number' ? Math.round((x as Portioned).portion as number) : (x as Portioned).portion ?? null} onChange={v => setX({ portion: v } as any)} placeholder="%" suffix="%" className={pctW} />
+              : <div title="Portion: this food's share of the meal" className={`${pctW} shrink-0 rounded border border-stone-200 dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800 px-1 py-1.5 text-sm text-right font-mono text-stone-500 dark:text-zinc-400`}>
+                  {foodShares[i] != null ? `${Math.round(foodShares[i]!)}%` : '—'}
                 </div>)}
           </div>
-          <NoteBox value={x.note} onChange={v => setX({ note: v })} />
-          <div className="flex flex-col gap-1">
-            <span className="text-xs text-stone-500 dark:text-zinc-400">Ingredients</span>
-            <TagInput values={x.ingredients} onChange={v => setX({ ingredients: v })} suggest={lookups.ingredientNames}
-              describe={v => lookups.lvl1.get(v)} known={lookups.ingredientSet} placeholder="Add an ingredient…" />
-          </div>
+          <IngredientsNote values={x.ingredients} onChange={v => setX({ ingredients: v })} suggest={lookups.ingredientNames}
+            describe={v => lookups.lvl1.get(v)} known={lookups.ingredientSet} note={x.note} onNote={v => setX({ note: v })} />
         </div>
       )}
     />
@@ -1053,10 +1077,10 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
                 <ItemList<FormAlcohol> items={f.food.alcohols} onChange={v => patch('food', { alcohols: v })} blank={blankAlcohol} addLabel="+ Add alcohol"
                   render={(x, setX) => (
                     <div className="flex flex-col gap-2">
-                      <div className="grid grid-cols-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2">
-                        <div className="col-span-2 sm:col-span-1"><PickText value={x.item} onChange={v => setX({ item: v, unit: lookups.alcoholUnits(v).includes(x.unit) ? x.unit : '' })} options={lookups.alcoholItems.map(a => ({ value: a }))} placeholder="Alcohol" /></div>
-                        <Text value={x.amount} onChange={v => setX({ amount: v })} placeholder="Amount" />
-                        <Select value={x.unit} onChange={v => setX({ unit: v })} options={lookups.alcoholUnits(x.item)} empty="Unit" />
+                      <div className="flex gap-1.5">
+                        <div className="flex-1 min-w-0"><PickText value={x.item} onChange={v => setX({ item: v, unit: lookups.alcoholUnits(v).includes(x.unit) ? x.unit : '' })} options={lookups.alcoholItems.map(a => ({ value: a }))} placeholder="Alcohol" /></div>
+                        <Text value={x.amount} onChange={v => setX({ amount: v })} placeholder="Amt" className={amtW} />
+                        <div className={unitW}><Select value={x.unit} onChange={v => setX({ unit: v })} options={lookups.alcoholUnits(x.item)} empty="Unit" /></div>
                       </div>
                       <NoteBox value={x.note} onChange={v => setX({ note: v })} />
                     </div>
