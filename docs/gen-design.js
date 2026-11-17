@@ -16,7 +16,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze Log", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Data Design & Requirements Document", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 4.32  |  12 November 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 4.33  |  14 November 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
 );
 C(p([new TextRun({ text: "Structure: ", bold: true }), new TextRun("Part I Foundations · Part II Data · Part III Features · Part IV Operations · Appendices. The body is the complete, always-current source of truth; the changelog below carries one line per version. Work status, open questions and the backlog live in the separate WBS, not here.")]));
 
@@ -75,6 +75,7 @@ C(table(
     ["4.28","7 Nov 2026","67.8 PLACE DETAILS “A - B” DONE (pushed 7 Nov, §15.5.9) and PLACE POINTS PAGE TOOLS (§15.5.10), shaped by Hyoje’s testing the same day. A name uses the point of the longest name that has one (src/lib/places/details.ts); Place points counts each record once under the point it uses, ‘12 (5 with details)’, and the detail names open under the row; renaming a point carries everything under it — records, favourite periods and child points — with a regular-expression sheet step; refused: a child point landing on a name already taken (merge too) and a new name that starts with the old one and “ - ”. Journeys joins legs and finds workplaces by the point’s place. The page: Note out of the table, a Changed column, foldable parts (Places open, the rest folded, remembered per browser), Missing points (3 / 6 / 12 months or all; names with no point listed under A; + Add point, Exclude, Rename) and Excluded with Put back (admin_settings.pointExcluded, §6.13). Rename a name with no point: exact text in Place / From / To and favourite periods, preview, Undo (e.g. ‘Brooklands College 302’ → ‘Brooklands College - 302’). Hyoje does not want Location filled automatically for 이동 records"],
     ["4.29","8 Nov 2026","#70 DONE: STEP 4, THE FIND & REPLACE PAGE (§15.6.3), tested by Hyoje on fargaze-log-test and pushed (15b643a). /records/replace in the gear menu: field, match, Find with values already used, Replace with, optional dates and activity, a Preview button; rows show date · activity · before → after and open the record pane; a Saved screen with Mark repeated and Undo. Items (purchase item and unit, food and drink item) can now be replaced as part of the text; a food or drink part replace is refused when the text appears in any record’s ingredients, which the sheet cell also holds. The step-2 routes had not been saved as built (the preview code sat at /api/records/replace, apply was not routed); now /api/records/replace (fields, used values, apply) and /preview. SHEET STEPS everywhere: the counts to expect in bold, the text to find and to put copied with a click (src/app/_components/SheetSteps.tsx). THE MIDDAY RULE: all-day records resolve 집 / 회사 / 사이트 / 내차 at 12:00 on their date (§15.5.6). Place points Delete now counts records as the list does (a favourite label with the point’s own name no longer blocks it)"],
     ["4.30","8 Nov 2026","#67.5 RENAME AND MERGE FOR THE REFERENCE LISTS (new §15.5.11), asked for by Hyoje on 8 Nov for his People-type clean-up (from an activity perspective to a person perspective: 친목 → 친구, 업무친목 → 업무친구, 업무지인 merged into 업무친구; 경조사 to be split record by record later). The nine reference lists now follow like activities: a new value renames, a value the list already has merges (the old row is deleted, records take the kept value — records are changed, never deleted); preview, one change-list entry, Undo until the next migration (a merge only before the tick). People lists: the dropdown combinations (가족|친목, no records) follow the rename; sheet steps for BB / BC are a regular expression matching the value as a whole | part, run twice; groups that end up side by side with the same method and type (업무친구|업무친구) are left as they are, because the migration reads them as the same people. Undo keeps, per record, exactly which fields changed (extra.hits). Values the code looks for are locked both ways. New src/lib/admin/renameRef.ts. Tested by Hyoje on fargaze-log-test and in production 8 Nov (92a2139). Ingredients, alcohol items and bowel values: after cutover (WBS 67.9). The #71 entry-app design was started and parked the same morning"],
+    ["4.33","14 Nov 2026","THE EXPORT (#72) IS DONE AND THE SHEET IS FROZEN (#74), new §15.8. A separate spreadsheet, FarGaze Export, holds every record in one tab per year (2010, 2018 … 2026), in the year-tab layout the migration reads, plus CJ record id and CK planned end; npm run export rewrites only the year tabs whose rows changed (a fingerprint per tab), --all rewrites everything, and a nightly GitHub Action runs it at 02:53 UTC. Every row is read back through the migration’s own reader (--check, --verify): 46,484 records read back exactly in production on 14 Nov. The Archive file’s 2026 tab was frozen at midnight 13/14 Nov and renamed ~2026.11.13 (a keepsake, never updated). The export file separates items with • and people groups with ‖, so the app now accepts commas, + and | in names and notes. Nothing is repeated in the sheet any more: Mark repeated, the sheet steps and the waiting counts are gone; the change list stays as the history with Undo. Also 13–14 Nov (§15.7.10): Ended at start and = Start; Done by start time; Copy in the record pane; open plans in Copy recent; + New ▾ on the Calendar, back to the Calendar after saving; Food & drink in one row per item, + Note beside the ingredients; activities ordered by the last 30 days; End follows Start."],
     ["4.32","12 Nov 2026","THE ENTRY APP IS IN DAILY USE (§15.7.5–15.7.8). Pilot go-live 10 Nov: Hyoje enters real records in production; the sheet stays the backup until cutover. Step 3 OFFLINE built 11–12 Nov in three slices and switched on in production 12 Nov: a service worker keeps the app and its lists on the phone; new entries, stamps and the buttons on Today (Start, End, Done now, Started / Ended as planned) wait in an outbox with phone-made IDs and are sent in order. Entry renamed TODAY. Calendar: records quiet (tinted), plans solid, records still going dashed after now, unconfirmed plans ringed red; overlapping events layered instead of split; a 3-day view; markers for events above / below; plans open read-only. Back closes pop-ups. Drop-downs became pills or a sheet of pills. Copy recent keeps one row per place. Insights include today (except the per-day widgets). Fixes: Vercel functions moved to Dublin next to Atlas (much faster); the HTTP 500s (a schema clone after use) fixed. Repeats page moved to after cutover"],
     ["4.31","10 Nov 2026","THE ENTRY APP (WBS #71, new §15.7), steps 1 and 2 built 8–10 Nov and tested by Hyoje on test.log.fargaze.co: Home at /entry (the landing page) with Coming up, In progress, Done and Ongoing; New, Copy recent and Stamp; plans in log_plan with Start now, Done as planned and Done now; drafts (an open record may wait for its details); the planned end (End is when it ended; plans and records still going carry plannedEnd); repeats (page still to build); presets built and hidden; long-press menus; ingredients filled from the latest record; npm run plans for a Plan tab; the Calendar draws open plans and records still going. Records made in the app carry origin: app (no sheet steps). Next: step 3, offline"],
     ["4.21","26 Oct 2026","DAILY STRIPS FOR DIET AND DRINKING; ONE RULE FOR FUTURE DAYS; MONTHS IN THE CALENDAR (§9.3.3, §9.3.4, §9.3.9). Diet: the Spicy days strip is replaced by Daily diet · carbs — each day coloured by its carbs index (below 4 blue, 4–8 amber, over 8 red), tooltip listing every food- or drink-bearing record of the day (time, meal type, items, 🌶 on a meal rated H, servings in 인분 or a drink-only record’s shared amount), opening upwards; diet.summary gains days. Drinking: a Daily drinking strip under the drinks row (below 4 blue, 4–10 amber, over 10 red), tooltip with the day’s total and each record’s items as logged and drinks; drinking.summary gains rangeStart, rangeEnd and days. Shared colours and band rule in src/app/insights/_lib/day-bands.ts. Strips and calendars in Diet, Drinking, Exercise and Sleep now cover the whole period and draw days from today on as future days (faint, no border, ‘not yet’; futureFrom = localToday()); exercise.summary gains rangeStart / rangeEnd. The calendar pop-up marks months: ‘Oct 1’ in bold on each 1st and on the first day shown, and a stepped line along each month boundary. Checked by Hyoje on 26 Oct"],
@@ -2042,6 +2043,7 @@ C(p("Atlas has no backups on the free tier, so two GitHub Actions workflows in t
 C(table(["Workflow","When","What it does"],[
   [".github/workflows/backup.yml","Nightly at 02:23 UTC ((v4.23) not on the hour: GitHub delays or drops scheduled runs at minute 0, silently — the 26 Oct run was lost that way); also Actions → Nightly backup → Run workflow","mongodump of the whole fargaze-log database into one gzipped archive, fargaze-log-YYYY-MM-DD.gz; uploads it to the Drive folder FarGaze Backups; deletes archives older than 30 days permanently (not to the Drive bin); writes the file size and the number kept to the run summary. A failed run emails Hyoje"],
   [".github/workflows/restore-test.yml","By hand only: Actions → Restore backup to test → Run workflow, with a date or empty for the newest","Downloads the archive, restores it into fargaze-log-test with --nsFrom fargaze-log.* --nsTo fargaze-log-test.* --drop, and writes a table of record counts per collection, test beside production, to the run summary. Atlas Search indexes are not in a dump and are not restored"],
+  [".github/workflows/export.yml","(v4.33) Nightly at 02:53 UTC; also Actions → Nightly export → Run workflow","The export to the FarGaze Export spreadsheet (§15.8): rewrites the year tabs that changed, or all, or only checks. On the 1st of each month a keep-alive job switches this workflow and backup.yml back on, so GitHub’s 60-day rule never stops them"],
 ],[2600,2400,4360]));
 C(spacer());
 C(bold("Why it is built this way"));
@@ -2266,7 +2268,7 @@ C(
   bullet("(23 Oct, open) 심리 측정, logged in the Happiness tab: recommended as one more field group in the entry app before cutover, with a one-off import of the Happiness history; no column insertion in the sheet during the build (it would touch five tabs, the Calendar script’s write-back numbers (§13.5), the migration’s column map and the survey)"),
   bullet("(23 Oct) Exchange rates: the sheet is correct. The server reads no rates today, because each record stores both amounts"),
   bullet("(24 Oct) The migration will REFUSE, and report, any record whose value is not in the database’s list — activity + category, cost detail + category, alcohol item + unit, reference values — not only ingredients and bowel values as before (#67 step 4, done 25 Oct: also time-zone codes and currencies, every list with records). One refused row stops the whole run before anything is deleted. Tighter, mandatory integrity replaces the sheet’s loose checks"),
-  bullet("(24 Oct) A change not yet ticked as repeated in the sheet BLOCKS every migration run, including the daily one; no override (#67 step 4)"),
+  bullet("(24 Oct) A change not yet ticked as repeated in the sheet BLOCKS every migration run, including the daily one; no override (#67 step 4). (v4.33) Ended with the freeze, 14 Nov: nothing waits for the sheet (§15.8.5)"),
   bullet("(24 Oct) An activity name is unique across all categories (§6.2)"),
   bullet("(24 Oct) Rename, merge and move change past records for activities and cost categories first; ingredients, alcohol items, bowel values, people categories and place names follow later. Hyoje’s planned people-category clean-up: 친목 → 친구 (가족|친목 → 가족|친구), 업무친목 → 업무친구, 업무지인 → 업무친구"),
   bullet("(24 Oct) Reference lists for drink notes, food notes and alcohol items retired (§6.3)"),
@@ -2283,9 +2285,9 @@ C(
   bullet("5. Test database — (v4.23) reduced 26 Oct: local dev on fargaze-log-test via .env.development.local, refreshed by restore-test.yml; no sync script. Done"),
   bullet("6. Edit feature with its change list, test then production — designed 26–27 Oct; steps 1–3 of 5 done (§15.6; step 3, the edit page, 7 Nov)"),
   bullet("7. Entry app: offline, all field groups, on test; the comparison report"),
-  bullet("8. Nightly export to a spreadsheet, proven on test"),
+  bullet("8. Nightly export to a spreadsheet, proven on test — done 13 Nov (§15.8)"),
   bullet("9. Year rollover setting (before January) — brought forward and done 26 Oct, right after 5 (§11.8); reminders set for 12 Dec, 1 Jan and 2 Jan"),
-  bullet("10. Cutover"),
+  bullet("10. Cutover — the sheet frozen 14 Nov (§15.8.5); the rollover dropped (12 Nov)"),
 );
 C(h2("15.4 Sheet Survey (23 Oct)"));
 C(p("scripts/survey-sheets.ts (read-only; run in WSL, ~20 s) writes myfiles/survey/survey-YYYY-MM-DD.md and .json. It reads the Active, Future and History sheets cell by cell (formulas, dropdowns, values), every tab’s formulas, the master tabs, both year tabs, and the database (find / aggregate only). Every year-tab row goes through the migration’s own row filter and rowToDocument, so the figures are what the database stores. The analysis is in src/lib/survey/sheetSurvey.ts (pure)."));
@@ -2324,6 +2326,7 @@ C(
 );
 C(h3("15.5.2 The Change List"));
 C(p("Each change shows on its list page with its sheet step in plain words, e.g. “Cost tab: add a row 휴대폰 | 통신”, “Activity tab, column N: add 업무지인. Check the dropdown in Active BC still covers the whole column.” (the Active dropdowns read a fixed range with one spare row). Mark repeated ticks it (undo unticks); unticked changes always show, however old. /admin shows the total to repeat per list. Since 25 Oct the migration will not run while any change is unticked: it lists them and stops before deleting anything; there is no override."));
+C(p("(v4.33) Since the freeze (14 Nov) nothing is repeated in the sheet: changes are saved as done, with no steps, and the list is a history with Undo (§15.8.5)."));
 C(h3("15.5.3 Clean-up Done on 24 Oct"));
 C(
   bullet("prepare-master-admin.ts: activity names checked (three ~2025 records sat under a second category; fixed below), reference lists converted (71 values), unique-name index built"),
@@ -2511,7 +2514,7 @@ C(table(["Step","What","Status"],[
 ],[700,4300,4360]));
 C(spacer());
 
-C(h2("15.7 The Entry App (WBS #71, v4.31–4.32)"));
+C(h2("15.7 The Entry App (WBS #71, v4.31–4.33)"));
 C(p("Replaces daily entry in the Active sheet: a phone-first app at /entry (the site’s landing page; / redirects there), built in steps on the test database and tried on test.log.fargaze.co (a second Vercel project reading fargaze-log-test). Designed with Hyoje 8–10 Nov; steps 1 and 2 built and tested 8–10 Nov. Pilot go-live 10 Nov: real records in production, the sheet kept as the backup (each app record repeated in the 2026 tab by hand) until #72 export. Step 3, offline, built 11–12 Nov and on in production from 12 Nov. Shown as Today in the menu (12 Nov); the address stays /entry."));
 C(h3("15.7.1 Decisions"));
 C(
@@ -2571,10 +2574,10 @@ C(
   bullet("The HTTP 500s on /api/entry/home: ‘Cannot create DocumentArrayElement schematype without a parent’ — LogPlan cloned Log’s schema at import, and Mongoose 9 cannot clone a schema with document arrays once it has been used (a warm instance had used Log). Log.ts now makes the copy (LogPlanBaseSchema) before the model is compiled. src/lib/mongodb.ts also forgets a failed connect, uses a pool of 5 and gives up in 8 s"),
   bullet("Battery: the outbox check runs only while the app is on screen; refreshes are throttled"),
 );
-C(h3("15.7.8 Running Before Cutover"));
+C(h3("15.7.8 Running Before Cutover (10–13 Nov)"));
 C(
-  bullet("Hyoje uses Today in production; with no signal the outbox holds the work. Each app record is repeated by hand in the 2026 tab (never in Staging: a duplicate would follow). No npm run migrate on the 2026 tab — it would replace app records with sheet rows"),
-  bullet("At the January rollover (or any full migration) app records and planned ends on sheet records would be deleted: the routine must change with #74"),
+  bullet("Hyoje used Today in production from 10 Nov; with no signal the outbox holds the work. Each app record was repeated by hand in the 2026 tab (never in Staging: a duplicate would follow). No npm run migrate on the 2026 tab — it would replace app records with sheet rows"),
+  bullet("(v4.33) Settled 12 Nov: npm run migrate is blocked (only -- --check runs); there is no January rollover — the database is the truth and the sheet a backup until the export. Ended 14 Nov with the freeze (§15.8.5)"),
 );
 C(h3("15.7.9 Order of Work"));
 C(table(["Step","What","Status"],[
@@ -2582,9 +2585,70 @@ C(table(["Step","What","Status"],[
   ["2","Home, New, Copy recent, plans, drafts, Stamp, planned end, long-press menus, Calendar plans","Done 9–10 Nov (tested by Hyoje). Left: Required / Shown columns on /admin/activity; the Repeats page after cutover"],
   ["3","Offline PWA: service worker, lists on the phone, a queue with phone-made IDs","Done 11–12 Nov (§15.7.5); on in production 12 Nov"],
   ["4","Trial on test.log.fargaze.co entering the same data as Staging; comparison script test vs production","Replaced by the pilot: real use in production since 10 Nov"],
-  ["5","History / Future import, #72 export, cutover (#74)","Next: #72 export first (Hyoje, 12 Nov: it ends the double entry)"],
+  ["5","History / Future import, #72 export, cutover (#74)","Done: History and Future already in the system (12 Nov); export done 13 Nov (§15.8); the sheet frozen 14 Nov"],
 ],[700,4300,4360]));
 C(spacer());
+
+C(h3("15.7.10 Today, the Form and the Calendar (13–14 Nov, v4.33)"));
+C(
+  bullet("In progress: a long press on End now adds “Ended at start (9:30)” — the record ends at its own start, with no duration, for a moment’s activity recorded afterwards; it queues offline like End now. The form’s End row has “= Start” beside Now"),
+  bullet("Done is ordered by start time, newest first, like the other lists (it was by end time). Card and section borders: 1.5 px on a phone, 1 px from 640 px (Hyoje: too heavy on a computer)"),
+  bullet("The record pane (Calendar, Search, Today) has Copy beside Edit: a new entry copied from it, today at its time; on a plan it copies the plan"),
+  bullet("Copy recent lists open plans first (soonest first, tagged Plan, copied from log_plan), then the latest record of each activity + title + place; a search covers plans too. GET /api/entry/recent with no text gives the same default list"),
+  bullet("Fixes: Remove on a card the activity shows by default (its Shown groups) now hides it until it is added again; after a name is picked in People (or any chip box) the suggestions stay open for the next one"),
+  bullet("Calendar: “+ New ▾” in the toolbar (compact “+” on a phone; calendar/_components/NewMenu.tsx). + New opens the New form; ▾ opens Copy recent straight away (no Stamp: stamps belong to Today). Whatever is opened from the Calendar — New, Copy recent, and Copy or a plan’s Edit in the Calendar’s record pane — returns to the same view and date after Save, Cancel or Delete (?back= on the form). The menu stays on screen and follows the page when a phone’s keyboard opens"),
+  bullet("Food & drink (14 Nov): each food, drink and alcohol is one row even on a narrow phone — the name takes the room, Amt and Unit are 48 px (alcohol’s Unit drop-down 56 px), the portion 48 px; the Ingredients heading is gone and “+ Note” sits after the ingredient box (IngredientsNote in fields.tsx). Portions show whole numbers; the exact share is kept underneath, so amounts don’t drift"),
+  bullet("Activity suggestions: most used in the last 30 days first, then most used ever, then the rest (formOptions.ts, used.activities). A finished word still suggests itself (계란 shows 계란), so a tap adds it"),
+  bullet("End follows Start: a new start date moves End’s and Planned end’s dates by the same days; a time typed into an End with no date takes the start’s date, or the next day when it would end before the start (23:00 → 1:00)"),
+);
+
+C(h2("15.8 Export (WBS #72) and the Freeze (#74), v4.33"));
+C(p("Designed 12 Nov, built and proven 13 Nov, the sheet frozen 14 Nov. With it Hyoje stopped repeating his records in the sheet: the app is fully running and the database is the only place records are entered."));
+C(h3("15.8.1 Decisions (Hyoje, 12–13 Nov)"));
+C(
+  bullet("A separate spreadsheet, FarGaze Export (safer than writing into the Archive file); a second, FarGaze Export (test), for the test database. Both are shared with the service account as Editor"),
+  bullet("The export file holds the WHOLE history, one tab per year (2010, 2018 … 2026, then 2027 …). The Archive file’s ~2025 and frozen 2026 tabs are retired — kept for memories, never updated. A record goes in the tab of its local START year; a long open record (독서(기간) since March) stays there, End empty until it ends"),
+  bullet("Not a nightly rewrite of all 46k records: each night rewrites only the year tabs that changed; --all rewrites everything, by hand, after big edits to old records"),
+  bullet("Columns as the migration reads them (A–CI), so the export file could be read back; CJ = record id, CK = planned end (the migration never reads them). E / CG / CH (Google Calendar sync) stay empty. V–Z are calculated: days, hours, minutes, seconds and a ‘1h 30m’ text (empty for zero)"),
+  bullet("Plans are not exported (they are not records)"),
+);
+C(h3("15.8.2 How It Works"));
+C(table(["Part","What it does"],[
+  ["src/lib/export/rows.ts","recordRow: a record as a row A–CK from sheetCells(doc, EXPORT_SEPS), weekdays and V–Z added, plain numbers written as numbers in numeric columns (body fat % stays text: the tab format would show 15.3 as 1530%). compareRecords: start date, start time (all day first), end, id. roundTripDiffs: where a row read back differs from its record. ROW_FORMAT: bumped when the layout changes, so every tab is rewritten on the next run"],
+  ["src/lib/export/sheets.ts","Writes a year tab: a new tab is a copy of the Template tab (rows 1–3 copied from the 2026 tab, with its widths and formats), placed in year order; enough rows and columns are added; the rows are written over the old ones in 2000-row chunks; then the old rows left below are deleted, so a run that fails half way never leaves an empty tab. Only tabs named as a year are ever written. Every Sheets call is named; busy answers (429, 5xx, FAILED_PRECONDITION) are tried again up to four times"],
+  ["scripts/export.ts","npm run export: reads every record, builds every row, fingerprints each year’s rows and compares with the fingerprint kept in the tab’s CK1; writes the changed years. --all, --year 2026, --check (reads every row back through prepareSheet / rowToDocument and compares; writes nothing), --verify (reads the tabs back from Google and compares), --compare 2026 --until 2026-11-13 (the Archive file’s tab against the database: missing, extra, different; filled-ingredient-only differences counted, not listed), --test (the test database and file). CJ1 shows ‘Exported …’, CJ3 / CK3 the labels"],
+  [".github/workflows/export.yml","Nightly at 02:53 UTC, half an hour after the backup, and Run workflow (changed years / all years / check only). Secrets: BACKUP_MONGODB_URI (the backup’s read-only user; the database is named by MONGODB_DB=fargaze-log, as the address names none), GOOGLE_SERVICE_ACCOUNT_JSON, SPREADSHEET_ID_EXPORT. The report goes to the run’s summary; a problem fails the run, which emails Hyoje. A keep-alive job on the 1st of each month switches export.yml and backup.yml back on (GitHub stops scheduled workflows after 60 days without repository activity)"],
+],[2600,6760]));
+C(spacer());
+C(h3("15.8.3 Separators in the Export File (13 Nov)"));
+C(p("Hyoje had removed commas from titles by hand for years (Amazon product names, for example) because the sheet split cells on them. The export file uses separators that are rare in text, so the app accepts commas, + and | from the freeze on."));
+C(table(["Where","The sheet (Archive, Staging)","The export file"],[
+  ["Between items, amounts, units, notes, names in a group, bowel values",", (and + joined items sharing one amount; + between bowel values)"," • "],
+  ["Between people groups (method, type, people)","|"," ‖ "],
+  ["Ingredients","item(a|b)","item(a|b) — the ingredient list never holds |"],
+],[3400,3000,2960]));
+C(spacer());
+C(
+  bullet("sheetCells(doc, seps) writes either style; the migration’s reader switches with useCellSeparators('export' | 'sheet') (transform.ts). In the export style an empty value in the middle of a list keeps its place (a food with no note before one with a note), which the sheet never could"),
+  bullet("The app (form.ts) now refuses only • and ‖ in a value, and brackets in a food or drink name (its ingredients go there); purchases may hold brackets"),
+  bullet("The reader also reads accounting brackets, (81,000) = −81000, since the Template’s cost column shows negatives that way"),
+);
+C(h3("15.8.4 Proof"));
+C(
+  bullet("--check on production: all 46,469 records read back as themselves (13 Nov)"),
+  bullet("Test file: two problems found and fixed — body fat % (format) and negative costs (brackets); then every tab read back exactly"),
+  bullet("Production --all --verify: 46,470 rows read back exactly (13 Nov); after the new separators, 46,484 (14 Nov). The nightly Action ran: ‘Nothing changed since the last export’"),
+  bullet("--compare 2026 before the freeze: only app records missing from the sheet (expected), 554 records differing only by ingredients the fill scripts added, 6 by food amounts set as portions in the app — all expected"),
+);
+C(h3("15.8.5 The Freeze and After (14 Nov)"));
+C(
+  bullet("The line: midnight between Fri 13 and Sat 14 Nov 2026. Records starting before it are in the Archive file’s 2026 tab, renamed ~2026.11.13 and frozen; from 14 Nov records live only in the app, and the export file is the sheet copy"),
+  bullet("SHEET_IS_TRUTH = false (edit.ts): the sheet’s separators are no longer refused"),
+  bullet("Nothing is repeated in the sheet. Every change — record edits, deletes, Find & replace, every /admin change and every Undo — is saved as done with no steps (a pre-validate hook on MasterChange). Gone: Mark repeated / untick, the ‘Then in the sheet’ steps in previews, the ‘to repeat’ counts on /admin, the gear’s dot and count (one request fewer on every page change), PATCH /api/admin/changes/<id>, and the migrations’ stop on unticked changes. A merge can always be undone now"),
+  bullet("Kept: the change list as history with Undo. Record changes (gear menu) lists the last 30 days, newest first, with the plain change lines"),
+  bullet("Staging stays for an outage (npm run staging, add only), though Hyoje expects to re-enter such records in the app instead. npm run migrate stays blocked. No January rollover"),
+  bullet("Hyoje deletes the combined People values (영상|대면, 웹콜|대면, 가족|친구 …; no records) on /admin himself"),
+);
 
 C(new Paragraph({ children: [new TextRun({ text: "Appendices", bold: true, size: 28 })], spacing: { before: 280, after: 140 } }));
 
@@ -2660,6 +2724,11 @@ C(table(["Path","Purpose"],[
   ["src/app/_components/useBackToClose.ts","(v4.32) Back closes a pop-up: dismiss(after) and closeModalThen"],
   ["src/app/manifest.ts","(v4.32) Add to Home screen: FarGaze, start_url /entry, icons in public/icons"],
   ["vercel.json","(v4.32) regions [dub1]: the functions run in Dublin, next to Atlas in Ireland"],
+  ["scripts/export.ts","(v4.33) npm run export (§15.8.2): changed years by fingerprint; --all, --year, --check, --verify, --compare, --test"],
+  ["src/lib/export/rows.ts","(v4.33) recordRow, compareRecords, roundTripDiffs, ROW_FORMAT — pure"],
+  ["src/lib/export/sheets.ts","(v4.33) writeYearTab, readYearTab, listTabInfo; call() names each Sheets call and retries busy answers"],
+  [".github/workflows/export.yml","(v4.33) Nightly export 02:53 UTC + Run workflow; monthly keep-alive for export.yml and backup.yml"],
+  ["src/app/calendar/_components/NewMenu.tsx","(v4.33) The Calendar’s + New ▾: New, Copy recent; ?back= returns to the Calendar"],
   ["src/app/NavBar.tsx","(v4.20) Gear button opens the menu (All master lists + pins); under 520 px the FARGAZE word is hidden and the links sit closer"],
   ["src/lib/admin/usage.ts","(v4.17) computeUsage: records per row (distinct records across specs) and values used in records but missing from the list (v4.20) Counts without record IDs where the specs open no arrays (one pass across Place / From / To and similar), breakdown per labelled spec, favourite-place labels resolved for viaFavorites lists, no orphans when refuseUnknown is false (v4.28) placeDetails: each record once under the point it uses, details and detailNames per row; missingPoints"],
   ["src/lib/admin/write.ts","(v4.17) addRow / editRow / deleteRow: parseInput (text, number, coords, zone + local time → true instant), locked and fixed columns, duplicates, favourite-place periods, confirmNew, rowUsage, sheetSteps, master_change logging (v4.20) deleteRow refuses a place point that a favourite-place period names"],
@@ -2674,7 +2743,7 @@ C(table(["Path","Purpose"],[
   ["src/app/api/admin/lists/[list]/rename/route.ts","(v4.18) POST — previews, or with apply and the preview’s record count carries out, a rename, move or merge (§15.5.4)"],
   ["src/lib/admin/renameRef.ts","(v4.30) Rename and merge for the nine reference lists (§15.5.11): plan with the people combinations, records by field and tab, locked code values, sheet steps (whole-cell and the | part regular expression), transaction, Undo by the fields each record had changed"],
   ["src/lib/admin/rename.ts","(v4.18) Rename, move and merge for activities and cost categories: plan, record counts by year, sheet steps, the transaction, Calendar settings, Undo; names the code looks for are locked (v4.20) Hands place points to renamePlace.ts in preview, apply and undo (v4.30) and the reference lists to renameRef.ts"],
-  ["src/models/MasterChange.ts","(v4.17) master_change model (§6.12)"],
+  ["src/models/MasterChange.ts","(v4.17) master_change model (§6.12) (v4.33) a pre-validate hook saves every change as done with no sheet steps (the sheet is frozen)"],
   ["src/models/ReferenceList.ts","(v4.17) One document per value; unique { userId, listName, value } (§6.3)"],
   ["src/models/ActivityMaster.ts","(v4.17) Unique index { userId, name } — a name is unique across categories"],
   ["scripts/prepare-master-admin.ts","(v4.17) Run once, safe to repeat: activity-name duplicates, reference-list conversion (saves the old documents first), alcohol items without a conversion; --apply converts and builds indexes"],
@@ -2748,7 +2817,7 @@ C(table(["Path","Purpose"],[
   ["src/lib/records/relationship.ts","(v4.27) Pure: peopleMethodCell, relationshipOf (the sheet’s G formula), oneIfSame"],
   ["src/lib/records/formOptions.ts","(v4.27) The edit page’s pickers: list values and values used in records, most used first; exchange rates"],
   ["src/app/records/[id]/page.tsx, src/app/records/_components/*","(v4.27) The edit page: RecordEditor, fields (Text, PickText, Select, NumberBox, NoteBox, chips, ItemList), PeopleEditor, ChangeTable"],
-  ["src/app/records/changes/page.tsx","(v4.27) Record changes"],
+  ["src/app/records/changes/page.tsx","(v4.27) Record changes (v4.33) a history of the last 30 days with Undo; no ticks"],
   ["src/lib/records/edit.ts","(v4.24) Server: getForEdit, previewEdit, saveEdit, deleteRecord, undoRecordChange, listRecordChanges; SHEET_IS_TRUTH"],
   ["scripts/check-record-form.ts","(v4.24) Read-only: every record through the form; reports records refused or changed without an edit"],
   ["src/lib/records/ingredients.ts","(v4.22) missingIngredients(record) — foods and drinks with no real ingredient (empty or Not Defined); describeMissing. Pure: used by the Staging migration, meant for the entry app (#71)"],
@@ -2795,7 +2864,7 @@ C(table(["Path","Purpose"],[
 C(spacer());
 
 // ===== FOOTER =====
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.32 — 12 November 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.33 — 14 November 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 
 // ===== DOCUMENT ASSEMBLY =====
@@ -2832,6 +2901,6 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-Log-Data-Design-v4.32.docx", buffer);
-  console.log("Wrote FarGaze-Log-Data-Design-v4.32.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-Log-Data-Design-v4.33.docx", buffer);
+  console.log("Wrote FarGaze-Log-Data-Design-v4.33.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });

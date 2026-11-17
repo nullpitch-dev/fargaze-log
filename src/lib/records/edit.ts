@@ -22,6 +22,8 @@ import LogTrash from '../../models/LogTrash';
 import MasterChange from '../../models/MasterChange';
 import ActivityMaster from '../../models/ActivityMaster';
 import TimezoneMaster from '../../models/TimezoneMaster';
+import LogPlan from '../../models/LogPlan';
+import { instantOf } from '../entry/time';
 import { loadMasterChecks, unknownValues } from '../migration/checkRecords';
 import { recordKey, existingQuery, yearTabFor, KEY_FIELDS } from '../migration/staging';
 import { missingIngredients, describeMissing } from './ingredients';
@@ -29,7 +31,7 @@ import { getArchiveUntil } from '../archiveYear';
 import { buildRecord, fromRecord, type FormContext, type RecordForm } from './form';
 import { sheetChange, deleteRowLines, addRowLines, findRowText, type ChangeLine, type PlainChange } from './sheetCells';
 import { isOpen, missingRequired } from '../entry/groups';
-import { endAheadToPlanned, plannedEndChanged, relaxOpen, tightenOnEnd } from '../entry/drafts';
+import { endAheadToPlanned, plannedEndChanged, relaxOpen, tightenOnEnd, NO_END_NOTE } from '../entry/drafts';
 
 const APP_ONLY = ['Nothing to do in the sheet.'];
 /** No sheet step: made in the app, or any record once the sheet is frozen. */
@@ -90,6 +92,8 @@ interface Prepared {
   warnings: string[];
   title: string;
   change: ReturnType<typeof sheetChange>;
+  /** Still going and its start moved to the future: back to Coming up (17 Nov). */
+  toPlan: boolean;
 }
 
 async function prepare(userId: string, id: string, form: RecordForm): Promise<{ ok: true; p: Prepared } | Fail> {
@@ -105,7 +109,11 @@ async function prepare(userId: string, id: string, form: RecordForm): Promise<{ 
   const warnings = [...built.warnings];
   // A record made in the app: an End still to come is its planned end (drafts.ts). A sheet
   // record keeps what was typed, as the sheet has no planned end.
-  if (base?.origin === 'app') endAheadToPlanned(doc, warnings); // sheet records keep their End
+  // A record still going whose start moves to the future goes back to Coming up as a plan
+  // (Hyoje, 17 Nov), so its End, if any, is the planned end there too.
+  const startAhead = (instantOf(doc.start) ?? 0) > Date.now();
+  if (base?.origin === 'app' || (isOpen(base) && startAhead)) endAheadToPlanned(doc, warnings); // sheet records keep their End
+  const toPlan = isOpen(base) && startAhead && !doc.end?.year;
 
   // Master lists. An unknown activity is already reported, so its pair is not.
   const checks = (await loadMasterChecks(userId)).filter(c => doc.activity.category || c.def.slug !== 'activity');
@@ -122,10 +130,13 @@ async function prepare(userId: string, id: string, form: RecordForm): Promise<{ 
     else problems.push(`${describeMissing(m)} has no ingredients — choose at least one`);
   }
 
-  // The same record twice: activity + title + start + end (the Staging rule).
-  const others = await Log.find({ ...existingQuery(userId, [doc]), _id: { $ne: base._id } }).select(KEY_FIELDS).lean();
+  // The same record twice: activity + title + start + end (the Staging rule) — among open
+  // plans when it is going back to Coming up.
+  const others = toPlan
+    ? await LogPlan.find({ ...existingQuery(userId, [doc]), 'plan.state': 'open', 'plan.recordId': { $ne: base._id } }).select(KEY_FIELDS).lean()
+    : await Log.find({ ...existingQuery(userId, [doc]), _id: { $ne: base._id } }).select(KEY_FIELDS).lean();
   if ((others as any[]).some(o => recordKey(o) === recordKey(doc))) {
-    problems.push('Another record has the same activity, title, start and end');
+    problems.push(toPlan ? 'Another plan has the same activity, title, start and end' : 'Another record has the same activity, title, start and end');
   }
 
   // An open record, or one ended here: its activity's required groups (#71). While it
@@ -140,14 +151,18 @@ async function prepare(userId: string, id: string, form: RecordForm): Promise<{ 
   if (!change.lines.length && !plannedEndChanged(base, doc)) problems.push('Nothing changed');
   const tight = tightenOnEnd(base, doc, [...new Set(problems)], warnings);
   const relaxed = relaxOpen(doc, tight.problems, tight.warnings);
-  return { ok: true, p: { base, doc, problems: relaxed.problems, warnings: relaxed.warnings, title: `Edit: ${findRowText(base)}`, change } };
+  if (toPlan) {
+    relaxed.warnings = relaxed.warnings.filter(w => !NO_END_NOTE.test(w));   // not an open record any more: a plan
+    relaxed.warnings.unshift('The start is still to come: saving moves it back to Coming up as a plan.');
+  }
+  return { ok: true, p: { base, doc, problems: relaxed.problems, warnings: relaxed.warnings, title: `Edit: ${findRowText(base)}`, change, toPlan } };
 }
 
 export async function previewEdit(userId: string, id: string, form: RecordForm) {
   const r = await prepare(userId, id, form);
   if (!r.ok) return r;
   const { problems, warnings, title, change } = r.p;
-  return { ok: true as const, problems, warnings, title, ...change, noSheet: appMade(r.p.base) || !change.lines.length };
+  return { ok: true as const, problems, warnings, title, ...change, noSheet: appMade(r.p.base) || !change.lines.length, toPlan: r.p.toPlan };
 }
 
 // ── Save ─────────────────────────────────────────────────────────────────────
@@ -160,6 +175,7 @@ export async function saveEdit(userId: string, id: string, form: RecordForm, upd
     return fail(409, 'This record was changed since you opened it. Reload it and make the change again.');
   }
   if (problems.length) return fail(422, 'The record was not saved.', problems);
+  if (r.p.toPlan) return moveToPlan(userId, base, doc);
 
   const now = new Date();
   const saved = { ...doc, _id: base._id, ...(base?.origin === 'app' ? { origin: 'app' } : {}), createdAt: base.createdAt, updatedAt: now };
@@ -188,6 +204,38 @@ export async function saveEdit(userId: string, id: string, form: RecordForm, upd
     await session.endSession();
   }
   return { ok: true as const, changeId, updatedAt: now.toISOString(), ...change, noSheet };
+}
+
+/**
+ * A record still going whose start was moved to the future becomes a plan again (Hyoje,
+ * 17 Nov): it leaves `log` and waits in Coming up. The plan it was started from (if any)
+ * opens again with the new fields; otherwise a new plan under the record's ID. Like the
+ * other plan steps it makes no change-list entry — the plan holds everything.
+ */
+async function moveToPlan(userId: string, base: any, doc: any) {
+  const now = new Date();
+  const { _id: _i, createdAt: _c, updatedAt: _u, origin: _o, __v: _v, ...fields } = doc;
+  const from = await LogPlan.findOne({ userId, 'plan.recordId': base._id, 'plan.state': 'done' }).lean() as any;
+  const planId = from?._id ?? ((await LogPlan.exists({ _id: base._id })) ? new mongoose.Types.ObjectId() : base._id);
+  const session = await mongoose.startSession();
+  try {
+    await session.withTransaction(async () => {
+      const res = await Log.deleteOne({ _id: base._id, userId, updatedAt: base.updatedAt }, { session });
+      if (!res.deletedCount) throw Object.assign(new Error('changed'), { conflict: true });
+      const plan = { ...(from?.plan ?? {}), state: 'open', recordId: null, doneBy: null, doneAt: null, edited: true };
+      if (from) {
+        await LogPlan.replaceOne({ _id: from._id, userId }, { ...fields, userId, _id: from._id, createdAt: from.createdAt, updatedAt: now, plan }, { session, timestamps: false } as any);
+      } else {
+        await LogPlan.create([{ ...fields, userId, _id: planId, createdAt: base.createdAt ?? now, updatedAt: now, plan }], { session });
+      }
+    });
+  } catch (e: any) {
+    if (e?.conflict) return fail(409, 'This record was changed since you opened it. Reload it and make the change again.');
+    throw e;
+  } finally {
+    await session.endSession();
+  }
+  return { ok: true as const, toPlan: true, planId: String(planId), updatedAt: now.toISOString() };
 }
 
 // ── Delete ───────────────────────────────────────────────────────────────────

@@ -58,6 +58,13 @@ const GROUP_SECTION: Record<string, Optional | 'place' | 'notes' | null> = {
   people: 'people', transport: 'transport', bowel: 'bowel', body: 'body', sleep: 'sleep', exercise: 'exercise',
   reading: 'reading', movie: 'movie', golf: 'golf', income: 'income', travel: 'travel',
 };
+/** Sleep quality pills, worst to best (the order of insights/sleep.ts QUALITY_SCORE);
+ *  any other value used before follows. */
+const SLEEP_ORDER = ['나쁨', '보통', '좋음'];
+const sleepOptions = (used: string[]) => {
+  const seen = [...new Set(used.map(x => x.trim()).filter(Boolean))];
+  return [...SLEEP_ORDER, ...seen.filter(x => !SLEEP_ORDER.includes(x))];
+};
 /** "회사 - 회의실 1" → ["회사", "회의실 1"]: the place and its detail (67.8). */
 const splitPlace = (v: string): [string, string] => { const i = v.indexOf(' - '); return i < 0 ? [v, ''] : [v.slice(0, i), v.slice(i + 3)]; };
 const joinPlace = (a: string, b: string) => (b.trim() ? `${a.trim()} - ${b.trim()}` : a.trim());
@@ -326,7 +333,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
     const t = setTimeout(async () => {
       try {
         const r = await fetchWithin(entryMode ? '/api/entry/check' : `/api/records/${id}/preview`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: formJson({ form }),
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: formJson(mode === 'plan' ? { form, planId: id } : { form }),
         }, 8000);
         const b = await r.json().catch(() => ({}));
         if (n !== seq.current) return;
@@ -346,8 +353,11 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
 
   // A start still to come makes a plan (in the entry app): a plan has no End, only a
   // planned end. Worked out here from the phone's clock, so the form changes at once.
+  // In the edit form: a record still going whose start moves ahead goes back to Coming up
+  // (Hyoje, 17 Nov), so it shows as a plan too.
+  const wasGoing = mode === 'edit' && !!rec?.form?.start?.hour && !rec?.form?.end?.hour;
   const planning = (() => {
-    if (!entryMode || !form?.start.date) return false;
+    if ((!entryMode && !wasGoing) || !form?.start.date) return false;
     const l = localNow(Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London');
     const k = (d: string, h: string) => `${d} ${(h || '').padStart(5, '0')}`;
     return form.start.hour ? k(form.start.date, form.start.hour) > k(l.date, l.hour) : form.start.date > l.date;
@@ -523,6 +533,8 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
       });
       const b = await r.json().catch(() => ({}));
       if (!r.ok) { setSaveError({ text: b.error ?? `HTTP ${r.status}`, problems: b.problems, conflict: r.status === 409 }); return; }
+      // Back to Coming up (17 Nov): the record is a plan now, so Today shows it there.
+      if (b.toPlan) { leaveTo(backTo() ?? `/entry?${new URLSearchParams({ saved: 'plan', id: b.planId, from: 'moved' })}`); return; }
       setResult({ kind: 'saved', noSheet: !!b.noSheet, changeId: b.changeId, tab: b.tab, findRow: b.findRow, moveTo: b.moveTo, lines: b.lines, changes: b.changes ?? [], sheetDone: !!b.noSheet, undone: null });
       window.scrollTo({ top: 0 });
     } catch (e: any) {
@@ -952,19 +964,16 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
           </Section>
 
           <Section title={`Place${req('place')}`}>
-            {entryMode ? (
-              <div className="grid grid-cols-[minmax(0,6fr)_minmax(0,4fr)] gap-3">
-                <Field label="Place">
-                  <Text value={splitPlace(f.location.activity)[0]} onChange={v => patch('location', { activity: joinPlace(v, splitPlace(f.location.activity)[1]) })}
-                    suggest={[...(entryOpts?.labels ?? []), ...used.places.filter(x => !(entryOpts?.labels ?? []).includes(x))]} />
-                </Field>
-                <Field label="Detail">
-                  <Text value={splitPlace(f.location.activity)[1]} onChange={v => patch('location', { activity: joinPlace(splitPlace(f.location.activity)[0], v) })} />
-                </Field>
-              </div>
-            ) : (
-              <Field label="Place"><Text value={f.location.activity} onChange={v => patch('location', { activity: v })} suggest={used.places} /></Field>
-            )}
+            {/* Place + Detail in every mode (Hyoje, 17 Nov: the edit form had no Detail box). */}
+            <div className="grid grid-cols-[minmax(0,6fr)_minmax(0,4fr)] gap-3">
+              <Field label="Place">
+                <Text value={splitPlace(f.location.activity)[0]} onChange={v => patch('location', { activity: joinPlace(v, splitPlace(f.location.activity)[1]) })}
+                  suggest={[...(entryOpts?.labels ?? []), ...used.places.filter(x => !(entryOpts?.labels ?? []).includes(x))]} />
+              </Field>
+              <Field label="Detail">
+                <Text value={splitPlace(f.location.activity)[1]} onChange={v => patch('location', { activity: joinPlace(splitPlace(f.location.activity)[0], v) })} />
+              </Field>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Online"><Text value={f.location.online} onChange={v => patch('location', { online: v })} suggest={used.online} /></Field>
               <Field label="Someone else’s place"><Text value={f.location.other} onChange={v => patch('location', { other: v })} suggest={used.places} /></Field>
@@ -1125,7 +1134,9 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
 
           {shown('sleep') && (
             <Section title={`Sleep${req('sleep')}`} onRemove={removeBtn('sleep')} onReset={resetBtn('sleep')}>
-              <Field label="Quality"><Text value={f.sleep.quality} onChange={v => patch('sleep', { quality: v })} suggest={used.sleep} /></Field>
+              {/* Pills (Hyoje, 17 Nov: it is always 나쁨, 보통 or 좋음); the values used before,
+                  worst to best; more than six → the picker. */}
+              <Field label="Quality"><Choice value={f.sleep.quality} options={sleepOptions(used.sleep)} onChange={v => patch('sleep', { quality: v })} /></Field>
             </Section>
           )}
 
@@ -1249,8 +1260,9 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
           <div className="basis-full sm:basis-auto sm:flex-1 min-w-0 text-sm truncate">{status}</div>
           <span className="flex-1 sm:hidden" />
           <button onClick={goBack} className={secondary}>Cancel</button>
-          <button onClick={endNowAndSave} disabled={saving} className={secondary} title="Set the end to now and save">End now</button>
-          <button onClick={() => save()} disabled={!canSave} className={primary}>{saving ? 'Saving…' : entryMode && current?.kind === 'plan' ? 'Save plan' : 'Save'}</button>
+          {/* Not for a start still to come (17 Nov): it is going back to Coming up. */}
+          {!planning && <button onClick={endNowAndSave} disabled={saving} className={secondary} title="Set the end to now and save">End now</button>}
+          <button onClick={() => save()} disabled={!canSave} className={primary}>{saving ? 'Saving…' : (entryMode && current?.kind === 'plan') || (!entryMode && planning) ? 'Save plan' : 'Save'}</button>
         </div>
       </div>
     </div>

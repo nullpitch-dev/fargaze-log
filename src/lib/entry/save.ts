@@ -92,9 +92,12 @@ export async function checkEntry(userId: string, form: RecordForm, opts: { base?
 
 // ── New ──────────────────────────────────────────────────────────────────────
 
-export async function previewNew(userId: string, form: RecordForm) {
+/** The form's check as you type. `planId`: the plan being edited — it is not its own twin
+ *  (Hyoje, 17 Nov: editing a plan said "Another plan has the same …"). */
+export async function previewNew(userId: string, form: RecordForm, planId?: string) {
   if (!form || typeof form !== 'object') return fail(400, 'Send { form }.');
-  const c = await checkEntry(userId, form);
+  const base = planId ? await loadPlan(userId, planId) : null;
+  const c = await checkEntry(userId, form, base ? { base, selfId: String(base._id) } : {});
   return { ok: true as const, kind: c.kind, problems: c.problems, warnings: c.warnings };
 }
 

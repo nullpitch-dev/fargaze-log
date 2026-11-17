@@ -19,6 +19,7 @@ import MasterChange from '@/models/MasterChange';
 import TimezoneMaster from '@/models/TimezoneMaster';
 import FavoritePlace from '@/models/FavoritePlace';
 import { type ListDef, type CellValue, toRow, lockedColumns } from './lists';
+import { ENTRY_GROUPS } from '@/lib/entry/groups';
 
 export type WriteResult =
   | { ok: true; id: string; sheetNeeded: boolean }
@@ -71,6 +72,14 @@ export async function parseInput(def: ListDef, userId: string, raw: Record<strin
       if (!Number.isFinite(n)) { errors.push(`${c.label} must be a number.`); continue; }
       values[c.key] = n;
       fields[c.key] = n;
+    } else if (c.type === 'groups') {
+      // "bowel, place" (or an array) → known keys in the form's order; stored in groups.<key>.
+      const given = (Array.isArray(v) ? v : typeof v === 'string' ? v.split(',') : []).map(x => String(x).trim()).filter(Boolean);
+      const unknown = given.filter(k => !ENTRY_GROUPS.some(g => g.key === k));
+      if (unknown.length) { errors.push(`${c.label}: unknown group ${unknown.join(', ')}.`); continue; }
+      const keys = ENTRY_GROUPS.map(g => g.key).filter(k => given.includes(k));
+      values[c.key] = keys.length ? keys.join(', ') : null;
+      fields.groups = { ...((fields.groups as object) ?? {}), [c.key]: keys };
     } else if (c.type === 'coords') {
       const p = typeof v === 'string' ? parseCoordsText(v) : null;
       if (!p) { errors.push(`${c.label}: write it as "latitude, longitude", e.g. 51.37, -0.45.`); continue; }
@@ -244,6 +253,10 @@ export async function editRow(def: ListDef, userId: string, id: string, raw: Rec
   // merge, used or not (open and planned records in the sheet may use it), so it
   // goes through the preview in rename.ts (#67 step 3).
   if (changedLocked.length && def.recordsFollow) {
+    // The rename preview changes the name and category only: the groups would be lost.
+    if (def.columns.some(c => c.type === 'groups' && !same(before[c.key], p.values[c.key]))) {
+      return fail(409, 'Change the groups and the name in two steps: save the groups first, then rename.');
+    }
     return { ok: false, status: 409, error: 'This is a rename, move or merge: preview it first.', needsRename: true };
   }
   if (changedLocked.length) {

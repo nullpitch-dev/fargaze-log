@@ -221,9 +221,9 @@ function EntryHome() {
     } else if (deleted) {
       setToast({ text: 'Plan deleted', undo: async () => { const r = await call(`/api/entry/plans/${deleted}/restore`, 'POST'); return r.ok ? null : r.b.error ?? 'Undo failed'; } });
     } else if (id) {
-      const fromPlan = params.get('from') === 'plan';
+      const from = params.get('from'), fromPlan = from === 'plan' || from === 'moved';
       setToast({
-        text: saved === 'plan' ? (fromPlan ? 'Plan saved' : 'Saved as a plan') : 'Saved',
+        text: from === 'moved' ? 'Moved back to Coming up' : saved === 'plan' ? (fromPlan ? 'Plan saved' : 'Saved as a plan') : 'Saved',
         undo: fromPlan ? undefined : async () => { const r = await call(`/api/entry/records/${id}`, 'DELETE'); return r.ok ? null : r.b.error ?? 'Undo failed'; },
       });
     }

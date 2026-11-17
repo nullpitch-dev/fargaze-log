@@ -11,8 +11,9 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { PointPicker, locate, type LatLng, type Located } from '../_components/PointPicker';
+import { ENTRY_GROUPS, rulesFor } from '@/lib/entry/groups';
 
-type ColumnType = 'text' | 'number' | 'zoneTime' | 'coords';
+type ColumnType = 'text' | 'number' | 'zoneTime' | 'coords' | 'groups';
 interface Column { key: string; label: string; type: ColumnType; required?: boolean; pickExisting?: boolean; narrow?: boolean; noSearch?: boolean }
 type Cell = string | number | null | { timezone: string; local: string } | { lat: number; lng: number };
 interface Row { _id: string; values: Record<string, Cell>; updatedAt: string | null; createdAt?: string | null; used: number | null; usedBy?: Record<string, number> | null; usedDetail?: number | null; detailNames?: { name: string; records: number }[] | null }
@@ -105,7 +106,36 @@ function cellText(c: Cell, type: ColumnType): string {
   if (type === 'zoneTime' && typeof c === 'object' && 'local' in c) return `${c.local} ${c.timezone}`;
   if (type === 'coords' && typeof c === 'object' && 'lat' in c) return `${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}`;
   if (type === 'number' && typeof c === 'number') return c.toLocaleString(undefined, { maximumFractionDigits: 6 });
+  if (type === 'groups' && typeof c === 'string') return groupLabels(groupKeys(c));
   return String(c);
+}
+
+// Field groups (activities, #71): "bowel, place" ⇄ keys ⇄ "Bowel, Place".
+const groupKeys = (v: unknown): string[] => (typeof v === 'string' ? v.split(',').map(x => x.trim()).filter(Boolean) : []);
+const groupLabels = (keys: string[]) => keys.map(k => ENTRY_GROUPS.find(g => g.key === k)?.label ?? k).join(', ');
+
+/** The groups as chips: one tap adds or removes (Required / Shown on /admin/activity). */
+function GroupChips({ value, onChange, disabled, implied = [] }: { value: string; onChange: (v: string) => void; disabled?: boolean;
+  /** Shown because they are required: drawn on, not tappable. */ implied?: string[] }) {
+  const on = groupKeys(value);
+  const flip = (k: string) => onChange(ENTRY_GROUPS.map(g => g.key).filter(x => (x === k ? !on.includes(k) : on.includes(x))).join(', '));
+  return (
+    <div className="flex flex-wrap gap-1 min-w-56 max-w-80">
+      {ENTRY_GROUPS.map(g => {
+        const lit = on.includes(g.key) || implied.includes(g.key);
+        const fixed = implied.includes(g.key);
+        return (
+          <button key={g.key} type="button" aria-pressed={lit} disabled={disabled || fixed} onClick={() => flip(g.key)}
+            title={fixed ? 'Required, so always shown' : undefined}
+            className={`rounded-full border px-2 py-0.5 text-[11px] leading-tight ${lit
+              ? 'border-stone-700 bg-stone-800 text-white dark:border-zinc-300 dark:bg-zinc-200 dark:text-zinc-900'
+              : 'border-stone-300 text-stone-600 dark:border-zinc-600 dark:text-zinc-300 hover:bg-stone-50 dark:hover:bg-zinc-800'} ${fixed ? 'opacity-60' : ''} disabled:cursor-default`}>
+            {g.label}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 function sortValue(c: Cell, type: ColumnType): string | number {
@@ -454,6 +484,22 @@ export default function AdminListPage() {
   // Columns shown in the table; hidden ones stay in the edit row, under Changed.
   const shown = columns.filter(c => !tools.hideColumns?.includes(c.key));
   const hiddenCols = columns.filter(c => tools.hideColumns?.includes(c.key));
+  // Activities' field groups (#71). A row with none of its own uses its category's, shown grey.
+  const hasGroups = columns.some(c => c.type === 'groups');
+  const groupRules = useMemo(() => {
+    if (!hasGroups || !data) return null;
+    const acts = data.rows.map(r => ({ name: String(r.values.name ?? ''), category: String(r.values.category ?? ''),
+      groups: { required: groupKeys(r.values.required), shown: groupKeys(r.values.shown) } }));
+    return (name: string) => rulesFor(name, acts);
+  }, [hasGroups, data]);
+  // Shown includes the required groups (a required group is always open on the form).
+  const groupCell = (r: Row, key: string) => {
+    const rules = groupRules?.(String(r.values.name ?? ''));
+    const keys = !rules ? [] : key === 'required' ? rules.required : rules.shown;
+    if (!rules || !keys.length) return <span className="text-stone-300 dark:text-zinc-600">—</span>;
+    if (rules.from === 'activity') return <span className="text-xs">{groupLabels(keys)}</span>;
+    return <span className="text-xs text-stone-400 dark:text-zinc-500" title="None of its own: its category's (what most of the category's activities have)">{groupLabels(keys)} (category)</span>;
+  };
   // Place points rename and merge like activities but have no category (26 Oct).
   const hasCategory = columns.some(c => c.key === 'category');
 
@@ -507,7 +553,10 @@ export default function AdminListPage() {
     if (!editing || !data) return null;
     const used = row?.used ?? 0;
     const fixedHere = (key: string) => !!row && data.list.fixedOnEdit.includes(key);
-    const lockedHere = (key: string) => fixedHere(key) || (!!row && used > 0 && !data.list.recordsFollow && data.list.locked.includes(key));
+    // A row the site's code looks for by name: only its groups can change (17 Nov).
+    const codeLocked = !!row && !!codeLock(data, row);
+    const lockedHere = (key: string) => fixedHere(key) || (codeLocked && columns.find(c => c.key === key)?.type !== 'groups')
+      || (!!row && used > 0 && !data.list.recordsFollow && data.list.locked.includes(key));
     return (
       <tr key={row?._id ?? 'new'} className="border-b border-stone-200 dark:border-zinc-700 bg-amber-50/60 dark:bg-zinc-800">
         {[...shown, ...(tools.changedColumn ? hiddenCols : [])].map(c => {
@@ -515,10 +564,14 @@ export default function AdminListPage() {
           const locked = lockedHere(c.key);
           const title = !locked ? undefined
             : fixedHere(c.key) ? 'Records refer to this by name; renaming comes later'
+            : codeLocked ? codeLock(data, row!)!
             : `${used.toLocaleString()} record${used === 1 ? '' : 's'} use this value; renaming comes later`;
           const cell = (
             <td key={c.key} className="px-2 py-1.5 align-top">
-              {c.type === 'zoneTime' ? (
+              {c.type === 'groups' ? (
+                <GroupChips value={v as string} onChange={x => setCell(c.key, x)} disabled={!!preview}
+                  implied={c.key === 'shown' ? groupKeys(editing.draft.required) : []} />
+              ) : c.type === 'zoneTime' ? (
                 <div className="flex gap-1">
                   <input value={(v as any).timezone} onChange={e => setCell(c.key, { ...(v as any), timezone: e.target.value })}
                     list="dl-zones" placeholder="Zone" className={`${input.replace('w-full ', '')} w-16 flex-none`} disabled={locked} title={title} />
@@ -827,7 +880,9 @@ export default function AdminListPage() {
                     {shown.map(c => (
                       <Fragment key={c.key}>
                         <td title={c.narrow ? cellText(r.values[c.key], c.type) || undefined : undefined} className={`px-3 py-1.5 ${c.type === 'number' || c.type === 'coords' ? 'font-mono text-xs' : ''} ${c.type === 'number' ? 'text-right' : ''} ${c.narrow ? 'max-w-40 truncate text-xs' : ''} ${tools.changedColumn && c.key === data.list.indexBy ? 'min-w-40 break-words' : ''} text-stone-800 dark:text-zinc-100`}>
-                          {cellText(r.values[c.key], c.type) || <span className="text-stone-300 dark:text-zinc-600">—</span>}
+                          {c.type === 'groups'
+                            ? groupCell(r, c.key)
+                            : cellText(r.values[c.key], c.type) || <span className="text-stone-300 dark:text-zinc-600">—</span>}
                           {tools.changedColumn && c.key === data.list.indexBy && !!cellText(r.values[c.key], c.type) && <CopyName text={cellText(r.values[c.key], c.type)} />}
                         </td>
                         {c.type === 'coords' && (
@@ -869,7 +924,7 @@ export default function AdminListPage() {
                       </td>
                     )}
                     <td className="px-3 py-1.5 text-right whitespace-nowrap space-x-3">
-                      {codeLock(data, r)
+                      {codeLock(data, r) && !hasGroups
                         ? <span title={codeLock(data, r)!} className="text-xs text-stone-400 dark:text-zinc-500 cursor-help">🔒 Locked</span>
                         : <button onClick={() => startEdit(r)} disabled={!!editing || !!catForm || !!preview} className={linkBtn}>Edit</button>}
                       <button

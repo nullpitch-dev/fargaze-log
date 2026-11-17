@@ -54,7 +54,7 @@ const instant = (p: any): number | null => {
   return null;
 };
 const EMPTY_POINT = { timezone: null, datetime: null, year: null, month: null, day: null, weekday: null, hour: null, timezoneOffset: null };
-const NO_END_NOTE = /^No end time: saved as an open record/;
+export const NO_END_NOTE = /^No end time: saved as an open record/;
 
 /** Moves an End still to come into plannedEnd (in place). True when it moved. */
 export function endAheadToPlanned(doc: any, warnings: string[], now = Date.now()): boolean {

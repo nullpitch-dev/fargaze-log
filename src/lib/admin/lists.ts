@@ -33,7 +33,9 @@ import BowelScore from '../../models/BowelScore';
 import FavoritePlace from '../../models/FavoritePlace';
 import PlaceCoord from '../../models/PlaceCoord';
 
-export type ColumnType = 'text' | 'number' | 'zoneTime' | 'coords';
+/** 'groups': the entry form's field groups (groups.ts keys) in `groups.<key>`; the page
+ *  shows their labels and edits them as chips; a row's value is the keys joined by ", ". */
+export type ColumnType = 'text' | 'number' | 'zoneTime' | 'coords' | 'groups';
 
 export interface ColumnDef {
   key: string;
@@ -161,6 +163,9 @@ export const LISTS: ListDef[] = [
     columns: [
       { key: 'category', label: 'Category', type: 'text', required: true, pickExisting: true },
       { key: 'name', label: 'Activity', type: 'text', required: true },
+      // The entry form's field groups (#71; Hyoje, 14 Nov: edit them here). Empty = the category's.
+      { key: 'required', label: 'Required', type: 'groups', noSearch: true },
+      { key: 'shown', label: 'Shown', type: 'groups', noSearch: true },
     ],
     unique: ['name'],
     sort: { category: 1, name: 1 },
@@ -346,6 +351,9 @@ export function toRow(def: ListDef, doc: any): RowOut {
     } else if (c.type === 'zoneTime') {
       const b = doc[c.key];
       values[c.key] = b ? { timezone: b.timezone, local: b.local } : null;
+    } else if (c.type === 'groups') {
+      const keys = doc.groups?.[c.key];
+      values[c.key] = Array.isArray(keys) && keys.length ? keys.join(', ') : null;
     } else {
       values[c.key] = doc[c.key] ?? null;
     }
