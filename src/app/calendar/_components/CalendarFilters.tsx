@@ -2,7 +2,7 @@
 // src/app/calendar/_components/CalendarFilters.tsx
 //
 // The Calendar's filter panel: display time zone, cross-activity drop-down,
-// the Reading & study switch, the category list, and — folded away at the
+// the Reading & study switch and the quiet rows (평일 업무, 음료 at home / work …), the category list, and — folded away at the
 // very bottom — the hidden activity names. That last section starts folded on
 // every visit on purpose: hidden things should stay out of sight. A side column on wide
 // screens, a fold-out panel under the toolbar on narrow ones (the page decides
@@ -12,12 +12,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { MultiSelectDropdown } from '@/app/insights/_components/MultiSelectDropdown';
 import { colorFor, colorKeyFor, PALETTE } from '../_lib/calendar-colors';
+import { QUIET_ROWS } from '@/lib/calendar/quietRows';
 
 export interface FilterState {
   hiddenCategories: string[];
   hiddenCrossActivities: string[];
   colors: Record<string, string>;
   showReading: boolean;
+  /** Quiet rows switched off (quietRows.ts; Hyoje, 17 Nov). */
+  hiddenRows: string[];
   hiddenNames: string[];
 }
 
@@ -89,6 +92,16 @@ export function CalendarFilters({
             onChange={e => onChange({ showReading: e.target.checked })} />
           Reading &amp; study
         </label>
+        {/* Long records that say little and crowd the Day view (Hyoje, 17 Nov). */}
+        {QUIET_ROWS.map(r => (
+          <label key={r.key} className="flex items-center gap-2 cursor-pointer text-stone-700 dark:text-zinc-200">
+            <input type="checkbox" className="accent-blue-500" checked={!state.hiddenRows.includes(r.key)}
+              onChange={e => onChange({ hiddenRows: e.target.checked
+                ? state.hiddenRows.filter(k => k !== r.key)
+                : [...state.hiddenRows, r.key] })} />
+            {r.label}
+          </label>
+        ))}
       </Section>
 
       <Section title="Categories" action={

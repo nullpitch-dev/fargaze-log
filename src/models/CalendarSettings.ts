@@ -7,6 +7,8 @@ import mongoose, { Schema, model, models } from 'mongoose';
 //   colors                 category → palette key (see calendar-colors.ts);
 //                          a category not listed uses its default colour
 //   showReading            the "Reading & study" row
+//   hiddenRows             quiet rows switched off (quietRows.ts keys: 평일 업무, 음료 at
+//                          집 / 회사 …; Hyoje, 17 Nov); none = all shown
 //   hiddenNames            activity names never shown (e.g. 정식 운동). No
 //                          schema default on purpose: while the field is
 //                          absent the API supplies the starting list.
@@ -17,6 +19,7 @@ const CalendarSettingsSchema = new Schema(
     hiddenCrossActivities: { type: [String], default: [] },
     colors:                { type: Schema.Types.Mixed, default: {} },
     showReading:           { type: Boolean, default: true },
+    hiddenRows:            { type: [String], default: [] },
     hiddenNames:           { type: [String], default: undefined },
   },
   { timestamps: true, collection: 'calendar_settings', minimize: false }

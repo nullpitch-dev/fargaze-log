@@ -2,7 +2,7 @@
 //
 // GET /api/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD&tz=Europe/London
 //   optional: excludeCategories=a,b   crossActivities=x,y   shape=days
-//             excludeCrossActivities=x,y   excludeNames=n1,n2   (the Year view's counts)
+//             excludeCrossActivities=x,y   excludeNames=n1,n2   excludeRows=k1,k2 (quiet rows) (the Year view's counts)
 //
 // `from` / `to` are DISPLAY dates in `tz`, both inclusive. Returns every record
 // touching the range (events), or per-day counts (shape=days, for the Year
@@ -55,6 +55,7 @@ export async function GET(req: NextRequest) {
     crossActivities:   list(sp.get('crossActivities')),
     excludeCrossActivities: list(sp.get('excludeCrossActivities')),
     excludeNames:      list(sp.get('excludeNames')),
+    excludeRows:       list(sp.get('excludeRows')),
   };
   const { events, diagnostics } = days
     ? buildCalendarEvents(docs, range, Date.now(), filters)

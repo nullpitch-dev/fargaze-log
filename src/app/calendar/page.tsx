@@ -84,7 +84,7 @@ function weekTitle(a: string, b: string): string {
 const SIDEBAR_KEY = 'fargaze.calendar.sidebarOpen';   // per device, like the panel width itself
 
 const DEFAULT_FILTERS: FilterState = {
-  hiddenCategories: [], hiddenCrossActivities: [], colors: {}, showReading: true,
+  hiddenCategories: [], hiddenCrossActivities: [], colors: {}, showReading: true, hiddenRows: [],
   hiddenNames: ['정식 운동', '약식 운동'],   // same starting list as the API, so nothing flashes before settings load
 };
 
@@ -250,6 +250,7 @@ function CalendarInner() {
       excludeCategories: filters.hiddenCategories.join(','),
       excludeCrossActivities: filters.hiddenCrossActivities.join(','),
       excludeNames: [...filters.hiddenNames, ...READING_NAMES].join(','),
+      excludeRows: filters.hiddenRows.join(','),
     });
     fetch(`/api/calendar?${q}`, { signal: ctl.signal })
       .then(r => r.json())
@@ -257,13 +258,13 @@ function CalendarInner() {
       .catch(e => { if (e.name !== 'AbortError') setError(String(e)); })
       .finally(() => { if (!ctl.signal.aborted) setLoading(false); });
     return () => ctl.abort();
-  }, [view, range.from, range.to, tz, filters.hiddenCategories, filters.hiddenCrossActivities, filters.hiddenNames]);
+  }, [view, range.from, range.to, tz, filters.hiddenCategories, filters.hiddenCrossActivities, filters.hiddenNames, filters.hiddenRows]);
 
 
   // ── Layout ──
   const shown = useMemo(
-    () => applyFilters(events, filters.hiddenCategories, filters.hiddenCrossActivities, filters.hiddenNames),
-    [events, filters.hiddenCategories, filters.hiddenCrossActivities, filters.hiddenNames]);
+    () => applyFilters(events, filters.hiddenCategories, filters.hiddenCrossActivities, filters.hiddenNames, filters.hiddenRows),
+    [events, filters.hiddenCategories, filters.hiddenCrossActivities, filters.hiddenNames, filters.hiddenRows]);
   const reading = useMemo(() => shown.filter(isReading), [shown]);
   const others  = useMemo(() => shown.filter(e => !isReading(e)), [shown]);
 
@@ -294,7 +295,7 @@ function CalendarInner() {
     return () => ctl.abort();
   }, [view, openDay, tz]);
   const dayPool = view === 'year'
-    ? applyFilters(yearDay ?? [], filters.hiddenCategories, filters.hiddenCrossActivities, filters.hiddenNames)
+    ? applyFilters(yearDay ?? [], filters.hiddenCategories, filters.hiddenCrossActivities, filters.hiddenNames, filters.hiddenRows)
     : shown;
   const dayLoading = loading || (view === 'year' && openDay !== null && yearDay === null);
   const dayEvents  = openDay ? dayPool.filter(e => !isReading(e) && touches(e, openDay)) : [];

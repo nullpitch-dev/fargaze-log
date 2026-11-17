@@ -16,6 +16,7 @@
 //     ONE row per week: ▶ title on a start day, ✓ title on a finish day,
 //     otherwise the number of books being read.
 
+import { isQuiet } from '@/lib/calendar/quietRows';
 import type { CalendarEvent } from '@/lib/calendar/calendar';
 import { addDays } from '@/lib/calendar/calendar';
 
@@ -158,12 +159,13 @@ export function layoutWeek(
 
 export function applyFilters(
   events: CalendarEvent[], hiddenCategories: string[], hiddenCrossActivities: string[],
-  hiddenNames: string[] = [],
+  hiddenNames: string[] = [], hiddenRows: string[] = [],
 ): CalendarEvent[] {
   const hc = new Set(hiddenCategories), hx = new Set(hiddenCrossActivities), hn = new Set(hiddenNames);
   return events.filter(e => !hc.has(e.category)
     && !(e.crossActivity && hx.has(e.crossActivity))
-    && !(e.name && hn.has(e.name)));
+    && !(e.name && hn.has(e.name))
+    && !(hiddenRows.length && isQuiet(e.name, e.place, e.relationship, hiddenRows)));
 }
 
 /** ISO 8601 week number (weeks start on Monday; week 1 holds the year's first Thursday). */

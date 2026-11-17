@@ -17,6 +17,8 @@
 // logged dates whatever the display zone. The logged end date is INCLUSIVE —
 // the last day shown.
 
+import { isQuiet } from './quietRows';
+
 // Look-back for timed records that started before the range and still run.
 // Records longer than this (the "(기간)" periods — reading, travel, stays, one
 // of 474 days) are fetched by their own query branch on duration instead.
@@ -148,7 +150,7 @@ export function candidateFilter(userId: string, r: CalendarRange, opts: { going?
 }
 
 export const CANDIDATE_PROJECTION = {
-  allDay: 1, activity: 1,
+  allDay: 1, activity: 1, 'location.activity': 1,
   'start.datetime': 1, 'start.year': 1, 'start.month': 1, 'start.day': 1,
   'start.hour': 1, 'start.timezone': 1, 'start.timezoneOffset': 1,
   'end.datetime': 1, 'end.year': 1, 'end.month': 1, 'end.day': 1,
@@ -235,6 +237,10 @@ export interface CalendarEvent {
   name: string | null;
   title: string | null;
   crossActivity: string | null;
+  /** The record's place (location.activity), for the quiet rows (quietRows.ts). */
+  place: string | null;
+  /** activity.relationship (혼자 / 함께 / 타인): quiet rows are only records done alone. */
+  relationship: string | null;
   start: string | null;      // ISO moment (timed / point)
   end:   string | null;      // ISO moment (timed only)
   startDate: string;         // display date the record starts on (all-day: logged date)
@@ -266,6 +272,7 @@ export interface EventFilters {
   crossActivities?: string[];   // include list; empty = all, with or without one
   excludeCrossActivities?: string[];   // the page's own rule: hide these, keep records without one
   excludeNames?: string[];             // activity.name, exact
+  excludeRows?: string[];              // quiet rows switched off (quietRows.ts keys)
 }
 
 function loggedLabel(e: any): string | null {
@@ -285,6 +292,7 @@ export function buildCalendarEvents(
   const cross   = new Set(filters.crossActivities ?? []);
   const xCross  = new Set(filters.excludeCrossActivities ?? []);
   const xNames  = new Set(filters.excludeNames ?? []);
+  const xRows   = filters.excludeRows ?? [];
   const today   = zonedDate(nowMs, r.tz);
   const events: CalendarEvent[] = [];
 
@@ -295,10 +303,12 @@ export function buildCalendarEvents(
     if (cross.size && !cross.has(a.crossActivity ?? '')) continue;
     if (a.crossActivity && xCross.has(a.crossActivity)) continue;
     if (a.name && xNames.has(a.name)) continue;
+    if (xRows.length && isQuiet(a.name, d.location?.activity, a.relationship, xRows)) continue;
 
     const base = {
       id: String(d._id), category,
       name: a.name ?? null, title: a.title ?? null, crossActivity: a.crossActivity || null,
+      place: d.location?.activity || null, relationship: a.relationship || null,
       logged: { start: loggedLabel(d.start) ?? '', end: loggedLabel(d.end) },
     };
 

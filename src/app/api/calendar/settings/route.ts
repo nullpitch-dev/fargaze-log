@@ -1,24 +1,26 @@
 // src/app/api/calendar/settings/route.ts
 //
 // GET  /api/calendar/settings — the saved Calendar settings, or the defaults.
-// PUT  /api/calendar/settings — body holds any subset of the five fields;
+// PUT  /api/calendar/settings — body holds any subset of the six fields;
 //      only those are replaced.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import connectDB from '@/lib/mongodb';
 import CalendarSettings from '@/models/CalendarSettings';
+import { QUIET_KEYS } from '@/lib/calendar/quietRows';
 
 interface CalendarSettingsDTO {
   hiddenCategories: string[];
   hiddenCrossActivities: string[];
   colors: Record<string, string>;
   showReading: boolean;
+  hiddenRows: string[];
   hiddenNames: string[];
 }
 
 const DEFAULTS: CalendarSettingsDTO = {
-  hiddenCategories: [], hiddenCrossActivities: [], colors: {}, showReading: true,
+  hiddenCategories: [], hiddenCrossActivities: [], colors: {}, showReading: true, hiddenRows: [],
   // Starting list until the first change is saved (Hyoje, 28 Sep 2026).
   hiddenNames: ['정식 운동', '약식 운동'],
 };
@@ -29,6 +31,7 @@ function toDTO(doc: any): CalendarSettingsDTO {
     hiddenCrossActivities: doc?.hiddenCrossActivities ?? DEFAULTS.hiddenCrossActivities,
     colors:                doc?.colors ?? DEFAULTS.colors,
     showReading:           doc?.showReading ?? DEFAULTS.showReading,
+    hiddenRows:            doc?.hiddenRows ?? DEFAULTS.hiddenRows,
     hiddenNames:           doc?.hiddenNames ?? DEFAULTS.hiddenNames,
   };
 }
@@ -76,6 +79,10 @@ export async function PUT(req: NextRequest) {
   if ('hiddenNames' in body) {
     if (!isStrings(body.hiddenNames)) return NextResponse.json({ error: 'hiddenNames' }, { status: 400 });
     set.hiddenNames = body.hiddenNames;
+  }
+  if ('hiddenRows' in body) {
+    if (!isStrings(body.hiddenRows) || !body.hiddenRows.every((k: string) => QUIET_KEYS.has(k))) return NextResponse.json({ error: 'hiddenRows' }, { status: 400 });
+    set.hiddenRows = body.hiddenRows;
   }
   if ('showReading' in body) {
     if (typeof body.showReading !== 'boolean') return NextResponse.json({ error: 'showReading' }, { status: 400 });
