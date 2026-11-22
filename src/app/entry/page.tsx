@@ -13,13 +13,15 @@
 // Long press (Hyoje, 10 Nov): on Start now → Done now (starts and ends now: paying a bill);
 // on any title → Copy to new entry.
 
+import type { CalendarEvent } from '@/lib/calendar/calendar';
+import { SideCalendar } from './_components/SideCalendar';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { localNow, zoneCodeFor, type ZoneRow } from '@/lib/entry/time';
 import { DetailPanel, formatDuration, type LogEntry } from '@/app/_components/LogDetailPanel';
 import { ActionSheet, useLongPress, type SheetAction } from './_components/LongPress';
-import { dropOutbox, fetchWithin, flushOutbox, isNoSignal, listOutbox, onOutbox, outboxOn, putOutbox, updateOutbox, type OutboxItem } from '@/lib/offline/outbox';
+import { dropOutbox, fetchWithin, flushOutbox, isNoSignal, keepRefused, retryOutbox, listOutbox, onOutbox, outboxOn, putOutbox, updateOutbox, type OutboxItem } from '@/lib/offline/outbox';
 import { newEntryId } from '@/lib/entry/forms';
 
 interface Point { date: string; hour: string; timezone: string }
@@ -155,6 +157,26 @@ function EntryHome() {
   // The note being typed on a stamp (a new stamp opens it at once; Hyoje 10 Nov).
   const [noteFor, setNoteFor] = useState<string | null>(null);
   const [noteText, setNoteText] = useState('');
+
+  // The side calendar (22 Nov): open or not, remembered on this device; it covers Today on
+  // a narrow screen (the Fold's outer screen) and sits beside it otherwise.
+  const [side, setSide] = useState(false);
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)');
+    // Reopened by itself only where it doesn't cover Today.
+    try { setSide(localStorage.getItem('fg-side-calendar') === '1' && !mq.matches); } catch { /* none */ }
+    const on = () => setNarrow(mq.matches);
+    on(); mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  const showSide = (v: boolean) => { setSide(v); try { localStorage.setItem('fg-side-calendar', v ? '1' : '0'); } catch { /* none */ } };
+  /** A record or plan on the side calendar: the same pane as Done's. */
+  const openEvent = (e: CalendarEvent) => {
+    fetch(`/api/calendar/record?id=${encodeURIComponent(e.id)}${e.plan ? '&plan=1' : ''}`)
+      .then(r => r.json()).then(d => { if (!d.error) setPane(d); else setToast({ text: d.error }); })
+      .catch(err => setToast({ text: isNoSignal(err) ? 'No signal: the record opens once there is one' : String(err?.message ?? err) }));
+  };
 
   // The outbox (#71 step 3): entries and stamps saved on the phone with no signal.
   const [outbox, setOutbox] = useState<OutboxItem[]>([]);
@@ -305,7 +327,14 @@ function EntryHome() {
     try {
       const r = await fetchWithin(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, SEND_WAIT);
       const b = await r.json().catch(() => ({}));
-      if (!r.ok) { drop(); setToast({ text: [b.error ?? 'Failed', ...(b.problems ?? [])].join(' — ') }); load(); return 'failed'; }
+      if (!r.ok) {
+        drop();
+        const why = [b.error ?? 'Failed', ...(b.problems ?? [])].join(' — ');
+        // Kept with its time in Waiting to send (Hyoje, 22 Nov: pressed Start and drove home).
+        if (outboxOn() && r.status < 500) { keepRefused(item, b.error ?? `HTTP ${r.status}`, b.problems ?? []); setToast({ text: `${label} not saved — kept in Waiting to send. ${why}` }); }
+        else setToast({ text: why });
+        load(); return 'failed';
+      }
       load().finally(drop);                    // the new Home first, then the stand-in goes
       return 'sent';
     } catch (e) {
@@ -515,7 +544,8 @@ function EntryHome() {
   );
 
   return (
-    <div className="flex flex-col flex-1 w-full pb-24">
+    <div className="flex flex-1 w-full min-w-0">
+    <div className="flex flex-col flex-1 min-w-0 pb-24">
       <div className="px-4 pt-5 pb-2 max-w-3xl mx-auto w-full flex flex-col gap-4">
         {savedAt && (
           <p className="text-xs rounded border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950 text-amber-900 dark:text-amber-200 px-3 py-2">
@@ -527,6 +557,8 @@ function EntryHome() {
         <section className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <h1 className="text-lg font-semibold text-stone-800 dark:text-zinc-100">Today</h1>
+            {/* The Calendar's Day view beside Today (22 Nov). */}
+            {!side && <button onClick={() => showSide(true)} className="ml-auto mr-3 text-xs text-stone-500 dark:text-zinc-400 underline">Calendar</button>}
             {PRESETS_ON && data.presets.length > 0 && (
               <button onClick={() => setEditPresets(v => !v)} className="text-xs text-stone-500 dark:text-zinc-400 underline">{editPresets ? 'Done' : 'Edit presets'}</button>
             )}
@@ -582,11 +614,13 @@ function EntryHome() {
                           className="block text-sm text-stone-800 dark:text-zinc-100 hover:underline truncate select-none">{x.label}</Link>
                       ) : (
                         <span {...press(() => setMenu({ title: x.label, actions: [
+                            ...(x.state === 'refused' ? [{ label: 'Try again', hint: 'After fixing the plan or record', run: () => retryOutbox(x.id) }] : []),
                             { label: 'Discard', hint: 'Never sent: the plan or record stays as it was', run: () => discard(x) },
                           ] }))} className="block text-sm text-stone-800 dark:text-zinc-100 truncate select-none">{x.label}</span>
                       )}
                       <span className={`block text-xs truncate ${x.state === 'refused' ? 'text-red-700 dark:text-red-300' : 'text-stone-500 dark:text-zinc-400'}`}>
-                        {x.state === 'refused' ? `Not saved: ${x.problems?.[0] ?? x.error ?? 'refused'}` : <>{[dayLabel(x.when.split(' ')[0], today), x.when.split(' ')[1]].filter(Boolean).join(' · ')}<span className={onPhone}>On phone</span></>}
+                        {/* The time it was pressed stays visible when refused (22 Nov). */}
+                        {x.state === 'refused' ? `${x.when.split(' ')[1] ? `${x.when.split(' ')[1]} · ` : ''}Not saved: ${x.problems?.[0] ?? x.error ?? 'refused'}` : <>{[dayLabel(x.when.split(' ')[0], today), x.when.split(' ')[1]].filter(Boolean).join(' · ')}<span className={onPhone}>On phone</span></>}
                       </span>
                     </div>
                   </li>
@@ -682,6 +716,8 @@ function EntryHome() {
           <button onClick={() => setToast(null)} aria-label="Close" className="opacity-70">×</button>
         </div>
       )}
+    </div>
+    {side && <SideCalendar reloadKey={data} overlay={narrow} onClose={() => showSide(false)} onOpen={openEvent} />}
     </div>
   );
 }

@@ -50,6 +50,16 @@ export function putOutbox(item: Omit<OutboxItem, 'at' | 'state'> & Partial<Pick<
   write(items);
   void flushOutbox();
 }
+/** A press the server refused while Today was sending it (22 Nov): kept, not sent again, so
+ *  Waiting to send shows what and when it was pressed — the time isn't lost while driving. */
+export function keepRefused(item: OutboxItem, error: string, problems: string[] = []) {
+  write([...listOutbox().filter(x => x.id !== item.id), { ...item, state: 'refused', error, problems }]);
+}
+/** Send a refused one again (after fixing what was wrong elsewhere, e.g. the plan). */
+export function retryOutbox(id: string) {
+  updateOutbox(id, x => ({ ...x, state: 'waiting', error: undefined, problems: undefined }));
+  void flushOutbox();
+}
 export function getOutbox(id: string) { return listOutbox().find(x => x.id === id) ?? null; }
 export function updateOutbox(id: string, change: (x: OutboxItem) => OutboxItem) {
   write(listOutbox().map(x => (x.id === id ? change(x) : x)));

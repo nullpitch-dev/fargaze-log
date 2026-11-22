@@ -34,6 +34,7 @@ import {
 import { MonthView, DayList } from './_components/MonthView';
 import { CalendarFilters, type FilterState } from './_components/CalendarFilters';
 import { MonthPicker } from './_components/MonthPicker';
+import { DayPicker } from './_components/DayPicker';
 import { TimeGridView } from './_components/TimeGridView';
 import { YearView } from './_components/YearView';
 import { ScheduleView } from './_components/ScheduleView';
@@ -449,7 +450,14 @@ function CalendarInner() {
             <h1 className="text-base font-semibold text-stone-900 dark:text-zinc-50">{title}</h1>
             <span className="text-[9px] text-stone-400 dark:text-zinc-500">▼</span>
           </button>
-          {pickerOpen && (
+          {/* Day / 3 days / Week: a month of days to jump to any day (Hyoje, 22 Nov). */}
+          {pickerOpen && (view === 'day' || view === '3day' || view === 'week') && (
+            <DayPicker cursor={cursor} today={today} firstYear={firstYear}
+              shown={view === 'week' ? week : view === '3day' ? three : [cursor]}
+              onPick={d => { go(d, view); setPickerOpen(false); }}
+              onClose={() => setPickerOpen(false)} />
+          )}
+          {pickerOpen && !(view === 'day' || view === '3day' || view === 'week') && (
             <MonthPicker cursor={cursor} today={today} firstYear={firstYear}
               onPick={d => { go(d, view === 'year' ? 'month' : view); setPickerOpen(false); }}
               onClose={() => setPickerOpen(false)} />
