@@ -128,15 +128,42 @@ export function formatBodyFatPercent(v?: number | null): string | undefined {
 
 // ── Detail Panel ──────────────────────────────────────────────────────────────
 
-function DetailRow({ label, value }: { label: string; value?: string | number | null }) {
+function DetailRow({ label, value, extra }: { label: string; value?: string | number | null; extra?: React.ReactNode }) {
   if (value === null || value === undefined || value === '') return null;
   return (
     <div className="flex gap-3 py-2 border-b border-stone-100 dark:border-zinc-800 last:border-0">
       <span className="text-xs text-stone-500 dark:text-zinc-300 w-24 shrink-0 pt-0.5">{label}</span>
-      <span className="text-xs text-stone-700 dark:text-zinc-200 flex-1 break-words">{String(value)}</span>
+      <span className="text-xs text-stone-700 dark:text-zinc-200 flex-1 break-words">{String(value)}{extra}</span>
     </div>
   );
 }
+
+/** Beside the Place (Hyoje, 22 Nov): "Map" when the place has a point (Google Maps at it),
+ *  "+" when not (Place points with the name filled in). 집 / 회사 … resolve at the record's
+ *  start; "A - B" uses A's point. Nothing while loading or without a signal. */
+function PlacePoint({ name, at }: { name: string; at: number }) {
+  const [p, setP] = React.useState<{ lat: number | null; lng: number | null; add: string | null } | null>(null);
+  React.useEffect(() => {
+    let live = true;
+    setP(null);
+    fetch(`/api/places/point?${new URLSearchParams({ name, at: String(at) })}`)
+      .then(r => (r.ok ? r.json() : null)).then(b => { if (live && b && !b.error) setP(b); }).catch(() => {});
+    return () => { live = false; };
+  }, [name, at]);
+  if (!p) return null;
+  const link = 'ml-2 text-xs text-blue-600 dark:text-blue-400 hover:underline';
+  if (p.lat !== null && p.lng !== null) {
+    return <a href={`https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}`} target="_blank" rel="noopener noreferrer" className={link}>Map</a>;
+  }
+  return p.add ? <Link href={`/admin/place-coord?${new URLSearchParams({ add: p.add })}`} className={link} title={`Give ${p.add} a point`}>+</Link> : null;
+}
+
+/** The record's start as a moment (local wall clock − offset); now when it has none. */
+const startMs = (s: LogEntry['start']) => {
+  if (!s?.year) return Date.now();
+  const [h, m] = (s.hour || '0:00').split(':').map(Number);
+  return Date.UTC(s.year, (s.month ?? 1) - 1, s.day ?? 1, h || 0, m || 0) - (s.timezoneOffset ?? 0) * 3_600_000;
+};
 
 // Stored weekdays are Korean ('일'–'토'); the pane shows them in English.
 const WEEKDAY_EN: Record<string, string> = { '일': 'Sun', '월': 'Mon', '화': 'Tue', '수': 'Wed', '목': 'Thu', '금': 'Fri', '토': 'Sat' };
@@ -229,7 +256,8 @@ export function DetailPanel({ entry, onClose }: { entry: LogEntry; onClose: () =
 
           {entry.location && (entry.location.activity || entry.location.online || entry.location.other) && (
             <DetailSection title="Place">
-              <DetailRow label="Place" value={entry.location.activity} />
+              <DetailRow label="Place" value={entry.location.activity}
+                extra={entry.location.activity ? <PlacePoint name={entry.location.activity} at={startMs(entry.start)} /> : null} />
               <DetailRow label="Online" value={entry.location.online} />
               <DetailRow label="Someone else’s place" value={entry.location.other} />
             </DetailSection>

@@ -14,18 +14,30 @@ export const addBtn = 'text-xs px-2 py-1 rounded border border-dashed border-sto
 
 // ── Layout ───────────────────────────────────────────────────────────────────
 
-export function Section({ title, onRemove, onReset, children }: { title: string; onRemove?: () => void; onReset?: () => void; children: ReactNode }) {
+export function Section({ title, onRemove, onReset, children, folded, summary }: { title: string; onRemove?: () => void; onReset?: () => void; children: ReactNode;
+  /** Starts folded: the title opens it (Notes, Hyoje 22 Nov). Default off. */
+  folded?: boolean;
+  /** Shown grey beside the title while folded (the first line of the notes). */
+  summary?: string }) {
+  const [open, setOpen] = useState(!folded);
   return (
     // Denser, with titles and borders that stand out more (Hyoje, 12 Nov).
     <section className="bg-white dark:bg-zinc-900 border-[1.5px] sm:border border-stone-400 dark:border-zinc-500 rounded-lg px-3 py-2.5 sm:p-4 shadow-sm">
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-700 dark:text-zinc-200">{title}</h2>
+      <div className={`flex items-center justify-between gap-3 ${open ? 'mb-2' : ''}`}>
+        {folded ? (
+          <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} className="flex-1 min-w-0 flex items-baseline gap-2 text-left">
+            <h2 className="shrink-0 text-xs font-semibold uppercase tracking-widest text-stone-700 dark:text-zinc-200">{open ? '▾' : '▸'} {title}</h2>
+            {!open && summary && <span className="truncate text-xs text-stone-400 dark:text-zinc-500">{summary}</span>}
+          </button>
+        ) : (
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-700 dark:text-zinc-200">{title}</h2>
+        )}
         <span className="flex items-center gap-3">
-          {onReset && <button type="button" onClick={onReset} className={linkBtn} title="Clear what was measured or paid, keep the rest">Reset</button>}
+          {open && onReset && <button type="button" onClick={onReset} className={linkBtn} title="Clear what was measured or paid, keep the rest">Reset</button>}
           {onRemove && <button type="button" onClick={onRemove} className={linkBtn} title="Empty this section and hide it">Remove</button>}
         </span>
       </div>
-      <div className="flex flex-col gap-2.5">{children}</div>
+      {open && <div className="flex flex-col gap-2.5">{children}</div>}
     </section>
   );
 }

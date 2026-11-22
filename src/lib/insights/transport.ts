@@ -475,15 +475,7 @@ function buildBlock(a: {
     },
     comingHome: comingHome(journeys),
     map: {
-      places: [...arrivals].sort((x, y) => y[1] - x[1]).slice(0, MAP_PLACES).map(([name, n]) => {
-        const p = a.pointOf.get(name);
-        return { name, arrivals: n, lat: p?.lat ?? null, lng: p?.lng ?? null, home: a.homeNames.has(name) };
-      }),
-      routes: [...routes].sort((x, y) => y[1] - x[1]).slice(0, MAP_ROUTES).map(([k, n]) => {
-        const [from, to] = k.split('\u0000');
-        const pa = a.pointOf.get(from), pb = a.pointOf.get(to);
-        return { from, to, count: n, a: pa ? [pa.lat, pa.lng] as [number, number] : null, b: pb ? [pb.lat, pb.lng] as [number, number] : null };
-      }),
+      ...mapOf(arrivals, routes, a),
       arrivals: journeys.length,
       arrivalsWithPoint: [...arrivals].filter(([name]) => a.pointOf.has(name)).reduce((n, [, c]) => n + c, 0),
       missing: [...arrivals].filter(([name]) => !a.pointOf.has(name))
@@ -495,6 +487,27 @@ function buildBlock(a: {
       km: a.flights.length && a.flights.every(l => legKm(l) !== null) ? round1(sum(a.flights.map(l => legKm(l)!))) : null,
     },
   };
+}
+
+/** The map's dots and lines. Dots: the busiest arrival places, plus every end of a line
+ *  drawn (Hyoje, 22 Nov: a place only left from — a restaurant before the hotel — had a
+ *  line but no dot); a place never arrived at shows as the smallest dot. */
+function mapOf(arrivals: Map<string, number>, routeTally: Map<string, number>, a: { pointOf: Map<string, { lat: number; lng: number }>; homeNames: Set<string> }) {
+  const dot = (name: string, n: number) => {
+    const p = a.pointOf.get(name);
+    return { name, arrivals: n, lat: p?.lat ?? null, lng: p?.lng ?? null, home: a.homeNames.has(name) };
+  };
+  const routes = [...routeTally].sort((x, y) => y[1] - x[1]).slice(0, MAP_ROUTES).map(([k, n]) => {
+    const [from, to] = k.split('\u0000');
+    const pa = a.pointOf.get(from), pb = a.pointOf.get(to);
+    return { from, to, count: n, a: pa ? [pa.lat, pa.lng] as [number, number] : null, b: pb ? [pb.lat, pb.lng] as [number, number] : null };
+  });
+  const places = [...arrivals].sort((x, y) => y[1] - x[1]).slice(0, MAP_PLACES).map(([name, n]) => dot(name, n));
+  const named = new Set(places.map(p => p.name));
+  for (const r of routes) for (const end of [r.from, r.to]) {
+    if (!named.has(end) && a.pointOf.has(end)) { named.add(end); places.push(dot(end, arrivals.get(end) ?? 0)); }
+  }
+  return { places, routes };
 }
 
 // Getting home: "All" (the three groups together) first, then each group.

@@ -13,18 +13,19 @@
 // Long press (Hyoje, 10 Nov): on Start now → Done now (starts and ends now: paying a bill);
 // on any title → Copy to new entry.
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { localNow, zoneCodeFor, type ZoneRow } from '@/lib/entry/time';
 import { DetailPanel, formatDuration, type LogEntry } from '@/app/_components/LogDetailPanel';
 import { ActionSheet, useLongPress, type SheetAction } from './_components/LongPress';
-import { dropOutbox, flushOutbox, isNoSignal, listOutbox, onOutbox, outboxOn, putOutbox, updateOutbox, type OutboxItem } from '@/lib/offline/outbox';
+import { dropOutbox, fetchWithin, flushOutbox, isNoSignal, listOutbox, onOutbox, outboxOn, putOutbox, updateOutbox, type OutboxItem } from '@/lib/offline/outbox';
 import { newEntryId } from '@/lib/entry/forms';
 
 interface Point { date: string; hour: string; timezone: string }
 interface Item { plan?: boolean; id: string; activity: string; category: string; title: string; start: Point; end: Point; place: string; updatedAt: string; seconds?: number | null; repeat?: boolean; started?: boolean; plannedEnd?: { date: string; hour: string; timezone?: string } | null;
-  /** changed on the phone, not sent yet (offline slice 3) */ local?: boolean }
+  /** changed on the phone, not sent yet (offline slice 3) */ local?: boolean;
+  /** pressed with a signal, being sent now (22 Nov) */ sending?: boolean }
 interface Preset { id: string; name: string; order: number; time: { kind: 'open' | 'moment' | 'length'; minutes: number | null } }
 interface Stamp { id: string; note: string; start: Point; end: Point; updatedAt: string; /** saved on the phone, not sent yet (offline) */ local?: boolean }
 interface Home { today: string; stamps: Stamp[]; comingUp: Item[]; inProgress: Item[]; done: Item[]; ongoing: Item[]; recent: Item[]; presets: Preset[] }
@@ -39,6 +40,8 @@ const heading = 'text-xs font-semibold uppercase tracking-widest text-stone-700 
 const planTag = 'shrink-0 self-center text-[10px] px-1.5 py-0.5 rounded bg-stone-100 dark:bg-zinc-800 text-stone-500 dark:text-zinc-400';
 const card = 'bg-white dark:bg-zinc-900 border-[1.5px] sm:border border-stone-400 dark:border-zinc-500 rounded-lg';   // outer line only (1.5 px on a phone, 1 px on a computer, 13 Nov); rows keep their thin lines
 /** Changed or saved on the phone, not sent yet (offline): a badge that stands out (Hyoje, 12 Nov). */
+/** Pressed with a signal, still on its way (22 Nov): quiet, it lands in a moment. */
+const sendingTag = 'ml-1.5 inline-block align-[1px] text-[10px] text-stone-400 dark:text-zinc-500';
 const onPhone = 'ml-1.5 inline-block align-[1px] rounded px-1 py-px text-[10px] font-semibold uppercase tracking-wide bg-amber-200 text-amber-900 dark:bg-amber-500/25 dark:text-amber-200';
 
 /** Presets are deferred (Hyoje, 10 Nov): Copy recent covers the need for now. */
@@ -83,7 +86,7 @@ const NO_POINT: Point = { date: '', hour: '', timezone: '' };
 
 /** Offline slice 3: Today as it will be once the buttons pressed with no signal are sent —
  *  a started plan is In progress, an ended record is Done. A refused one shows as it was. */
-function withOutbox(h: Home, ob: OutboxItem[]): Home {
+function withOutbox(h: Home, ob: OutboxItem[], sending: Set<string> = new Set()): Home {
   const acts = ob.filter(x => x.kind === 'action' && x.state === 'waiting' && x.meta);
   if (!acts.length) return h;
   let comingUp = [...h.comingUp], inProgress = [...h.inProgress], done = [...h.done], ongoing = [...h.ongoing];
@@ -94,14 +97,14 @@ function withOutbox(h: Home, ob: OutboxItem[]): Home {
       inProgress = inProgress.filter(x => x.id !== m.target);
       ongoing = ongoing.filter(x => x.id !== m.target);
       done = done.filter(x => x.id !== m.target);
-      if (from) done = [{ ...from, end: m.at, seconds: null, local: true }, ...done];
+      if (from) done = [{ ...from, end: m.at, seconds: null, local: true, sending: sending.has(a.id) }, ...done];
       continue;
     }
     const plan: Item | undefined = comingUp.find(x => x.id === m.target) ?? m.item;
     comingUp = comingUp.filter(x => x.id !== m.target);
     if (!plan || !m.recordId || [...inProgress, ...done].some(x => x.id === m.recordId)) continue;
     const start = m.op === 'onTime' ? plan.start : m.at;
-    const rec: Item = { ...plan, id: m.recordId, start, end: m.op === 'nowDone' ? start : NO_POINT, updatedAt: '', started: true, local: true };
+    const rec: Item = { ...plan, id: m.recordId, start, end: m.op === 'nowDone' ? start : NO_POINT, updatedAt: '', started: true, local: true, sending: sending.has(a.id) };
     if (m.op === 'nowDone') done = [rec, ...done]; else inProgress = [rec, ...inProgress];
   }
   // Done by start time, newest first (13 Nov), the phone's rows included.
@@ -127,6 +130,9 @@ function warmItems(h: any) {
     navigator.serviceWorker.controller.postMessage({ type: 'warm', data: [...new Set(data)] });
   } catch { /* nothing saved; fine */ }
 }
+
+/** How long Start / End wait for an answer before the phone keeps them (22 Nov). */
+const SEND_WAIT = 6000;
 
 const NO_SIGNAL = 'No signal: this needs one — Start, End, + New, Copy and Stamp work without';
 
@@ -168,6 +174,9 @@ function EntryHome() {
 
   /** When the Home shown was saved, if it came from the phone's copy (offline). */
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const retry = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadRef = useRef<(() => Promise<void>) | null>(null);
+  useEffect(() => () => { if (retry.current) clearTimeout(retry.current); }, []);
   const load = useCallback(async () => {
     try {
       const [h, z] = await Promise.all([
@@ -182,10 +191,14 @@ function EntryHome() {
       setSavedAt(saved || null);
       setData(hb); setError('');
       if (!saved) warmItems(hb);
+      // The saved copy was shown because the answer was slow: ask again shortly — the
+      // network's answer has usually landed by then (22 Nov).
+      else if (!retry.current) retry.current = setTimeout(() => { retry.current = null; void loadRef.current?.(); }, 12000);
     } catch (e: any) {
       setError(navigator.onLine === false ? 'No signal, and Home hasn’t been saved on this phone yet.' : String(e.message ?? e));
     }
   }, [iana, zones]);
+  useEffect(() => { loadRef.current = load; }, [load]);
   useEffect(() => { load(); }, [load]);
 
   // Sent from the outbox: Home again, and a word on how it went.
@@ -271,23 +284,69 @@ function EntryHome() {
     });
     setToast({ text: `${label} — saved on the phone, sent once there is a signal` });
   }
-  /** A plan happens; offline the phone names the record, so End now can follow before sending. */
+  // Start / End at once (Hyoje, 22 Nov: changing a status was too slow). The press shows
+  // straight away — the same way as a press with no signal (withOutbox) — and is sent in
+  // the background; Home reloads quietly after. No answer within SEND_WAIT → it goes to the
+  // phone's queue under the same record ID (sending twice can't make two records).
+  // A refusal puts it back and says why.
+  const [pending, setPending] = useState<OutboxItem[]>([]);
+  const inFlight = useRef(new Map<string, Promise<'sent' | 'queued' | 'failed'>>());   // by record ID
+  async function fly(it: Item, op: 'start' | 'onTime' | 'nowDone' | 'end', at: Point, url: string, body: any, label: string, done: Toast, recordId?: string): Promise<'sent' | 'queued' | 'failed'> {
+    const item: OutboxItem = {
+      id: newEntryId(), kind: 'action', url, method: 'POST', body, state: 'waiting', at: Date.now(),
+      label: `${label} · ${name(it)}`, when: `${(at.date || it.start.date)} ${at.hour || it.start.hour}`.trim(),
+      meta: { op, target: it.id, recordId, at, item: it },
+    };
+    const queue = () => { putOutbox(op === 'end' ? { ...item, body: { ...body, updatedAt: 'phone' } } : item); setToast({ text: `${label} — saved on the phone, sent once there is a signal` }); };
+    if (outboxOn() && navigator.onLine === false) { queue(); return 'queued'; }
+    setPending(xs => [...xs, item]);
+    setToast(done);
+    const drop = () => setPending(xs => xs.filter(x => x.id !== item.id));
+    try {
+      const r = await fetchWithin(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, SEND_WAIT);
+      const b = await r.json().catch(() => ({}));
+      if (!r.ok) { drop(); setToast({ text: [b.error ?? 'Failed', ...(b.problems ?? [])].join(' — ') }); load(); return 'failed'; }
+      load().finally(drop);                    // the new Home first, then the stand-in goes
+      return 'sent';
+    } catch (e) {
+      drop();
+      if (outboxOn() && isNoSignal(e)) { queue(); return 'queued'; }
+      setToast({ text: isNoSignal(e) ? NO_SIGNAL : String((e as any)?.message ?? e) });
+      return 'failed';
+    }
+  }
+  /** A plan happens. The phone names the record, so End now can follow before it is sent. */
   function confirm(it: Item, how: 'now' | 'onTime' | 'nowDone', label: string, done: Toast) {
     const at = how === 'onTime' ? it.start : nowPoint();
     const op = how === 'now' ? 'start' : how;
-    const queue = () => {
-      const recordId = newEntryId();
-      queueAction(it, op, at, `/api/entry/plans/${it.id}/confirm`, { updatedAt: it.updatedAt, how, ...(how === 'onTime' ? {} : { now: at }), recordId }, label, recordId);
-    };
-    return act(`s${it.id}`, () => call(`/api/entry/plans/${it.id}/confirm`, 'POST', { updatedAt: it.updatedAt, how, ...(how === 'onTime' ? {} : { now: at }) }), done, queue);
+    const recordId = newEntryId();
+    const body = { updatedAt: it.updatedAt, how, ...(how === 'onTime' ? {} : { now: at }), recordId };
+    const p = fly(it, op, at, `/api/entry/plans/${it.id}/confirm`, body, label, done, recordId);
+    inFlight.current.set(recordId, p);
+    p.finally(() => inFlight.current.delete(recordId));
   }
   /** End a record; one started on the phone (not sent yet) always waits behind its start. */
   function end(it: Item, at: Point, label: string, done: Toast) {
     const url = `/api/entry/records/${it.id}/end`;
     const body = { end: at, updatedAt: it.local ? '' : it.updatedAt };
-    const queue = () => queueAction(it, 'end', at, url, body, label);
-    if (it.local) { if (outboxOn()) queue(); return; }
-    return act(`e${it.id}`, () => call(url, 'POST', body), done, queue);
+    if (it.local) {
+      const start = inFlight.current.get(it.id);
+      // Its start is still being sent: end it after that (queued too if the start was).
+      if (start) {
+        // Shown as ended at once; sent (or queued) once its start is settled.
+        const wait: OutboxItem = { id: newEntryId(), kind: 'action', url, method: 'POST', body, state: 'waiting', at: Date.now(), label, when: '', meta: { op: 'end', target: it.id, at, item: it } };
+        setPending(xs => [...xs, wait]);
+        void start.then(how => {
+          setPending(xs => xs.filter(x => x.id !== wait.id));
+          if (how === 'sent') void fly({ ...it, local: false }, 'end', at, url, { ...body, updatedAt: 'phone' }, label, done);
+          else if (how === 'queued' && outboxOn()) queueAction(it, 'end', at, url, body, label);
+        });
+        return;
+      }
+      if (outboxOn()) queueAction(it, 'end', at, url, body, label);
+      return;
+    }
+    void fly(it, 'end', at, url, body, label, done);
   }
 
   // The waiting list says only Started or Ended (Hyoje, 12 Nov); the kind still travels.
@@ -400,7 +459,7 @@ function EntryHome() {
     ...(data.stamps ?? []),
   ].filter(st => !usedStamps.has(st.id));
   const waiting = outbox.filter(x => x.kind === 'entry' || x.kind === 'action');
-  const view = withOutbox(data, outbox);
+  const view = withOutbox(data, [...outbox, ...pending], new Set(pending.map(x => x.id)));
   const discard = (x: OutboxItem) => { if (window.confirm(`Discard “${x.label}”? It was never sent, so it is lost.`)) dropOutbox(x.id); };
   const newHref = (extra: Record<string, string> = {}) => `/entry/new?${new URLSearchParams(extra)}`;
   const recent = copyQ.trim() ? (found ?? data.recent.filter(r => name(r).toLowerCase().includes(copyQ.trim().toLowerCase()))) : data.recent;
@@ -449,7 +508,7 @@ function EntryHome() {
           : href
           ? <Link href={href} {...copyMenu(it, plan)} className="block text-sm text-stone-800 dark:text-zinc-100 hover:underline truncate select-none">{name(it)}</Link>
           : <span className="block text-sm text-stone-800 dark:text-zinc-100 truncate">{name(it)}</span>}
-        <span className="block text-xs leading-4 text-stone-500 dark:text-zinc-400 truncate">{sub ?? when(it, today)}{it.place ? ` · ${it.place}` : ''}{it.local && <span className={onPhone}>On phone</span>}</span>
+        <span className="block text-xs leading-4 text-stone-500 dark:text-zinc-400 truncate">{sub ?? when(it, today)}{it.place ? ` · ${it.place}` : ''}{it.local && (it.sending ? <span className={sendingTag}>Sending</span> : <span className={onPhone}>On phone</span>)}</span>
       </div>
       {right}
     </li>

@@ -7,7 +7,7 @@
 // Undo (sheet ticks went with the freeze, 14 Nov 2026). Long lists (indexBy) get an alphabet bar: ㄱ–ㅎ, A–Z and #.
 // A point column (place points) gets a Map column and 📍 Here (PointPicker).
 
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { PointPicker, locate, type LatLng, type Located } from '../_components/PointPicker';
@@ -469,6 +469,17 @@ export default function AdminListPage() {
     if (missingSort === 'name') out.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
     return out;
   }, [missing, missingSort]);
+
+  // ?add=<name> (the record pane's "+", 22 Nov): the Add row with the name filled in, once.
+  const addAsked = useRef(false);
+  useEffect(() => {
+    if (!data || addAsked.current || !data.list.indexBy) return;
+    const name = new URLSearchParams(window.location.search).get('add');
+    if (!name) return;
+    addAsked.current = true;
+    if (!data.rows.some(r => r.values[data.list.indexBy!] === name)) addFromMissing(name);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
 
   /** "+ Add point" from Missing points: the Add row with the name filled in. */
   function addFromMissing(name: string) {

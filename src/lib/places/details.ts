@@ -13,6 +13,13 @@
 
 export const DETAIL_SEP = ' - ';
 
+/** The form's Place + Detail boxes keep what is typed (spaces included — Hyoje, 22 Nov:
+ *  "Guine 집" lost its space); saving tidies each part: "Guine  - 3층 " → "Guine - 3층",
+ *  " - 3층" (no place) → "3층". */
+export function tidyPlace(name: unknown): string {
+  return String(name ?? '').split(DETAIL_SEP).map(x => x.trim()).filter(Boolean).join(DETAIL_SEP);
+}
+
 /** The name and its shorter forms, longest first: A - B - C, A - B, A. */
 export function namePrefixes(name: string): string[] {
   const parts = name.split(DETAIL_SEP);

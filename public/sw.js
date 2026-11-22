@@ -19,8 +19,10 @@ const STATIC = `fg-static-${VERSION}`;
 const PAGES = `fg-pages-${VERSION}`;
 const DATA = `fg-data-${VERSION}`;
 const KEEP = [STATIC, PAGES, DATA];
-const PAGE_WAIT = 5000;
-const DATA_WAIT = 8000;
+// Shorter waits (Hyoje, 22 Nov: deciding it was offline took too long): the saved copy
+// shows sooner and the page swaps in the fresh answer when it comes (Today retries).
+const PAGE_WAIT = 2500;
+const DATA_WAIT = 3500;
 const STATIC_MAX = 400;
 
 // What the entry app needs to open offline; fetched again on every online visit.

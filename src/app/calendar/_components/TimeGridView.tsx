@@ -187,8 +187,10 @@ export function TimeGridView({
         </div>
       </div>
 
-      {/* Hours */}
-      <div className="relative flex-1 min-h-0 flex flex-col">
+      {/* Hours. `isolate`: the grid's own layers (records stacked by start time, the now
+          line z-900, the ▲ / ▼ z-950) stay inside it, under Copy recent, the record pane and
+          other pop-ups (Hyoje, 22 Nov). */}
+      <div className="relative isolate flex-1 min-h-0 flex flex-col">
       {(['above', 'below'] as const).map(side => hidden.some(x => x[side].length) && (
         <div key={side} className={`absolute left-0 right-0 z-[950] flex pointer-events-none ${side === 'above' ? 'top-1' : 'bottom-1'}`} style={reserve}>
           <div style={gutterStyle} />

@@ -28,7 +28,7 @@ import { loadFormContext } from '../records/edit';
 import { buildRecord, fromRecord, type RecordForm } from '../records/form';
 import { isOpen, missingRequired } from './groups';
 import { endAheadToPlanned, relaxOpen, tightenOnEnd } from './drafts';
-import { instantOf } from './time';
+import { instantOf, addMinutes, daysBetween } from './time';
 
 type Fail = { ok: false; status: number; error: string; problems?: string[] };
 const fail = (status: number, error: string, problems?: string[]): Fail => ({ ok: false, status, error, ...(problems ? { problems } : {}) });
@@ -175,6 +175,9 @@ async function happen(userId: string, plan: any, doc: any, doneBy: 'confirmed' |
   return recordId;
 }
 
+/** "09:30" → 570; '' → 0. */
+const minutesOfHour = (h: string) => { const m = /^(\d{1,2}):(\d{2})/.exec(h || ''); return m ? Number(m[1]) * 60 + Number(m[2]) : 0; };
+
 const CHANGED = 'This plan was changed since you opened it. Reload and try again.';
 
 /**
@@ -203,6 +206,21 @@ export async function confirmPlan(userId: string, id: string, updatedAt: string,
   if (atNow) {
     if (!now?.date || !now?.hour) return fail(400, 'Send now: { date, hour, timezone }.');
     form.start = { date: now.date, hour: now.hour, timezone: now.timezone || form.start.timezone };
+  }
+  // A planned end already behind the new start (an overdue plan started or done now) would
+  // be refused as "Planned end is before start" (Hyoje, 22 Nov: it should simply work):
+  // Done now drops it — the record ends now; Start now keeps the planned length from now.
+  if (atNow && (form.plannedEnd.date || form.plannedEnd.hour)) {
+    const at = (x: { date: string; hour: string }) => daysBetween('2000-01-01', x.date) * 1440 + minutesOfHour(x.hour);
+    const planned = fromRecord(p);
+    const pe = { date: form.plannedEnd.date || planned.start.date, hour: form.plannedEnd.hour };
+    if (pe.date && at(pe) < at(form.start)) {
+      if (how === 'nowDone' || !planned.start.date) form.plannedEnd = { date: '', hour: '', timezone: '' };
+      else {
+        const e = addMinutes(form.start.date, form.start.hour, Math.max(0, at(pe) - at(planned.start)));
+        form.plannedEnd = { ...e, timezone: form.start.timezone };
+      }
+    }
   }
   if (how === 'nowDone') form.end = { ...form.start };
   else if (how === 'done') form.end = { ...form.plannedEnd };   // Done as planned: it ended when planned

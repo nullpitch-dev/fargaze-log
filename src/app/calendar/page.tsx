@@ -121,6 +121,15 @@ function CalendarInner() {
     if (v !== view) router.push(href, { scroll: false }); else router.replace(href, { scroll: false });
   }, [router, view]);
   const setCursor = useCallback((d: string) => go(d, view), [go, view]);
+  // On a touch screen (the phone, either screen) the Calendar opens in 3 days (Hyoje,
+  // 22 Nov); a computer keeps Month. Only when the address names no view.
+  useEffect(() => {
+    if (urlView || !window.matchMedia?.('(pointer: coarse)').matches) return;
+    const q = new URLSearchParams(window.location.search);
+    q.set('view', '3day');
+    router.replace(`/calendar?${q}`, { scroll: false });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Search in the address ──
   const paramsKey = params.toString();

@@ -67,7 +67,9 @@ const sleepOptions = (used: string[]) => {
 };
 /** "회사 - 회의실 1" → ["회사", "회의실 1"]: the place and its detail (67.8). */
 const splitPlace = (v: string): [string, string] => { const i = v.indexOf(' - '); return i < 0 ? [v, ''] : [v.slice(0, i), v.slice(i + 3)]; };
-const joinPlace = (a: string, b: string) => (b.trim() ? `${a.trim()} - ${b.trim()}` : a.trim());
+// Kept as typed — no trimming while typing (Hyoje, 22 Nov: a space could not be typed);
+// buildRecord tidies on save (tidyPlace).
+const joinPlace = (a: string, b: string) => (b ? `${a} - ${b}` : a);
 interface Result {
   kind: 'saved' | 'deleted';
   /** Made in the entry app (#71): not in the sheet, nothing to repeat there. */
@@ -1207,7 +1209,8 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
             </div>
           )}
 
-          <Section title="Notes" onReset={resetBtn('notes')}>
+          {/* Folded (Hyoje, 22 Nov); the first line shows while folded. */}
+          <Section title="Notes" onReset={resetBtn('notes')} folded summary={f.notes.split('\n')[0].trim()}>
             <textarea value={f.notes} onChange={e => set('notes', e.target.value)} rows={3} className={`${inputCls} resize-y`} />
           </Section>
 

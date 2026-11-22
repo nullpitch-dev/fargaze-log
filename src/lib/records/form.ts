@@ -10,6 +10,7 @@
 // works out what the sheet calculates: the category from the activity, weekdays,
 // offsets, all-day and the duration. Empty lists are [] (the database's array default).
 
+import { tidyPlace } from '../places/details';
 import { relationshipOf } from './relationship';
 import { computeTotalSeconds, weekdayOf } from '../migration/transform';
 
@@ -361,7 +362,7 @@ export function buildRecord(form: RecordForm, base: any | null, ctx: FormContext
     end: end ? strip(end) : base?.end ?? null,
     plannedEnd: plannedEnd ? strip(plannedEnd) : null,
     duration: { totalSeconds },
-    location: { activity: str(f?.location?.activity), online: str(f?.location?.online), other: str(f?.location?.other) },
+    location: { activity: str(tidyPlace(f?.location?.activity)), online: str(f?.location?.online), other: str(f?.location?.other) },
     cost: {
       amountKRW: num(f?.cost?.amountKRW, 'Cost (KRW)', problems), amountForeign: num(f?.cost?.amountForeign, 'Cost (foreign)', problems),
       currency: str(f?.cost?.currency), categoryDetail: str(f?.cost?.categoryDetail), category: str(f?.cost?.category),
