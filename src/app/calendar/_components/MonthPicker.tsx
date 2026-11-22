@@ -5,6 +5,7 @@
 // then the month. Opens from the month title in the Calendar toolbar.
 
 import React, { useEffect, useRef, useState } from 'react';
+import { useKeepOnScreen } from './DayPicker';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -31,11 +32,12 @@ export function MonthPicker({ cursor, today, firstYear, onPick, onClose }: {
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
   }, [onClose]);
 
+  const keep = useKeepOnScreen(ref);
   const years = Array.from({ length: hi - lo + 1 }, (_, i) => hi - i);
   const arrow = 'w-7 h-7 rounded-full text-lg leading-none text-stone-500 dark:text-zinc-400 hover:bg-stone-100 dark:hover:bg-zinc-800 disabled:opacity-30';
 
   return (
-    <div ref={ref}
+    <div ref={ref} style={keep}
       className="absolute left-0 top-full mt-1 z-40 w-64 max-w-[calc(100vw-2rem)] p-3 rounded-lg border border-stone-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg">
       <div className="flex items-center justify-between mb-2">
         <button className={arrow} disabled={year <= lo} onClick={() => setYear(y => y - 1)} aria-label="Previous year">‹</button>

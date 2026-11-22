@@ -8,12 +8,34 @@
 //   a day        goes there; the days shown now are shaded (a whole week row in Week)
 // Today is blue. Esc or a click outside closes it.
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { monthGrid } from '../_lib/month-layout';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+/** Keeps a pop-up inside the screen (Hyoje, 22 Nov: on the Fold's outer screen the
+ *  picker ran off the right edge): shifts it sideways by what sticks out, 8 px margin. */
+export function useKeepOnScreen(ref: React.RefObject<HTMLElement | null>) {
+  const [dx, setDx] = useState(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const fit = () => {
+      const was = el.style.transform;
+      el.style.transform = '';                        // measure where it sits unshifted
+      const r = el.getBoundingClientRect(), w = window.innerWidth;
+      el.style.transform = was;
+      setDx(r.right > w - 8 ? Math.max(8 - r.left, w - 8 - r.right) : r.left < 8 ? 8 - r.left : 0);
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ref]);
+  return dx ? { transform: `translateX(${dx}px)` } : undefined;
+}
 
 const ym = (y: number, m: number) => `${y}-${String(m).padStart(2, '0')}`;
 
@@ -46,6 +68,7 @@ export function DayPicker({ cursor, today, shown, firstYear, onPick, onClose, cl
     };
   }, [onClose]);
 
+  const keep = useKeepOnScreen(ref);
   const [y, m] = month.split('-').map(Number);
   const step = (n: number) => { const t = new Date(Date.UTC(y, m - 1 + n, 1)); setMonth(ym(t.getUTCFullYear(), t.getUTCMonth() + 1)); };
   const thisYear = Number(today.slice(0, 4));
@@ -55,7 +78,7 @@ export function DayPicker({ cursor, today, shown, firstYear, onPick, onClose, cl
   const arrow = 'w-7 h-7 rounded-full text-lg leading-none text-stone-500 dark:text-zinc-400 hover:bg-stone-100 dark:hover:bg-zinc-800 disabled:opacity-30';
 
   return (
-    <div ref={ref} className={`${className} z-40 w-64 max-w-[calc(100vw-2rem)] p-3 rounded-lg border border-stone-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg`}>
+    <div ref={ref} style={keep} className={`${className} z-40 w-64 max-w-[calc(100vw-2rem)] p-3 rounded-lg border border-stone-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg`}>
       {mode === 'days' ? (
         <>
           <div className="flex items-center justify-between mb-1">
