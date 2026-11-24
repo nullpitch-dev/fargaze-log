@@ -27,12 +27,13 @@ import type { RecordForm, FormFood, FormAlcohol, FormItem, FormExercise } from '
 import type { FormOptions } from '@/lib/records/formOptions';
 import { Choice, Field, IngredientsNote, ItemList, NoteBox, NumberBox, PickText, Row, Section, Select, TagInput, Text, ToggleChips, OnePills, addBtn, inputCls } from './fields';
 import { PeopleEditor } from './PeopleEditor';
+import { RepeatField, ScopeDialog, sameSchedule, scheduleOf, type Schedule } from './RepeatPicker';
 import { ChangeTable, type Line, type Plain } from './ChangeTable';
 import { relationshipOf } from '@/lib/records/relationship';
 import { rulesFor, type EntryGroup } from '@/lib/entry/groups';
 import { addMinutes, localNow, zoneCodeFor, type ZoneRow } from '@/lib/entry/time';
 import { RESETTABLE, resetSection, HOME_CURRENCY, type ResettableSection } from '@/lib/entry/forms';
-import { dropOutbox, fetchWithin, isNoSignal, outboxOn, putOutbox } from '@/lib/offline/outbox';
+import { dropOutbox, fetchWithin, isNoSignal, outboxOn, putOutbox, seemsOffline } from '@/lib/offline/outbox';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -265,6 +266,11 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
   const [check, setCheck] = useState<{ for: string; data: Check } | null>(null);
   const [checkError, setCheckError] = useState('');
   const [saving, setSaving] = useState(false);
+  // Repeats (24 Nov, as Google Calendar): the schedule chosen on the form; on a repeating
+  // plan, its rule as loaded, and the "This event / This and following / All events" question.
+  const [repeat, setRepeat] = useState<Schedule | null>(null);
+  const [rule, setRule] = useState<any | null>(null);
+  const [scopeAsk, setScopeAsk] = useState<null | 'save' | 'delete'>(null);
   const [saveError, setSaveError] = useState<{ text: string; problems?: string[]; conflict?: boolean } | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [busy, setBusy] = useState(false);
@@ -311,6 +317,14 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
           const w = wholeFrom(rb.form.food.foods ?? []);
           if (w.safe) { whole0 = w.whole; form0 = { ...rb.form, food: { ...rb.form.food, foods: shareWhole(w.foods, w.whole) } }; }
         }
+        // A repeating plan: its repeat, shown on the form (24 Nov).
+        let rule0: any = null;
+        if (mode === 'plan' && rb.repeatId) {
+          const rr = await fetch(`/api/entry/repeats/${rb.repeatId}`, { cache: 'no-store' }).then(x => x.json()).catch(() => null);
+          rule0 = rr?.rule ?? null;
+        }
+        if (!live) return;
+        setRule(rule0); setRepeat(scheduleOf(rule0));
         setRec(rb); setForm(form0); setAdded(new Set()); setRemoved(new Set()); setRateOverride(undefined); setWhole(whole0); setCheck(null); setSaveError(null); setLoadError(''); setKrwPicked(false);
       } catch (e: any) {
         if (live) setLoadError(String(e.message ?? e));
@@ -493,9 +507,101 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
 
   // ── Save / delete / undo / tick ─────────────────────────────────────────────
 
-  async function save(override?: RecordForm) {
+  // ── Repeats (24 Nov) ──────────────────────────────────────────────────────────
+
+  /** The rule the server keeps, from the form and the schedule: the start's time, the length
+   *  from the planned end (or End), the zone's IANA name. */
+  const ruleBody = (fm: RecordForm, sc: Schedule, from: string) => {
+    const zone = entryOpts?.zones?.find(z => z.code === fm.start.timezone);
+    const iana = zone?.ianaTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London';
+    const until = fm.plannedEnd.date || fm.plannedEnd.hour ? fm.plannedEnd : fm.end;
+    let minutes: number | null = null;
+    if (fm.start.hour && until.hour) {
+      const at = (p: { date: string; hour: string }) => {
+        const [y, m, d] = (p.date || fm.start.date).split('-').map(Number);
+        const [h, mi] = p.hour.split(':').map(Number);
+        return Date.UTC(y, m - 1, d, h, mi) / 60000;
+      };
+      minutes = Math.max(0, Math.round(at(until) - at(fm.start)));
+    } else if (!fm.start.hour && until.date) {
+      minutes = (Math.round((Date.parse(until.date) - Date.parse(fm.start.date)) / 86400000) + 1) * 1440;
+    }
+    const { start: _s, end: _e, plannedEnd: _p, ...rest } = fm;
+    return {
+      name: fm.activity.title.trim() || fm.activity.name.trim(), form: rest,
+      allDay: !fm.start.hour, startTime: fm.start.hour || null, minutes, iana,
+      freq: sc.freq, interval: sc.interval, weekdays: sc.weekdays, monthDay: sc.monthDay,
+      monthWeek: sc.monthWeek, monthWeekday: sc.monthWeekday, from, until: sc.until, count: sc.count, mode: sc.mode,
+    };
+  };
+  const post = async (url: string, method: string, b: unknown) => {
+    const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: formJson(b) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw Object.assign(new Error(j.error ?? `HTTP ${r.status}`), { problems: j.problems, conflict: r.status === 409 });
+    return j;
+  };
+  /** Runs one of the repeat saves; leaves for Today with a word on how it went. */
+  async function repeatStep(fn: () => Promise<string>) {
+    if (navigator.onLine === false || seemsOffline()) { setSaveError({ text: 'Repeats need a signal: try again once there is one (or save it without repeating).' }); return; }
+    setSaving(true); setSaveError(null);
+    try { leaveTo(backTo() ?? await fn()); }
+    catch (e: any) { setSaveError({ text: String(e.message ?? e), problems: e.problems, conflict: !!e.conflict }); }
+    finally { setSaving(false); }
+  }
+  /** The plan's own date (its occurrence): what "this and following" counts from. */
+  const occurrence = rec?.form?.start?.date ?? '';
+  async function saveRepeating(scope: 'one' | 'following' | 'all') {
+    const fm = form;
+    if (!fm || !rec) return;
+    if (scope === 'one') { await save(fm, true); return; }
+    await repeatStep(async () => {
+      if (!repeat) {
+        // "Does not repeat" on a repeating plan: this one is kept as a single plan, the
+        // repeat ends before it (or stops) — and its later plans go.
+        const b = await post(`/api/entry/plans/${id}`, 'PUT', { form: fm, updatedAt: rec.updatedAt });
+        await post(`/api/entry/repeats/${rule._id}`, 'DELETE', { scope, at: occurrence, keepId: b.kind === 'plan' ? id : null });
+        return `/entry?${new URLSearchParams({ saved: b.kind, id: b.id ?? id, from: 'repeat' })}`;
+      }
+      const b = scope === 'following'
+        ? await post(`/api/entry/repeats/${rule._id}/split`, 'POST', { ...ruleBody(fm, repeat, fm.start.date), planId: id, updatedAt: rec.updatedAt, planForm: fm })
+        : await post(`/api/entry/repeats/${rule._id}`, 'PUT', { ...ruleBody(fm, repeat, rule.from), planId: id, updatedAt: rec.updatedAt, planForm: fm });
+      return `/entry?${new URLSearchParams({ saved: b.kind ?? 'plan', id: b.id ?? id, from: 'repeat' })}`;
+    });
+  }
+
+  async function save(override?: RecordForm, plain = false) {
     const fm = override ?? form;
     if (!rec || !fm || (!override && !canSave) || saving) return;
+    // Repeats (24 Nov): a repeating plan asks which ones; a new entry or a plan made to repeat
+    // saves its repeat too.
+    if (!plain && mode === 'plan' && rule) {
+      if (!repeat || !sameSchedule(repeat, scheduleOf(rule)) || repeat.mode !== scheduleOf(rule)?.mode || formKey !== origKey) { setScopeAsk('save'); return; }
+    }
+    if (!plain && mode === 'plan' && !rule && repeat) {
+      await repeatStep(async () => {
+        await post('/api/entry/repeats', 'POST', { ...ruleBody(fm, repeat, fm.start.date), adopt: { planId: id, updatedAt: rec.updatedAt, planForm: fm } });
+        return `/entry?${new URLSearchParams({ saved: 'plan', id, from: 'repeat' })}`;
+      });
+      return;
+    }
+    if (!plain && mode === 'new' && repeat) {
+      await repeatStep(async () => {
+        if (planning) {
+          await post('/api/entry/repeats', 'POST', ruleBody(fm, repeat, fm.start.date));
+          return `/entry?${new URLSearchParams({ saved: 'plan', id, from: 'repeat' })}`;
+        }
+        // Started now or earlier: the record as usual, then the repeat — today's occurrence
+        // counted as done by it.
+        const b = await post('/api/entry/records', 'POST', { id, form: fm, presetId, stampId });
+        try {
+          await post('/api/entry/repeats', 'POST', { ...ruleBody(fm, repeat, fm.start.date), doneAs: b.kind === 'record' ? { date: fm.start.date, recordId: b.id ?? id } : undefined });
+        } catch (e: any) {
+          return `/entry?${new URLSearchParams({ saved: b.kind, id: b.id ?? id, from: 'repeatfail', why: String(e.message ?? e) })}`;
+        }
+        return `/entry?${new URLSearchParams({ saved: b.kind, id: b.id ?? id, from: 'repeat' })}`;
+      });
+      return;
+    }
     setSaving(true); setSaveError(null);
     if (entryMode) {
       // No signal (#71 step 3): a new entry waits in the outbox on the phone and is sent,
@@ -546,8 +652,17 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
     }
   }
 
-  async function remove() {
+  async function removeRepeating(scope: 'one' | 'following' | 'all') {
+    if (scope === 'one') { await remove(true); return; }
+    await repeatStep(async () => {
+      await post(`/api/entry/repeats/${rule._id}`, 'DELETE', { scope, at: occurrence, planId: id, updatedAt: rec?.updatedAt });
+      return `/entry?${new URLSearchParams({ deleted: id, from: 'repeat' })}`;
+    });
+  }
+
+  async function remove(plain = false) {
     if (!rec) return;
+    if (mode === 'plan' && rule && !plain) { setScopeAsk('delete'); return; }
     if (mode === 'plan') {
       setSaving(true); setSaveError(null);
       try {
@@ -908,6 +1023,12 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
 
   return (
     <div className="flex flex-col flex-1 w-full pb-24">
+      {scopeAsk && (
+        <ScopeDialog title={scopeAsk === 'save' ? 'Edit recurring event' : 'Delete recurring event'}
+          withOne={scopeAsk === 'delete' || (!!repeat && sameSchedule(repeat, scheduleOf(rule)) && repeat.mode === scheduleOf(rule)?.mode)}
+          onClose={() => setScopeAsk(null)}
+          onPick={sc => { const ask = scopeAsk; setScopeAsk(null); void (ask === 'save' ? saveRepeating(sc) : removeRepeating(sc)); }} />
+      )}
       <div className="px-4 pt-6 max-w-6xl mx-auto w-full">
         <button onClick={goBack} className="text-xs text-stone-500 dark:text-zinc-400 hover:text-stone-800 dark:hover:text-zinc-100">← Back</button>
         <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -967,6 +1088,8 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
             ) : !f.end.hour && (entryMode || !f.end.date || !!f.start.hour) && (
               <div><button type="button" className={addBtn} onClick={openPlanned}>+ Planned end</button></div>
             ))}
+            {/* Repeats, as Google Calendar (24 Nov): New form and plans. */}
+            {entryMode && <RepeatField value={repeat} onChange={setRepeat} date={f.start.date} disabled={saving} />}
             <p className="text-xs text-stone-400 dark:text-zinc-500">{planning
               ? 'A plan: the planned end is when it should end. End is set when it happens.'
               : 'No times = all day. A start time without an end time = still going (an open record).'}</p>
@@ -1255,7 +1378,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
 
           {mode !== 'new' && (
             <div className="flex justify-end">
-              <button onClick={remove} disabled={saving} className={danger}>{mode === 'plan' ? 'Delete this plan' : 'Delete this record'}</button>
+              <button onClick={() => remove()} disabled={saving} className={danger}>{mode === 'plan' ? 'Delete this plan' : 'Delete this record'}</button>
             </div>
           )}
         </div>

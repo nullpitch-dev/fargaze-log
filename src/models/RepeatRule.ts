@@ -18,10 +18,14 @@ const RepeatRuleSchema = new Schema({
   startTime: { type: String, default: null },      // 'H:mm'
   minutes: { type: Number, default: null },         // length; null = no end
   iana: { type: String, required: true },           // e.g. 'Europe/London'
-  freq: { type: String, enum: ['daily', 'weekly', 'monthly'], required: true },
+  freq: { type: String, enum: ['daily', 'weekly', 'monthly', 'yearly'], required: true },   // yearly: 24 Nov 2026
   interval: { type: Number, default: 1 },
   weekdays: { type: [Number], default: undefined }, // weekly: 0 = Sunday … 6 = Saturday
   monthDay: { type: Number, default: null },        // monthly: 1–31 (a shorter month skips)
+  // monthly "on the fourth Tuesday" (24 Nov 2026, as Google Calendar): which week (1–4, or -1
+  // for the last) and weekday (0 = Sunday); null = by monthDay
+  monthWeek: { type: Number, default: null },
+  monthWeekday: { type: Number, default: null },
   from: { type: String, required: true },           // first date 'YYYY-MM-DD'
   until: { type: String, default: null },           // last date, or
   count: { type: Number, default: null },           // number of occurrences

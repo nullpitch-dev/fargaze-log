@@ -1,18 +1,30 @@
 // /api/entry/repeats/<id>
-//   PUT (as POST) → replaces untouched occurrences still to come → { rule, removed, made }
-//   DELETE        → stop: untouched occurrences still to come are removed → { removed }
+//   GET           → { rule } (the form shows its schedule on a repeating plan)
+//   PUT (as POST) → "All events": + planId, updatedAt, planForm (that plan's edits, saved first);
+//                   replaces untouched occurrences still to come → { rule, removed, made, kind, id }
+//   DELETE        → no body: stop (untouched occurrences still to come removed) → { removed };
+//                   { scope: 'one' | 'following' | 'all', planId, updatedAt, at, keepId? } — deleting a
+//                   repeating plan, as Google Calendar (24 Nov) → { removed }
 import { requireUser } from '@/lib/admin/guard';
-import { updateRule, stopRule } from '@/lib/entry/repeats';
+import { deleteScoped, getRule, stopRule, updateAll } from '@/lib/entry/repeats';
 import { reply, body, type IdCtx } from '@/lib/entry/reply';
+
+export async function GET(_req: Request, { params }: IdCtx) {
+  const g = await requireUser();
+  if (g.denied) return g.denied;
+  return reply(await getRule(g.userId, (await params).id));
+}
 
 export async function PUT(req: Request, { params }: IdCtx) {
   const g = await requireUser();
   if (g.denied) return g.denied;
-  return reply(await updateRule(g.userId, (await params).id, await body(req)));
+  return reply(await updateAll(g.userId, (await params).id, await body(req)));
 }
 
-export async function DELETE(_req: Request, { params }: IdCtx) {
+export async function DELETE(req: Request, { params }: IdCtx) {
   const g = await requireUser();
   if (g.denied) return g.denied;
-  return reply(await stopRule(g.userId, (await params).id));
+  const b = await req.json().catch(() => null);
+  const id = (await params).id;
+  return reply(b?.scope ? await deleteScoped(g.userId, id, b) : await stopRule(g.userId, id));
 }

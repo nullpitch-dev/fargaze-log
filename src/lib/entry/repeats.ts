@@ -15,7 +15,7 @@ import RepeatRule from '../../models/RepeatRule';
 import TimezoneMaster from '../../models/TimezoneMaster';
 import { loadFormContext } from '../records/edit';
 import { buildRecord, normaliseHour, type RecordForm } from '../records/form';
-import { mergeForm, settleOne } from './save';
+import { adjustPlan, deletePlan, mergeForm, settleOne } from './save';
 import { addDays, addMinutes, daysBetween, instantOf, localNow, weekdayOfDate, zoneCodeFor, type ZoneRow } from './time';
 
 export const HORIZON_DAYS = 60;
@@ -27,14 +27,15 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export interface RuleInput {
   name: string; form: any; allDay?: boolean; startTime?: string | null; minutes?: number | null; iana: string;
-  freq: 'daily' | 'weekly' | 'monthly'; interval?: number; weekdays?: number[] | null; monthDay?: number | null;
+  freq: 'daily' | 'weekly' | 'monthly' | 'yearly'; interval?: number; weekdays?: number[] | null; monthDay?: number | null;
+  monthWeek?: number | null; monthWeekday?: number | null;
   from: string; until?: string | null; count?: number | null; mode?: 'ask' | 'auto';
 }
 
 // ── Dates ────────────────────────────────────────────────────────────────────
 
 /** The rule's occurrence dates from its first date up to `upTo` (inclusive), within until / count. */
-export function occurrences(rule: Pick<RuleInput, 'freq' | 'interval' | 'weekdays' | 'monthDay' | 'from' | 'until' | 'count'>, upTo: string): string[] {
+export function occurrences(rule: Pick<RuleInput, 'freq' | 'interval' | 'weekdays' | 'monthDay' | 'monthWeek' | 'monthWeekday' | 'from' | 'until' | 'count'>, upTo: string): string[] {
   const out: string[] = [];
   const every = Math.max(1, rule.interval ?? 1);
   const last = rule.until && rule.until < upTo ? rule.until : upTo;
@@ -46,9 +47,19 @@ export function occurrences(rule: Pick<RuleInput, 'freq' | 'interval' | 'weekday
     let hit = false;
     if (rule.freq === 'daily') hit = daysBetween(rule.from, d) % every === 0;
     else if (rule.freq === 'weekly') hit = Math.floor(daysBetween(weekStart, d) / 7) % every === 0 && days.includes(weekdayOfDate(d));
-    else {
+    else if (rule.freq === 'yearly') {
+      // Every N years on the first date's day and month (29 Feb: leap years only).
+      const [y, , dd] = d.split('-').map(Number);
+      hit = (y - fy) % every === 0 && d.slice(5) === rule.from.slice(5) && dd > 0;
+    } else {
       const [y, m, dd] = d.split('-').map(Number);
-      hit = ((y * 12 + m) - (fy * 12 + fm)) % every === 0 && dd === monthDay;
+      const month = ((y * 12 + m) - (fy * 12 + fm)) % every === 0;
+      if (rule.monthWeek != null && rule.monthWeekday != null) {
+        // "the fourth Tuesday" / "the last Tuesday"
+        const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+        hit = month && weekdayOfDate(d) === rule.monthWeekday
+          && (rule.monthWeek === -1 ? dd + 7 > last : Math.ceil(dd / 7) === rule.monthWeek);
+      } else hit = month && dd === monthDay;
     }
     if (hit) {
       out.push(d);
@@ -149,7 +160,7 @@ function validate(b: any): { ok: true; rule: RuleInput } | Fail {
   const iana = typeof b?.iana === 'string' ? b.iana : '';
   try { new Intl.DateTimeFormat('en-GB', { timeZone: iana }); } catch { return fail(400, `Unknown time zone '${iana}'.`); }
   if (!iana) return fail(400, 'Time zone is required.');
-  if (!['daily', 'weekly', 'monthly'].includes(b?.freq)) return fail(400, 'Repeat: daily, weekly or monthly.');
+  if (!['daily', 'weekly', 'monthly', 'yearly'].includes(b?.freq)) return fail(400, 'Repeat: daily, weekly, monthly or yearly.');
   if (typeof b?.from !== 'string' || !DATE.test(b.from)) return fail(400, 'First date is required (YYYY-MM-DD).');
   if (b?.until != null && b.until !== '' && (typeof b.until !== 'string' || !DATE.test(b.until) || b.until < b.from)) return fail(400, 'The last date must be on or after the first.');
   const allDay = !!b?.allDay;
@@ -165,6 +176,10 @@ function validate(b: any): { ok: true; rule: RuleInput } | Fail {
   const weekdays = Array.isArray(b?.weekdays) ? [...new Set(b.weekdays.map(Number))].filter((d: any) => Number.isInteger(d) && d >= 0 && d <= 6) as number[] : null;
   const monthDay = b?.monthDay == null || b.monthDay === '' ? null : Number(b.monthDay);
   if (monthDay != null && (!Number.isInteger(monthDay) || monthDay < 1 || monthDay > 31)) return fail(400, 'Day of the month: 1 to 31.');
+  const monthWeek = b?.monthWeek == null || b.monthWeek === '' ? null : Number(b.monthWeek);
+  const monthWeekday = b?.monthWeekday == null || b.monthWeekday === '' ? null : Number(b.monthWeekday);
+  if (monthWeek != null && ![1, 2, 3, 4, -1].includes(monthWeek)) return fail(400, 'Week of the month: 1 to 4, or -1 for the last.');
+  if (monthWeek != null && (monthWeekday == null || !Number.isInteger(monthWeekday) || monthWeekday < 0 || monthWeekday > 6)) return fail(400, 'Weekday: 0 (Sunday) to 6.');
   const count = b?.count == null || b.count === '' ? null : Number(b.count);
   if (count != null && (!Number.isInteger(count) || count < 1)) return fail(400, 'Times: a whole number, 1 or more.');
   const { start: _s, end: _e, ...form } = b.form;
@@ -173,7 +188,9 @@ function validate(b: any): { ok: true; rule: RuleInput } | Fail {
     rule: {
       name, form, allDay, startTime, minutes, iana, freq: b.freq, interval,
       weekdays: b.freq === 'weekly' ? (weekdays?.length ? weekdays : null) : null,
-      monthDay: b.freq === 'monthly' ? monthDay : null,
+      monthDay: b.freq === 'monthly' && monthWeek == null ? monthDay : null,
+      monthWeek: b.freq === 'monthly' ? monthWeek : null,
+      monthWeekday: b.freq === 'monthly' && monthWeek != null ? monthWeekday : null,
       from: b.from, until: b.until || null, count, mode: b?.mode === 'auto' ? 'auto' : 'ask',
     },
   };
@@ -204,12 +221,130 @@ export async function listRules(userId: string) {
   return { ok: true as const, rules: out };
 }
 
+export async function getRule(userId: string, id: string) {
+  if (!mongoose.isValidObjectId(id)) return fail(404, 'Unknown repeat.');
+  const r = await RepeatRule.findOne({ _id: id, userId }).lean() as any;
+  return r ? { ok: true as const, rule: view(r) } : fail(404, 'This repeat no longer exists.');
+}
+
+/** Makes a plan the rule's occurrence on `date` (so the fill doesn't make it twice). */
+async function adopt(userId: string, planId: string, ruleId: mongoose.Types.ObjectId, date: string) {
+  await LogPlan.updateOne({ _id: planId, userId, 'plan.state': 'open' }, { $set: { 'plan.repeatId': ruleId, 'plan.occurrence': date } });
+}
+
+/**
+ * A new repeat (24 Nov, the form's "Does not repeat ▾"). From the New form or a plan:
+ *   doneAs { date, recordId } — the entry was saved as a record (started now or earlier):
+ *     that date's occurrence counts as done by it, so it isn't asked again;
+ *   adopt { planId, updatedAt, form } — a plan made to repeat: its edits are saved and it
+ *     becomes the first occurrence.
+ */
 export async function createRule(userId: string, body: any) {
   const v = validate(body);
   if (!v.ok) return v;
+  if (body?.adopt?.planId) {
+    const a = await adjustPlan(userId, String(body.adopt.planId), body.adopt.planForm ?? body.adopt.form, String(body.adopt.updatedAt ?? ''));
+    if (!a.ok) return a;
+  }
   const [r] = await RepeatRule.create([{ userId, ...v.rule }]);
-  const filled = await fillRule(userId, (r as any).toObject());
-  return { ok: true as const, rule: view((r as any).toObject()), made: filled.made, problem: filled.problem };
+  const rule = (r as any).toObject();
+  if (body?.adopt?.planId) await adopt(userId, String(body.adopt.planId), rule._id, v.rule.from);
+  const filled = await fillRule(userId, rule);
+  if (body?.doneAs?.date && mongoose.isValidObjectId(body?.doneAs?.recordId)) {
+    const now = new Date();
+    await LogPlan.updateOne(
+      { userId, 'plan.repeatId': rule._id, 'plan.occurrence': body.doneAs.date, 'plan.state': 'open' },
+      { $set: { 'plan.state': 'done', 'plan.recordId': new mongoose.Types.ObjectId(String(body.doneAs.recordId)), 'plan.doneBy': 'confirmed', 'plan.doneAt': now, updatedAt: now } },
+      { timestamps: false } as any,
+    );
+  }
+  return { ok: true as const, rule: view(rule), made: filled.made, problem: filled.problem };
+}
+
+/** Removes a rule's open plans from `date` on whose start is still to come — touched ones too
+ *  (Google's "this and following" / "all events"); `keep` is spared. */
+async function dropFrom(userId: string, ruleId: mongoose.Types.ObjectId, date: string, keep: string | null, now = Date.now()) {
+  const plans = await LogPlan.find({ userId, 'plan.repeatId': ruleId, 'plan.state': 'open', 'plan.occurrence': { $gte: date } }).select('start').lean() as any[];
+  const ids = plans.filter(p => String(p._id) !== keep && (instantOf(p.start) ?? 0) > now).map(p => p._id);
+  if (!ids.length) return 0;
+  return (await LogPlan.deleteMany({ userId, _id: { $in: ids } })).deletedCount ?? 0;
+}
+
+/** Ends a rule the day before `date` (no more occurrences from then; stopped if none are left). */
+async function endBefore(userId: string, rule: any, date: string) {
+  const until = addDays(date, -1);
+  if (until < rule.from) await RepeatRule.updateOne({ _id: rule._id, userId }, { $set: { stoppedAt: new Date() } });
+  else await RepeatRule.updateOne({ _id: rule._id, userId }, { $set: { until, count: null } });
+}
+
+/**
+ * "This and following events" (24 Nov): the plan being edited and every occurrence after it
+ * follow the new settings — the old repeat ends the day before; a new one starts on the
+ * plan's date with the plan as its first occurrence. Body: the rule (from = that date) +
+ * planId, updatedAt, planForm (the plan's own edits).
+ */
+export async function splitRule(userId: string, id: string, body: any) {
+  if (!mongoose.isValidObjectId(id)) return fail(404, 'Unknown repeat.');
+  const old = await RepeatRule.findOne({ _id: id, userId }).lean() as any;
+  if (!old) return fail(404, 'This repeat no longer exists.');
+  const v = validate(body);
+  if (!v.ok) return v;
+  // "After N times" left as it was: the new part makes only the ones still owed (as Google).
+  if (v.rule.count && old.count === v.rule.count) {
+    const before = occurrences(old, addDays(v.rule.from, -1)).length;
+    v.rule.count = Math.max(1, old.count - before);
+  }
+  const planId = String(body?.planId ?? '');
+  const a = await adjustPlan(userId, planId, body.planForm, String(body?.updatedAt ?? ''));
+  if (!a.ok) return a;
+  await dropFrom(userId, old._id, v.rule.from, planId);
+  await endBefore(userId, old, v.rule.from);
+  const [r] = await RepeatRule.create([{ userId, ...v.rule }]);
+  const rule = (r as any).toObject();
+  if (a.kind === 'plan') await adopt(userId, planId, rule._id, v.rule.from);
+  const filled = await fillRule(userId, rule);
+  return { ok: true as const, rule: view(rule), made: filled.made, problem: filled.problem, kind: a.kind, id: a.id };
+}
+
+/** "All events" (24 Nov): this plan's edits, then the rule — its untouched plans still to
+ *  come are made again; plans already records stay as they are. */
+export async function updateAll(userId: string, id: string, body: any) {
+  let a: Awaited<ReturnType<typeof adjustPlan>> | null = null;
+  if (body?.planId) {
+    a = await adjustPlan(userId, String(body.planId), body.planForm, String(body?.updatedAt ?? ''));
+    if (!a.ok) return a;
+  }
+  const u = await updateRule(userId, id, body);
+  if (!u.ok) return u;
+  return { ...u, kind: a?.ok ? a.kind : 'plan', id: a?.ok ? a.id : null };
+}
+
+/**
+ * Deleting a repeating plan (24 Nov, as Google): scope 'one' — this plan; 'following' — this
+ * and every later occurrence (the repeat ends the day before); 'all' — the repeat stops and
+ * its plans still to come go. Records already made stay.
+ */
+export async function deleteScoped(userId: string, id: string, body: any) {
+  if (!mongoose.isValidObjectId(id)) return fail(404, 'Unknown repeat.');
+  const r = await RepeatRule.findOne({ _id: id, userId }).lean() as any;
+  if (!r) return fail(404, 'This repeat no longer exists.');
+  const scope = body?.scope;
+  if (!['one', 'following', 'all'].includes(scope)) return fail(400, "scope: 'one', 'following' or 'all'.");
+  const planId = body?.planId ? String(body.planId) : null;
+  if (planId) {
+    const d = await deletePlan(userId, planId, String(body?.updatedAt ?? ''));
+    if (!d.ok) return d;
+  }
+  if (scope === 'one') return { ok: true as const, removed: planId ? 1 : 0 };
+  const at = scope === 'all' ? '0000-01-01' : String(body?.at ?? '');
+  if (scope === 'following' && !DATE.test(at)) return fail(400, 'at: the date to delete from (YYYY-MM-DD).');
+  // keepId: a repeating plan set to "Does not repeat" — it stays, as a single plan.
+  const keep = body?.keepId && mongoose.isValidObjectId(body.keepId) ? String(body.keepId) : null;
+  if (keep) await LogPlan.updateOne({ _id: keep, userId }, { $set: { 'plan.repeatId': null, 'plan.occurrence': null } });
+  const removed = await dropFrom(userId, r._id, at, keep);
+  if (scope === 'all') await RepeatRule.updateOne({ _id: r._id, userId }, { $set: { stoppedAt: new Date() } });
+  else await endBefore(userId, r, at);
+  return { ok: true as const, removed: removed + (planId ? 1 : 0) };
 }
 
 export async function updateRule(userId: string, id: string, body: any) {

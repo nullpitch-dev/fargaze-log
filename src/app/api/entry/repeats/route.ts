@@ -1,7 +1,8 @@
 // /api/entry/repeats (#71, Design §15.7)
 //   GET  → { rules } (each with its next date)
-//   POST { name, form, allDay, startTime, minutes, iana, freq, interval, weekdays,
-//          monthDay, from, until, count, mode: 'ask' | 'auto' } → { rule, made, problem }
+//   POST { name, form, allDay, startTime, minutes, iana, freq (daily|weekly|monthly|yearly), interval, weekdays,
+//          monthDay | monthWeek + monthWeekday, from, until, count, mode: 'ask' | 'auto',
+//          doneAs?: { date, recordId }, adopt?: { planId, updatedAt, form } } → { rule, made, problem }
 import { requireUser } from '@/lib/admin/guard';
 import { listRules, createRule } from '@/lib/entry/repeats';
 import { reply, body } from '@/lib/entry/reply';

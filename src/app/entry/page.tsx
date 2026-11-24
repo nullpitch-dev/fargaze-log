@@ -260,12 +260,16 @@ function EntryHome() {
     if (!saved && !deleted && !queued) return;
     if (queued) {
       setToast({ text: 'Saved on the phone — it is sent once there is a signal' });
+    } else if (deleted && params.get('from') === 'repeat') {
+      setToast({ text: 'Repeating plans deleted' });     // no Undo for a repeat (24 Nov)
     } else if (deleted) {
       setToast({ text: 'Plan deleted', undo: async () => { const r = await call(`/api/entry/plans/${deleted}/restore`, 'POST'); return r.ok ? null : r.b.error ?? 'Undo failed'; } });
     } else if (id) {
-      const from = params.get('from'), fromPlan = from === 'plan' || from === 'moved';
+      const from = params.get('from'), fromPlan = from === 'plan' || from === 'moved' || from === 'repeat' || from === 'repeatfail';
       setToast({
-        text: from === 'moved' ? 'Moved back to Coming up' : saved === 'plan' ? (fromPlan ? 'Plan saved' : 'Saved as a plan') : 'Saved',
+        text: from === 'repeat' ? 'Repeat saved — its plans are in Coming up'
+          : from === 'repeatfail' ? `Saved — but not the repeat: ${params.get('why') ?? 'it failed'}. Try it again from one of the plans.`
+          : from === 'moved' ? 'Moved back to Coming up' : saved === 'plan' ? (fromPlan ? 'Plan saved' : 'Saved as a plan') : 'Saved',
         undo: fromPlan ? undefined : async () => { const r = await call(`/api/entry/records/${id}`, 'DELETE'); return r.ok ? null : r.b.error ?? 'Undo failed'; },
       });
     }
