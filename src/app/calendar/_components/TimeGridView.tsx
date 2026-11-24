@@ -256,12 +256,11 @@ function DayColumn({ pieces, m, colors, isDark, compact, narrow, time, last, now
         const range = e.start
           ? (e.end && e.end !== e.start ? `${time.format(new Date(e.start))} – ${time.format(new Date(e.end))}` : time.format(new Date(e.start)))
           : '';
-        // Layering (Hyoje, 11 Nov): indented a step per depth, to the right edge; side by side
-        // only in the rare fallback. A covered title sits below what covers it.
+        // Columns and layering (time-layout.ts, 24 Nov). A covered title sits below what covers it.
         const step = stepFor(pieces, narrow ? 10 : 5);        // % of the day's width per depth (smaller: Hyoje, 11 Nov); smaller still on a deep day (24 Nov)
-        const room = 100 - p.depth * step;
-        const left = p.depth * step + (p.col / p.cols) * room;
-        const width = room / p.cols;
+        // Its column(s) (24 Nov), indented a step per layer inside them.
+        const left = p.colLeft + p.depth * step;
+        const width = p.colWidth - p.depth * step;
         const below = p.labelTop > p.top;
         const twoLines = !compact && !below && px(p.labelRoom) >= 30;
         // Past, now and plans (calendar-colors.ts): records tinted, plans solid, a record

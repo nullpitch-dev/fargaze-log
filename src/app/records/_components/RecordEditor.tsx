@@ -552,7 +552,9 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
   async function repeatStep(fn: () => Promise<string>) {
     if (navigator.onLine === false || seemsOffline()) { setSaveError({ text: 'Repeats need a signal: try again once there is one (or save it without repeating).' }); return; }
     setSaving(true); setSaveError(null);
-    try { leaveTo(backTo() ?? await fn()); }
+    // fn() first, always (24 Nov: `backTo() ?? await fn()` skipped the change itself whenever
+    // the form was opened from the Calendar — nothing was saved or deleted).
+    try { const done = await fn(); leaveTo(backTo() ?? done); }
     catch (e: any) { setSaveError({ text: String(e.message ?? e), problems: e.problems, conflict: !!e.conflict }); }
     finally { setSaving(false); }
   }
