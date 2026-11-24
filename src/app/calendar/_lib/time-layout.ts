@@ -10,8 +10,10 @@
 //   · Every piece is drawn at least MIN_MINUTES tall, so a 2-minute record
 //     or a point stays clickable; overlap is judged on the drawn size.
 //   · Layering (Hyoje, 11 Nov), not narrow columns: pieces are stacked by start
-//     time, a later one on top, indented one step per piece still running when
-//     it starts (`depth`) and running to the right edge. A lower piece's title goes
+//     time, a later one on top, indented one step past the deepest piece still
+//     running when it starts (`depth`) and running to the right edge. A piece with
+//     less than a line left doesn't count (24 Nov): the new one may cover its last
+//     minutes and start further left. A lower piece's title goes
 //     in its first stretch not covered by a later one (`labelTop`): at its top,
 //     else just below whatever covers it. Only when a piece has no stretch tall
 //     enough for one line (`labelMin`) does it share its depth side by side with
@@ -82,9 +84,13 @@ export function layoutDay(events: CalendarEvent[], date: string, tz: string, lab
   const group = new Map<Piece, Piece[]>();   // side-by-side groups (the fallback)
   const siblings = (a: Piece, b: Piece) => !!group.get(a)?.includes(b);
   const overlap = (a: Piece, b: Piece) => a.top < b.bottom && b.top < a.bottom;
+  // A piece with less than a line left when another starts is nearly over: the new one may
+  // sit on its last minutes instead of stepping in (Hyoje, 24 Nov: "it can start from the
+  // left edge" — a 13:00 lesson was indented only because a lunch ran to 13:05).
+  const tail = labelMin;
 
   const place = () => {
-    // Depth: one step past the deepest piece still running when it starts.
+    // Depth: one step past the deepest piece still running (with more than a line to go).
     for (let i = 0; i < raw.length; i++) {
       const p = raw[i];
       const g = group.get(p);
@@ -92,39 +98,55 @@ export function layoutDay(events: CalendarEvent[], date: string, tz: string, lab
       let d = 0;
       for (let j = 0; j < i; j++) {
         const q = raw[j];
-        if (q.top <= p.top && q.bottom > p.top && !siblings(p, q)) d = Math.max(d, q.depth + 1);
+        if (q.top <= p.top && q.bottom - p.top > tail && !siblings(p, q)) d = Math.max(d, q.depth + 1);
       }
       p.depth = d;
     }
-    // Title: the first stretch of at least labelMin not covered by a later piece.
-    for (let i = 0; i < raw.length; i++) {
-      const p = raw[i];
-      const covers = raw.slice(i + 1).filter(q => overlap(p, q) && !siblings(p, q) && q.depth > p.depth)
+    // Title: the first stretch of at least labelMin not covered by a piece drawn over it.
+    for (const p of raw) {
+      const covers = raw.filter(q => q !== p && q.z > p.z && overlap(p, q) && !siblings(p, q))
         .map(q => [Math.max(q.top, p.top), Math.min(q.bottom, p.bottom)] as const)
         .sort((a, b) => a[0] - b[0]);
       let at = p.top, found: number | null = null, room = 0;
+      let best = -1, bestRoom = 0;                       // the widest gap, should none be a line tall
       for (const [a, b] of covers) {
         if (a - at >= labelMin) { found = at; room = a - at; break; }
+        if (a - at > bestRoom) { best = at; bestRoom = a - at; }
         at = Math.max(at, b);
       }
       if (found === null && p.bottom - at >= Math.min(labelMin, p.bottom - p.top)) { found = at; room = p.bottom - at; }
+      if (found === null && p.bottom - at > bestRoom) { best = at; bestRoom = p.bottom - at; }
+      // Nearly a line (24 Nov: a lesson's title lost in 12 free minutes between two others).
+      if (found === null && bestRoom >= 0.75 * labelMin) { found = best; room = bestRoom; }
       p.labelTop = found ?? -1;
       p.labelRoom = room;
     }
   };
   place();
-  // The fallback: a piece with no room for its title shares its depth, side by side, with
-  // the pieces starting within one line of it — and ending near it too (24 Nov: a 1-hour
-  // plan put beside a short lunch spent its whole hour in half the width, under the next
-  // record; two that start and end together still sit side by side).
-  const alike = (p: Piece, q: Piece) => Math.abs(q.bottom - p.bottom) <= 3 * labelMin;
+  // A piece left with no room for its title:
+  //  · beside the pieces starting within one line of it that also end near it (two of a
+  //    kind — a lesson and the waiting for it), side by side;
+  //  · otherwise, when it is short, drawn ON TOP of what starts on it (24 Nov: a 15-minute
+  //    payment just before sleep was hidden under it); the longer one's title goes below.
+  const alike = (p: Piece, q: Piece) => Math.abs(q.bottom - p.bottom) <= Math.min(3 * labelMin, 20);   // minutes, whatever the scale
+  const short = (p: Piece) => p.bottom - p.top <= 2 * labelMin;
+  let top = raw.length;
+  let again = false;
   for (const p of raw) {
     if (p.labelTop >= 0 || group.has(p)) continue;
     const g = [p, ...raw.filter(q => q !== p && !group.has(q) && q.top >= p.top && q.top - p.top < labelMin && alike(p, q) && overlap(p, q))];
-    if (g.length < 2) continue;
-    g.forEach((q, k) => { group.set(q, g); q.col = k; q.cols = g.length; });
+    if (g.length >= 2) { g.forEach((q, k) => { group.set(q, g); q.col = k; q.cols = g.length; }); again = true; continue; }
+    if (short(p)) { p.z = top++; again = true; continue; }
+    //  · a long one covered at its top by short ones starting within a line: those move to
+    //    its right half (still on top), it keeps its full width and its title on the left.
+    const right = raw.filter(q => q !== p && !group.has(q) && q.top >= p.top && q.top - p.top < labelMin && short(q) && overlap(p, q));
+    if (right.length) {
+      for (const q of right) { group.set(q, [p, q]); q.col = 1; q.cols = 2; }
+      group.set(p, [p, ...right]);
+      again = true;
+    }
   }
-  if (group.size) place();
+  if (again) place();
   for (const p of raw) if (p.labelTop < 0) { p.labelTop = p.top; p.labelRoom = labelMin; }   // the rare rest: title at the top
   return raw;
 }
