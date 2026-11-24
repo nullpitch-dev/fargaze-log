@@ -76,10 +76,30 @@ export const isNoSignal = (e: unknown) =>
   (typeof navigator !== 'undefined' && navigator.onLine === false) || e instanceof TypeError || (e as any)?.name === 'AbortError' || (e as any)?.name === 'TimeoutError';
 
 /** fetch that gives up after `ms` (a weak signal: better queued than waiting forever). */
+// Weak signal remembered on the page too (24 Nov): after one request found no signal (or
+// no answer in time), the next minute waits only WEAK_WAIT before the phone keeps the entry —
+// wifi that connects but goes nowhere made Stamp and + New wait the full time each time.
+const WEAK_KEY = 'fg-weak-until', WEAK_FOR = 60000, WEAK_WAIT = 2500;
+export function seemsOffline(): boolean {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
+  try { return Number(sessionStorage.getItem(WEAK_KEY) || 0) > Date.now(); } catch { return false; }
+}
+export function noteNoSignal() { try { sessionStorage.setItem(WEAK_KEY, String(Date.now() + WEAK_FOR)); } catch { /* none */ } }
+export function noteSignal() { try { sessionStorage.removeItem(WEAK_KEY); } catch { /* none */ } }
+
 export async function fetchWithin(url: string, init: RequestInit, ms = 12000): Promise<Response> {
   const ctl = new AbortController();
-  const t = setTimeout(() => ctl.abort(), ms);
-  try { return await fetch(url, { ...init, signal: ctl.signal }); } finally { clearTimeout(t); }
+  const t = setTimeout(() => ctl.abort(), seemsOffline() ? Math.min(ms, WEAK_WAIT) : ms);
+  try {
+    const r = await fetch(url, { ...init, signal: ctl.signal });
+    // A wifi login page answering for the server is no signal (24 Nov).
+    if (r.redirected && new URL(r.url).origin !== window.location.origin) { noteNoSignal(); throw new TypeError('Redirected away: no signal'); }
+    if (!r.headers.get('x-offline-from-cache')) noteSignal();
+    return r;
+  } catch (e) {
+    if (isNoSignal(e)) noteNoSignal();
+    throw e;
+  } finally { clearTimeout(t); }
 }
 
 let flushing = false;

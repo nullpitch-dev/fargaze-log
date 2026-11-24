@@ -746,7 +746,14 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
       const before = f.start.hour && minutesOf(p.hour) != null && minutesOf(f.start.hour) != null && minutesOf(p.hour)! < minutesOf(f.start.hour)!;
       q = { ...q, date: before ? addDays(f.start.date, 1) : f.start.date };
     }
-    patch(which, which !== 'start' && !f[which].timezone && f.start.timezone && (q.date || q.hour) ? { ...q, timezone: f.start.timezone } : q);
+    const next = which !== 'start' && !f[which].timezone && f.start.timezone && (q.date || q.hour) ? { ...q, timezone: f.start.timezone } : q;
+    // An End typed in takes the planned end away (Hyoje, 24 Nov): it has done its job.
+    if (which === 'end' && (next.date || next.hour) && (f.plannedEnd.date || f.plannedEnd.hour) && !planning) {
+      setForm({ ...f, end: { ...f.end, ...next }, plannedEnd: { date: '', hour: '', timezone: '' } });
+      setPlannedOpen(false);
+      return;
+    }
+    patch(which, next);
   };
   const clearPlanned = () => { patch('plannedEnd', { date: '', hour: '', timezone: '' }); setPlannedOpen(false); };
   const openPlanned = () => { setPlannedSnap({ ...f.plannedEnd }); setPlannedOpen(true); };

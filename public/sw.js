@@ -58,18 +58,31 @@ const keepable = res => res && res.ok && !res.redirected && res.type === 'basic'
 
 /** Network first: the network's answer if it comes within `wait`; else the saved copy (the
  *  network keeps going and refreshes it); with neither, the network's error. */
+// Weak signal remembered (Hyoje, 24 Nov: wifi he couldn't use — every page and form waited
+// the full time again): after a wait runs out or the network fails, the next minute waits
+// only WEAK_WAIT; any answer from the network clears it.
+const WEAK_FOR = 60000, WEAK_WAIT = 400;
+let weakUntil = 0;
+
 async function networkFirst(event, cacheName, key, wait, nothing) {
   const cache = await caches.open(cacheName);
   const net = fetch(event.request).then(async res => {
+    weakUntil = 0;
     if (keepable(res)) await cache.put(key, await stamped(res.clone()));
     return res;
   });
+  net.catch(() => { weakUntil = Date.now() + WEAK_FOR; });
   event.waitUntil(net.catch(() => {}));
   const saved = () => cache.match(key);
+  // X-FG-Fresh: the page wants the network's answer (after showing a saved copy): no race,
+  // the saved copy only if the network fails.
+  const fresh = event.request.headers.get('X-FG-Fresh') === '1';
+  const limit = self.navigator.onLine === false ? 0 : Date.now() < weakUntil ? Math.min(wait, WEAK_WAIT) : wait;
   try {
+    if (fresh) return await net;
     return await Promise.race([
       net,
-      new Promise((_, no) => setTimeout(() => no(new Error('slow')), self.navigator.onLine === false ? 0 : wait)),
+      new Promise((_, no) => setTimeout(() => { weakUntil = Date.now() + WEAK_FOR; no(new Error('slow')); }, limit)),
     ]);
   } catch (e) {
     const hit = await saved();

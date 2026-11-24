@@ -248,7 +248,11 @@ export function buildRecord(form: RecordForm, base: any | null, ctx: FormContext
   const timesOld = !!start?._unchanged && !!end?._unchanged;
   // Planned end: only when the form has one; empty = none (× on the form removes it).
   const pe = f?.plannedEnd;
-  const plannedEnd = pe && (t(pe.date) || t(pe.hour)) ? point(pe, 'plannedEnd', base?.plannedEnd) : null;
+  // Once it has an End the planned end has done its job and goes (Hyoje, 24 Nov: typing an
+  // End should remove it). An End still to come becomes the planned end later
+  // (endAheadToPlanned), so plans are not affected.
+  const ended = !!end?.year;
+  const plannedEnd = !ended && pe && (t(pe.date) || t(pe.hour)) ? point(pe, 'plannedEnd', base?.plannedEnd) : null;
   if (plannedEnd?.year && start?.year) {
     const before = plannedEnd.hour && start.hour
       ? (plannedEnd._ms ?? 0) - (plannedEnd.timezoneOffset ?? 0) * 3600e3 < (start._ms ?? 0) - (start.timezoneOffset ?? 0) * 3600e3

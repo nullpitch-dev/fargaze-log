@@ -38,7 +38,17 @@ export interface Piece {
   z: number;              // stacking order: later on top
 }
 
+/** No longer a cap on depth (24 Nov: past it a piece went exactly on top of another and hid
+ *  it — a zero-length record at 18:10 under one at 18:11). The view makes the steps smaller
+ *  instead when a day goes deep (`stepFor`). */
 export const MAX_DEPTH = 4;
+
+/** % of the day's width per depth step: `base`, smaller when the day goes deeper than the
+ *  last piece could keep `keep` % of the width. */
+export function stepFor(pieces: Piece[], base: number, keep = 40): number {
+  const deepest = pieces.reduce((m, p) => Math.max(m, p.depth), 0);
+  return deepest ? Math.min(base, (100 - keep) / deepest) : base;
+}
 
 /** The pieces of one display date, layered. `labelMin` = minutes one line of text needs
  *  at the view's scale; `minMinutes` = the least a piece is drawn (the view's minimum
@@ -84,7 +94,7 @@ export function layoutDay(events: CalendarEvent[], date: string, tz: string, lab
         const q = raw[j];
         if (q.top <= p.top && q.bottom > p.top && !siblings(p, q)) d = Math.max(d, q.depth + 1);
       }
-      p.depth = Math.min(d, MAX_DEPTH);
+      p.depth = d;
     }
     // Title: the first stretch of at least labelMin not covered by a later piece.
     for (let i = 0; i < raw.length; i++) {
@@ -104,10 +114,13 @@ export function layoutDay(events: CalendarEvent[], date: string, tz: string, lab
   };
   place();
   // The fallback: a piece with no room for its title shares its depth, side by side, with
-  // the pieces starting within one line of it.
+  // the pieces starting within one line of it — and ending near it too (24 Nov: a 1-hour
+  // plan put beside a short lunch spent its whole hour in half the width, under the next
+  // record; two that start and end together still sit side by side).
+  const alike = (p: Piece, q: Piece) => Math.abs(q.bottom - p.bottom) <= 3 * labelMin;
   for (const p of raw) {
     if (p.labelTop >= 0 || group.has(p)) continue;
-    const g = [p, ...raw.filter(q => q !== p && !group.has(q) && q.top >= p.top && q.top - p.top < labelMin && overlap(p, q))];
+    const g = [p, ...raw.filter(q => q !== p && !group.has(q) && q.top >= p.top && q.top - p.top < labelMin && alike(p, q) && overlap(p, q))];
     if (g.length < 2) continue;
     g.forEach((q, k) => { group.set(q, g); q.col = k; q.cols = g.length; });
   }

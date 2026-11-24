@@ -45,7 +45,17 @@ export function useBackToClose(close: () => void) {
       after?.();
     };
     window.addEventListener('popstate', onPop);
-    return () => { window.removeEventListener('popstate', onPop); };
+    return () => {
+      window.removeEventListener('popstate', onPop);
+      // Closed some other way than Back (a pick, a tap outside, the page moving on): take our
+      // entry away too, or it stays behind and a later Back lands on this page again — after
+      // saving a form, Back went to the form (Hyoje, 24 Nov). Next tick: a page change
+      // replaces the entry first, and React's dev double-mount pushes a new one; neither
+      // still shows our key, so neither goes back.
+      if (done) return;
+      done = true;
+      setTimeout(() => { if (window.history.state?.fgModal === key) window.history.back(); }, 0);
+    };
   }, []);
 
   return useCallback((after?: () => void) => {

@@ -18,7 +18,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { CalendarEvent } from '@/lib/calendar/calendar';
 import { layoutWeek, labelOf, isBar, isoWeek } from '../_lib/month-layout';
-import { layoutDay, nowMinutes, type Piece } from '../_lib/time-layout';
+import { layoutDay, nowMinutes, stepFor, type Piece } from '../_lib/time-layout';
 import { colorFor, textOn, lookOf, isOverdue, tintOf, inkOf, OVERDUE } from '../_lib/calendar-colors';
 import { Bar, ReadingRow, nowColOf } from './MonthView';
 
@@ -258,7 +258,7 @@ function DayColumn({ pieces, m, colors, isDark, compact, narrow, time, last, now
           : '';
         // Layering (Hyoje, 11 Nov): indented a step per depth, to the right edge; side by side
         // only in the rare fallback. A covered title sits below what covers it.
-        const step = narrow ? 10 : 5;                         // % of the day's width per depth (smaller: Hyoje, 11 Nov)
+        const step = stepFor(pieces, narrow ? 10 : 5);        // % of the day's width per depth (smaller: Hyoje, 11 Nov); smaller still on a deep day (24 Nov)
         const room = 100 - p.depth * step;
         const left = p.depth * step + (p.col / p.cols) * room;
         const width = room / p.cols;

@@ -78,7 +78,8 @@ const until = (it: Item, today: string) =>
 const name = (it: Item) => (it.title ? `${it.activity} · ${it.title}` : it.activity);
 
 async function call(url: string, method: string, body?: unknown): Promise<{ ok: boolean; b: any }> {
-  const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
+  // A time limit (24 Nov): wifi that goes nowhere used to hold Stamp and the buttons for long.
+  const r = await fetchWithin(url, { method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) }, 8000);
   const b = await r.json().catch(() => ({}));
   return { ok: r.ok, b };
 }
@@ -196,13 +197,18 @@ function EntryHome() {
 
   /** When the Home shown was saved, if it came from the phone's copy (offline). */
   const [savedAt, setSavedAt] = useState<number | null>(null);
-  const retry = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const loadRef = useRef<(() => Promise<void>) | null>(null);
-  useEffect(() => () => { if (retry.current) clearTimeout(retry.current); }, []);
-  const load = useCallback(async () => {
+  // The saved copy is shown at once, and the network asked again straight away (24 Nov: at
+  // home on strong wifi the banner said "no signal" — the server was only slow to wake). The
+  // banner shows only once that second ask fails too; meanwhile a quiet "Updating…".
+  const [checking, setChecking] = useState(false);
+  const loadRef = useRef<((fresh?: boolean) => Promise<void>) | null>(null);
+  const load = useCallback(async (fresh = false) => {
     try {
+      if (fresh) setChecking(true);
       const [h, z] = await Promise.all([
-        fetch(`/api/entry/home?tz=${encodeURIComponent(iana)}`, { cache: 'no-store' }),
+        fresh
+          ? fetchWithin(`/api/entry/home?tz=${encodeURIComponent(iana)}`, { cache: 'no-store', headers: { 'X-FG-Fresh': '1' } }, 25000)
+          : fetch(`/api/entry/home?tz=${encodeURIComponent(iana)}`, { cache: 'no-store' }),
         zones ? Promise.resolve(null) : fetch('/api/entry/rules'),
       ]);
       const hb = await h.json().catch(() => ({}));
@@ -212,11 +218,12 @@ function EntryHome() {
       const saved = h.headers.get('x-offline-from-cache') ? Number(h.headers.get('x-offline-saved')) : 0;
       setSavedAt(saved || null);
       setData(hb); setError('');
-      if (!saved) warmItems(hb);
-      // The saved copy was shown because the answer was slow: ask again shortly — the
-      // network's answer has usually landed by then (22 Nov).
-      else if (!retry.current) retry.current = setTimeout(() => { retry.current = null; void loadRef.current?.(); }, 12000);
+      if (!saved) { warmItems(hb); setChecking(false); }
+      else if (!fresh && navigator.onLine !== false) void loadRef.current?.(true);
+      else setChecking(false);
     } catch (e: any) {
+      setChecking(false);
+      if (fresh) return;   // the saved copy stays, now with the banner
       setError(navigator.onLine === false ? 'No signal, and Home hasn’t been saved on this phone yet.' : String(e.message ?? e));
     }
   }, [iana, zones]);
@@ -473,7 +480,7 @@ function EntryHome() {
     return (
       <div className="px-4 py-8 max-w-3xl mx-auto w-full">
         <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
-        <button onClick={load} className={`${secondary} mt-3`}>Try again</button>
+        <button onClick={() => load()} className={`${secondary} mt-3`}>Try again</button>
       </div>
     );
   }
@@ -547,10 +554,11 @@ function EntryHome() {
     <div className="flex flex-1 w-full min-w-0">
     <div className="flex flex-col flex-1 min-w-0 pb-24">
       <div className="px-4 pt-5 pb-2 max-w-3xl mx-auto w-full flex flex-col gap-4">
-        {savedAt && (
+        {savedAt && checking && <p className="text-xs text-stone-400 dark:text-zinc-500">Updating…</p>}
+        {savedAt && !checking && (
           <p className="text-xs rounded border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950 text-amber-900 dark:text-amber-200 px-3 py-2">
             Saved copy from {new Date(savedAt).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' })} — no signal (or a very slow one).
-            What you do here is saved on the phone and sent once there is a signal; opening or deleting a record needs one. <button onClick={load} className="underline">Try again</button>
+            What you do here is saved on the phone and sent once there is a signal; opening or deleting a record needs one. <button onClick={() => load(true)} className="underline">Try again</button>
           </p>
         )}
         {/* Presets and new */}
