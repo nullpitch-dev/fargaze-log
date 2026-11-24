@@ -404,6 +404,14 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
   const leaving = useRef(false);
   /** After a save: Home replaces the form in history, so Back doesn't reopen it (12 Nov). */
   const leaveTo = (href: string) => { leaving.current = true; router.replace(href); };
+  // Back skips a record already saved or deleted here (Hyoje, 24 Nov: edit, save, go to
+  // Today, Back → the edit form again). The page's history entry is marked when it is
+  // done; coming back to a marked entry steps back once more.
+  const markDone = () => { try { window.history.replaceState({ ...window.history.state, fgDone: id }, ''); } catch { /* none */ } };
+  useEffect(() => {
+    if (mode === 'edit' && window.history.state?.fgDone === id && window.history.length > 1) window.history.back();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   /** Opened from the Calendar (13 Nov): ?back=/calendar?… — saving returns there instead of Today. */
   const backTo = (): string | null => {
     if (typeof window === 'undefined') return null;
@@ -562,6 +570,9 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
         await post(`/api/entry/repeats/${rule._id}`, 'DELETE', { scope, at: occurrence, keepId: b.kind === 'plan' ? id : null });
         return `/entry?${new URLSearchParams({ saved: b.kind, id: b.id ?? id, from: 'repeat' })}`;
       }
+      // Ends before this plan's own date: the whole repeat ends then — "this and following"
+      // from here would start after its own end (24 Nov: Ends on 29 Nov, set on a 1 Dec plan).
+      if (scope === 'following' && repeat.until && repeat.until < fm.start.date) scope = 'all';
       const b = scope === 'following'
         ? await post(`/api/entry/repeats/${rule._id}/split`, 'POST', { ...ruleBody(fm, repeat, fm.start.date), planId: id, updatedAt: rec.updatedAt, planForm: fm })
         : await post(`/api/entry/repeats/${rule._id}`, 'PUT', { ...ruleBody(fm, repeat, rule.from), planId: id, updatedAt: rec.updatedAt, planForm: fm });
@@ -643,6 +654,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
       if (!r.ok) { setSaveError({ text: b.error ?? `HTTP ${r.status}`, problems: b.problems, conflict: r.status === 409 }); return; }
       // Back to Coming up (17 Nov): the record is a plan now, so Today shows it there.
       if (b.toPlan) { leaveTo(backTo() ?? `/entry?${new URLSearchParams({ saved: 'plan', id: b.planId, from: 'moved' })}`); return; }
+      markDone();
       setResult({ kind: 'saved', noSheet: !!b.noSheet, changeId: b.changeId, tab: b.tab, findRow: b.findRow, moveTo: b.moveTo, lines: b.lines, changes: b.changes ?? [], sheetDone: !!b.noSheet, undone: null });
       window.scrollTo({ top: 0 });
     } catch (e: any) {
@@ -683,6 +695,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
       });
       const b = await r.json().catch(() => ({}));
       if (!r.ok) { setSaveError({ text: b.error ?? `HTTP ${r.status}`, conflict: r.status === 409 }); return; }
+      markDone();
       setResult({ kind: 'deleted', noSheet: !!b.noSheet, changeId: b.changeId, tab: b.tab, findRow: b.findRow, moveTo: null, lines: b.lines, changes: [], sheetDone: !!b.noSheet, undone: null });
       window.scrollTo({ top: 0 });
     } catch (e: any) {

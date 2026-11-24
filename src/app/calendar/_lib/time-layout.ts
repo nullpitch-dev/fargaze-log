@@ -123,30 +123,45 @@ export function layoutDay(events: CalendarEvent[], date: string, tz: string, lab
     }
   };
   place();
-  // A piece left with no room for its title:
-  //  · beside the pieces starting within one line of it that also end near it (two of a
-  //    kind — a lesson and the waiting for it), side by side;
-  //  · otherwise, when it is short, drawn ON TOP of what starts on it (24 Nov: a 15-minute
-  //    payment just before sleep was hidden under it); the longer one's title goes below.
+  // A piece left with no room for its title. What takes its room: the pieces starting on
+  // it before it has had a line of its own — counted from where it is first free (below a
+  // short one drawn on top of its start). Then:
+  //  · already side by side: they join its row (24 Nov: 06:00 대변 · 체중 · 팔굽혀펴기 and
+  //    아침 준비 starting a few minutes later — four across);
+  //  · two of a kind (they end near it too — a lesson and the waiting for it): side by side;
+  //  · it is short: drawn ON TOP of them (a 15-minute payment just before sleep); their
+  //    titles go below it;
+  //  · they are short: they move to its right half, it keeps its full width and title;
+  //  · else side by side (24 Nov: a 13:00 lesson and coffee from 13:17).
+  // Repeated until nothing moves (each change can take another's room), at most 4 times.
   const alike = (p: Piece, q: Piece) => Math.abs(q.bottom - p.bottom) <= Math.min(3 * labelMin, 20);   // minutes, whatever the scale
   const short = (p: Piece) => p.bottom - p.top <= 2 * labelMin;
+  const regroup = (g: Piece[]) => g.forEach((q, k) => { group.set(q, g); q.col = k; q.cols = g.length; });
   let top = raw.length;
-  let again = false;
-  for (const p of raw) {
-    if (p.labelTop >= 0 || group.has(p)) continue;
-    const g = [p, ...raw.filter(q => q !== p && !group.has(q) && q.top >= p.top && q.top - p.top < labelMin && alike(p, q) && overlap(p, q))];
-    if (g.length >= 2) { g.forEach((q, k) => { group.set(q, g); q.col = k; q.cols = g.length; }); again = true; continue; }
-    if (short(p)) { p.z = top++; again = true; continue; }
-    //  · a long one covered at its top by short ones starting within a line: those move to
-    //    its right half (still on top), it keeps its full width and its title on the left.
-    const right = raw.filter(q => q !== p && !group.has(q) && q.top >= p.top && q.top - p.top < labelMin && short(q) && overlap(p, q));
-    if (right.length) {
-      for (const q of right) { group.set(q, [p, q]); q.col = 1; q.cols = 2; }
-      group.set(p, [p, ...right]);
+  for (let pass = 0; pass < 4; pass++) {
+    let again = false;
+    for (const p of raw) {
+      if (p.labelTop >= 0) continue;
+      const free = Math.max(p.top, ...raw.filter(q => q !== p && q.z > p.z && q.top <= p.top && overlap(p, q) && !siblings(p, q)).map(q => q.bottom));
+      const on = raw.filter(q => q !== p && !group.has(q) && q.z > p.z && q.top >= p.top && q.top < free + labelMin && overlap(p, q));
+      const g0 = group.get(p);
+      if (g0) {
+        if (on.length && g0.every(q => q.cols === g0.length)) { regroup([...g0, ...on]); again = true; }
+        continue;
+      }
+      const two = on.filter(q => alike(p, q));
+      if (two.length) { regroup([p, ...two]); again = true; continue; }
+      if (short(p)) { if (p.z < top - 1 || on.length) { p.z = top++; again = true; } continue; }
+      if (!on.length) continue;
+      if (on.every(short)) {
+        for (const q of on) { group.set(q, [p, q]); q.col = 1; q.cols = 2; }
+        group.set(p, [p, ...on]);
+      } else regroup([p, ...on]);
       again = true;
     }
+    if (!again) break;
+    place();
   }
-  if (again) place();
   for (const p of raw) if (p.labelTop < 0) { p.labelTop = p.top; p.labelRoom = labelMin; }   // the rare rest: title at the top
   return raw;
 }

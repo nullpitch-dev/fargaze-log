@@ -355,7 +355,10 @@ export async function updateRule(userId: string, id: string, body: any) {
   const v = validate(body);
   if (!v.ok) return v;
   const today = localNow(v.rule.iana).date;
-  const removed = await dropUntouched(userId, old._id, today);
+  let removed = await dropUntouched(userId, old._id, today);
+  // An end date: nothing after it stays, touched or not (24 Nov: "Ends on 29 Nov" left
+  // plans after it).
+  if (v.rule.until) removed += await dropFrom(userId, old._id, addDays(v.rule.until, 1), null);
   await RepeatRule.updateOne({ _id: old._id, userId }, { $set: { ...v.rule, filledUntil: null } });
   const rule = await RepeatRule.findOne({ _id: old._id, userId }).lean() as any;
   const filled = await fillRule(userId, rule);
