@@ -102,6 +102,11 @@ export interface ListDef {
    *  record count, whose names records refer to (place points, favourite places).
    *  Renaming them must also change the records, so it waits for rename (step 3). */
   fixedOnEdit?: string[];
+  /** Why the fixedOnEdit boxes are grey, when not the usual reason (shown on hover). */
+  fixedWhy?: string;
+  /** A row whose name the code looks for: only its name is locked, not the row (25 Nov:
+   *  a bowel value's score can still change). */
+  codeLockKeyOnly?: boolean;
   /** Shown under the title. */
   note?: string;
   /** The column the alphabet bar sorts into ㄱ–ㅎ, A–Z and # (long lists). */
@@ -237,7 +242,11 @@ export const LISTS: ListDef[] = [
       { key: 'score', label: 'Score', type: 'number', required: true },
     ],
     unique: ['field', 'value'],
-    recordsFollow: true,   // #67.9 (25 Nov): rename and merge, past records following (renameItem.ts)
+    recordsFollow: true,
+    // 25 Nov (Hyoje): the field is grey on an existing row rather than refused on save.
+    fixedOnEdit: ['field'],
+    fixedWhy: 'The field can’t change: add the value under the other field instead',
+    codeLockKeyOnly: true,   // #67.9 (25 Nov): rename and merge, past records following (renameItem.ts)
     sort: { field: 1, score: -1, value: 1 },
     usage: [
       { when: { field: 'amount' }, key: { value: 'bowel.amount' } },

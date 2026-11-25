@@ -32,6 +32,11 @@ const SLUGS = ['ingredient', 'alcohol', 'bowel'] as const;
 type Slug = typeof SLUGS[number];
 export const isItemList = (def: ListDef) => (SLUGS as readonly string[]).includes(def.slug);
 
+/** Names the code looks for, shown locked on the page (bowel: only the value box). */
+export function itemLockedNames(def: ListDef): Record<string, string> {
+  return def.slug === 'bowel' ? { ...IN_CODE['bowel:characteristics'] } : {};
+}
+
 /** The columns that name the row (the rest must stay as they are in a rename). */
 const KEY: Record<Slug, string[]> = { ingredient: ['level2'], alcohol: ['item', 'unit'], bowel: ['value'] };
 
@@ -91,13 +96,12 @@ async function makePlan(def: ListDef, userId: string, id: string, values: Record
   const from: Record<string, string> = {}, to: Record<string, string> = {};
   for (const k of keys) { from[k] = str(before[k]); to[k] = str(values[k]); }
   for (const k of keys) if (!to[k]) return fail(400, `${def.columns.find(c => c.key === k)?.label ?? k} is needed.`);
-  if (same(from, to)) return fail(400, 'Nothing changed.');
+  // The other columns first (25 Nov: a changed Field alone said "Nothing changed").
   const others = def.columns.map(c => c.key).filter(k => !keys.includes(k));
   const moved = others.filter(k => !same(str(before[k]), str(values[k])));
-  if (moved.length) {
-    if (slug === 'bowel' && moved.includes('field')) return fail(409, 'The field can’t change: add the value under the other field instead.');
-    return fail(409, 'Change the name on its own, then the other columns.');
-  }
+  if (slug === 'bowel' && moved.includes('field')) return fail(409, 'The field can’t change: add the value under the other field instead.');
+  if (same(from, to)) return fail(400, 'Nothing changed.');
+  if (moved.length) return fail(409, 'Change the name on its own, then the other columns.');
   const field = slug === 'bowel' ? str(before.field) : null;
   const inCode = field ? IN_CODE[`bowel:${field}`] : undefined;
   for (const v of [from.value, to.value]) {

@@ -46,7 +46,7 @@ type PartKey = 'places' | 'changes' | 'missing' | 'excluded';
 const FOLD_DEFAULT: Record<PartKey, boolean> = { places: true, changes: false, missing: false, excluded: false };
 type ExcludedPoint = MissingPoint & { at: string | null };
 interface ListResponse {
-  list: { slug: string; title: string; group: string; note: string | null; columns: Column[]; recordsFollow: boolean; usageCounted: boolean; locked: string[]; fixedOnEdit: string[]; zoneCodes: string[]; codeNames: { key: Record<string, string>; cat: Record<string, string> }; indexBy: string | null; viaFavorites: boolean; page: PageTools | null };
+  list: { slug: string; title: string; group: string; note: string | null; columns: Column[]; recordsFollow: boolean; usageCounted: boolean; locked: string[]; fixedOnEdit: string[]; fixedWhy?: string | null; codeLockKeyOnly?: boolean; zoneCodes: string[]; codeNames: { key: Record<string, string>; cat: Record<string, string> }; indexBy: string | null; viaFavorites: boolean; page: PageTools | null };
   rows: Row[];
   orphans: Orphan[];
   since: string;
@@ -566,7 +566,10 @@ export default function AdminListPage() {
     const fixedHere = (key: string) => !!row && data.list.fixedOnEdit.includes(key);
     // A row the site's code looks for by name: only its groups can change (17 Nov).
     const codeLocked = !!row && !!codeLock(data, row);
-    const lockedHere = (key: string) => fixedHere(key) || (codeLocked && columns.find(c => c.key === key)?.type !== 'groups')
+    // Bowel (25 Nov): a value the code looks for keeps its score editable; only the value is locked.
+    const keyCol = columns.find(c => !c.pickExisting && c.type === 'text')?.key;
+    const lockedHere = (key: string) => fixedHere(key)
+      || (codeLocked && (data.list.codeLockKeyOnly ? key === keyCol : columns.find(c => c.key === key)?.type !== 'groups'))
       || (!!row && used > 0 && !data.list.recordsFollow && data.list.locked.includes(key));
     return (
       <tr key={row?._id ?? 'new'} className="border-b border-stone-200 dark:border-zinc-700 bg-amber-50/60 dark:bg-zinc-800">
@@ -574,7 +577,7 @@ export default function AdminListPage() {
           const v = editing.draft[c.key];
           const locked = lockedHere(c.key);
           const title = !locked ? undefined
-            : fixedHere(c.key) ? 'Records refer to this by name; renaming comes later'
+            : fixedHere(c.key) ? (data.list.fixedWhy ?? 'Records refer to this by name; renaming comes later')
             : codeLocked ? codeLock(data, row!)!
             : `${used.toLocaleString()} record${used === 1 ? '' : 's'} use this value; renaming comes later`;
           const cell = (
@@ -935,7 +938,7 @@ export default function AdminListPage() {
                       </td>
                     )}
                     <td className="px-3 py-1.5 text-right whitespace-nowrap space-x-3">
-                      {codeLock(data, r) && !hasGroups
+                      {codeLock(data, r) && !hasGroups && !data.list.codeLockKeyOnly
                         ? <span title={codeLock(data, r)!} className="text-xs text-stone-400 dark:text-zinc-500 cursor-help">🔒 Locked</span>
                         : <button onClick={() => startEdit(r)} disabled={!!editing || !!catForm || !!preview} className={linkBtn}>Edit</button>}
                       <button

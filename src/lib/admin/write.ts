@@ -245,7 +245,7 @@ export async function editRow(def: ListDef, userId: string, id: string, raw: Rec
   const changedFixed = (def.fixedOnEdit ?? []).filter(k => !same(before[k], p.values[k]));
   if (changedFixed.length) {
     const labels = changedFixed.map(k => def.columns.find(c => c.key === k)?.label ?? k).join(', ');
-    return fail(409, `${labels} can't change here: records refer to it by name, and renaming comes later.`);
+    return fail(409, def.fixedWhy ? `${def.fixedWhy}.` : `${labels} can't change here: records refer to it by name, and renaming comes later.`);
   }
 
 	const changedLocked = lockedColumns(def).filter(k => !same(before[k], p.values[k]));

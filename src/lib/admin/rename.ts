@@ -32,7 +32,7 @@ import { undoReplace } from '@/lib/records/replace';
 import { type ListDef, toRow } from './lists';
 import { PLACE_SLUG, previewPlaceRename, applyPlaceRename, undoPlaceChange, type PlacePreview } from './renamePlace';
 import { isRefList, refLockedNames, previewRefRename, applyRefRename, undoRefChange, type RefPreview } from './renameRef';
-import { isItemList, previewItemRename, applyItemRename, undoItemChange, type ItemPreview } from './renameItem';
+import { isItemList, itemLockedNames, previewItemRename, applyItemRename, undoItemChange, type ItemPreview } from './renameItem';
 
 // ── What follows, per list ───────────────────────────────────────────────────
 
@@ -76,6 +76,7 @@ export const followFor = (def: ListDef): Follow | null => (def.recordsFollow ? F
 /** Names and categories the page shows as locked, with the pages that need them. */
 export function lockedNames(def: ListDef): { key: Record<string, string>; cat: Record<string, string> } {
   if (isRefList(def)) return { key: refLockedNames(def), cat: {} };          // #67.5
+  if (isItemList(def)) return { key: itemLockedNames(def), cat: {} };        // #67.9
   const f = followFor(def);
   return { key: f?.inCode.key ?? {}, cat: f?.inCode.cat ?? {} };
 }

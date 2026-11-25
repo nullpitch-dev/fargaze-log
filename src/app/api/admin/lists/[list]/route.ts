@@ -55,6 +55,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ list: st
       usageCounted: usage.counted,
       locked: lockedColumns(def),
       fixedOnEdit: def.fixedOnEdit ?? [],
+      fixedWhy: def.fixedWhy ?? null,
+      codeLockKeyOnly: !!def.codeLockKeyOnly,
       // Names the site's code looks for: shown locked, and refused by rename.ts too.
       codeNames: lockedNames(def),
       zoneCodes: (zones as any[]).map(z => z.code),
