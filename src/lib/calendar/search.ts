@@ -42,7 +42,14 @@ export const FIELD_OPTIONS: { value: string; label: string }[] = [
   { value: 'transport.to',            label: '도착지' },
   { value: 'travel.city',             label: '여행도시' },
   { value: 'notes',                   label: '메모' },
+  // 25 Nov (Hyoje: to see the records an ingredient rename changed): food and drink ingredients.
+  { value: 'food.ingredients',        label: '재료' },
 ];
+
+/** A field that stands for several record paths. */
+const FIELD_PATHS: Record<string, string[]> = {
+  'food.ingredients': ['food.foods.ingredients', 'food.drinks.ingredients'],
+};
 const FIELD_SET = new Set(FIELD_OPTIONS.map(f => f.value));
 
 export const SEARCH_LIMIT = 200;          // shown, newest first (Google's cap)
@@ -87,7 +94,10 @@ export function buildSearchFilter(userId: string, s: SearchInput): Record<string
   const and: any[] = [];
 
   for (const t of parseTerms(s.q)) and.push({ $or: ALL_TEXT_PATHS.map(p => ({ [p]: contains(t) })) });
-  for (const c of s.conditions) for (const t of parseTerms(c.value)) and.push({ [c.field]: contains(t) });
+  for (const c of s.conditions) for (const t of parseTerms(c.value)) {
+    const paths = FIELD_PATHS[c.field] ?? [c.field];
+    and.push(paths.length === 1 ? { [paths[0]]: contains(t) } : { $or: paths.map(p => ({ [p]: contains(t) })) });
+  }
   const hasText = and.length > 0;
 
   const nots = parseTerms(s.not);

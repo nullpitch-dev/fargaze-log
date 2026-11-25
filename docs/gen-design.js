@@ -2442,6 +2442,7 @@ C(
   bullet("Records: ingredients in food.foods[].ingredients and food.drinks[].ingredients (after a merge a list holding both names keeps the kept one once); alcohol in food.alcohols[] (item and unit); bowel in bowel.amount, bowel.quality[] or bowel.characteristics[] (merged arrays hold the kept value once). OPEN PLANS (log_plan) follow too, so they still save; done and deleted plans don’t. The form’s saved suggestion lists (entry_cache) are cleared"),
   bullet("Refused: 편하게 / 급하게 / 힘들게 (bowel characteristics), both ways — the Bowel insight looks for them. Warned: a bowel QUALITY value renamed out of the insight’s order (QUALITY_ORDER in insights/bowel.ts and BowelWidget.tsx) goes after 설사 until the code learns it"),
   bullet("Undo keeps, per record and plan, the exact fields before and after (extra.hits). Refused when any record has changed since; plans that changed since stay as they are. A merge’s Undo re-creates the row under its old id"),
+  bullet("To see an ingredient’s records (25 Nov): Calendar search → 상세 검색 → 재료 (food and drink ingredients; FIELD_PATHS in calendar/search.ts maps it to both paths). Plans are found too"),
   bullet("Code: src/lib/admin/renameItem.ts (isItemList, previewItemRename, applyItemRename, undoItemChange), dispatched from rename.ts; lists.ts marks the three lists recordsFollow. Not tested against a real database from the cloud: test on fargaze-log-test first"),
 );
 
