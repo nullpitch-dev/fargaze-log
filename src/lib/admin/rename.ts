@@ -32,6 +32,7 @@ import { undoReplace } from '@/lib/records/replace';
 import { type ListDef, toRow } from './lists';
 import { PLACE_SLUG, previewPlaceRename, applyPlaceRename, undoPlaceChange, type PlacePreview } from './renamePlace';
 import { isRefList, refLockedNames, previewRefRename, applyRefRename, undoRefChange, type RefPreview } from './renameRef';
+import { isItemList, previewItemRename, applyItemRename, undoItemChange, type ItemPreview } from './renameItem';
 
 // ── What follows, per list ───────────────────────────────────────────────────
 
@@ -254,7 +255,12 @@ export function stepsFor(f: Follow, p: Plan, c: Counts, masterRows: number): str
 
 // ── Preview ──────────────────────────────────────────────────────────────────
 
-export async function previewRename(def: ListDef, userId: string, req: RenameRequest): Promise<{ ok: true; preview: Preview | PlacePreview | RefPreview } | Fail> {
+export async function previewRename(def: ListDef, userId: string, req: RenameRequest): Promise<{ ok: true; preview: Preview | PlacePreview | RefPreview | ItemPreview } | Fail> {
+  if (isItemList(def)) {                                                 // #67.9
+    if (req.mode !== 'row') return fail(400, 'This list has no categories to rename.');
+    const out = await previewItemRename(def, userId, req.id, req.values);
+    return out.ok ? { ok: true, preview: out.preview } : out;
+  }
   if (isRefList(def)) {                                                  // #67.5
     if (req.mode !== 'row') return fail(400, 'Reference lists have no categories.');
     const out = await previewRefRename(def, userId, req.id, req.values);
@@ -336,6 +342,9 @@ async function calendarChange(userId: string, p: Plan, write: boolean, session?:
 
 export async function applyRename(def: ListDef, userId: string, req: RenameRequest, expectRecords: number):
   Promise<{ ok: true; changeId: string; recordsChanged: number; sheetNeeded?: boolean } | Fail> {
+  if (isItemList(def)) {                                                 // #67.9
+    return req.mode === 'row' ? applyItemRename(def, userId, req.id, req.values, expectRecords) : fail(400, 'This list has no categories to rename.');
+  }
   if (isRefList(def)) {                                                  // #67.5
     return req.mode === 'row' ? applyRefRename(def, userId, req.id, req.values, expectRecords) : fail(400, 'Reference lists have no categories.');
   }
@@ -429,6 +438,7 @@ export async function undoChange(userId: string, changeId: string, defOf: (slug:
   const def = defOf(ch.list);
   if (def?.slug === PLACE_SLUG) return undoPlaceChange(def, userId, ch);
   if (def && isRefList(def)) return undoRefChange(def, userId, ch);     // #67.5
+  if (def && isItemList(def)) return undoItemChange(def, userId, ch);   // #67.9
   const f = def && followFor(def);
   if (!def || !f) return fail(400, 'Unknown list.');
   const model = def.model();

@@ -10,6 +10,10 @@
  *   /api/records/options,  saved last time, marked x-offline-saved: <ms> so the page can say
  *   /api/records/<id>      how old it is. Home asks for its plans, stamps and recent records
  *                          to be saved (slice 2), so they open and copy offline.
+ *   RSC of /entry/…        (a tap on a link inside the app) network, but no answer within
+ *                          PAGE_WAIT (or WEAK_WAIT while weak) → an error, so Next loads the
+ *                          page itself and the page rule above serves the saved copy (25 Nov:
+ *                          with a weak signal a tap on Copy recent did nothing at all).
  *   everything else        untouched (saving, other pages' data, sign-in).
  *
  * Bump VERSION when this file changes in a way old caches must not survive.
@@ -92,6 +96,21 @@ async function networkFirst(event, cacheName, key, wait, nothing) {
   }
 }
 
+/** An RSC payload within PAGE_WAIT (WEAK_WAIT while the signal is weak), else an error. */
+async function rscWithin(event) {
+  const net = fetch(event.request).then(res => { weakUntil = 0; return res; });
+  net.catch(() => { weakUntil = Date.now() + WEAK_FOR; });
+  const limit = self.navigator.onLine === false ? 0 : Date.now() < weakUntil ? WEAK_WAIT : PAGE_WAIT;
+  try {
+    return await Promise.race([
+      net,
+      new Promise((_, no) => setTimeout(() => { weakUntil = Date.now() + WEAK_FOR; no(new Error('slow')); }, limit)),
+    ]);
+  } catch {
+    return Response.error();
+  }
+}
+
 async function cacheFirst(event) {
   const cache = await caches.open(STATIC);
   const hit = await cache.match(event.request);
@@ -127,6 +146,9 @@ self.addEventListener('fetch', event => {
     return;
   }
 
+  // A tap on a link inside the entry app: Next asks for the page's RSC payload and waits for
+  // it with no time limit. Give up in time, so Next loads the page itself (served above).
+  if (req.headers.get('RSC') === '1' && isEntryPage(p)) { event.respondWith(rscWithin(event)); return; }
   // Page data (not the RSC payloads of client navigations: those fail offline and Next then
   // loads the page itself, which the rule above serves).
   if (isData(p) && req.headers.get('RSC') !== '1') {
@@ -147,8 +169,9 @@ self.addEventListener('message', event => {
       } catch { /* offline: keep what is there */ }
     };
     await Promise.all([
-      ...WARM_PAGES.map(u => put(PAGES, u, u)),
-      ...WARM_DATA.map(u => put(DATA, u, u)),
+      // only: just the listed data (Copy recent's search results, 25 Nov)
+      ...(m.only ? [] : WARM_PAGES.map(u => put(PAGES, u, u))),
+      ...(m.only ? [] : WARM_DATA.map(u => put(DATA, u, u))),
       ...(m.data || []).filter(u => isData(new URL(u, self.location.origin).pathname))
         .map(u => { const x = new URL(u, self.location.origin); return put(DATA, x.pathname + x.search, x.href); }),
     ]);

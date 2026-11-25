@@ -205,6 +205,7 @@ export const LISTS: ListDef[] = [
     unique: ['item', 'unit'],
     sort: { item: 1, unit: 1 },
     usage: [{ unwind: ['food.alcohols'], key: { item: 'food.alcohols.item', unit: 'food.alcohols.unit' } }],
+    recordsFollow: true,   // #67.9 (25 Nov): rename and merge, past records following (renameItem.ts)
     sheet: { where: 'AlcoholConv tab', order: ['item', 'unit', 'unitTo50ml', 'alcoholRatio', 'drinks'] },
   },
   {
@@ -217,6 +218,7 @@ export const LISTS: ListDef[] = [
       { key: 'level2', label: 'Ingredient', type: 'text', required: true },
     ],
     unique: ['level2'],
+    recordsFollow: true,   // #67.9 (25 Nov): rename and merge, past records following (renameItem.ts)
     sort: { level1: 1, level2: 1 },
     usage: [
       { unwind: ['food.foods', 'food.foods.ingredients'], key: { level2: 'food.foods.ingredients' } },
@@ -235,6 +237,7 @@ export const LISTS: ListDef[] = [
       { key: 'score', label: 'Score', type: 'number', required: true },
     ],
     unique: ['field', 'value'],
+    recordsFollow: true,   // #67.9 (25 Nov): rename and merge, past records following (renameItem.ts)
     sort: { field: 1, score: -1, value: 1 },
     usage: [
       { when: { field: 'amount' }, key: { value: 'bowel.amount' } },

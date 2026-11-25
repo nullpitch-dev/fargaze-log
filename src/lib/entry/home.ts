@@ -48,30 +48,38 @@ const key = (p: { date: string; hour: string }) => `${p.date} ${(p.hour || '0:00
 const isOpenRec = (r: any) => !r?.end?.year || (!!r?.start?.hour && !r?.end?.hour);
 
 export async function home(userId: string, iana = 'Europe/London', now = Date.now()) {
+  // Speed (25 Nov): the repeats first (they may make today's plans), then every other read at
+  // once — they ran one after another. Timings go to the server log: "[timing] home …".
+  const t0 = Date.now(), lap: string[] = [];
   const refreshed = await refresh(userId, now);
+  lap.push(`repeats ${Date.now() - t0}`);
   const today = localNow(iana, now).date;
   const yesterday = addDays(today, -1);
   const [y, m, d] = today.split('-').map(Number);
 
-  // Coming up: open plans whose start day is today or earlier.
-  const plans = await LogPlan.find({
-    userId, 'plan.state': 'open',
-    // naive local times: the end of tomorrow covers every zone's today
-    $or: [{ 'start.datetime': { $lte: new Date(Date.parse(addDays(today, 1) + 'T23:59:59Z')) } }, { 'start.datetime': null }],
-  }).sort({ 'start.datetime': 1 }).lean() as any[];
-  const comingUp = plans
-    .filter(p => dateOf(p.start) && dateOf(p.start) <= today)
-    .map(p => item(p, { repeat: !!p.plan?.repeatId, repeatId: p.plan?.repeatId ? String(p.plan.repeatId) : null, occurrence: p.plan?.occurrence ?? null, started: (instantOf(p.start) ?? 0) <= now }))
-    .sort((a, b) => key(b.start).localeCompare(key(a.start)));
-
-  const [open, ended, latest] = await Promise.all([
+  const t1 = Date.now();
+  const [plans, open, ended, latest, openPlanItems, stamps, presets] = await Promise.all([
+    // Coming up: open plans whose start day is today or earlier.
+    LogPlan.find({
+      userId, 'plan.state': 'open',
+      // naive local times: the end of tomorrow covers every zone's today
+      $or: [{ 'start.datetime': { $lte: new Date(Date.parse(addDays(today, 1) + 'T23:59:59Z')) } }, { 'start.datetime': null }],
+    }).sort({ 'start.datetime': 1 }).lean() as Promise<any[]>,
     // Open: no end at all, or a start time without an end time (as the form says).
     Log.find({ userId, 'start.year': { $ne: null }, $or: [{ 'end.year': null }, { 'start.hour': { $nin: [null, ''] }, 'end.hour': { $in: [null, ''] } }] })
       .sort({ 'start.datetime': -1 }).limit(200).lean(),
     Log.find({ userId, 'end.year': y, 'end.month': m, 'end.day': d }).sort({ 'end.datetime': 1 }).lean(),
     Log.find({ userId, 'start.datetime': { $ne: null } }).sort({ 'start.datetime': -1 }).limit(300)
       .select('activity start end plannedEnd location duration updatedAt').lean(),
+    openPlans(userId),
+    listStamps(userId),
+    listPresets(userId),
   ]);
+  lap.push(`reads ${Date.now() - t1}`);
+  const comingUp = plans
+    .filter(p => dateOf(p.start) && dateOf(p.start) <= today)
+    .map(p => item(p, { repeat: !!p.plan?.repeatId, repeatId: p.plan?.repeatId ? String(p.plan.repeatId) : null, occurrence: p.plan?.occurrence ?? null, started: (instantOf(p.start) ?? 0) <= now }))
+    .sort((a, b) => key(b.start).localeCompare(key(a.start)));
 
   // Planned ends of records started from a plan.
   const openIds = (open as any[]).map(r => r._id);
@@ -100,19 +108,20 @@ export async function home(userId: string, iana = 'Europe/London', now = Date.no
 
   // Copy recent: open plans first (soonest first, 13 Nov), then the latest record of each
   // activity + title + place, newest first.
-  const recent = [...await openPlans(userId), ...variants(latest as any[]).slice(0, 40).map(r => item(r))];
+  const recent = [...openPlanItems, ...variants(latest as any[]).slice(0, 40).map(r => item(r))];
+  console.log(`[timing] home ${Date.now() - t0} ms: ${lap.join(', ')}`);
 
   return {
     ok: true as const,
     now: new Date(now).toISOString(),
     today,
-    stamps: await listStamps(userId),
+    stamps,
     comingUp,
     inProgress,
     done,
     ongoing,
     recent,
-    presets: await listPresets(userId),
+    presets,
     refreshed,
   };
 }

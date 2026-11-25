@@ -234,6 +234,16 @@ const danger = `${btn} border-red-300 text-red-700 hover:bg-red-50 dark:border-r
 /** A heading inside a section — Foods, Drinks, Alcohol … (Hyoje, 12 Nov: stand out more). */
 const subhead = 'text-xs font-semibold text-stone-700 dark:text-zinc-200';
 
+// Kept on the phone between visits (25 Nov, speed): the pickers' lists and the field rules.
+const KEPT_OPTIONS = 'fg-kept-form-options';
+const KEPT_RULES = 'fg-kept-entry-rules';
+function readKept<T>(key: string): T | null {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) as T : null; } catch { return null; }
+}
+function keep(key: string, v: unknown) {
+  try { localStorage.setItem(key, JSON.stringify(v)); } catch { /* full or private: next time waits */ }
+}
+
 export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, stampId, refusal }: { id: string; mode?: EditorMode; initial?: RecordForm; presetId?: string; copied?: boolean; stampId?: string;
   /** Opened from the outbox after the server refused it (offline, #71 step 3): why. */
   refusal?: { error?: string; problems?: string[] } }) {
@@ -291,26 +301,37 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
     let live = true;
     (async () => {
       try {
-        const [r, o, e] = await Promise.all([
+        // Speed (25 Nov): the pickers' lists and the field rules change rarely, so the copy kept
+        // on this phone from last time is used at once and the fresh one swapped in when it
+        // comes. Only a first visit (nothing kept) waits for them.
+        const keptO = opts ? null : readKept<FormOptions>(KEPT_OPTIONS);
+        const keptE = entryOpts ? null : readKept<any>(KEPT_RULES);
+        if (keptO) setOpts(keptO);
+        if (keptE) setEntryOpts(keptE);
+        const fresh = async <T,>(url: string, key: string, set: (v: T) => void) => {
+          const x = await fetch(url);
+          const b = await x.json().catch(() => ({}));
+          if (!x.ok) throw new Error(b.error ?? `HTTP ${x.status}`);
+          keep(key, b);
+          if (live) set(b);
+        };
+        const oJob = opts ? null : fresh<FormOptions>('/api/records/options', KEPT_OPTIONS, setOpts);
+        const eJob = entryOpts ? null : fresh<any>('/api/entry/rules', KEPT_RULES, setEntryOpts);
+        oJob?.catch(() => {}); eJob?.catch(() => {});
+        // The record's repeat (edit), alongside the rest.
+        const fromJob = mode === 'edit'
+          ? fetch(`/api/entry/repeats?record=${encodeURIComponent(id)}`, { cache: 'no-store' }).then(x => x.json()).then(x => x?.rule ?? null).catch(() => null)
+          : Promise.resolve(null);
+        const [r] = await Promise.all([
           mode === 'new' ? Promise.resolve(null) : fetch(mode === 'plan' ? `/api/entry/plans/${id}` : `/api/records/${id}`, { cache: 'no-store' }),
-          opts ? Promise.resolve(null) : fetch('/api/records/options'),
-          !entryOpts ? fetch('/api/entry/rules') : Promise.resolve(null),
+          keptO ? null : oJob,
+          keptE ? null : eJob,
         ]);
         let rb: any = mode === 'new' ? { id, form: initial, updatedAt: '', category: null, tab: null, findRow: '' } : await r!.json().catch(() => ({}));
         if (r && !r.ok) throw new Error(rb.error ?? `HTTP ${r.status}`);
         if (mode === 'plan') {
           if (rb.state !== 'open') throw new Error(rb.state === 'done' ? 'This plan is a record now: open it from Today or the Calendar.' : 'This plan was deleted.');
           rb = { ...rb, category: null, tab: null, findRow: '' };
-        }
-        if (e) {
-          const eb = await e.json().catch(() => ({}));
-          if (!e.ok) throw new Error(eb.error ?? `HTTP ${e.status}`);
-          if (live) setEntryOpts(eb);
-        }
-        if (o) {
-          const ob = await o.json().catch(() => ({}));
-          if (!o.ok) throw new Error(ob.error ?? `HTTP ${o.status}`);
-          if (live) setOpts(ob);
         }
         if (!live) return;
         // Whole meal starts ticked in the entry app (Hyoje, 11 Nov) when nothing typed would be
@@ -327,11 +348,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
           const rr = await fetch(`/api/entry/repeats/${rb.repeatId}`, { cache: 'no-store' }).then(x => x.json()).catch(() => null);
           rule0 = rr?.rule ?? null;
         }
-        let from0: any = null;
-        if (mode === 'edit') {
-          const rr = await fetch(`/api/entry/repeats?record=${encodeURIComponent(id)}`, { cache: 'no-store' }).then(x => x.json()).catch(() => null);
-          from0 = rr?.rule ?? null;
-        }
+        const from0: any = await fromJob;
         if (!live) return;
         setRule(rule0); setRepeat(scheduleOf(rule0)); setFromRule(from0);
         setRec(rb); setForm(form0); setAdded(new Set()); setRemoved(new Set()); setRateOverride(undefined); setWhole(whole0); setCheck(null); setSaveError(null); setLoadError(''); setKrwPicked(false);

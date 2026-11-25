@@ -134,6 +134,16 @@ function warmItems(h: any) {
   } catch { /* nothing saved; fine */ }
 }
 
+/** Copy recent's search results (25 Nov): their forms saved on the phone while the list is
+ *  read, so a tap opens one even when the signal drops. */
+function warmFound(found: any[]) {
+  try {
+    if (!outboxOn() || !navigator.serviceWorker?.controller) return;
+    const data = found.slice(0, 12).map((x: any) => (x.plan ? `/api/entry/plans/${x.id}` : `/api/records/${x.id}`));
+    if (data.length) navigator.serviceWorker.controller.postMessage({ type: 'warm', data, only: true });
+  } catch { /* nothing saved; fine */ }
+}
+
 /** How long Start / End wait for an answer before the phone keeps them (22 Nov). */
 const SEND_WAIT = 6000;
 
@@ -249,7 +259,7 @@ function EntryHome() {
     const t = setTimeout(async () => {
       const r = await fetch(`/api/entry/recent?q=${encodeURIComponent(q)}`, { cache: 'no-store' });
       const b = await r.json().catch(() => ({}));
-      if (live && r.ok) setFound(b.recent ?? []);
+      if (live && r.ok) { setFound(b.recent ?? []); warmFound(b.recent ?? []); }
     }, 300);
     return () => { live = false; clearTimeout(t); };
   }, [copyQ]);

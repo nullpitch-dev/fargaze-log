@@ -7,6 +7,8 @@
 //     most used first. Free text: anything may be typed; the list only helps.
 // Suggestions take a scan of every record, so they are kept for ten minutes per user.
 
+import { after } from 'next/server';
+import EntryCache from '../../models/EntryCache';
 import Log from '../../models/Log';
 import ActivityMaster from '../../models/ActivityMaster';
 import CostMaster from '../../models/CostMaster';
@@ -75,9 +77,28 @@ function merge(...lists: { v: string; n: number; r?: number }[][]): string[] {
   return [...m.entries()].sort((a, b) => b[1].r - a[1].r || b[1].n - a[1].n || a[0].localeCompare(b[0], 'ko')).map(([v]) => v);
 }
 
+// Speed (25 Nov): the form waited for all 19 passes whenever a server had just woken (the
+// memory copy above is lost then). Now the last answer is kept in entry_cache too: the form
+// gets it at once, and one older than CACHE_MS is worked out again after the answer is sent.
+let refreshing: Promise<unknown> | null = null;
 async function loadUsed(userId: string): Promise<FormOptions['used']> {
   const hit = usedCache.get(userId);
   if (hit && Date.now() - hit.at < CACHE_MS) return hit.used;
+  const kept = await EntryCache.findOne({ userId, key: 'formUsed' }).lean() as any;
+  if (kept?.value) {
+    const at = new Date(kept.at).getTime();
+    usedCache.set(userId, { at, used: kept.value });
+    if (Date.now() - at >= CACHE_MS && !refreshing) {
+      const job = () => (refreshing ??= computeUsed(userId).finally(() => { refreshing = null; }));
+      try { after(job); } catch { void job(); }   // outside a request (a script): just start it
+    }
+    return kept.value;
+  }
+  return computeUsed(userId);
+}
+
+async function computeUsed(userId: string): Promise<FormOptions['used']> {
+  const t0 = Date.now();
   const [
     locAct, locOther, trFrom, trTo, online, people, pItem, pUnit,
     dItem, dUnit, fItem, fUnit, eItem, eUnit, eStyle, sleep, city, theme, points, acts,
@@ -107,6 +128,8 @@ async function loadUsed(userId: string): Promise<FormOptions['used']> {
     activities: merge(acts),
   };
   usedCache.set(userId, { at: Date.now(), used });
+  await EntryCache.updateOne({ userId, key: 'formUsed' }, { $set: { value: used, at: new Date() } }, { upsert: true });
+  console.log(`[timing] form values worked out in ${Date.now() - t0} ms`);
   return used;
 }
 

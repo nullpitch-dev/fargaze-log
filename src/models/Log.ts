@@ -291,6 +291,12 @@ LogSchema.index({ userId: 1, 'start.datetime': -1 });
 // Calendar (#59): finds long "(기간)" records that started before the viewed range.
 LogSchema.index({ userId: 1, 'duration.totalSeconds': -1 });
 
+// Today (25 Nov, speed): records ended today and records with no end looked through every
+// record (only start.datetime had an index). The first also serves `end.year: null`; the
+// second serves "a start time but no end time". Built by Mongoose on the app's next start.
+LogSchema.index({ userId: 1, 'end.year': 1, 'end.month': 1, 'end.day': 1 });
+LogSchema.index({ userId: 1, 'end.hour': 1 });
+
 // The entry app's plans (log_plan, #71) are records of the same shape.
 // log_plan's schema starts as a copy of this one (LogPlan.ts). The copy is made here, before
 // the model is compiled or used: Mongoose 9 can't clone a schema with document arrays once
