@@ -7,13 +7,16 @@
 //   last) · Annually on 24 November · Every weekday (Mon–Fri) · Custom…
 // Custom…: Repeat every N day / week / month / year; weekday chips (week); day N or the
 // Nth weekday (month); Ends never / on a date / after N times.
-// One thing Google doesn't have: "Count as done" — its plans become records by themselves
-// once their end has passed (the rule's mode 'auto').
+// Things Google doesn't have: "Count as done" — its plans become records by themselves
+// once their end has passed (the rule's mode 'auto'); yearly on a lunar date — 음력 (25 Nov:
+// birthdays, 제사, 설, 추석); monthly on day N moved off a weekend — the Friday before or
+// the Monday after (25 Nov: salary, phone bill).
 
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useBackToClose } from '@/app/_components/useBackToClose';
 import { inputCls } from './fields';
+import { lunarOf, lunarText } from '@/lib/entry/lunar';
 
 export type Freq = 'daily' | 'weekly' | 'monthly' | 'yearly';
 export interface Schedule {
@@ -23,6 +26,10 @@ export interface Schedule {
   monthDay: number | null;          // monthly by day
   monthWeek: number | null;         // monthly by weekday: 1–4, -1 = last
   monthWeekday: number | null;
+  monthShift: 'before' | 'after' | null;   // monthly by day: off a weekend
+  lunar: boolean;                   // yearly on a lunar date
+  lunarMonth: number | null;
+  lunarDay: number | null;
   until: string | null;             // last date
   count: number | null;             // or after N times
   mode: 'ask' | 'auto';
@@ -41,7 +48,8 @@ const parts = (date: string) => {
   return { y, m, d, wd, nth: Math.ceil(d / 7), isLast: d + 7 > last };
 };
 
-const base = (freq: Freq): Schedule => ({ freq, interval: 1, weekdays: null, monthDay: null, monthWeek: null, monthWeekday: null, until: null, count: null, mode: 'ask' });
+const base = (freq: Freq): Schedule => ({ freq, interval: 1, weekdays: null, monthDay: null, monthWeek: null, monthWeekday: null, monthShift: null, lunar: false, lunarMonth: null, lunarDay: null, until: null, count: null, mode: 'ask' });
+const SHIFT_TEXT = { before: 'or the Friday before at a weekend', after: 'or the Monday after at a weekend' } as const;
 
 /** Google's list for this start date. */
 export function presets(date: string): { label: string; s: Schedule }[] {
@@ -55,6 +63,8 @@ export function presets(date: string): { label: string; s: Schedule }[] {
   if (p.nth <= 4) out.push({ label: `Monthly on the ${NTH[p.nth]} ${DAY[p.wd]}`, s: { ...base('monthly'), monthWeek: p.nth, monthWeekday: p.wd } });
   if (p.isLast) out.push({ label: `Monthly on the last ${DAY[p.wd]}`, s: { ...base('monthly'), monthWeek: -1, monthWeekday: p.wd } });
   out.push({ label: `Annually on ${p.d} ${MONTH[p.m - 1]}`, s: base('yearly') });
+  const l = lunarOf(date);
+  if (l && !l.leap) out.push({ label: `Annually on ${lunarText(l.month, l.day)}`, s: { ...base('yearly'), lunar: true, lunarMonth: l.month, lunarDay: l.day } });
   out.push({ label: 'Every weekday (Monday to Friday)', s: { ...base('weekly'), weekdays: [1, 2, 3, 4, 5] } });
   return out;
 }
@@ -76,9 +86,10 @@ export function describe(s: Schedule | null, date: string): string {
   } else if (s.freq === 'monthly') {
     const on = s.monthWeek != null && s.monthWeekday != null
       ? `the ${s.monthWeek === -1 ? 'last' : NTH[s.monthWeek]} ${DAY[s.monthWeekday]}`
-      : `day ${s.monthDay ?? p?.d ?? ''}`;
+      : `day ${s.monthDay ?? p?.d ?? ''}${s.monthShift ? `, ${SHIFT_TEXT[s.monthShift]}` : ''}`;
     t = `${n === 1 ? 'Monthly' : `Every ${n} months`} on ${on}`;
-  } else t = `${n === 1 ? 'Annually' : `Every ${n} years`}${p ? ` on ${p.d} ${MONTH[p.m - 1]}` : ''}`;
+  } else if (s.lunar && s.lunarMonth && s.lunarDay) t = `${n === 1 ? 'Annually' : `Every ${n} years`} on ${lunarText(s.lunarMonth, s.lunarDay)}`;
+  else t = `${n === 1 ? 'Annually' : `Every ${n} years`}${p ? ` on ${p.d} ${MONTH[p.m - 1]}` : ''}`;
   if (s.until) t += `, until ${dateText(s.until)}`;
   else if (s.count) t += `, ${plural(s.count, 'time')}`;
   return t;
@@ -87,7 +98,7 @@ export function describe(s: Schedule | null, date: string): string {
 /** The same schedule? (decides whether "This event" can be offered: Google only offers
  *  "This and following" / "All events" once the repeat itself changed). */
 export function sameSchedule(a: Schedule | null, b: Schedule | null): boolean {
-  const k = (s: Schedule | null) => s ? JSON.stringify([s.freq, s.interval, [...(s.weekdays ?? [])].sort(), s.monthDay, s.monthWeek, s.monthWeekday, s.until, s.count]) : '';
+  const k = (s: Schedule | null) => s ? JSON.stringify([s.freq, s.interval, [...(s.weekdays ?? [])].sort(), s.monthDay, s.monthWeek, s.monthWeekday, s.monthShift ?? null, !!s.lunar, s.lunar ? s.lunarMonth : null, s.lunar ? s.lunarDay : null, s.until, s.count]) : '';
   return k(a) === k(b);
 }
 
@@ -96,7 +107,8 @@ export function scheduleOf(rule: any): Schedule | null {
   if (!rule) return null;
   return {
     freq: rule.freq, interval: rule.interval ?? 1, weekdays: rule.weekdays ?? null, monthDay: rule.monthDay ?? null,
-    monthWeek: rule.monthWeek ?? null, monthWeekday: rule.monthWeekday ?? null, until: rule.until ?? null, count: rule.count ?? null,
+    monthWeek: rule.monthWeek ?? null, monthWeekday: rule.monthWeekday ?? null, monthShift: rule.monthShift ?? null,
+    lunar: !!rule.lunar, lunarMonth: rule.lunarMonth ?? null, lunarDay: rule.lunarDay ?? null, until: rule.until ?? null, count: rule.count ?? null,
     mode: rule.mode === 'auto' ? 'auto' : 'ask',
   };
 }
@@ -130,6 +142,7 @@ function RepeatSheet({ value, date, onPick, onClose }: { value: Schedule | null;
   const [custom, setCustom] = useState<Schedule | null>(null);
   const [ends, setEnds] = useState<'never' | 'on' | 'after'>(value?.until ? 'on' : value?.count ? 'after' : 'never');
   const p = parts(date);
+  const lun = lunarOf(date);
   const pick = (s: Schedule | null) => dismiss(() => onPick(s));
   const row = (on: boolean) => `w-full text-left rounded-lg px-3 py-2.5 text-sm ${on ? 'bg-stone-800 text-white dark:bg-zinc-200 dark:text-zinc-900' : 'text-stone-700 dark:text-zinc-200 hover:bg-stone-100 dark:hover:bg-zinc-800'}`;
   const chip = (on: boolean) => `w-8 h-8 rounded-full text-xs font-medium ${on ? 'bg-blue-600 text-white' : 'bg-stone-100 text-stone-600 dark:bg-zinc-800 dark:text-zinc-300'}`;
@@ -137,7 +150,10 @@ function RepeatSheet({ value, date, onPick, onClose }: { value: Schedule | null;
   const setC = (x: Partial<Schedule>) => setCustom(s => s ? { ...s, ...x } : s);
   const startCustom = () => {
     const from = value ?? { ...base('weekly'), weekdays: [p.wd] };
-    setCustom({ ...from, monthDay: from.freq === 'monthly' && from.monthWeek == null ? (from.monthDay ?? p.d) : from.monthDay });
+    setCustom({
+      ...from, monthDay: from.freq === 'monthly' && from.monthWeek == null ? (from.monthDay ?? p.d) : from.monthDay,
+      lunarMonth: from.lunarMonth ?? (lun && !lun.leap ? lun.month : null), lunarDay: from.lunarDay ?? (lun && !lun.leap ? lun.day : null),
+    });
   };
   const done = () => {
     if (!c) return;
@@ -146,6 +162,8 @@ function RepeatSheet({ value, date, onPick, onClose }: { value: Schedule | null;
     if (s.freq === 'monthly' && s.monthWeek == null && !s.monthDay) s.monthDay = p.d;
     if (s.freq !== 'weekly') s.weekdays = null;
     if (s.freq !== 'monthly') { s.monthDay = null; s.monthWeek = null; s.monthWeekday = null; }
+    if (s.freq !== 'monthly' || s.monthWeek != null) s.monthShift = null;
+    if (s.freq !== 'yearly' || !s.lunar || !s.lunarMonth || !s.lunarDay) { s.lunar = false; s.lunarMonth = null; s.lunarDay = null; }
     pick(s);
   };
   if (typeof document === 'undefined') return null;
@@ -190,9 +208,32 @@ function RepeatSheet({ value, date, onPick, onClose }: { value: Schedule | null;
               )}
               {c.freq === 'monthly' && (
                 <div className="flex flex-col gap-1.5">
-                  <label className="flex items-center gap-2"><input type="radio" checked={c.monthWeek == null} onChange={() => setC({ monthWeek: null, monthWeekday: null, monthDay: p.d })} />Monthly on day {p.d}</label>
+                  <label className="flex items-center gap-2"><input type="radio" checked={c.monthWeek == null} onChange={() => setC({ monthWeek: null, monthWeekday: null, monthDay: c.monthDay ?? p.d })} />Monthly on day
+                    <input type="number" min={1} max={31} value={c.monthDay ?? p.d} aria-label="Day of the month"
+                      onChange={e => setC({ monthWeek: null, monthWeekday: null, monthDay: Math.max(1, Math.min(31, Number(e.target.value) || 1)) })}
+                      className={`${inputCls} !w-16`} /></label>
+                  {c.monthWeek == null && (
+                    <label className="flex items-center gap-2 pl-6">At a weekend
+                      <select value={c.monthShift ?? ''} onChange={e => setC({ monthShift: (e.target.value || null) as Schedule['monthShift'] })} className={`${inputCls} !w-auto`}>
+                        <option value="">keep the day</option>
+                        <option value="before">the Friday before</option>
+                        <option value="after">the Monday after</option>
+                      </select></label>
+                  )}
                   {p.nth <= 4 && <label className="flex items-center gap-2"><input type="radio" checked={c.monthWeek === p.nth} onChange={() => setC({ monthWeek: p.nth, monthWeekday: p.wd, monthDay: null })} />Monthly on the {NTH[p.nth]} {DAY[p.wd]}</label>}
                   {p.isLast && <label className="flex items-center gap-2"><input type="radio" checked={c.monthWeek === -1} onChange={() => setC({ monthWeek: -1, monthWeekday: p.wd, monthDay: null })} />Monthly on the last {DAY[p.wd]}</label>}
+                </div>
+              )}
+              {c.freq === 'yearly' && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="flex items-center gap-2"><input type="radio" checked={!c.lunar} onChange={() => setC({ lunar: false })} />On {p.d} {MONTH[p.m - 1]}</label>
+                  {lun && (
+                    <label className="flex items-center gap-2 flex-wrap"><input type="radio" checked={c.lunar} onChange={() => setC({ lunar: true })} />On 음력
+                      <input type="number" min={1} max={12} value={c.lunarMonth ?? ''} aria-label="Lunar month"
+                        onChange={e => setC({ lunar: true, lunarMonth: Math.max(1, Math.min(12, Number(e.target.value) || 1)) })} className={`${inputCls} !w-14`} />월
+                      <input type="number" min={1} max={30} value={c.lunarDay ?? ''} aria-label="Lunar day"
+                        onChange={e => setC({ lunar: true, lunarDay: Math.max(1, Math.min(30, Number(e.target.value) || 1)) })} className={`${inputCls} !w-14`} />일</label>
+                  )}
                 </div>
               )}
               <div className="flex flex-col gap-2">

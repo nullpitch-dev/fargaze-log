@@ -539,7 +539,9 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
       name: fm.activity.title.trim() || fm.activity.name.trim(), form: rest,
       allDay: !fm.start.hour, startTime: fm.start.hour || null, minutes, iana,
       freq: sc.freq, interval: sc.interval, weekdays: sc.weekdays, monthDay: sc.monthDay,
-      monthWeek: sc.monthWeek, monthWeekday: sc.monthWeekday, from, until: sc.until, count: sc.count, mode: sc.mode,
+      monthWeek: sc.monthWeek, monthWeekday: sc.monthWeekday, monthShift: sc.monthShift,
+      lunar: sc.lunar, lunarMonth: sc.lunarMonth, lunarDay: sc.lunarDay,
+      from, until: sc.until, count: sc.count, mode: sc.mode,
     };
   };
   const post = async (url: string, method: string, b: unknown) => {

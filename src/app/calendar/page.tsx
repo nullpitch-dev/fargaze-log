@@ -20,6 +20,8 @@
 // scrolls to today even when today has no records.
 // Search (28 Sep, Google's model with 상세 검색): the box sits in the toolbar;
 // a search is a view of its own in the address (?view=search&q=…&prev=month),
+// shown as a list (Schedule) or, with &as=month, on a month grid (Hyoje, 25 Nov), whose month
+// is the address's date (first: the month of the latest match),
 // and ← returns to the view it came from.
 
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -121,7 +123,14 @@ function CalendarInner() {
     const href = `/calendar?view=${v}&date=${d}`;
     if (v !== view) router.push(href, { scroll: false }); else router.replace(href, { scroll: false });
   }, [router, view]);
-  const setCursor = useCallback((d: string) => go(d, view), [go, view]);
+  const setCursor = useCallback((d: string) => {
+    // In a search the address keeps the search; only the date moves.
+    if (view === 'search') {
+      const q = new URLSearchParams(window.location.search);
+      q.set('date', d);
+      router.replace(`/calendar?${q}`, { scroll: false });
+    } else go(d, view);
+  }, [go, view, router]);
   // On a touch screen (the phone, either screen) the Calendar opens in 3 days (Hyoje,
   // 22 Nov); a computer keeps Month. Only when the address names no view.
   useEffect(() => {
@@ -139,12 +148,23 @@ function CalendarInner() {
   const prevParam = params.get('prev');
   const prevView: View = isView(prevParam) && prevParam !== 'search' ? prevParam : 'month';
   const runSearch = useCallback((s: SearchSpec) => {
-    const q = new URLSearchParams({ view: 'search', date: cursor, prev: view === 'search' ? prevView : view, ...searchToParams(s) });
+    const q = new URLSearchParams({ view: 'search', date: cursor, prev: view === 'search' ? prevView : view,
+      ...(view === 'search' && new URLSearchParams(window.location.search).get('as') === 'month' ? { as: 'month' } : {}),
+      ...searchToParams(s) });
     // Entering search adds a history step (Back leaves it); refining a search replaces it.
     if (view === 'search') router.replace(`/calendar?${q}`, { scroll: false });
     else router.push(`/calendar?${q}`, { scroll: false });
   }, [router, cursor, view, prevView]);
   const [searchOpen, setSearchOpen] = useState(false);   // phone: the box folds under the toolbar
+  // Results as a list or on a month grid (25 Nov). Both only replace the address: Back still
+  // leaves the search in one step.
+  const searchAs: 'list' | 'month' = view === 'search' && params.get('as') === 'month' ? 'month' : 'list';
+  const searchMonth = view === 'search' && searchAs === 'month';
+  const setSearchParams = useCallback((patch: Record<string, string | null>) => {
+    const q = new URLSearchParams(window.location.search);
+    for (const [k, v] of Object.entries(patch)) { if (v == null) q.delete(k); else q.set(k, v); }
+    router.replace(`/calendar?${q}`, { scroll: false });
+  }, [router]);
 
   // Escape leaves the results (unless a pop-up or the detail pane is open — they close first).
   const overlayOpen = useRef(false);
@@ -224,7 +244,7 @@ function CalendarInner() {
   const year = Number(cursor.slice(0, 4));
   const monthFirst = `${cursor.slice(0, 7)}-01`;
   const monthLast = new Date(Date.UTC(year, Number(cursor.slice(5, 7)), 0)).toISOString().slice(0, 10);
-  const range = view === 'month' ? { from: grid.from, to: grid.to }
+  const range = view === 'month' || (view === 'search' && params.get('as') === 'month') ? { from: grid.from, to: grid.to }
     : view === 'week' ? { from: week[0], to: week[6] }
     : view === '3day' ? { from: three[0], to: three[2] }
     : view === 'year' ? { from: `${year}-01-01`, to: `${year}-12-31` }
@@ -278,6 +298,37 @@ function CalendarInner() {
   const reading = useMemo(() => shown.filter(isReading), [shown]);
   const others  = useMemo(() => shown.filter(e => !isReading(e)), [shown]);
 
+  // ── Search results ──
+  const [results, setResults] = useState<{ events: CalendarEvent[]; total: number; totalIsMinimum: boolean }>(
+    { events: [], total: 0, totalIsMinimum: false });
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  useEffect(() => {
+    if (view !== 'search' || isEmptySearch(search)) return;
+    const ctl = new AbortController();
+    setSearching(true); setSearchError(null);
+    const q = new URLSearchParams({
+      tz,
+      ...(search.q.trim() ? { q: search.q.trim() } : {}),
+      ...(search.conditions.length ? { conditions: search.conditions.map(c => `${c.field}:${c.value}`).join('|') } : {}),
+      ...(search.not.trim() ? { not: search.not.trim() } : {}),
+      ...(search.from ? { dateFrom: search.from } : {}),
+      ...(search.to ? { dateTo: search.to } : {}),
+      excludeCategories: filters.hiddenCategories.join(','),
+      excludeCrossActivities: filters.hiddenCrossActivities.join(','),
+      excludeNames: filters.hiddenNames.join(','),
+    });
+    fetch(`/api/calendar/search?${q}`, { signal: ctl.signal })
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) { setSearchError(d.error); return; }
+        setResults({ events: d.events ?? [], total: d.total ?? 0, totalIsMinimum: !!d.totalIsMinimum });
+      })
+      .catch(e => { if (e.name !== 'AbortError') setSearchError(String(e)); })
+      .finally(() => { if (!ctl.signal.aborted) setSearching(false); });
+    return () => ctl.abort();
+  }, [view, search, tz, filters.hiddenCategories, filters.hiddenCrossActivities, filters.hiddenNames]);
+
   // ── Record detail (the Search pane) ──
   const [record, setRecord] = useState<LogEntry | null>(null);
   const openEvent = useCallback((e: CalendarEvent) => {
@@ -306,8 +357,9 @@ function CalendarInner() {
   }, [view, openDay, tz]);
   const dayPool = view === 'year'
     ? applyFilters(yearDay ?? [], filters.hiddenCategories, filters.hiddenCrossActivities, filters.hiddenNames, filters.hiddenRows)
+    : view === 'search' ? results.events
     : shown;
-  const dayLoading = loading || (view === 'year' && openDay !== null && yearDay === null);
+  const dayLoading = view === 'search' ? searching : loading || (view === 'year' && openDay !== null && yearDay === null);
   const dayEvents  = openDay ? dayPool.filter(e => !isReading(e) && touches(e, openDay)) : [];
   const dayReading = openDay && filters.showReading
     ? dayPool.filter(e => isReading(e) && touches(e, openDay)).map(e => ({ e, ...readingProgress(e, openDay) }))
@@ -344,37 +396,6 @@ function CalendarInner() {
   };
   overlayOpen.current = !!openDay || !!record;
 
-  // ── Search results ──
-  const [results, setResults] = useState<{ events: CalendarEvent[]; total: number; totalIsMinimum: boolean }>(
-    { events: [], total: 0, totalIsMinimum: false });
-  const [searching, setSearching] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
-  useEffect(() => {
-    if (view !== 'search' || isEmptySearch(search)) return;
-    const ctl = new AbortController();
-    setSearching(true); setSearchError(null);
-    const q = new URLSearchParams({
-      tz,
-      ...(search.q.trim() ? { q: search.q.trim() } : {}),
-      ...(search.conditions.length ? { conditions: search.conditions.map(c => `${c.field}:${c.value}`).join('|') } : {}),
-      ...(search.not.trim() ? { not: search.not.trim() } : {}),
-      ...(search.from ? { dateFrom: search.from } : {}),
-      ...(search.to ? { dateTo: search.to } : {}),
-      excludeCategories: filters.hiddenCategories.join(','),
-      excludeCrossActivities: filters.hiddenCrossActivities.join(','),
-      excludeNames: filters.hiddenNames.join(','),
-    });
-    fetch(`/api/calendar/search?${q}`, { signal: ctl.signal })
-      .then(r => r.json())
-      .then(d => {
-        if (d.error) { setSearchError(d.error); return; }
-        setResults({ events: d.events ?? [], total: d.total ?? 0, totalIsMinimum: !!d.totalIsMinimum });
-      })
-      .catch(e => { if (e.name !== 'AbortError') setSearchError(String(e)); })
-      .finally(() => { if (!ctl.signal.aborted) setSearching(false); });
-    return () => ctl.abort();
-  }, [view, search, tz, filters.hiddenCategories, filters.hiddenCrossActivities, filters.hiddenNames]);
-
   const unit = view === 'day' || view === '3day' ? 'day' : view === 'week' ? 'week' : view === 'year' ? 'year' : 'month';
   const title = view === 'search' ? 'Search' : view === 'year' ? String(year)
     : view === 'month' || view === 'schedule'
@@ -387,7 +408,41 @@ function CalendarInner() {
   const openDate = useCallback((d: string) => go(d, 'day'), [go]);
   const hiddenCount = filters.hiddenCategories.length + filters.hiddenCrossActivities.length;
 
-  const mainView = (isCompact: boolean) => view === 'search'
+  // The month of the latest match, when Month is first chosen for a search.
+  const latestMonth = results.events[0]?.startDate ?? null;
+  // A new search on the month grid opens on the month of its latest match.
+  const jumpedFor = useRef('');
+  useEffect(() => {
+    if (!searchMonth || searching || !latestMonth) return;
+    const key = JSON.stringify(search);
+    if (jumpedFor.current === key) return;
+    jumpedFor.current = key;
+    if (latestMonth.slice(0, 7) !== cursor.slice(0, 7)) setSearchParams({ date: latestMonth });
+  }, [searchMonth, searching, latestMonth, search, cursor, setSearchParams]);
+  const searchOnMonth = useMemo(() => searchMonth ? results.events.filter(e => !isReading(e)) : [], [searchMonth, results.events]);
+  const searchReading = useMemo(() => searchMonth ? results.events.filter(isReading) : [], [searchMonth, results.events]);
+  const monthMatches = searchMonth
+    ? results.events.filter(e => e.startDate.slice(0, 7) === grid.month || (e.endDate ?? e.startDate).slice(0, 7) === grid.month).length : 0;
+  const searchSummary = searching ? 'Searching…'
+    : searchError ? null
+    : results.total === 0 ? 'No matches.'
+    : `${monthMatches.toLocaleString()} in ${fmtDate(`${grid.month}-01`, { month: 'long', year: 'numeric' })} · ${
+      results.totalIsMinimum ? `more than 2,000 in all — the latest ${results.events.length} shown`
+      : results.total > results.events.length ? `${results.total.toLocaleString()} in all — the latest ${results.events.length} shown`
+      : `${results.total.toLocaleString()} in all`}`;
+
+  const mainView = (isCompact: boolean) => searchMonth
+    ? <div className="flex flex-col gap-2 min-w-0">
+        <p className="text-[11px] px-1 text-stone-500 dark:text-zinc-400">
+          {searchError ? <span className="text-red-500">{searchError}</span> : searchSummary}
+        </p>
+        <div style={{ opacity: searching ? 0.5 : 1 }}>
+          <MonthView weekDates={grid.weeks} events={searchOnMonth} reading={searchReading} showReading={filters.showReading}
+            month={grid.month} today={today} tz={tz} colors={filters.colors} isDark={isDark} compact={isCompact}
+            onOpenDay={setOpenDay} onOpenDate={openDate} onOpenEvent={openEvent} />
+        </div>
+      </div>
+    : view === 'search'
     ? <SearchResultsView events={results.events} total={results.total} totalIsMinimum={results.totalIsMinimum}
         loading={searching} error={searchError} today={today} tz={tz} colors={filters.colors} isDark={isDark}
         onOpenDate={openDate} onOpenEvent={openEvent} />
@@ -430,6 +485,42 @@ function CalendarInner() {
             <button onClick={() => go(cursor, prevView)} aria-label="Back to the calendar" title="Back (Esc)"
               className="w-7 h-7 rounded-full text-lg leading-none text-stone-500 dark:text-zinc-400 hover:bg-stone-100 dark:hover:bg-zinc-800">←</button>
             <h1 className="text-base font-semibold text-stone-900 dark:text-zinc-50 px-1">Search</h1>
+            {/* The results as a list or on a month (25 Nov) */}
+            <div className="flex rounded overflow-hidden border border-stone-200 dark:border-zinc-700 text-[11px]">
+              {([['list', 'Schedule'], ['month', 'Month']] as const).map(([v, label]) => (
+                <button key={v} aria-pressed={searchAs === v}
+                  onClick={() => setSearchParams(v === 'month'
+                    ? { as: 'month', date: latestMonth && searchAs !== 'month' ? latestMonth : cursor }
+                    : { as: null })}
+                  className={`px-2.5 py-1 ${searchAs === v
+                    ? 'bg-stone-800 dark:bg-zinc-200 text-white dark:text-zinc-900 font-medium'
+                    : 'bg-white dark:bg-zinc-900 text-stone-600 dark:text-zinc-300 hover:bg-stone-50 dark:hover:bg-zinc-800'}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            {searchMonth && (<>
+              <div className="flex">
+                {[['‹', -1], ['›', 1]].map(([sym, n]) => (
+                  <button key={sym} onClick={() => shift(n as number)} aria-label={`${n === -1 ? 'Previous' : 'Next'} month`}
+                    className="w-7 h-7 rounded-full text-lg leading-none text-stone-500 dark:text-zinc-400 hover:bg-stone-100 dark:hover:bg-zinc-800">
+                    {sym}
+                  </button>
+                ))}
+              </div>
+              <div className="relative">
+                <button onClick={() => setPickerOpen(o => !o)}
+                  className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-stone-100 dark:hover:bg-zinc-800">
+                  <span className="text-sm font-semibold text-stone-900 dark:text-zinc-50">{fmtDate(`${grid.month}-01`, { month: compact ? 'short' : 'long', year: 'numeric' })}</span>
+                  <span className="text-[9px] text-stone-400 dark:text-zinc-500">▼</span>
+                </button>
+                {pickerOpen && (
+                  <MonthPicker cursor={cursor} today={today} firstYear={firstYear}
+                    onPick={d => { setCursor(d); setPickerOpen(false); }}
+                    onClose={() => setPickerOpen(false)} />
+                )}
+              </div>
+            </>)}
           </>
         ) : (<>
         <button onClick={() => { setCursor(today); setJump(j => j + 1); }}

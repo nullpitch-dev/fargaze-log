@@ -16,10 +16,17 @@ import TimezoneMaster from '../../models/TimezoneMaster';
 import { loadFormContext } from '../records/edit';
 import { buildRecord, normaliseHour, type RecordForm } from '../records/form';
 import { adjustPlan, deletePlan, mergeForm, settleOne } from './save';
+import { isLunarDay, lunarOf } from './lunar';
 import { addDays, addMinutes, daysBetween, instantOf, localNow, weekdayOfDate, zoneCodeFor, type ZoneRow } from './time';
 
 export const HORIZON_DAYS = 60;
 const REFILL_WHEN_LEFT = 45;   // refill once fewer days than this are made ahead
+// Yearly repeats (25 Nov: birthdays, 제사, 설, 추석) are made about 13 months ahead, so the
+// next one is always on the Calendar; topped up monthly.
+const YEARLY_HORIZON_DAYS = 400;
+const YEARLY_REFILL_WHEN_LEFT = 370;
+export const horizonFor = (rule: { freq: string }) => (rule.freq === 'yearly' ? YEARLY_HORIZON_DAYS : HORIZON_DAYS);
+const refillWhenLeft = (rule: { freq: string }) => (rule.freq === 'yearly' ? YEARLY_REFILL_WHEN_LEFT : REFILL_WHEN_LEFT);
 
 type Fail = { ok: false; status: number; error: string };
 const fail = (status: number, error: string): Fail => ({ ok: false, status, error });
@@ -29,13 +36,31 @@ export interface RuleInput {
   name: string; form: any; allDay?: boolean; startTime?: string | null; minutes?: number | null; iana: string;
   freq: 'daily' | 'weekly' | 'monthly' | 'yearly'; interval?: number; weekdays?: number[] | null; monthDay?: number | null;
   monthWeek?: number | null; monthWeekday?: number | null;
+  monthShift?: 'before' | 'after' | null;
+  lunar?: boolean; lunarMonth?: number | null; lunarDay?: number | null;
   from: string; until?: string | null; count?: number | null; mode?: 'ask' | 'auto';
 }
 
 // ── Dates ────────────────────────────────────────────────────────────────────
 
+type DatesOf = Pick<RuleInput, 'freq' | 'interval' | 'weekdays' | 'monthDay' | 'monthWeek' | 'monthWeekday' | 'monthShift' | 'lunar' | 'lunarMonth' | 'lunarDay' | 'from' | 'until' | 'count'>;
+
+const ymd = (y: number, m: number, d: number) => new Date(Date.UTC(y, m - 1, d)).toISOString().slice(0, 10);
+
+/** Monthly "on day N, or the Friday before / the Monday after when it's a weekend" (25 Nov:
+ *  salary on the 21st, phone bill on the 21st). The date for month index `mi` (y*12 + m-1),
+ *  or null when that month has no day N. */
+function shiftedDay(mi: number, day: number, shift: 'before' | 'after'): string | null {
+  const y = Math.floor(mi / 12), m = (mi % 12) + 1;
+  if (day > new Date(Date.UTC(y, m, 0)).getUTCDate()) return null;
+  const d = ymd(y, m, day);
+  const wd = weekdayOfDate(d);
+  if (wd !== 0 && wd !== 6) return d;
+  return shift === 'before' ? addDays(d, wd === 6 ? -1 : -2) : addDays(d, wd === 6 ? 2 : 1);
+}
+
 /** The rule's occurrence dates from its first date up to `upTo` (inclusive), within until / count. */
-export function occurrences(rule: Pick<RuleInput, 'freq' | 'interval' | 'weekdays' | 'monthDay' | 'monthWeek' | 'monthWeekday' | 'from' | 'until' | 'count'>, upTo: string): string[] {
+export function occurrences(rule: DatesOf, upTo: string): string[] {
   const out: string[] = [];
   const every = Math.max(1, rule.interval ?? 1);
   const last = rule.until && rule.until < upTo ? rule.until : upTo;
@@ -43,14 +68,37 @@ export function occurrences(rule: Pick<RuleInput, 'freq' | 'interval' | 'weekday
   const monthDay = rule.monthDay ?? Number(rule.from.slice(8, 10));
   const weekStart = addDays(rule.from, -weekdayOfDate(rule.from));
   const [fy, fm] = rule.from.split('-').map(Number);
+  const fromMonth = fy * 12 + fm - 1;
+  // Lunar yearly: the lunar month / day to keep (the first date's, unless stored).
+  const lunar = rule.freq === 'yearly' && rule.lunar ? (() => {
+    const l = lunarOf(rule.from);
+    const month = rule.lunarMonth ?? l?.month, day = rule.lunarDay ?? l?.day;
+    return month && day ? { month, day, fromYear: l?.year ?? fy } : null;
+  })() : null;
+  if (rule.freq === 'yearly' && rule.lunar && !lunar) return out;   // no lunar calendar here
+  const shift = rule.freq === 'monthly' && rule.monthWeek == null && rule.monthShift ? rule.monthShift : null;
   for (let d = rule.from; d <= last; d = addDays(d, 1)) {
     let hit = false;
     if (rule.freq === 'daily') hit = daysBetween(rule.from, d) % every === 0;
     else if (rule.freq === 'weekly') hit = Math.floor(daysBetween(weekStart, d) / 7) % every === 0 && days.includes(weekdayOfDate(d));
-    else if (rule.freq === 'yearly') {
+    else if (rule.freq === 'yearly' && lunar) {
+      // Every N lunar years on the lunar month / day (an ordinary month; 30 → 29 when short).
+      if (isLunarDay(d, lunar.month, lunar.day, x => addDays(x, 1))) {
+        const ly = lunarOf(d)?.year ?? 0;
+        hit = (ly - lunar.fromYear) % every === 0;
+      }
+    } else if (rule.freq === 'yearly') {
       // Every N years on the first date's day and month (29 Feb: leap years only).
       const [y, , dd] = d.split('-').map(Number);
       hit = (y - fy) % every === 0 && d.slice(5) === rule.from.slice(5) && dd > 0;
+    } else if (shift) {
+      // The day may have moved into the month before or after its own.
+      const [y, m] = d.split('-').map(Number);
+      const mi = y * 12 + m - 1;
+      for (const k of [mi - 1, mi, mi + 1]) {
+        if (k < fromMonth || (k - fromMonth) % every !== 0) continue;
+        if (shiftedDay(k, monthDay, shift) === d) { hit = true; break; }
+      }
     } else {
       const [y, m, dd] = d.split('-').map(Number);
       const month = ((y * 12 + m) - (fy * 12 + fm)) % every === 0;
@@ -97,7 +145,7 @@ async function zonesOf(userId: string): Promise<ZoneRow[]> {
 export async function fillRule(userId: string, rule: any, now = Date.now()): Promise<{ made: number; problem: string | null }> {
   if (rule.stoppedAt) return { made: 0, problem: null };
   const today = localNow(rule.iana, now).date;
-  const horizon = addDays(today, HORIZON_DAYS);
+  const horizon = addDays(today, horizonFor(rule));
   const startFrom = rule.filledUntil ? addDays(rule.filledUntil, 1) : (rule.from > today ? rule.from : today);
   const dates = occurrences(rule, horizon).filter(d => d >= startFrom);
   const [ctx, zones] = await Promise.all([loadFormContext(userId), zonesOf(userId)]);
@@ -130,7 +178,7 @@ export async function refresh(userId: string, now = Date.now()): Promise<{ made:
   let made = 0;
   for (const r of rules) {
     const today = localNow(r.iana, now).date;
-    if (!r.filledUntil || daysBetween(today, r.filledUntil) < REFILL_WHEN_LEFT) made += (await fillRule(userId, r, now)).made;
+    if (!r.filledUntil || daysBetween(today, r.filledUntil) < refillWhenLeft(r)) made += (await fillRule(userId, r, now)).made;
   }
   const auto = rules.filter(r => r.mode === 'auto').map(r => r._id);
   let settled = 0;
@@ -182,6 +230,17 @@ function validate(b: any): { ok: true; rule: RuleInput } | Fail {
   if (monthWeek != null && (monthWeekday == null || !Number.isInteger(monthWeekday) || monthWeekday < 0 || monthWeekday > 6)) return fail(400, 'Weekday: 0 (Sunday) to 6.');
   const count = b?.count == null || b.count === '' ? null : Number(b.count);
   if (count != null && (!Number.isInteger(count) || count < 1)) return fail(400, 'Times: a whole number, 1 or more.');
+  const monthShift = b?.monthShift === 'before' || b?.monthShift === 'after' ? b.monthShift : null;
+  const lunar = b.freq === 'yearly' && !!b?.lunar;
+  let lunarMonth: number | null = null, lunarDay: number | null = null;
+  if (lunar) {
+    const l = lunarOf(b.from);
+    if (!l) return fail(400, 'The lunar calendar is not available on the server.');
+    lunarMonth = b?.lunarMonth == null || b.lunarMonth === '' ? l.month : Number(b.lunarMonth);
+    lunarDay = b?.lunarDay == null || b.lunarDay === '' ? l.day : Number(b.lunarDay);
+    if (!Number.isInteger(lunarMonth) || lunarMonth < 1 || lunarMonth > 12) return fail(400, 'Lunar month: 1 to 12.');
+    if (!Number.isInteger(lunarDay) || lunarDay < 1 || lunarDay > 30) return fail(400, 'Lunar day: 1 to 30.');
+  }
   const { start: _s, end: _e, ...form } = b.form;
   return {
     ok: true,
@@ -191,6 +250,8 @@ function validate(b: any): { ok: true; rule: RuleInput } | Fail {
       monthDay: b.freq === 'monthly' && monthWeek == null ? monthDay : null,
       monthWeek: b.freq === 'monthly' ? monthWeek : null,
       monthWeekday: b.freq === 'monthly' && monthWeek != null ? monthWeekday : null,
+      monthShift: b.freq === 'monthly' && monthWeek == null ? monthShift : null,
+      lunar, lunarMonth, lunarDay,
       from: b.from, until: b.until || null, count, mode: b?.mode === 'auto' ? 'auto' : 'ask',
     },
   };

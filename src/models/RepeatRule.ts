@@ -1,5 +1,6 @@
 // log_repeat (#71, Design §15.7, 8 Nov 2026): repeating plans, like Google Calendar's.
-// The app makes the occurrences as plans (log_plan) up to HORIZON_DAYS ahead, so they
+// The app makes the occurrences as plans (log_plan) up to HORIZON_DAYS ahead (yearly ones about
+// 13 months), so they
 // show on the Calendar. Per rule:
 //   mode 'ask'  — each occurrence goes to To confirm once its start has passed (meetings)
 //   mode 'auto' — "count as done": it becomes a record by itself once its end has
@@ -26,6 +27,14 @@ const RepeatRuleSchema = new Schema({
   // for the last) and weekday (0 = Sunday); null = by monthDay
   monthWeek: { type: Number, default: null },
   monthWeekday: { type: Number, default: null },
+  // monthly on day N, moved off a weekend (25 Nov): 'before' — the Friday before (salary);
+  // 'after' — the Monday after (a bill); null = day N whatever the weekday
+  monthShift: { type: String, enum: ['before', 'after', null], default: null },
+  // yearly on a lunar date (25 Nov: birthdays, 제사, 설, 추석): the lunar month / day (an
+  // ordinary month; day 30 falls on the 29th in a short month). See lib/entry/lunar.ts.
+  lunar: { type: Boolean, default: false },
+  lunarMonth: { type: Number, default: null },
+  lunarDay: { type: Number, default: null },
   from: { type: String, required: true },           // first date 'YYYY-MM-DD'
   until: { type: String, default: null },           // last date, or
   count: { type: Number, default: null },           // number of occurrences
