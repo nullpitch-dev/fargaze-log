@@ -22,6 +22,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { closeModalThen } from '@/app/_components/useBackToClose';
 import { useRouter } from 'next/navigation';
 import type { RecordForm, FormFood, FormAlcohol, FormItem, FormExercise } from '@/lib/records/form';
 import type { FormOptions } from '@/lib/records/formOptions';
@@ -431,7 +432,9 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
   // which asked "Leave site?" (Hyoje, 12 Nov).
   const leaving = useRef(false);
   /** After a save: Home replaces the form in history, so Back doesn't reopen it (12 Nov). */
-  const leaveTo = (href: string) => { leaving.current = true; router.replace(href); };
+  // A pop-up still open (the This / All events question): close it through Back first, so the
+  // page's own entry is the one replaced — else the form stays behind it (25 Nov).
+  const leaveTo = (href: string) => { leaving.current = true; closeModalThen(() => router.replace(href)); };
   // Back skips a record already saved or deleted here (Hyoje, 24 Nov: edit, save, go to
   // Today, Back → the edit form again). The page's history entry is marked when it is
   // done; coming back to a marked entry steps back once more.

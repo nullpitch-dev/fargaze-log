@@ -13,6 +13,20 @@ import { useCallback, useEffect, useRef } from 'react';
 
 const afters = new Map<string, () => void>();
 
+// Pop-ups open now (their history keys). An entry with a key not in here was left behind by a
+// pop-up that is gone (25 Nov, Hyoje: Back after saving still showed the New form): Back steps
+// over it, so it never shows the page it was added on. Checked after every Back and on load.
+const live = new Set<string>();
+if (typeof window !== 'undefined' && !(window as any).__fgStaleSkip) {
+  (window as any).__fgStaleSkip = true;
+  const skip = () => {
+    const k = window.history.state?.fgModal;
+    if (k && !live.has(k)) window.history.back();
+  };
+  window.addEventListener('popstate', () => setTimeout(skip, 0));
+  setTimeout(skip, 0);
+}
+
 /** Close the pop-up on top (if any) through Back, then run `fn`. For callers outside it. */
 export function closeModalThen(fn: () => void) {
   const key = typeof window !== 'undefined' ? window.history.state?.fgModal : null;
@@ -30,6 +44,7 @@ export function useBackToClose(close: () => void) {
   useEffect(() => {
     const key = Math.random().toString(36).slice(2);
     keyRef.current = key;
+    live.add(key);
     window.history.pushState({ fgModal: key }, '');
     let done = false;
     const onPop = () => {
@@ -38,6 +53,7 @@ export function useBackToClose(close: () => void) {
       // Still on our entry, or on one above it: a pop-up opened on top of us closed.
       if (state?.fgModal === key) return;
       done = true;
+      live.delete(key);
       window.removeEventListener('popstate', onPop);
       const after = afters.get(key);
       afters.delete(key);
@@ -47,6 +63,7 @@ export function useBackToClose(close: () => void) {
     window.addEventListener('popstate', onPop);
     return () => {
       window.removeEventListener('popstate', onPop);
+      live.delete(key);
       // Closed some other way than Back (a pick, a tap outside, the page moving on): take our
       // entry away too, or it stays behind and a later Back lands on this page again — after
       // saving a form, Back went to the form (Hyoje, 24 Nov). Next tick: a page change
