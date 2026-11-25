@@ -21,12 +21,13 @@ import { addDays, addMinutes, daysBetween, instantOf, localNow, weekdayOfDate, z
 
 export const HORIZON_DAYS = 60;
 const REFILL_WHEN_LEFT = 45;   // refill once fewer days than this are made ahead
-// Yearly repeats (25 Nov: birthdays, 제사, 설, 추석) are made about 13 months ahead, so the
-// next one is always on the Calendar; topped up monthly.
-const YEARLY_HORIZON_DAYS = 400;
-const YEARLY_REFILL_WHEN_LEFT = 370;
-export const horizonFor = (rule: { freq: string }) => (rule.freq === 'yearly' ? YEARLY_HORIZON_DAYS : HORIZON_DAYS);
-const refillWhenLeft = (rule: { freq: string }) => (rule.freq === 'yearly' ? YEARLY_REFILL_WHEN_LEFT : REFILL_WHEN_LEFT);
+// Monthly and yearly repeats are made about 13 months ahead (Hyoje, 25 Nov: 60 days held only
+// two of a monthly one; birthdays, 제사, 설, 추석), topped up monthly. Daily and weekly: 60 days.
+const LONG_HORIZON_DAYS = 400;
+const LONG_REFILL_WHEN_LEFT = 370;
+const isLong = (rule: { freq: string }) => rule.freq === 'yearly' || rule.freq === 'monthly';
+export const horizonFor = (rule: { freq: string }) => (isLong(rule) ? LONG_HORIZON_DAYS : HORIZON_DAYS);
+const refillWhenLeft = (rule: { freq: string }) => (isLong(rule) ? LONG_REFILL_WHEN_LEFT : REFILL_WHEN_LEFT);
 
 type Fail = { ok: false; status: number; error: string };
 const fail = (status: number, error: string): Fail => ({ ok: false, status, error });

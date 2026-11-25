@@ -1,6 +1,6 @@
 // log_repeat (#71, Design §15.7, 8 Nov 2026): repeating plans, like Google Calendar's.
-// The app makes the occurrences as plans (log_plan) up to HORIZON_DAYS ahead (yearly ones about
-// 13 months), so they
+// The app makes the occurrences as plans (log_plan) up to HORIZON_DAYS ahead (monthly and yearly
+// ones about 13 months), so they
 // show on the Calendar. Per rule:
 //   mode 'ask'  — each occurrence goes to To confirm once its start has passed (meetings)
 //   mode 'auto' — "count as done": it becomes a record by itself once its end has

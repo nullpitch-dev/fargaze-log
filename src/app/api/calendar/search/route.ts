@@ -10,13 +10,17 @@
 //
 // Returns the newest SEARCH_LIMIT matches as Calendar events, newest first,
 // plus the total. Rules: src/lib/calendar/search.ts.
+// Plans (Hyoje, 25 Nov): open plans matching the same search come apart — `plans`, soonest
+// first (overdue ones first), with their own total — so they never use up the records' limit
+// and never count as things that happened. Done plans are left out (their record is found).
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import connectDB from '@/lib/mongodb';
 import Log from '@/models/Log';
+import LogPlan from '@/models/LogPlan';
 import {
-  isValidZone, resolveRange, buildCalendarEvents, CANDIDATE_PROJECTION, zonedDayStart, addDays,
+  isValidZone, resolveRange, buildCalendarEvents, buildPlanEvents, CANDIDATE_PROJECTION, PLAN_PROJECTION, zonedDayStart, addDays,
 } from '@/lib/calendar/calendar';
 import {
   buildSearchFilter, parseConditions, SEARCH_LIMIT, SEARCH_SCAN_LIMIT, SEARCH_SORT,
@@ -56,7 +60,10 @@ export async function GET(req: NextRequest) {
 
   await connectDB();
   const t0 = Date.now();
-  const docs = await Log.find(filter, CANDIDATE_PROJECTION).sort(SEARCH_SORT).limit(SEARCH_SCAN_LIMIT).lean();
+  const [docs, planDocs] = await Promise.all([
+    Log.find(filter, CANDIDATE_PROJECTION).sort(SEARCH_SORT).limit(SEARCH_SCAN_LIMIT).lean(),
+    LogPlan.find({ ...filter, 'plan.state': 'open' }, PLAN_PROJECTION).limit(SEARCH_SCAN_LIMIT).lean(),
+  ]);
   const ms = Date.now() - t0;
 
   // Exact cut: a match must START on a display date inside the range (records
@@ -68,7 +75,13 @@ export async function GET(req: NextRequest) {
     .filter(e => e.startDate >= from && e.startDate <= to)
     .sort((a, b) => b.startDate.localeCompare(a.startDate) || (b.start ?? '').localeCompare(a.start ?? ''));
 
+  const plans = buildPlanEvents(planDocs, range, Date.now())
+    .filter(e => e.startDate >= from && e.startDate <= to)
+    .sort((a, b) => a.startDate.localeCompare(b.startDate) || (a.start ?? '').localeCompare(b.start ?? ''));
+
   return NextResponse.json({
+    plans: plans.slice(0, SEARCH_LIMIT),
+    planTotal: plans.length,
     total: inRange.length,
     totalIsMinimum: docs.length >= SEARCH_SCAN_LIMIT,   // true → "2000+"
     shown: Math.min(inRange.length, SEARCH_LIMIT),

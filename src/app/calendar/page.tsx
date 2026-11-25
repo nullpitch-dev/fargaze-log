@@ -299,8 +299,9 @@ function CalendarInner() {
   const others  = useMemo(() => shown.filter(e => !isReading(e)), [shown]);
 
   // ── Search results ──
-  const [results, setResults] = useState<{ events: CalendarEvent[]; total: number; totalIsMinimum: boolean }>(
-    { events: [], total: 0, totalIsMinimum: false });
+  // plans: open plans matching the search, soonest first, counted apart (25 Nov)
+  const [results, setResults] = useState<{ events: CalendarEvent[]; total: number; totalIsMinimum: boolean; plans: CalendarEvent[]; planTotal: number }>(
+    { events: [], total: 0, totalIsMinimum: false, plans: [], planTotal: 0 });
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   useEffect(() => {
@@ -322,7 +323,7 @@ function CalendarInner() {
       .then(r => r.json())
       .then(d => {
         if (d.error) { setSearchError(d.error); return; }
-        setResults({ events: d.events ?? [], total: d.total ?? 0, totalIsMinimum: !!d.totalIsMinimum });
+        setResults({ events: d.events ?? [], total: d.total ?? 0, totalIsMinimum: !!d.totalIsMinimum, plans: d.plans ?? [], planTotal: d.planTotal ?? 0 });
       })
       .catch(e => { if (e.name !== 'AbortError') setSearchError(String(e)); })
       .finally(() => { if (!ctl.signal.aborted) setSearching(false); });
@@ -357,7 +358,7 @@ function CalendarInner() {
   }, [view, openDay, tz]);
   const dayPool = view === 'year'
     ? applyFilters(yearDay ?? [], filters.hiddenCategories, filters.hiddenCrossActivities, filters.hiddenNames, filters.hiddenRows)
-    : view === 'search' ? results.events
+    : view === 'search' ? [...results.events, ...results.plans]
     : shown;
   const dayLoading = view === 'search' ? searching : loading || (view === 'year' && openDay !== null && yearDay === null);
   const dayEvents  = openDay ? dayPool.filter(e => !isReading(e) && touches(e, openDay)) : [];
@@ -409,7 +410,7 @@ function CalendarInner() {
   const hiddenCount = filters.hiddenCategories.length + filters.hiddenCrossActivities.length;
 
   // The month of the latest match, when Month is first chosen for a search.
-  const latestMonth = results.events[0]?.startDate ?? null;
+  const latestMonth = results.events[0]?.startDate ?? results.plans[0]?.startDate ?? null;
   // A new search on the month grid opens on the month of its latest match.
   const jumpedFor = useRef('');
   useEffect(() => {
@@ -419,17 +420,20 @@ function CalendarInner() {
     jumpedFor.current = key;
     if (latestMonth.slice(0, 7) !== cursor.slice(0, 7)) setSearchParams({ date: latestMonth });
   }, [searchMonth, searching, latestMonth, search, cursor, setSearchParams]);
-  const searchOnMonth = useMemo(() => searchMonth ? results.events.filter(e => !isReading(e)) : [], [searchMonth, results.events]);
-  const searchReading = useMemo(() => searchMonth ? results.events.filter(isReading) : [], [searchMonth, results.events]);
-  const monthMatches = searchMonth
-    ? results.events.filter(e => e.startDate.slice(0, 7) === grid.month || (e.endDate ?? e.startDate).slice(0, 7) === grid.month).length : 0;
+  const searchAll = useMemo(() => [...results.events, ...results.plans], [results.events, results.plans]);
+  const searchOnMonth = useMemo(() => searchMonth ? searchAll.filter(e => !isReading(e)) : [], [searchMonth, searchAll]);
+  const searchReading = useMemo(() => searchMonth ? searchAll.filter(isReading) : [], [searchMonth, searchAll]);
+  const inMonth = (e: CalendarEvent) => e.startDate.slice(0, 7) === grid.month || (e.endDate ?? e.startDate).slice(0, 7) === grid.month;
+  const monthRecords = searchMonth ? results.events.filter(inMonth).length : 0;
+  const monthPlans = searchMonth ? results.plans.filter(inMonth).length : 0;
+  const plural = (n: number, w: string) => `${n.toLocaleString()} ${w}${n === 1 ? '' : 's'}`;
   const searchSummary = searching ? 'Searching…'
     : searchError ? null
-    : results.total === 0 ? 'No matches.'
-    : `${monthMatches.toLocaleString()} in ${fmtDate(`${grid.month}-01`, { month: 'long', year: 'numeric' })} · ${
-      results.totalIsMinimum ? `more than 2,000 in all — the latest ${results.events.length} shown`
-      : results.total > results.events.length ? `${results.total.toLocaleString()} in all — the latest ${results.events.length} shown`
-      : `${results.total.toLocaleString()} in all`}`;
+    : results.total === 0 && results.planTotal === 0 ? 'No matches.'
+    : `${[plural(monthRecords, 'record'), ...(monthPlans ? [plural(monthPlans, 'plan')] : [])].join(' · ')} in ${fmtDate(`${grid.month}-01`, { month: 'long', year: 'numeric' })} — ${
+      results.totalIsMinimum ? `more than 2,000 records in all, the latest ${results.events.length} shown`
+      : results.total > results.events.length ? `${results.total.toLocaleString()} records in all, the latest ${results.events.length} shown`
+      : plural(results.total, 'record') + ' in all'}${results.planTotal ? ` · ${plural(results.planTotal, 'plan')}` : ''}`;
 
   const mainView = (isCompact: boolean) => searchMonth
     ? <div className="flex flex-col gap-2 min-w-0">
@@ -444,6 +448,7 @@ function CalendarInner() {
       </div>
     : view === 'search'
     ? <SearchResultsView events={results.events} total={results.total} totalIsMinimum={results.totalIsMinimum}
+        plans={results.plans} planTotal={results.planTotal}
         loading={searching} error={searchError} today={today} tz={tz} colors={filters.colors} isDark={isDark}
         onOpenDate={openDate} onOpenEvent={openEvent} />
     : view === 'year'
