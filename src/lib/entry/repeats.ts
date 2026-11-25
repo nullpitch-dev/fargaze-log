@@ -21,13 +21,17 @@ import { addDays, addMinutes, daysBetween, instantOf, localNow, weekdayOfDate, z
 
 export const HORIZON_DAYS = 60;
 const REFILL_WHEN_LEFT = 45;   // refill once fewer days than this are made ahead
-// Monthly and yearly repeats are made about 13 months ahead (Hyoje, 25 Nov: 60 days held only
-// two of a monthly one; birthdays, 제사, 설, 추석), topped up monthly. Daily and weekly: 60 days.
+// Repeats two weeks or more apart — every 2+ weeks, monthly, yearly — are made about 13 months
+// ahead (Hyoje, 25 Nov: 60 days held only two of a monthly one, and an every-4-weeks one looked
+// as if it stopped; birthdays, 제사, 설, 추석), topped up monthly. Closer ones: 60 days.
 const LONG_HORIZON_DAYS = 400;
 const LONG_REFILL_WHEN_LEFT = 370;
-const isLong = (rule: { freq: string }) => rule.freq === 'yearly' || rule.freq === 'monthly';
-export const horizonFor = (rule: { freq: string }) => (isLong(rule) ? LONG_HORIZON_DAYS : HORIZON_DAYS);
-const refillWhenLeft = (rule: { freq: string }) => (isLong(rule) ? LONG_REFILL_WHEN_LEFT : REFILL_WHEN_LEFT);
+const isLong = (rule: { freq: string; interval?: number | null }) => {
+  const n = Math.max(1, rule.interval ?? 1);
+  return rule.freq === 'yearly' || rule.freq === 'monthly' || (rule.freq === 'weekly' && n >= 2) || (rule.freq === 'daily' && n >= 14);
+};
+export const horizonFor = (rule: { freq: string; interval?: number | null }) => (isLong(rule) ? LONG_HORIZON_DAYS : HORIZON_DAYS);
+const refillWhenLeft = (rule: { freq: string; interval?: number | null }) => (isLong(rule) ? LONG_REFILL_WHEN_LEFT : REFILL_WHEN_LEFT);
 
 type Fail = { ok: false; status: number; error: string };
 const fail = (status: number, error: string): Fail => ({ ok: false, status, error });
@@ -287,6 +291,15 @@ export async function getRule(userId: string, id: string) {
   if (!mongoose.isValidObjectId(id)) return fail(404, 'Unknown repeat.');
   const r = await RepeatRule.findOne({ _id: id, userId }).lean() as any;
   return r ? { ok: true as const, rule: view(r) } : fail(404, 'This repeat no longer exists.');
+}
+
+/** The repeat a record came from (25 Nov: its edit form shows it), or null. */
+export async function ruleOfRecord(userId: string, recordId: string) {
+  if (!mongoose.isValidObjectId(recordId)) return { ok: true as const, rule: null };
+  const p = await LogPlan.findOne({ userId, 'plan.recordId': new mongoose.Types.ObjectId(recordId), 'plan.repeatId': { $ne: null } })
+    .select('plan.repeatId').lean() as any;
+  const r = p?.plan?.repeatId ? await RepeatRule.findOne({ _id: p.plan.repeatId, userId }).lean() as any : null;
+  return { ok: true as const, rule: r ? view(r) : null };
 }
 
 /** Makes a plan the rule's occurrence on `date` (so the fill doesn't make it twice). */

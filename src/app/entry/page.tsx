@@ -25,7 +25,7 @@ import { dropOutbox, fetchWithin, flushOutbox, isNoSignal, keepRefused, retryOut
 import { newEntryId } from '@/lib/entry/forms';
 
 interface Point { date: string; hour: string; timezone: string }
-interface Item { plan?: boolean; id: string; activity: string; category: string; title: string; start: Point; end: Point; place: string; updatedAt: string; seconds?: number | null; repeat?: boolean; started?: boolean; plannedEnd?: { date: string; hour: string; timezone?: string } | null;
+interface Item { plan?: boolean; id: string; activity: string; category: string; title: string; start: Point; end: Point; place: string; updatedAt: string; seconds?: number | null; repeat?: boolean; repeatId?: string | null; occurrence?: string | null; started?: boolean; plannedEnd?: { date: string; hour: string; timezone?: string } | null;
   /** changed on the phone, not sent yet (offline slice 3) */ local?: boolean;
   /** pressed with a signal, being sent now (22 Nov) */ sending?: boolean }
 interface Preset { id: string; name: string; order: number; time: { kind: 'open' | 'moment' | 'length'; minutes: number | null } }
@@ -396,6 +396,11 @@ function EntryHome() {
     text: 'Plan deleted',
     undo: async () => { const r = await call(`/api/entry/plans/${it.id}/restore`, 'POST'); return r.ok ? null : r.b.error ?? 'Undo failed'; },
   });
+  // A repeating plan (25 Nov): the following ones or all of them, as on the plan's form. Needs a
+  // signal; no Undo (the plans are made again only by the repeat).
+  const deleteRepeating = (it: Item, scope: 'following' | 'all') => act(`x${it.id}`,
+    () => call(`/api/entry/repeats/${it.repeatId}`, 'DELETE', { scope, at: it.occurrence, planId: it.id, updatedAt: it.updatedAt }),
+    { text: scope === 'all' ? 'All its plans deleted' : 'This and following plans deleted' });
   // A record goes to the trash, as on the edit page. One from the sheet also waits on
   // Record changes until its row is deleted there.
   const deleteRecord = (it: Item) => act(`x${it.id}`, () => call(`/api/records/${it.id}`, 'DELETE', { updatedAt: it.updatedAt }), b => ({
@@ -509,9 +514,16 @@ function EntryHome() {
   const copyMenu = (it: Item, plan = false) => press(() => setMenu({ title: name(it), actions: [
     { label: 'Copy to new entry', hint: 'Same fields, starting today at its time', run: () => router.push(newHref({ copy: it.id, ...(plan ? { from: 'plan' } : {}) })) },
     ...(plan ? startedAsPlanned(it) : []),
-    plan
-      ? { label: 'Delete', hint: 'Undo on the toast brings it back', run: () => deletePlan(it) }
-      : { label: 'Delete', hint: 'It goes to the trash; Undo on the toast brings it back', run: () => deleteRecord(it) },
+    ...(plan && it.repeatId && it.occurrence
+      // A repeating plan asks which, as Google Calendar does (25 Nov).
+      ? [
+        { label: 'Delete this event', hint: 'Only this plan; Undo on the toast brings it back', run: () => deletePlan(it) },
+        { label: 'Delete this and following events', hint: 'This plan and the later ones; the repeat ends the day before', run: () => deleteRepeating(it, 'following') },
+        { label: 'Delete all events', hint: 'The repeat and all its open plans; records stay', run: () => deleteRepeating(it, 'all') },
+      ]
+      : [plan
+        ? { label: 'Delete', hint: 'Undo on the toast brings it back', run: () => deletePlan(it) }
+        : { label: 'Delete', hint: 'It goes to the trash; Undo on the toast brings it back', run: () => deleteRecord(it) }]),
   ] }));
   // Started as planned: a record from the plan's own start, still going (Hyoje, 11 Nov).
   const startedAsPlanned = (it: Item) => it.start.hour

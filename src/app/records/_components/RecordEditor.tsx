@@ -27,7 +27,7 @@ import type { RecordForm, FormFood, FormAlcohol, FormItem, FormExercise } from '
 import type { FormOptions } from '@/lib/records/formOptions';
 import { Choice, Field, IngredientsNote, ItemList, NoteBox, NumberBox, PickText, Row, Section, Select, TagInput, Text, ToggleChips, OnePills, addBtn, inputCls } from './fields';
 import { PeopleEditor } from './PeopleEditor';
-import { RepeatField, ScopeDialog, sameSchedule, scheduleOf, type Schedule } from './RepeatPicker';
+import { RepeatField, ScopeDialog, describe, sameSchedule, scheduleOf, type Schedule } from './RepeatPicker';
 import { ChangeTable, type Line, type Plain } from './ChangeTable';
 import { relationshipOf } from '@/lib/records/relationship';
 import { rulesFor, type EntryGroup } from '@/lib/entry/groups';
@@ -270,6 +270,10 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
   // plan, its rule as loaded, and the "This event / This and following / All events" question.
   const [repeat, setRepeat] = useState<Schedule | null>(null);
   const [rule, setRule] = useState<any | null>(null);
+  // Edit (25 Nov): the repeat a record came from (shown, not changed here), and what making a
+  // record repeat did (shown with Saved).
+  const [fromRule, setFromRule] = useState<any | null>(null);
+  const [repeatNote, setRepeatNote] = useState<{ text: string; bad?: boolean } | null>(null);
   const [scopeAsk, setScopeAsk] = useState<null | 'save' | 'delete'>(null);
   const [saveError, setSaveError] = useState<{ text: string; problems?: string[]; conflict?: boolean } | null>(null);
   const [result, setResult] = useState<Result | null>(null);
@@ -323,8 +327,13 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
           const rr = await fetch(`/api/entry/repeats/${rb.repeatId}`, { cache: 'no-store' }).then(x => x.json()).catch(() => null);
           rule0 = rr?.rule ?? null;
         }
+        let from0: any = null;
+        if (mode === 'edit') {
+          const rr = await fetch(`/api/entry/repeats?record=${encodeURIComponent(id)}`, { cache: 'no-store' }).then(x => x.json()).catch(() => null);
+          from0 = rr?.rule ?? null;
+        }
         if (!live) return;
-        setRule(rule0); setRepeat(scheduleOf(rule0));
+        setRule(rule0); setRepeat(scheduleOf(rule0)); setFromRule(from0);
         setRec(rb); setForm(form0); setAdded(new Set()); setRemoved(new Set()); setRateOverride(undefined); setWhole(whole0); setCheck(null); setSaveError(null); setLoadError(''); setKrwPicked(false);
       } catch (e: any) {
         if (live) setLoadError(String(e.message ?? e));
@@ -396,7 +405,9 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
     return out;
   }, [checkOffline, form, entryOpts]);
   const offlineReady = checkOffline && !current && offlineProblems.length === 0;
-  const canSave = dirty && !saving && (current ? current.problems.length === 0 : offlineReady);
+  // Edit (25 Nov): a record made to repeat can be saved with nothing else changed.
+  const repeatOnly = mode === 'edit' && !!repeat && !fromRule && !changed && !!form && !result;
+  const canSave = (dirty && !saving && (current ? current.problems.length === 0 : offlineReady)) || (repeatOnly && !saving);
 
   // Unsaved changes: ask before leaving (closing the tab, or a link in the app) — not when
   // leaving because it was just saved: with no signal the move to Home is a full page load,
@@ -650,7 +661,30 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
       }
       return;
     }
+    // Edit + a repeat (25 Nov): the record (if changed), then the repeat from its date, the
+    // record counting as that day's occurrence (doneAs). Needs a signal.
+    const makeRepeat = mode === 'edit' && !!repeat && !fromRule && !planning;
+    if (makeRepeat && (navigator.onLine === false || seemsOffline())) {
+      setSaving(false); setSaveError({ text: 'Repeats need a signal: try again when you have one.' }); return;
+    }
+    const addRepeat = async () => {
+      try {
+        const rb = await post('/api/entry/repeats', 'POST', { ...ruleBody(fm, repeat!, fm.start.date), doneAs: { date: fm.start.date, recordId: id } });
+        const made = typeof rb?.made === 'number' ? rb.made : null;
+        setRepeatNote({ text: `Repeats ${describe(repeat, fm.start.date).replace(/^./, c => c.toLowerCase())}${made != null ? ` — ${made} ${made === 1 ? 'plan' : 'plans'} made` : ''}. Change or stop it from any of its plans.` });
+      } catch (e: any) {
+        setRepeatNote({ text: `The repeat wasn't made: ${String(e.message ?? e)}`, bad: true });
+      }
+    };
     try {
+      if (makeRepeat && !changed) {
+        // Nothing else changed: the repeat alone.
+        await addRepeat();
+        markDone();
+        setResult({ kind: 'saved', noSheet: true, changeId: '', tab: '', findRow: '', moveTo: null, lines: [], changes: [], sheetDone: true, undone: null, repeatOnly: true } as any);
+        window.scrollTo({ top: 0 });
+        return;
+      }
       const r = await fetch(`/api/records/${id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: formJson({ form: fm, updatedAt: rec.updatedAt }),
       });
@@ -658,6 +692,7 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
       if (!r.ok) { setSaveError({ text: b.error ?? `HTTP ${r.status}`, problems: b.problems, conflict: r.status === 409 }); return; }
       // Back to Coming up (17 Nov): the record is a plan now, so Today shows it there.
       if (b.toPlan) { leaveTo(backTo() ?? `/entry?${new URLSearchParams({ saved: 'plan', id: b.planId, from: 'moved' })}`); return; }
+      if (makeRepeat) await addRepeat();
       markDone();
       setResult({ kind: 'saved', noSheet: !!b.noSheet, changeId: b.changeId, tab: b.tab, findRow: b.findRow, moveTo: b.moveTo, lines: b.lines, changes: b.changes ?? [], sheetDone: !!b.noSheet, undone: null });
       window.scrollTo({ top: 0 });
@@ -736,11 +771,14 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
             {result.undone ? (result.kind === 'saved' ? 'Edit undone' : 'Delete undone') : result.kind === 'saved' ? 'Saved' : 'Deleted'}
           </h1>
           <p className="text-sm text-stone-600 dark:text-zinc-300 mt-1">
-            {u ? 'The record is back as it was.' : result.kind === 'saved' ? 'The record is saved.' : 'The record is in the trash.'}
+            {u ? 'The record is back as it was.' : (result as any).repeatOnly ? 'The record is unchanged.' : result.kind === 'saved' ? 'The record is saved.' : 'The record is in the trash.'}
           </p>
+          {repeatNote && (
+            <p className={`text-sm mt-1 ${repeatNote.bad ? 'text-red-600 dark:text-red-400' : 'text-stone-600 dark:text-zinc-300'}`}>↻ {repeatNote.text}</p>
+          )}
         </div>
         {/* Nothing to repeat in the sheet since the freeze (14 Nov 2026): just Undo. */}
-        {!u && (
+        {!u && !(result as any).repeatOnly && (
           <div><button onClick={undo} disabled={busy} className={secondary}>{result.kind === 'saved' ? 'Undo this edit' : 'Undo the delete'}</button></div>
         )}
         {resultError && <p className="text-sm text-red-700 dark:text-red-300">{resultError}</p>}
@@ -1107,6 +1145,14 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
             ))}
             {/* Repeats, as Google Calendar (24 Nov): New form and plans. */}
             {entryMode && <RepeatField value={repeat} onChange={setRepeat} date={f.start.date} disabled={saving} />}
+            {/* A record (25 Nov): made to repeat from its date — it counts as the first; one that
+                came from a repeat shows it, changed from its plans. */}
+            {mode === 'edit' && !planning && (fromRule
+              ? <div className="flex flex-col gap-0.5">
+                  <RepeatField value={scheduleOf(fromRule)} onChange={() => {}} date={fromRule.from} disabled />
+                  <span className="text-xs text-stone-400 dark:text-zinc-500">From a repeat: change or stop it from one of its plans.</span>
+                </div>
+              : <RepeatField value={repeat} onChange={setRepeat} date={f.start.date} disabled={saving} />)}
             <p className="text-xs text-stone-400 dark:text-zinc-500">{planning
               ? 'A plan: the planned end is when it should end. End is set when it happens.'
               : 'No times = all day. A start time without an end time = still going (an open record).'}</p>

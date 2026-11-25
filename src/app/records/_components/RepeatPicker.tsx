@@ -126,8 +126,8 @@ export function RepeatField({ value, onChange, date, disabled }: {
         <span aria-hidden>↻</span>{describe(value, date)}<span className="text-[9px] text-stone-400 dark:text-zinc-500">▼</span>
       </button>
       {value && (
-        <label className="flex items-center gap-2 text-xs text-stone-600 dark:text-zinc-300">
-          <input type="checkbox" checked={value.mode === 'auto'} onChange={e => onChange({ ...value, mode: e.target.checked ? 'auto' : 'ask' })} />
+        <label className={`flex items-center gap-2 text-xs text-stone-600 dark:text-zinc-300 ${disabled ? 'opacity-50' : ''}`}>
+          <input type="checkbox" disabled={disabled} checked={value.mode === 'auto'} onChange={e => onChange({ ...value, mode: e.target.checked ? 'auto' : 'ask' })} />
           Count as done — each one becomes a record once its end has passed
         </label>
       )}
@@ -157,7 +157,7 @@ function RepeatSheet({ value, date, onPick, onClose }: { value: Schedule | null;
   };
   const done = () => {
     if (!c) return;
-    const s: Schedule = { ...c, until: ends === 'on' ? (c.until || null) : null, count: ends === 'after' ? (c.count || 1) : null };
+    const s: Schedule = { ...c, until: ends === 'on' ? (c.until || null) : null, count: ends === 'after' ? (c.count ?? 10) : null };   // the box shows 10 until typed in (25 Nov: it saved 1)
     if (s.freq === 'weekly' && !s.weekdays?.length) s.weekdays = [p.wd];
     if (s.freq === 'monthly' && s.monthWeek == null && !s.monthDay) s.monthDay = p.d;
     if (s.freq !== 'weekly') s.weekdays = null;

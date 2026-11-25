@@ -61,7 +61,7 @@ export async function home(userId: string, iana = 'Europe/London', now = Date.no
   }).sort({ 'start.datetime': 1 }).lean() as any[];
   const comingUp = plans
     .filter(p => dateOf(p.start) && dateOf(p.start) <= today)
-    .map(p => item(p, { repeat: !!p.plan?.repeatId, started: (instantOf(p.start) ?? 0) <= now }))
+    .map(p => item(p, { repeat: !!p.plan?.repeatId, repeatId: p.plan?.repeatId ? String(p.plan.repeatId) : null, occurrence: p.plan?.occurrence ?? null, started: (instantOf(p.start) ?? 0) <= now }))
     .sort((a, b) => key(b.start).localeCompare(key(a.start)));
 
   const [open, ended, latest] = await Promise.all([
