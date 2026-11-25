@@ -523,7 +523,9 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
   const goBack = useCallback(() => {
     if (changed && !window.confirm('Leave without saving? Your changes will be lost.')) return;
     // Opened from the Calendar: Cancel goes back there too (13 Nov).
-    if (entryMode) { const b = backTo(); if (b) { leaving.current = true; router.replace(b); } else router.push('/entry'); return; }
+    // Replaced, as saving does (25 Nov, Hyoje: New › Cancel › Back showed the New form — Cancel
+    // added Today on top of the form instead of in its place).
+    if (entryMode) { leaveTo(backTo() ?? '/entry'); return; }
     if (window.history.length > 1) router.back(); else router.push('/calendar');
   }, [changed, router, entryMode]);
 
