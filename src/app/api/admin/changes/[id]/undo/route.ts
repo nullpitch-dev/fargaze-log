@@ -7,10 +7,12 @@ import { isValidObjectId } from 'mongoose';
 import { requireUser } from '@/lib/admin/guard';
 import { getList } from '@/lib/admin/lists';
 import { undoChange } from '@/lib/admin/rename';
+import { syncAfter } from '@/lib/gcal/sync';
 
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const g = await requireUser();
   if (g.denied) return g.denied;
+  syncAfter(g.userId);   // Google Calendar (§15.9): after the answer
 
   const { id } = await params;
   if (!isValidObjectId(id)) return NextResponse.json({ error: 'Unknown change' }, { status: 404 });

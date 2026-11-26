@@ -34,6 +34,7 @@ import { relationshipOf } from '@/lib/records/relationship';
 import { rulesFor, type EntryGroup } from '@/lib/entry/groups';
 import { addMinutes, localNow, zoneCodeFor, type ZoneRow } from '@/lib/entry/time';
 import { RESETTABLE, resetSection, HOME_CURRENCY, type ResettableSection } from '@/lib/entry/forms';
+import { CALENDARS, DEFAULT_CALENDAR, calendarLabel } from '@/lib/gcal/calendars';
 import { dropOutbox, fetchWithin, isNoSignal, outboxOn, putOutbox, seemsOffline } from '@/lib/offline/outbox';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -1175,6 +1176,8 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
                   <span className="text-xs text-stone-400 dark:text-zinc-500">From a repeat: change or stop it from one of its plans.</span>
                 </div>
               : <RepeatField value={repeat} onChange={setRepeat} date={f.start.date} disabled={saving} />)}
+            {/* Google Calendar (§15.9, Hyoje 26 Nov): sent to the chosen calendar — Family for now. */}
+            <CalendarTick value={f.calendar ?? ''} onChange={v => set('calendar', v)} disabled={saving} />
             <p className="text-xs text-stone-400 dark:text-zinc-500">{planning
               ? 'A plan: the planned end is when it should end. End is set when it happens.'
               : 'No times = all day. A start time without an end time = still going (an open record).'}</p>
@@ -1483,6 +1486,25 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
           <button onClick={() => save()} disabled={!canSave} className={primary}>{saving ? 'Saving…' : (entryMode && current?.kind === 'plan') || (!entryMode && planning) ? 'Save plan' : 'Save'}</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Google Calendar (§15.9): the tick, and which calendar (one name while there is only Family). */
+function CalendarTick({ value, onChange, disabled }: { value: string; onChange: (v: string) => void; disabled?: boolean }) {
+  return (
+    <div className={`flex flex-wrap items-center gap-2 text-sm text-stone-700 dark:text-zinc-200 ${disabled ? 'opacity-50' : ''}`}>
+      <label className="inline-flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" data-testid="gcal-tick" disabled={disabled} checked={!!value}
+          onChange={e => onChange(e.target.checked ? (value || DEFAULT_CALENDAR) : '')} className="accent-blue-600" />
+        Google Calendar
+      </label>
+      {!!value && (CALENDARS.length === 1
+        ? <span className="text-stone-500 dark:text-zinc-400">· {calendarLabel(value)}</span>
+        : <select value={value} disabled={disabled} onChange={e => onChange(e.target.value)}
+            className="rounded border border-stone-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 px-1.5 py-0.5 text-sm">
+            {CALENDARS.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+          </select>)}
     </div>
   );
 }

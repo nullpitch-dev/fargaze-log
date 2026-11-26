@@ -13,6 +13,7 @@
 import { tidyPlace } from '../places/details';
 import { relationshipOf } from './relationship';
 import { computeTotalSeconds, weekdayOf } from '../migration/transform';
+import { CALENDARS, DEFAULT_CALENDAR } from '../gcal/calendars';
 
 // ── Shape ────────────────────────────────────────────────────────────────────
 
@@ -47,6 +48,9 @@ export interface RecordForm {
   income: { gross: Num; net: Num };
   travel: { city: string; theme: string };
   notes: string;
+  /** Google Calendar sync (§15.9, 26 Nov): the calendar key ('family') or '' = not sent.
+   *  Optional: forms saved before it (presets, repeats) leave the record's setting as it is. */
+  calendar?: string;
 }
 
 /** What buildRecord needs from the master lists. */
@@ -105,6 +109,7 @@ export function fromRecord(doc: any): RecordForm {
     income: { gross: n(doc?.income?.gross), net: n(doc?.income?.net) },
     travel: { city: s(doc?.travel?.city), theme: s(doc?.travel?.theme) },
     notes: s(doc?.notes),
+    calendar: s(doc?.sync?.export).toUpperCase() === 'Y' ? (s(doc?.sync?.calendar) || DEFAULT_CALENDAR) : '',
   };
 }
 
@@ -356,7 +361,7 @@ export function buildRecord(form: RecordForm, base: any | null, ctx: FormContext
   const doc: any = {
     userId: base?.userId,
     allDay,
-    sync: base?.sync ?? { status: null, eventId: null, export: null },
+    sync: syncOf(f?.calendar, base?.sync, problems),
     activity: {
       category, name: str(name), title: str(f?.activity?.title), additionalInfo: str(f?.activity?.additionalInfo),
       // Relationship follows People, like the sheet's formula in G (5 Nov); not typed.
@@ -449,6 +454,22 @@ export function transportMissing(tr: { from?: string | null; to?: string | null;
 export function newRecordRules(doc: any, ctx: FormContext): { problems: string[]; warnings: string[] } {
   const b = buildRecord(fromRecord(doc), null, ctx);
   return { problems: b.problems, warnings: b.warnings };
+}
+
+/** The calendar tick (§15.9): 'Y' + the calendar, or off. Old fields (status, eventId) are kept. */
+function syncOf(calendar: unknown, base: any, problems: string[]) {
+  const was = { status: base?.status ?? null, eventId: base?.eventId ?? null, export: base?.export ?? null, ...(base?.calendar ? { calendar: base.calendar } : {}) };
+  if (calendar === undefined || calendar === null) return was;     // a form from before the tick
+  const key = t(calendar);
+  if (!key) return { ...was, export: null, calendar: null };
+  if (!CALENDARS.some(c => c.key === key)) { problems.push(`Google Calendar '${key}' is not a calendar the app knows`); return was; }
+  return { ...was, export: 'Y', calendar: key };
+}
+
+/** Whether the calendar tick changed (an edit with only that is still a change). */
+export function calendarChanged(base: any, doc: any): boolean {
+  const on = (x: any) => (t(x?.sync?.export).toUpperCase() === 'Y' ? t(x?.sync?.calendar) || DEFAULT_CALENDAR : '');
+  return on(base) !== on(doc);
 }
 
 function strip(p: any) {

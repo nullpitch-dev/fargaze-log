@@ -23,6 +23,7 @@ export const config = {
   matcher: [
 		// /privacy is public: Google's OAuth consent screen links to it.
     // sw.js, the manifest and its icons too: the browser fetches them on its own (#71 step 3).
-    '/((?!_next/static|_next/image|favicon.ico|privacy|sw\\.js|manifest\\.webmanifest|icons/).*)',
+    // /api/cron/: Vercel Cron, which checks its own secret (Google Calendar sync, §15.9).
+    '/((?!_next/static|_next/image|favicon.ico|privacy|sw\\.js|manifest\\.webmanifest|icons/|api/cron/).*)',
   ],
 };

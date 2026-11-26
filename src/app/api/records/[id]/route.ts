@@ -12,6 +12,7 @@ import { requireUser } from '@/lib/admin/guard';
 import { getForEdit, saveEdit, deleteRecord } from '@/lib/records/edit';
 import mongoose from 'mongoose';
 import Log from '@/models/Log';
+import { syncAfter } from '@/lib/gcal/sync';
 
 type Ctx = { params: Promise<{ id: string }> };
 const reply = (out: any) => (out.ok ? NextResponse.json(out) : NextResponse.json(out, { status: out.status }));
@@ -31,6 +32,7 @@ export async function GET(req: Request, { params }: Ctx) {
 export async function PUT(req: Request, { params }: Ctx) {
   const g = await requireUser();
   if (g.denied) return g.denied;
+  syncAfter(g.userId, [(await params).id]);   // Google Calendar (§15.9): after the answer
   const { id } = await params;
   const body = await req.json().catch(() => null);
   if (!body?.form || typeof body.updatedAt !== 'string') {
@@ -42,6 +44,7 @@ export async function PUT(req: Request, { params }: Ctx) {
 export async function DELETE(req: Request, { params }: Ctx) {
   const g = await requireUser();
   if (g.denied) return g.denied;
+  syncAfter(g.userId, [(await params).id]);   // Google Calendar (§15.9): after the answer
   const { id } = await params;
   const body = await req.json().catch(() => null);
   if (typeof body?.updatedAt !== 'string') return NextResponse.json({ error: 'Send { updatedAt }' }, { status: 400 });

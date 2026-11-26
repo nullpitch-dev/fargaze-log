@@ -9,6 +9,7 @@
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/admin/guard';
 import { applyReplace, replaceFieldsInfo, usedValues } from '@/lib/records/replace';
+import { syncAfter } from '@/lib/gcal/sync';
 
 export async function GET(req: Request) {
   const g = await requireUser();
@@ -22,6 +23,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const g = await requireUser();
   if (g.denied) return g.denied;
+  syncAfter(g.userId);   // Google Calendar (§15.9): after the answer
   const body = await req.json().catch(() => null);
   if (!body?.field) return NextResponse.json({ error: 'Send { field, mode, from, to, …, expectPlaces }' }, { status: 400 });
   const out = await applyReplace(g.userId, body);

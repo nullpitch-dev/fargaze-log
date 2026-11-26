@@ -34,6 +34,7 @@ export function blankForm(): RecordForm {
     income: { gross: null, net: null },
     travel: { city: '', theme: '' },
     notes: '',
+    calendar: '',
   };
 }
 export function mergeForm(partial: any): RecordForm {

@@ -28,7 +28,7 @@ import { loadMasterChecks, unknownValues } from '../migration/checkRecords';
 import { recordKey, existingQuery, yearTabFor, KEY_FIELDS } from '../migration/staging';
 import { missingIngredients, describeMissing } from './ingredients';
 import { getArchiveUntil } from '../archiveYear';
-import { buildRecord, fromRecord, type FormContext, type RecordForm } from './form';
+import { buildRecord, calendarChanged, fromRecord, type FormContext, type RecordForm } from './form';
 import { sheetChange, deleteRowLines, addRowLines, findRowText, type ChangeLine, type PlainChange } from './sheetCells';
 import { isOpen, missingRequired } from '../entry/groups';
 import { endAheadToPlanned, plannedEndChanged, relaxOpen, tightenOnEnd, NO_END_NOTE } from '../entry/drafts';
@@ -148,7 +148,7 @@ async function prepare(userId: string, id: string, form: RecordForm): Promise<{ 
 
   const archiveUntil = await getArchiveUntil(userId);
   const change = sheetChange(base, doc, yearTabFor(base, archiveUntil), yearTabFor(doc, archiveUntil));
-  if (!change.lines.length && !plannedEndChanged(base, doc)) problems.push('Nothing changed');
+  if (!change.lines.length && !plannedEndChanged(base, doc) && !calendarChanged(base, doc)) problems.push('Nothing changed');
   const tight = tightenOnEnd(base, doc, [...new Set(problems)], warnings);
   const relaxed = relaxOpen(doc, tight.problems, tight.warnings);
   if (toPlan) {
@@ -315,7 +315,8 @@ export async function undoRecordChange(userId: string, ch: any) {
   } else {
     const trash = await LogTrash.findOne({ userId, 'record._id': ch.recordIds?.[0] ?? ch.rowId }).lean() as any;
     if (!trash) return fail(409, 'Undo is no longer possible: the deleted record is no longer in the trash.');
-    restore = trash.record;
+    // updatedAt now: the Google Calendar sync looks at records changed since its last run.
+    restore = { ...trash.record, updatedAt: now };
     if (await Log.exists({ _id: restore._id })) return fail(409, 'Undo is no longer possible: the record is back already.');
     // A migration that rebuilt the record's year since the delete has re-created every
     // record of that year; putting this one back could then double it.

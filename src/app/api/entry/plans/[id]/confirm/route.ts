@@ -7,10 +7,12 @@
 import { requireUser } from '@/lib/admin/guard';
 import { confirmPlan } from '@/lib/entry/save';
 import { reply, body, type IdCtx } from '@/lib/entry/reply';
+import { syncAfter } from '@/lib/gcal/sync';
 
 export async function POST(req: Request, { params }: IdCtx) {
   const g = await requireUser();
   if (g.denied) return g.denied;
+  syncAfter(g.userId);   // Google Calendar (§15.9): after the answer
   const b = await body(req);
   if (typeof b?.updatedAt !== 'string') return reply({ ok: false, status: 400, error: 'Send { updatedAt, how }' });
   const how = b.how === 'now' || b.how === 'onTime' || b.how === 'nowDone' ? b.how : 'done';

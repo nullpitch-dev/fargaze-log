@@ -4,10 +4,12 @@
 import { requireUser } from '@/lib/admin/guard';
 import { home } from '@/lib/entry/home';
 import { reply } from '@/lib/entry/reply';
+import { syncSoon } from '@/lib/gcal/sync';
 
 export async function GET(req: Request) {
   const g = await requireUser();
   if (g.denied) return g.denied;
+  syncSoon(g.userId);   // Google Calendar (§15.9): a catch-up run after the answer, at most every 30 s
   const tz = new URL(req.url).searchParams.get('tz') || 'Europe/London';
   try { new Intl.DateTimeFormat('en-GB', { timeZone: tz }); } catch { return reply({ ok: false, status: 400, error: `Unknown time zone '${tz}'.` }); }
   return reply(await home(g.userId, tz));

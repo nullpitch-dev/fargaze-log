@@ -9,6 +9,8 @@ export interface ILog extends Document {
     status?: string;
     eventId?: string;
     export?: string;
+    /** Google Calendar sync (§15.9): the calendar key (calendars.ts) when export is 'Y'. */
+    calendar?: string;
   };
   activity?: {
     category?: string;
@@ -162,6 +164,7 @@ const LogSchema = new Schema<ILog>({
     status: String,
     eventId: String,
     export: String,
+    calendar: String,
   },
   activity: {
     category: String,
@@ -296,6 +299,11 @@ LogSchema.index({ userId: 1, 'duration.totalSeconds': -1 });
 // second serves "a start time but no end time". Built by Mongoose on the app's next start.
 LogSchema.index({ userId: 1, 'end.year': 1, 'end.month': 1, 'end.day': 1 });
 LogSchema.index({ userId: 1, 'end.hour': 1 });
+
+// Google Calendar sync (§15.9, 26 Nov): records and plans changed since the last sync, and
+// who holds an old Google event (sync.eventId, from the Apps Script days). Both collections.
+LogSchema.index({ userId: 1, updatedAt: 1 });
+LogSchema.index({ userId: 1, 'sync.eventId': 1 }, { partialFilterExpression: { 'sync.eventId': { $type: 'string' } } });
 
 // The entry app's plans (log_plan, #71) are records of the same shape.
 // log_plan's schema starts as a copy of this one (LogPlan.ts). The copy is made here, before

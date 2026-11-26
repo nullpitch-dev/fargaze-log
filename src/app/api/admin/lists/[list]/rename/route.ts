@@ -12,10 +12,12 @@ import { isValidObjectId } from 'mongoose';
 import { requireUser } from '@/lib/admin/guard';
 import { getList } from '@/lib/admin/lists';
 import { previewRename, applyRename, type RenameRequest } from '@/lib/admin/rename';
+import { syncAfter } from '@/lib/gcal/sync';
 
 export async function POST(req: Request, { params }: { params: Promise<{ list: string }> }) {
   const g = await requireUser();
   if (g.denied) return g.denied;
+  syncAfter(g.userId);   // Google Calendar (§15.9): after the answer
 
   const { list } = await params;
   const def = getList(list);

@@ -15,6 +15,7 @@ import { auth } from '@/auth';
 import connectDB from '@/lib/mongodb';
 import Log from '@/models/Log';
 import LogPlan from '@/models/LogPlan';
+import { syncSoon } from '@/lib/gcal/sync';
 import {
   isValidZone, daySpan, resolveRange, candidateFilter, CANDIDATE_PROJECTION,
   buildCalendarEvents, buildRecordEvents, countByDay, MAX_RANGE_DAYS, PLAN_PROJECTION, buildPlanEvents, sortEvents,
@@ -27,6 +28,7 @@ export async function GET(req: NextRequest) {
   const session = await auth();
   const userId = (session as any)?.user?.userId;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+  syncSoon(userId);   // Google Calendar (§15.9): a catch-up run after the answer, at most every 30 s
 
   const sp   = req.nextUrl.searchParams;
   const from = sp.get('from') ?? '';

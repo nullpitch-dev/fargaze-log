@@ -6,6 +6,7 @@
 import { requireUser } from '@/lib/admin/guard';
 import { getPlan, adjustPlan, deletePlan } from '@/lib/entry/save';
 import { reply, body, type IdCtx } from '@/lib/entry/reply';
+import { syncAfter } from '@/lib/gcal/sync';
 
 export async function GET(_req: Request, { params }: IdCtx) {
   const g = await requireUser();
@@ -16,6 +17,7 @@ export async function GET(_req: Request, { params }: IdCtx) {
 export async function PUT(req: Request, { params }: IdCtx) {
   const g = await requireUser();
   if (g.denied) return g.denied;
+  syncAfter(g.userId);   // Google Calendar (§15.9): after the answer
   const b = await body(req);
   if (!b?.form || typeof b.updatedAt !== 'string') return reply({ ok: false, status: 400, error: 'Send { form, updatedAt }' });
   return reply(await adjustPlan(g.userId, (await params).id, b.form, b.updatedAt));
@@ -24,6 +26,7 @@ export async function PUT(req: Request, { params }: IdCtx) {
 export async function DELETE(req: Request, { params }: IdCtx) {
   const g = await requireUser();
   if (g.denied) return g.denied;
+  syncAfter(g.userId);   // Google Calendar (§15.9): after the answer
   const b = await body(req);
   if (typeof b?.updatedAt !== 'string') return reply({ ok: false, status: 400, error: 'Send { updatedAt }' });
   return reply(await deletePlan(g.userId, (await params).id, b.updatedAt));

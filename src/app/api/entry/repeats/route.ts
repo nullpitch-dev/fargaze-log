@@ -6,6 +6,7 @@
 import { requireUser } from '@/lib/admin/guard';
 import { listRules, createRule, ruleOfRecord } from '@/lib/entry/repeats';
 import { reply, body } from '@/lib/entry/reply';
+import { syncAfter } from '@/lib/gcal/sync';
 
 export async function GET(req: Request) {
   const g = await requireUser();
@@ -18,5 +19,6 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const g = await requireUser();
   if (g.denied) return g.denied;
+  syncAfter(g.userId);   // Google Calendar (§15.9): after the answer
   return reply(await createRule(g.userId, await body(req)));
 }

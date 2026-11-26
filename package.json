@@ -10,7 +10,8 @@
 		"migrate": "tsx scripts/migrate.ts",
 		"staging": "tsx scripts/migrate-staging.ts",
 		"plans": "tsx scripts/upload-plans.ts",
-		"export": "tsx scripts/export.ts"
+		"export": "tsx scripts/export.ts",
+		"gcal": "tsx scripts/gcal.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

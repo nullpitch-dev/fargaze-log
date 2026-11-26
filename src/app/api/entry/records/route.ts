@@ -7,10 +7,12 @@ import { createEntry } from '@/lib/entry/save';
 import { presetUsed } from '@/lib/entry/presets';
 import { stampUsed } from '@/lib/entry/stamps';
 import { reply, body } from '@/lib/entry/reply';
+import { syncAfter } from '@/lib/gcal/sync';
 
 export async function POST(req: Request) {
   const g = await requireUser();
   if (g.denied) return g.denied;
+  syncAfter(g.userId);   // Google Calendar (§15.9): after the answer
   const b = await body(req);
   const out = await createEntry(g.userId, b?.id, b?.form);
   if (out.ok && !out.already && typeof b?.presetId === 'string') await presetUsed(g.userId, b.presetId);
