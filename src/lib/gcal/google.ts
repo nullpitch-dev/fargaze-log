@@ -9,7 +9,9 @@
 // A calendar with no ID set is simply not synced (test.log).
 
 import path from 'path';
-import { google, type calendar_v3 } from 'googleapis';
+// The Calendar part of googleapis only (26 Nov): importing the whole library added ~340 MB to
+// the type check, and `next build` ran out of memory on the WSL machine.
+import { calendar as calendarApi, auth as gauth, type calendar_v3 } from 'googleapis/build/src/apis/calendar';
 import type { GEvent } from './event';
 
 export const calendarIdOf = (key: string): string | null => process.env[`GCAL_${key.toUpperCase()}_ID`]?.trim() || null;
@@ -31,8 +33,8 @@ async function client(): Promise<calendar_v3.Calendar> {
   if (api) return api;
   const c = credentials();
   if (!c) throw new Error('No service account key (GOOGLE_SERVICE_ACCOUNT_JSON)');
-  const auth = new google.auth.GoogleAuth({ ...c, scopes: ['https://www.googleapis.com/auth/calendar.events'] });
-  api = google.calendar({ version: 'v3', auth: (await auth.getClient()) as any });
+  const auth = new gauth.GoogleAuth({ ...c, scopes: ['https://www.googleapis.com/auth/calendar.events'] });
+  api = calendarApi({ version: 'v3', auth: (await auth.getClient()) as any });
   return api;
 }
 

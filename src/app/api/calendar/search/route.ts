@@ -7,6 +7,7 @@
 //   dateFrom, dateTo        display dates, inclusive (optional)
 //   tz                      display zone
 //   excludeCategories, excludeCrossActivities, excludeNames   the page's filters
+//   hides                   the Hide list's ticked entries (hides.ts hidesParam)
 //
 // Returns the newest SEARCH_LIMIT matches as Calendar events, newest first,
 // plus the total. Rules: src/lib/calendar/search.ts.
@@ -19,6 +20,7 @@ import { auth } from '@/auth';
 import connectDB from '@/lib/mongodb';
 import Log from '@/models/Log';
 import LogPlan from '@/models/LogPlan';
+import { hidesFromParam } from '@/lib/calendar/hides';
 import {
   isValidZone, resolveRange, buildCalendarEvents, buildPlanEvents, CANDIDATE_PROJECTION, PLAN_PROJECTION, zonedDayStart, addDays,
 } from '@/lib/calendar/calendar';
@@ -70,12 +72,14 @@ export async function GET(req: NextRequest) {
   // are found by when they happened, as in Search).
   const from = dateFrom ?? '1900-01-01', to = dateTo ?? '2999-12-31';
   const range = resolveRange(from, to, tz);
-  const { events } = buildCalendarEvents(docs, range, Date.now());
+  // The Hide list (26 Nov): records and plans each by their own entries.
+  const hides = hidesFromParam(sp.get('hides'));
+  const { events } = buildCalendarEvents(docs, range, Date.now(), { hides });
   const inRange = events
     .filter(e => e.startDate >= from && e.startDate <= to)
     .sort((a, b) => b.startDate.localeCompare(a.startDate) || (b.start ?? '').localeCompare(a.start ?? ''));
 
-  const plans = buildPlanEvents(planDocs, range, Date.now())
+  const plans = buildPlanEvents(planDocs, range, Date.now(), { hides })
     .filter(e => e.startDate >= from && e.startDate <= to)
     .sort((a, b) => a.startDate.localeCompare(b.startDate) || (a.start ?? '').localeCompare(b.start ?? ''));
 

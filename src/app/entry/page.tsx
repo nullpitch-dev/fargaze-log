@@ -116,6 +116,23 @@ function withOutbox(h: Home, ob: OutboxItem[], sending: Set<string> = new Set())
   return { ...h, comingUp, inProgress, done, ongoing };
 }
 
+/** A refused press that something else has settled since (Hyoje, 26 Nov: End now was refused
+ *  — Foods missing — then the record was filled in and ended on its form, yet the refused
+ *  press stayed in Waiting to send): an End for a record no longer open, a Start for a plan no
+ *  longer in Coming up. Only refused ones, and only from a fresh Today (not the saved copy):
+ *  a press still waiting to be sent is kept. */
+function dropSettled(h: Home) {
+  try {
+    const open = new Set([...(h.inProgress ?? []), ...(h.ongoing ?? [])].map(x => x.id));
+    const plans = new Set((h.comingUp ?? []).map(x => x.id));
+    for (const x of listOutbox()) {
+      if (x.kind !== 'action' || x.state !== 'refused' || !x.meta) continue;
+      const settled = x.meta.op === 'end' ? !open.has(x.meta.target) : !plans.has(x.meta.target);
+      if (settled) dropOutbox(x.id);
+    }
+  } catch { /* no storage: nothing kept */ }
+}
+
 /** Offline (#71 step 3): ask the service worker to save the plans, stamps and recent records
  *  Home shows, so they open and copy with no signal. At most every 20 minutes. */
 function warmItems(h: any) {
@@ -228,7 +245,7 @@ function EntryHome() {
       const saved = h.headers.get('x-offline-from-cache') ? Number(h.headers.get('x-offline-saved')) : 0;
       setSavedAt(saved || null);
       setData(hb); setError('');
-      if (!saved) { warmItems(hb); setChecking(false); }
+      if (!saved) { warmItems(hb); dropSettled(hb); setChecking(false); }
       else if (!fresh && navigator.onLine !== false) void loadRef.current?.(true);
       else setChecking(false);
     } catch (e: any) {

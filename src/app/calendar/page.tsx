@@ -35,6 +35,7 @@ import {
 } from './_lib/month-layout';
 import { MonthView, DayList } from './_components/MonthView';
 import { CalendarFilters, type FilterState } from './_components/CalendarFilters';
+import { hidesParam } from '@/lib/calendar/hides';
 import { MonthPicker } from './_components/MonthPicker';
 import { DayPicker } from './_components/DayPicker';
 import { TimeGridView } from './_components/TimeGridView';
@@ -87,7 +88,7 @@ function weekTitle(a: string, b: string): string {
 const SIDEBAR_KEY = 'fargaze.calendar.sidebarOpen';   // per device, like the panel width itself
 
 const DEFAULT_FILTERS: FilterState = {
-  hiddenCategories: [], hiddenCrossActivities: [], colors: {}, showReading: true, hiddenRows: [],
+  hiddenCategories: [], hiddenCrossActivities: [], colors: {}, showReading: true, hiddenRows: [], hides: [],
   hiddenNames: ['정식 운동', '약식 운동'],   // same starting list as the API, so nothing flashes before settings load
 };
 
@@ -204,6 +205,7 @@ function CalendarInner() {
 
   // ── Options and saved settings ──
   const [categories, setCategories] = useState<{ name: string; count: number }[]>([]);
+  const [activities, setActivities] = useState<{ name: string; category: string }[]>([]);
   const [crossActivities, setCrossActivities] = useState<string[]>([]);
   const [firstYear, setFirstYear] = useState(2019);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
@@ -213,6 +215,7 @@ function CalendarInner() {
   useEffect(() => {
     fetch('/api/calendar/options').then(r => r.json()).then(o => {
       setCategories(o.categories ?? []);
+      setActivities(o.activities ?? []);
       setCrossActivities(o.crossActivities ?? []);
       if (o.firstYear) setFirstYear(o.firstYear);
     }).catch(() => {});
@@ -223,18 +226,21 @@ function CalendarInner() {
   }, []);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Only what was changed here is sent (26 Nov): colours and hidden names are kept on
+  // /admin/calendar-settings now, and an open Calendar must not put back their old values.
+  const unsaved = useRef<Partial<FilterState>>({});
   const updateFilters = useCallback((patch: Partial<FilterState>) => {
-    setFilters(prev => {
-      const next = { ...prev, ...patch };
-      if (!settingsLoaded.current) return next;
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-      saveTimer.current = setTimeout(() => {
-        fetch('/api/calendar/settings', {
-          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(next),
-        }).catch(() => {});
-      }, 400);
-      return next;
-    });
+    setFilters(prev => ({ ...prev, ...patch }));
+    if (!settingsLoaded.current) return;
+    unsaved.current = { ...unsaved.current, ...patch };
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      const body = unsaved.current;
+      unsaved.current = {};
+      fetch('/api/calendar/settings', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      }).catch(() => {});
+    }, 400);
   }, []);
 
   // ── Events for the visible range ──
@@ -277,7 +283,7 @@ function CalendarInner() {
     setLoading(true); setError(null);
     const q = new URLSearchParams({
       from: range.from, to: range.to, tz, shape: 'days',
-      excludeCategories: filters.hiddenCategories.join(','),
+      hides: hidesParam(filters.hides),
       excludeCrossActivities: filters.hiddenCrossActivities.join(','),
       excludeNames: [...filters.hiddenNames, ...READING_NAMES].join(','),
       excludeRows: filters.hiddenRows.join(','),
@@ -288,13 +294,13 @@ function CalendarInner() {
       .catch(e => { if (e.name !== 'AbortError') setError(String(e)); })
       .finally(() => { if (!ctl.signal.aborted) setLoading(false); });
     return () => ctl.abort();
-  }, [view, range.from, range.to, tz, filters.hiddenCategories, filters.hiddenCrossActivities, filters.hiddenNames, filters.hiddenRows]);
+  }, [view, range.from, range.to, tz, filters.hides, filters.hiddenCrossActivities, filters.hiddenNames, filters.hiddenRows]);
 
 
   // ── Layout ──
   const shown = useMemo(
-    () => applyFilters(events, filters.hiddenCategories, filters.hiddenCrossActivities, filters.hiddenNames, filters.hiddenRows),
-    [events, filters.hiddenCategories, filters.hiddenCrossActivities, filters.hiddenNames, filters.hiddenRows]);
+    () => applyFilters(events, filters.hides, filters.hiddenCrossActivities, filters.hiddenNames, filters.hiddenRows),
+    [events, filters.hides, filters.hiddenCrossActivities, filters.hiddenNames, filters.hiddenRows]);
   const reading = useMemo(() => shown.filter(isReading), [shown]);
   const others  = useMemo(() => shown.filter(e => !isReading(e)), [shown]);
 
@@ -315,7 +321,7 @@ function CalendarInner() {
       ...(search.not.trim() ? { not: search.not.trim() } : {}),
       ...(search.from ? { dateFrom: search.from } : {}),
       ...(search.to ? { dateTo: search.to } : {}),
-      excludeCategories: filters.hiddenCategories.join(','),
+      hides: hidesParam(filters.hides),
       excludeCrossActivities: filters.hiddenCrossActivities.join(','),
       excludeNames: filters.hiddenNames.join(','),
     });
@@ -328,7 +334,7 @@ function CalendarInner() {
       .catch(e => { if (e.name !== 'AbortError') setSearchError(String(e)); })
       .finally(() => { if (!ctl.signal.aborted) setSearching(false); });
     return () => ctl.abort();
-  }, [view, search, tz, filters.hiddenCategories, filters.hiddenCrossActivities, filters.hiddenNames]);
+  }, [view, search, tz, filters.hides, filters.hiddenCrossActivities, filters.hiddenNames]);
 
   // ── Record detail (the Search pane) ──
   const [record, setRecord] = useState<LogEntry | null>(null);
@@ -357,7 +363,7 @@ function CalendarInner() {
     return () => ctl.abort();
   }, [view, openDay, tz]);
   const dayPool = view === 'year'
-    ? applyFilters(yearDay ?? [], filters.hiddenCategories, filters.hiddenCrossActivities, filters.hiddenNames, filters.hiddenRows)
+    ? applyFilters(yearDay ?? [], filters.hides, filters.hiddenCrossActivities, filters.hiddenNames, filters.hiddenRows)
     : view === 'search' ? [...results.events, ...results.plans]
     : shown;
   const dayLoading = view === 'search' ? searching : loading || (view === 'year' && openDay !== null && yearDay === null);
@@ -407,7 +413,7 @@ function CalendarInner() {
       ? { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }
       : { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const openDate = useCallback((d: string) => go(d, 'day'), [go]);
-  const hiddenCount = filters.hiddenCategories.length + filters.hiddenCrossActivities.length;
+  const hiddenCount = filters.hides.filter(h => h.on).length + filters.hiddenCrossActivities.length;
 
   // The month of the latest match, when Month is first chosen for a search.
   const latestMonth = results.events[0]?.startDate ?? results.plans[0]?.startDate ?? null;
@@ -468,7 +474,7 @@ function CalendarInner() {
 
   const filterPanel = (
     <CalendarFilters tz={tz} deviceTz={deviceTz} onTz={setTz}
-      categories={categories} crossActivities={crossActivities}
+      categories={categories} activities={activities} crossActivities={crossActivities}
       state={filters} onChange={updateFilters} />
   );
 

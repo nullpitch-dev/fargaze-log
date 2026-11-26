@@ -19,6 +19,7 @@
 import { isQuiet } from '@/lib/calendar/quietRows';
 import type { CalendarEvent } from '@/lib/calendar/calendar';
 import { addDays } from '@/lib/calendar/calendar';
+import { isHiddenBy, type HideEntry } from '@/lib/calendar/hides';
 
 const DAY_MS = 86_400_000;
 
@@ -157,12 +158,14 @@ export function layoutWeek(
 
 // ── Filters ─────────────────────────────────────────────────────────────────
 
+/** What the Calendar shows: the Hide list (26 Nov: category – activity | All, records /
+ *  plans), the activity types switched off, the hidden names (/admin) and the quiet rows. */
 export function applyFilters(
-  events: CalendarEvent[], hiddenCategories: string[], hiddenCrossActivities: string[],
+  events: CalendarEvent[], hides: HideEntry[], hiddenCrossActivities: string[],
   hiddenNames: string[] = [], hiddenRows: string[] = [],
 ): CalendarEvent[] {
-  const hc = new Set(hiddenCategories), hx = new Set(hiddenCrossActivities), hn = new Set(hiddenNames);
-  return events.filter(e => !hc.has(e.category)
+  const hx = new Set(hiddenCrossActivities), hn = new Set(hiddenNames);
+  return events.filter(e => !isHiddenBy(hides, e.category, e.name, !!e.plan)
     && !(e.crossActivity && hx.has(e.crossActivity))
     && !(e.name && hn.has(e.name))
     && !(hiddenRows.length && isQuiet(e.name, e.place, e.relationship, hiddenRows)));

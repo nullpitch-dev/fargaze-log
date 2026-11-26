@@ -1,7 +1,7 @@
 // src/app/api/calendar/settings/route.ts
 //
 // GET  /api/calendar/settings — the saved Calendar settings, or the defaults.
-// PUT  /api/calendar/settings — body holds any subset of the six fields;
+// PUT  /api/calendar/settings — body holds any subset of the seven fields;
 //      only those are replaced.
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -9,6 +9,7 @@ import { auth } from '@/auth';
 import connectDB from '@/lib/mongodb';
 import CalendarSettings from '@/models/CalendarSettings';
 import { QUIET_KEYS } from '@/lib/calendar/quietRows';
+import { hidesFrom, parseHides, type HideEntry } from '@/lib/calendar/hides';
 
 interface CalendarSettingsDTO {
   hiddenCategories: string[];
@@ -17,12 +18,14 @@ interface CalendarSettingsDTO {
   showReading: boolean;
   hiddenRows: string[];
   hiddenNames: string[];
+  hides: HideEntry[];
 }
 
 const DEFAULTS: CalendarSettingsDTO = {
   hiddenCategories: [], hiddenCrossActivities: [], colors: {}, showReading: true, hiddenRows: [],
   // Starting list until the first change is saved (Hyoje, 28 Sep 2026).
   hiddenNames: ['정식 운동', '약식 운동'],
+  hides: [],
 };
 
 function toDTO(doc: any): CalendarSettingsDTO {
@@ -33,6 +36,9 @@ function toDTO(doc: any): CalendarSettingsDTO {
     showReading:           doc?.showReading ?? DEFAULTS.showReading,
     hiddenRows:            doc?.hiddenRows ?? DEFAULTS.hiddenRows,
     hiddenNames:           doc?.hiddenNames ?? DEFAULTS.hiddenNames,
+    // The Hide list replaced the category ticks (26 Nov): until it is first saved, the
+    // categories ticked off become "<category> – All · Both".
+    hides:                 Array.isArray(doc?.hides) ? doc.hides.map((h: any) => ({ category: h.category, name: h.name ?? null, scope: h.scope, on: h.on !== false })) : hidesFrom(doc?.hiddenCategories),
   };
 }
 
@@ -83,6 +89,11 @@ export async function PUT(req: NextRequest) {
   if ('hiddenRows' in body) {
     if (!isStrings(body.hiddenRows) || !body.hiddenRows.every((k: string) => QUIET_KEYS.has(k))) return NextResponse.json({ error: 'hiddenRows' }, { status: 400 });
     set.hiddenRows = body.hiddenRows;
+  }
+  if ('hides' in body) {
+    const h = parseHides(body.hides);
+    if (!h) return NextResponse.json({ error: 'hides' }, { status: 400 });
+    set.hides = h;
   }
   if ('showReading' in body) {
     if (typeof body.showReading !== 'boolean') return NextResponse.json({ error: 'showReading' }, { status: 400 });

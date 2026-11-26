@@ -16,6 +16,7 @@ import connectDB from '@/lib/mongodb';
 import Log from '@/models/Log';
 import LogPlan from '@/models/LogPlan';
 import { syncSoon } from '@/lib/gcal/sync';
+import { hidesFromParam } from '@/lib/calendar/hides';
 import {
   isValidZone, daySpan, resolveRange, candidateFilter, CANDIDATE_PROJECTION,
   buildCalendarEvents, buildRecordEvents, countByDay, MAX_RANGE_DAYS, PLAN_PROJECTION, buildPlanEvents, sortEvents,
@@ -58,6 +59,7 @@ export async function GET(req: NextRequest) {
     excludeCrossActivities: list(sp.get('excludeCrossActivities')),
     excludeNames:      list(sp.get('excludeNames')),
     excludeRows:       list(sp.get('excludeRows')),
+    hides:             hidesFromParam(sp.get('hides')),   // the Hide list (26 Nov): the Year counts
   };
   const { events, diagnostics } = days
     ? buildCalendarEvents(docs, range, Date.now(), filters)

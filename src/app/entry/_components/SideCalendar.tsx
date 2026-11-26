@@ -6,7 +6,7 @@
 // pushes Today aside; on a narrow screen (the outer screen) it covers Today, with ×.
 //   ‹ ›, the date title   another day; the title opens the day picker (DayPicker)
 //   a record              the record pane (Today's)
-// Uses the Calendar's saved filters (hidden categories, Rows …) and colours. Loads again
+// Uses the Calendar's saved filters (the Hide list, Hide's fixed switches …) and colours. Loads again
 // whenever Today does (after Start / End). Needs a signal: the Calendar isn't kept offline.
 
 import React, { useEffect, useMemo, useState } from 'react';
@@ -53,7 +53,7 @@ export function SideCalendar({ reloadKey, onOpen, onClose, overlay }: {
   }, [date, tz, reloadKey]);
 
   const shown = useMemo(() => !events ? [] : filters
-    ? applyFilters(events, filters.hiddenCategories, filters.hiddenCrossActivities, filters.hiddenNames, filters.hiddenRows)
+    ? applyFilters(events, filters.hides, filters.hiddenCrossActivities, filters.hiddenNames, filters.hiddenRows)
     : events, [events, filters]);
   const reading = shown.filter(isReading), others = shown.filter(e => !isReading(e));
 

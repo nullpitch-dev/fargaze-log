@@ -9,7 +9,10 @@ import mongoose, { Schema, model, models } from 'mongoose';
 //   showReading            the "Reading & study" row
 //   hiddenRows             quiet rows switched off (quietRows.ts keys: 평일 업무, 음료 at
 //                          집 / 회사 …; Hyoje, 17 Nov); none = all shown
-//   hiddenNames            activity names never shown (e.g. 정식 운동). No
+//   hides                  the Hide list (26 Nov; hides.ts): { category, name (null =
+//                          All), scope records|plans|both, on }. Absent = made from
+//                          hiddenCategories, which it replaced (kept for that only)
+//   hiddenNames            activity names never shown (e.g. 정식 운동; /admin/calendar-settings). No
 //                          schema default on purpose: while the field is
 //                          absent the API supplies the starting list.
 const CalendarSettingsSchema = new Schema(
@@ -21,6 +24,7 @@ const CalendarSettingsSchema = new Schema(
     showReading:           { type: Boolean, default: true },
     hiddenRows:            { type: [String], default: [] },
     hiddenNames:           { type: [String], default: undefined },
+    hides:                 { type: [{ _id: false, category: String, name: { type: String, default: null }, scope: String, on: Boolean }], default: undefined },
   },
   { timestamps: true, collection: 'calendar_settings', minimize: false }
 );

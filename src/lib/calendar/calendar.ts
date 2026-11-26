@@ -18,6 +18,7 @@
 // the last day shown.
 
 import { isQuiet } from './quietRows';
+import { isHiddenBy, type HideEntry } from './hides';
 
 // Look-back for timed records that started before the range and still run.
 // Records longer than this (the "(기간)" periods — reading, travel, stays, one
@@ -169,7 +170,7 @@ export function buildPlanEvents(plans: any[], r: CalendarRange, nowMs: number, f
   const docs = plans.map(p => (p.plannedEnd?.year ? { ...p, end: p.plannedEnd } : p));
   const today = zonedDate(nowMs, r.tz);
   // Overdue: still open after its start (an all-day one: from the day after).
-  return buildCalendarEvents(docs, r, nowMs, filters).events.map(e => ({
+  return buildCalendarEvents(docs, r, nowMs, { ...filters, plans: true }).events.map(e => ({
     ...e, plan: true, overdue: e.kind === 'allDay' ? e.startDate < today : !e.future,
   }));
 }
@@ -273,6 +274,8 @@ export interface EventFilters {
   excludeCrossActivities?: string[];   // the page's own rule: hide these, keep records without one
   excludeNames?: string[];             // activity.name, exact
   excludeRows?: string[];              // quiet rows switched off (quietRows.ts keys)
+  hides?: HideEntry[];                 // the Hide list (hides.ts; 26 Nov): category – activity | All, records / plans
+  plans?: boolean;                     // these documents are plans (buildPlanEvents sets it)
 }
 
 function loggedLabel(e: any): string | null {
@@ -304,6 +307,7 @@ export function buildCalendarEvents(
     if (a.crossActivity && xCross.has(a.crossActivity)) continue;
     if (a.name && xNames.has(a.name)) continue;
     if (xRows.length && isQuiet(a.name, d.location?.activity, a.relationship, xRows)) continue;
+    if (isHiddenBy(filters.hides, category, a.name, !!filters.plans)) continue;
 
     const base = {
       id: String(d._id), category,

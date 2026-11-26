@@ -114,6 +114,17 @@ export default function AdminHome() {
           </div>
         </section>
       ))}
+
+      {/* Not a master list: the Calendar's hidden activities and category colours (26 Nov). */}
+      {lists && (
+        <section className="mb-6">
+          <p className="text-xs text-stone-500 dark:text-zinc-400 uppercase tracking-widest mb-2">Calendar</p>
+          <div className="border border-stone-200 dark:border-zinc-700 rounded-lg shadow-sm bg-white dark:bg-zinc-900 px-4 py-2 text-sm">
+            <Link href="/admin/calendar-settings" className="text-stone-800 dark:text-zinc-100 hover:underline">Calendar settings</Link>
+            <span className="text-stone-500 dark:text-zinc-400"> — hidden activities, category colours</span>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

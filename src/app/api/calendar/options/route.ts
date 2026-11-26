@@ -4,6 +4,7 @@
 //   categories      every activity.category with its all-time record count
 //   crossActivities every distinct activity.crossActivity
 //   firstYear       the year of the earliest record (month picker range)
+//   activities      [{ name, category }] from the Activities list (the Hide list's picker)
 //   longestTimed    the longest timed (not all-day) record
 //   longTimedCount  timed records longer than MAX_TIMED_SPAN_DAYS; the events
 //                   query fetches these by duration, not by the look-back
@@ -13,6 +14,7 @@ import { auth } from '@/auth';
 import connectDB from '@/lib/mongodb';
 import Log from '@/models/Log';
 import { MAX_TIMED_SPAN_DAYS } from '@/lib/calendar/calendar';
+import ActivityMaster from '@/models/ActivityMaster';
 
 export async function GET() {
   const session = await auth();
@@ -21,7 +23,7 @@ export async function GET() {
 
   await connectDB();
 
-  const [cats, cross, longest, longTimedCount, first] = await Promise.all([
+  const [cats, cross, longest, longTimedCount, first, acts] = await Promise.all([
     Log.aggregate([
       { $match: { userId } },
       { $group: { _id: '$activity.category', count: { $sum: 1 } } },
@@ -37,6 +39,7 @@ export async function GET() {
       userId, allDay: { $ne: true }, 'duration.totalSeconds': { $gt: MAX_TIMED_SPAN_DAYS * 86_400 },
     }),
     Log.findOne({ userId, 'start.year': { $gt: 0 } }, { 'start.year': 1 }).sort({ 'start.year': 1 }).lean(),
+    ActivityMaster.find({ userId }).select('name category -_id').lean(),
   ]);
 
   const categories = cats
@@ -56,6 +59,9 @@ export async function GET() {
     categories,
     crossActivities: (cross as string[]).filter(Boolean).sort((a, b) => a.localeCompare(b, 'ko')),
     firstYear: (first as any)?.start?.year ?? null,
+    // The Hide list's activity picker (26 Nov): the Activities list, by category.
+    activities: (acts as any[]).filter(a => a.name && a.category).map(a => ({ name: String(a.name), category: String(a.category) }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'ko')),
     longestTimed,
     longTimedCount,
     longTimedLimitDays: MAX_TIMED_SPAN_DAYS,
