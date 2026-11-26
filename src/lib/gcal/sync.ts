@@ -29,7 +29,21 @@ import GcalEvent from '../../models/GcalEvent';
 import GcalState from '../../models/GcalState';
 import connectDB from '../mongodb';
 import { eventOf, calendarOf, type GEvent, type ZoneInfo } from './event';
-import { calendarIdOf, syncConfigured, insertEvent, patchEvent, removeEvent, isGone, errorText } from './google';
+import { calendarIdOf, syncConfigured } from './config';
+
+// The Google library only when a call is due (26 Nov, Vercel CPU: it was parsed on every cold
+// start of every route that starts a sync).
+let googleMod: Promise<any> | null = null;
+const g = () => (googleMod ??= import('./google'));
+const insertEvent = async (calendarId: string, ev: GEvent, docId: string): Promise<string> => (await g()).insertEvent(calendarId, ev, docId);
+const patchEvent = async (calendarId: string, eventId: string, ev: GEvent, docId: string): Promise<void> => (await g()).patchEvent(calendarId, eventId, ev, docId);
+const removeEvent = async (calendarId: string, eventId: string): Promise<void> => (await g()).removeEvent(calendarId, eventId);
+const isGone = (e: any) => [404, 410].includes(Number(e?.code ?? e?.response?.status ?? 0));
+const errorText = (e: any) => {
+  const code = Number(e?.code ?? e?.response?.status ?? 0);
+  const msg = e?.response?.data?.error?.message ?? e?.errors?.[0]?.message ?? e?.message ?? String(e);
+  return `${code || ''} ${msg}`.trim().slice(0, 300);
+};
 
 const OID = (x: any) => new mongoose.Types.ObjectId(String(x));
 const idOf = (x: any) => String(x);
@@ -318,11 +332,11 @@ export function syncAfter(userId: string, ids: string[] = []) {
 }
 
 const lastSoon = new Map<string, number>();
-/** When Today or the Calendar loads: a catch-up run, at most every 30 s per server. */
+/** When Today or the Calendar loads: a catch-up run, at most every 2 minutes per server. */
 export function syncSoon(userId: string) {
   if (!syncConfigured()) return;
   const t = lastSoon.get(userId) ?? 0;
-  if (Date.now() - t < 30_000) return;
+  if (Date.now() - t < 120_000) return;   // 30 s until 26 Nov (Vercel CPU)
   lastSoon.set(userId, Date.now());
   start(() => syncCalendar(userId));
 }

@@ -10,7 +10,7 @@ import { NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import GcalState from '@/models/GcalState';
 import { syncCalendar } from '@/lib/gcal/sync';
-import { syncConfigured } from '@/lib/gcal/google';
+import { syncConfigured } from '@/lib/gcal/config';
 
 export const maxDuration = 60;
 

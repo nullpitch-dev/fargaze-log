@@ -23,7 +23,9 @@ export const config = {
   matcher: [
 		// /privacy is public: Google's OAuth consent screen links to it.
     // sw.js, the manifest and its icons too: the browser fetches them on its own (#71 step 3).
-    // /api/cron/: Vercel Cron, which checks its own secret (Google Calendar sync, §15.9).
-    '/((?!_next/static|_next/image|favicon.ico|privacy|sw\\.js|manifest\\.webmanifest|icons/|api/cron/).*)',
+    // /api/: every API route checks the session itself (requireUser / auth()), /api/auth is
+    // the sign-in itself, /api/cron checks its own secret. Running the middleware before them
+    // too was a quarter of Vercel's CPU (26 Nov). Pages still go through it (the sign-in redirect).
+    '/((?!_next/static|_next/image|favicon.ico|privacy|sw\\.js|manifest\\.webmanifest|icons/|api/).*)',
   ],
 };

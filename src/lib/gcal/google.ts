@@ -14,7 +14,7 @@ import path from 'path';
 import { calendar as calendarApi, auth as gauth, type calendar_v3 } from 'googleapis/build/src/apis/calendar';
 import type { GEvent } from './event';
 
-export const calendarIdOf = (key: string): string | null => process.env[`GCAL_${key.toUpperCase()}_ID`]?.trim() || null;
+export { calendarIdOf, syncConfigured } from './config';
 
 function credentials(): { credentials?: any; keyFile?: string } | null {
   const json = process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.trim();
@@ -25,8 +25,6 @@ function credentials(): { credentials?: any; keyFile?: string } | null {
   return file ? { keyFile: path.join(process.cwd(), 'myfiles', file) } : null;
 }
 
-/** Whether the sync can run at all here: a key and at least one calendar ID. */
-export const syncConfigured = () => !!(process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.trim() || process.env.GOOGLE_SERVICE_ACCOUNT_FILE?.trim()) && !!calendarIdOf('family');
 
 let api: calendar_v3.Calendar | null = null;
 async function client(): Promise<calendar_v3.Calendar> {

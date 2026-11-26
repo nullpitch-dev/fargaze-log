@@ -1,7 +1,11 @@
+import { requireUser } from '@/lib/admin/guard';
 import { NextResponse } from 'next/server';
 import { getSheetData } from '@/lib/googleSheets';
 
 export async function GET() {
+  // Its own sign-in check (26 Nov): the middleware no longer runs for /api (Vercel CPU).
+  const g = await requireUser();
+  if (g.denied) return g.denied;
   try {
     const data = await getSheetData(
       process.env.SPREADSHEET_ID_ACTIVE!,

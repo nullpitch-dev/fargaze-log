@@ -32,6 +32,10 @@ const STATIC_MAX = 400;
 // What the entry app needs to open offline; fetched again on every online visit.
 const WARM_PAGES = ['/entry', '/entry/new'];
 const WARM_DATA = ['/api/entry/rules', '/api/records/options', '/api/entry/recent'];
+// How old a saved copy may be before a warm-up fetches it again (26 Nov, Vercel CPU).
+const WARM_PAGES_AGE = 6 * 3600_000;
+const WARM_DATA_AGE = 30 * 60_000;
+const WARM_ITEM_AGE = 6 * 3600_000;   // one record, plan or stamp
 
 const isEntryPage = p => p === '/entry' || p.startsWith('/entry/');
 // A record's form (/api/records/<id>): Copy to new entry works offline for the ones saved.
@@ -162,18 +166,26 @@ self.addEventListener('message', event => {
   const m = event.data || {};
   if (m.type !== 'warm') return;
   event.waitUntil((async () => {
-    const put = async (cacheName, key, url) => {
+    // Vercel CPU (26 Nov): a copy saved recently is kept as it is, not fetched again — the
+    // warm-ups were the largest use of the free plan's CPU. Opening something with a signal
+    // still fetches it fresh (network first), and that refreshes the copy too.
+    const put = async (cacheName, key, url, maxAge) => {
       try {
+        if (maxAge) {
+          const have = await (await caches.open(cacheName)).match(key);
+          const at = Number(have?.headers.get('x-offline-saved') || 0);
+          if (at && Date.now() - at < maxAge) return;
+        }
         const res = await fetch(url, { credentials: 'same-origin' });
         if (keepable(res)) await (await caches.open(cacheName)).put(key, await stamped(res));
       } catch { /* offline: keep what is there */ }
     };
     await Promise.all([
       // only: just the listed data (Copy recent's search results, 25 Nov)
-      ...(m.only ? [] : WARM_PAGES.map(u => put(PAGES, u, u))),
-      ...(m.only ? [] : WARM_DATA.map(u => put(DATA, u, u))),
+      ...(m.only ? [] : WARM_PAGES.map(u => put(PAGES, u, u, WARM_PAGES_AGE))),
+      ...(m.only ? [] : WARM_DATA.map(u => put(DATA, u, u, WARM_DATA_AGE))),
       ...(m.data || []).filter(u => isData(new URL(u, self.location.origin).pathname))
-        .map(u => { const x = new URL(u, self.location.origin); return put(DATA, x.pathname + x.search, x.href); }),
+        .map(u => { const x = new URL(u, self.location.origin); return put(DATA, x.pathname + x.search, x.href, WARM_ITEM_AGE); }),
     ]);
     const statics = (m.statics || []).filter(u => new URL(u, self.location.origin).pathname.startsWith('/_next/static/'));
     const cache = await caches.open(STATIC);

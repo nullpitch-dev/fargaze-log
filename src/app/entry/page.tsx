@@ -139,13 +139,15 @@ function warmItems(h: any) {
   try {
     if (!outboxOn() || !navigator.serviceWorker?.controller) return;
     const last = Number(localStorage.getItem('fg-warm-items') || 0);
-    if (Date.now() - last < 20 * 60_000) return;
+    // Every 2 hours (20 minutes until 26 Nov: the warm-ups were the largest use of Vercel's
+    // free CPU); the worker also skips copies saved in the last 6 hours.
+    if (Date.now() - last < 2 * 3600_000) return;
     localStorage.setItem('fg-warm-items', String(Date.now()));
     const data = [
       '/api/entry/ingredients?all=1',   // the ingredient fill with no signal
       ...(h.comingUp ?? []).map((x: any) => `/api/entry/plans/${x.id}`),
       ...(h.stamps ?? []).map((x: any) => `/api/entry/stamps/${x.id}`),
-      ...[...(h.inProgress ?? []), ...(h.done ?? []), ...(h.recent ?? []).filter((x: any) => !x.plan).slice(0, 15)].map((x: any) => `/api/records/${x.id}`),
+      ...[...(h.inProgress ?? []), ...(h.recent ?? []).filter((x: any) => !x.plan).slice(0, 8)].map((x: any) => `/api/records/${x.id}`),
     ];
     navigator.serviceWorker.controller.postMessage({ type: 'warm', data: [...new Set(data)] });
   } catch { /* nothing saved; fine */ }
@@ -156,7 +158,7 @@ function warmItems(h: any) {
 function warmFound(found: any[]) {
   try {
     if (!outboxOn() || !navigator.serviceWorker?.controller) return;
-    const data = found.slice(0, 12).map((x: any) => (x.plan ? `/api/entry/plans/${x.id}` : `/api/records/${x.id}`));
+    const data = found.slice(0, 6).map((x: any) => (x.plan ? `/api/entry/plans/${x.id}` : `/api/records/${x.id}`));
     if (data.length) navigator.serviceWorker.controller.postMessage({ type: 'warm', data, only: true });
   } catch { /* nothing saved; fine */ }
 }
@@ -585,7 +587,7 @@ function EntryHome() {
           : typeof href === 'function'
           ? <button type="button" onClick={href} {...copyMenu(it, plan)} className="block w-full text-left text-sm text-stone-800 dark:text-zinc-100 hover:underline truncate select-none">{name(it)}</button>
           : href
-          ? <Link href={href} {...copyMenu(it, plan)} className="block text-sm text-stone-800 dark:text-zinc-100 hover:underline truncate select-none">{name(it)}</Link>
+          ? <Link href={href} prefetch={false} {...copyMenu(it, plan)} className="block text-sm text-stone-800 dark:text-zinc-100 hover:underline truncate select-none">{name(it)}</Link>
           : <span className="block text-sm text-stone-800 dark:text-zinc-100 truncate">{name(it)}</span>}
         <span className="block text-xs leading-4 text-stone-500 dark:text-zinc-400 truncate">{sub ?? when(it, today)}{it.place ? ` · ${it.place}` : ''}{it.local && (it.sending ? <span className={sendingTag}>Sending</span> : <span className={onPhone}>On phone</span>)}</span>
       </div>
@@ -624,12 +626,12 @@ function EntryHome() {
                 <button aria-label={`Delete ${p.name}`} onClick={() => deletePreset(p)} className="px-1 text-red-500">×</button>
               </span>
             ) : (
-              <Link key={p.id} href={newHref({ preset: p.id })}
+              <Link key={p.id} href={newHref({ preset: p.id })} prefetch={false}
                 className="rounded-full border border-stone-300 dark:border-zinc-600 px-3 py-1 text-sm text-stone-800 dark:text-zinc-100 hover:bg-stone-50 dark:hover:bg-zinc-800">{p.name}</Link>
             ))}
           </div>
           <div className="flex gap-2">
-            <Link href={newHref()} className={primary}>+ New</Link>
+            <Link href={newHref()} prefetch={false} className={primary}>+ New</Link>
             <button onClick={() => setCopyOpen(v => !v)} className={secondary} aria-expanded={copyOpen}>Copy recent</button>
             <button onClick={stamp} disabled={busy !== null} className={secondary} title="Save the time now; fill it in later">Stamp</button>
           </div>

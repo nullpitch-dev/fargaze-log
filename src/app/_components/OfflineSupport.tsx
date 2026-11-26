@@ -15,7 +15,8 @@ function warm(reg: ServiceWorkerRegistration) {
   sw.postMessage({
     type: 'warm',
     statics: urls.filter(u => u.includes('/_next/static/')),
-    data: urls.filter(u => /\/api\/entry\/(home|rules|recent)/.test(u)),
+    // No data here (26 Nov, Vercel CPU): what this page loaded went through the worker,
+    // which saved it then; asking for it again ran every function a second time.
   });
 }
 
@@ -36,14 +37,15 @@ export default function OfflineSupport() {
     navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
   }, []);
 
-  // Refresh the saved copies: on a page change at most every 5 minutes (battery, Hyoje 11 Nov),
+  // Refresh the saved copies: on a page change at most every 30 minutes (5 until 26 Nov, when
+  // Vercel's free CPU ran short; battery, Hyoje 11 Nov),
   // and always when the signal comes back. Files the pages load are saved as they load anyway.
   useEffect(() => {
     if (!on) return;
     const go = (force: boolean) => {
       try {
         const last = Number(localStorage.getItem('fg-warm-pages') || 0);
-        if (!force && Date.now() - last < 5 * 60_000) return;
+        if (!force && Date.now() - last < 30 * 60_000) return;
         localStorage.setItem('fg-warm-pages', String(Date.now()));
       } catch { /* storage blocked: refresh anyway */ }
       navigator.serviceWorker.ready.then(r => setTimeout(() => warm(r), 1500)).catch(() => {});
