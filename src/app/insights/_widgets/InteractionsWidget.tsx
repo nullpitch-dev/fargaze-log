@@ -34,6 +34,9 @@ interface TrendBucket {
   byMethod: Record<string, number>;
   top7: { name: string; count: number }[];
   transitioning: string[];
+  /** (27 Nov) the single methods / relation types seen — the bands are mixes */
+  allMethods?: string[];
+  allRelations?: string[];
 }
 
 // ── Metric definitions ────────────────────────────────────────────────────────
@@ -48,17 +51,18 @@ const TREND_METRICS: { key: TrendMetric; label: string; desc: string }[] = [
 
 // ── Colours ───────────────────────────────────────────────────────────────────
 
+// Single types first (each keeps its colour), then the mixes ("가족 + 친구").
 function buildCategoryColorMap(
   buckets: TrendBucket[],
   key: 'byRelationType' | 'byMethod',
   isDark: boolean,
+  singles: string[] = [],
 ): Record<string, string> {
-  const palette = isDark ? PERSON_COLORS_DARK : PERSON_COLORS_LIGHT;
-  const cats = new Set<string>();
+  // The longer bar palette (as the Summary): five person colours repeated
+  // once the mixes arrived.
+  const cats = new Set<string>(singles);
   for (const b of buckets) Object.keys(b[key]).forEach(k => cats.add(k));
-  const map: Record<string, string> = {};
-  [...cats].forEach((cat, i) => { map[cat] = palette[i % palette.length]; });
-  return map;
+  return autoColorMap([...cats], isDark);
 }
 
 // ── Data adapters: TrendBucket → shared chart prop types ─────────────────────
@@ -141,17 +145,20 @@ function BigStat({ value, label }: { value: string; label: string }) {
   );
 }
 
-// Bar row without the grey track; the value column keeps its width, so values
-// still line up down the list.
-// `pct`, when given, shows before the value only where the card is wide enough
-// (the narrow phone screen keeps just the value).
-function PlainBar({ label, value, pct, frac, color, labelW = 'w-14', valueW = 'w-14' }: {
-  label: string; value: string; pct?: string; frac: number; color: string; labelW?: string; valueW?: string;
+// Bar row with the grey track. Values keep a fixed-width column, so they line
+// up down the list. With `trackW` the track has a fixed width and the NAME
+// takes the rest (People, 27 Nov: the short bars of columns 2–3 left most of
+// the row as grey, so the track is narrower and names get the room); without
+// it the label is fixed and the track stretches. `pct`, when given, shows
+// before the value only where the card is wide enough.
+function TrackBar({ label, value, pct, frac, color, isDark, labelW = 'w-14', valueW = 'w-14', trackW }: {
+  label: string; value: string; pct?: string; frac: number; color: string; isDark: boolean;
+  labelW?: string; valueW?: string; trackW?: string;
 }) {
   return (
     <div className="flex items-center gap-2 text-[11px] min-w-0">
-      <span className={`${labelW} shrink-0 truncate text-stone-600 dark:text-zinc-300`}>{label}</span>
-      <div className="flex-1 h-1.5 min-w-0">
+      <span className={`${trackW ? 'flex-1 min-w-0' : `${labelW} shrink-0`} truncate text-stone-600 dark:text-zinc-300`}>{label}</span>
+      <div className={`${trackW ? `${trackW} shrink-0` : 'flex-1 min-w-0'} h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-zinc-800' : 'bg-stone-100'}`}>
         <div className="h-full rounded-full" style={{ width: `${Math.max(2, frac * 100)}%`, background: color }} />
       </div>
       <span className={`${valueW} shrink-0 text-right tabular-nums whitespace-nowrap text-stone-500 dark:text-zinc-400`}>
@@ -232,24 +239,24 @@ function SummaryView({ data, by, isDark }: { data: Summary; by: Measure; isDark:
           return [
             <div key={`${c.category}-l`} role="button" tabIndex={0} onClick={() => toggle(c.category)}
               className="min-w-0 cursor-pointer rounded hover:bg-stone-50 dark:hover:bg-zinc-800">
-              <PlainBar label={`${isOpen ? '▾' : '▸'} ${c.category}`} labelW="w-14 @[34rem]:w-20" valueW="w-14 @[34rem]:w-24"
+              <TrackBar isDark={isDark} label={`${isOpen ? '▾' : '▸'} ${c.category}`} labelW="w-14 @[34rem]:w-20" valueW="w-14 @[34rem]:w-24"
                 pct={pct(valueOf(c.interactions, by), totalV)} value={showValue(valueOf(c.interactions, by), by)}
                 frac={valueOf(c.interactions, by) / maxV} color={accent} />
             </div>,
             <div key={`${c.category}-r`} role="button" tabIndex={0} onClick={() => toggle(c.category)}
               className="min-w-0 pl-4 cursor-pointer rounded hover:bg-stone-50 dark:hover:bg-zinc-800">
-              <PlainBar label={c.category} labelW="w-14 @[34rem]:w-20" valueW="w-6 @[34rem]:w-16"
+              <TrackBar isDark={isDark} label={c.category} labelW="w-14 @[34rem]:w-20" valueW="w-6 @[34rem]:w-16"
                 pct={pct(c.people, data.people.total)} value={String(c.people)}
                 frac={c.people / maxP} color={accent} />
             </div>,
             ...(isOpen ? items.flatMap(a => [
               <div key={`${c.category}/${a.name}-l`} className="min-w-0 pl-3">
-                <PlainBar label={a.name} labelW="w-11 @[34rem]:w-[4.25rem]" valueW="w-14 @[34rem]:w-24"
+                <TrackBar isDark={isDark} label={a.name} labelW="w-11 @[34rem]:w-[4.25rem]" valueW="w-14 @[34rem]:w-24"
                   pct={pct(valueOf(a.interactions, by), totalV)} value={showValue(valueOf(a.interactions, by), by)}
                   frac={valueOf(a.interactions, by) / maxV} color={neutral} />
               </div>,
               <div key={`${c.category}/${a.name}-r`} className="min-w-0 pl-7">
-                <PlainBar label={a.name} labelW="w-11 @[34rem]:w-[4.25rem]" valueW="w-6 @[34rem]:w-16"
+                <TrackBar isDark={isDark} label={a.name} labelW="w-11 @[34rem]:w-[4.25rem]" valueW="w-6 @[34rem]:w-16"
                   pct={pct(a.people, data.people.total)} value={String(a.people)}
                   frac={a.people / maxP} color={neutral} />
               </div>,
@@ -267,8 +274,9 @@ function SummaryView({ data, by, isDark }: { data: Summary; by: Measure; isDark:
             {people.map(p => {
               const v = by === 'count' ? p.count : p.seconds;
               return (
-                <PlainBar key={p.name} label={p.name} value={showValue(v, by)} frac={v / pMax}
-                  color={relColors[p.dominantCategory] ?? neutral} valueW={by === 'count' ? 'w-8' : 'w-14'} />
+                <TrackBar isDark={isDark} key={p.name} label={p.name} value={showValue(v, by)} frac={v / pMax}
+                  color={relColors[p.dominantCategory] ?? neutral} valueW={by === 'count' ? 'w-8' : 'w-14'}
+                  trackW="w-10 @[34rem]:w-20" />
               );
             })}
           </div>
@@ -328,7 +336,8 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
   // whatever is filtered — the Method pie now follows the filter.
   const summaryAllMethods   = summaryData?.options.methods   ?? [];
   const summaryAllRelations = summaryData?.options.relations ?? [];
-  const trendAllMethods = [...new Set(trendData.flatMap(b => Object.keys(b.byMethod)))].filter(s => s.trim());
+  const trendAllMethods   = [...new Set(trendData.flatMap(b => b.allMethods ?? []))].filter(s => s.trim()).sort();
+  const trendAllRelations = [...new Set(trendData.flatMap(b => b.allRelations ?? []))].filter(s => s.trim()).sort();
 
   const subsetParam = (sel: string[] | undefined, universe: string[]) =>
     sel && sel.length > 0 && sel.length < universe.length ? sel.join(',') : '';
@@ -384,8 +393,8 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
   // Initialise all Trend selections to all-selected when trend data first loads
   useEffect(() => {
     if (trendData.length === 0) return;
-    const allRelTypes = [...new Set(trendData.flatMap(b => Object.keys(b.byRelationType)))].filter(s => s.trim());
-    const allMethods  = [...new Set(trendData.flatMap(b => Object.keys(b.byMethod)))].filter(s => s.trim());
+    const allRelTypes = [...new Set(trendData.flatMap(b => b.allRelations ?? []))].filter(s => s.trim());
+    const allMethods  = [...new Set(trendData.flatMap(b => b.allMethods ?? []))].filter(s => s.trim());
     setTop7RelType(prev      => prev.length === 0 ? allRelTypes : prev);
     setTop7Method(prev       => prev.length === 0 ? allMethods  : prev);
     setCommittedRelType(prev => prev.length === 0 ? allRelTypes : prev);
@@ -429,8 +438,8 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
     : '';
 
   // Derived values
-  const relTypeColorMap = buildCategoryColorMap(trendData, 'byRelationType', isDark);
-  const methodColorMap  = buildCategoryColorMap(trendData, 'byMethod', isDark);
+  const relTypeColorMap = buildCategoryColorMap(trendData, 'byRelationType', isDark, trendAllRelations);
+  const methodColorMap  = buildCategoryColorMap(trendData, 'byMethod', isDark, trendAllMethods);
 	const relTypeArea     = toArea(trendData, 'byRelationType', relTypeColorMap, isDark);
   const methodArea      = toArea(trendData, 'byMethod',       methodColorMap,  isDark);
 
@@ -440,7 +449,7 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
   const validLineValues = lineValues.filter((v): v is number => v !== null);
   const activeDesc      = TREND_METRICS.find(m => m.key === trendMetric)?.desc;
 
-  const relTypeOptions  = [...new Set(trendData.flatMap(b => Object.keys(b.byRelationType)))].filter(s => s.trim());
+  const relTypeOptions  = trendAllRelations;
   const methodOptions   = trendAllMethods;
 
   // Summary Method filter row — between the header line and the contents

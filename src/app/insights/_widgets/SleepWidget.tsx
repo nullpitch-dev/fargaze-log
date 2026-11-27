@@ -53,7 +53,10 @@ export interface Seg { key: string; label: string; value: number; color: string;
  * The card hangs below the block rather than below the pie, so it never lands
  * on top of the legend it is explaining.
  */
-export function MetricPieBlock({ segments, title, size = 56, isDark, flip = false, unit = 'day', legendCols = 1, legendDetail }: {
+// (27 Nov) Legend to the RIGHT of the pie, wrapping below it when the cell is
+// too narrow; legend text 11 px (was 9) and the pie 76 px (was 56) — for every
+// widget that uses it (Sleep, Bowel, Journeys, Interactions).
+export function MetricPieBlock({ segments, title, size = 76, isDark, flip = false, unit = 'day', legendCols = 1, legendDetail }: {
   segments: Seg[]; title: string; size?: number; isDark: boolean; flip?: boolean;
   /** extra text after the % in each legend row (e.g. "30 · 5h 20m"); off by default */
   legendDetail?: (s: Seg) => string;
@@ -93,7 +96,7 @@ export function MetricPieBlock({ segments, title, size = 56, isDark, flip = fals
   const hovered = segments.find(s => s.key === hoverKey);
 
   return (
-    <div className="relative flex flex-col items-center gap-1.5"
+    <div className="relative flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5"
       onMouseLeave={() => setHoverKey(null)}>
 
       {total === 0 ? (
@@ -122,8 +125,8 @@ export function MetricPieBlock({ segments, title, size = 56, isDark, flip = fals
               transition: 'opacity 120ms',
             }}
             onMouseEnter={() => setHoverKey(s.key)}>
-            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: s.color }} />
-            <span className="text-[9px] leading-tight text-stone-500 dark:text-zinc-400">
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.color }} />
+            <span className="text-[11px] leading-tight text-stone-500 dark:text-zinc-400 whitespace-nowrap">
 						  {s.label} {total ? Math.round((s.value / total) * 100) : 0}%
               {legendDetail && <span className="text-stone-400 dark:text-zinc-500"> · {legendDetail(s)}</span>}
             </span>
