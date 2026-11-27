@@ -32,7 +32,7 @@ import { bandFill, bandOf, BAND_WORD, fmt1 } from '../_lib/day-bands';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type TrendMetric = 'days' | 'totalDrinks' | 'drinksPerDay' | 'drinkType' | 'occasion' | 'withWhom' | 'topPeople' | 'restDays' | 'sessionTime';
+type TrendMetric = 'totalDrinks' | 'drinksPerDay' | 'drinkType' | 'occasion' | 'withWhom' | 'topPeople' | 'restDays' | 'sessionTime';
 
 interface DrinksStats {
   total: number;
@@ -99,17 +99,18 @@ interface DrinkingTrendBucket {
 // ── Metric definitions ────────────────────────────────────────────────────────
 
 const TREND_METRICS: { key: TrendMetric; label: string; desc: string; tip?: string }[] = [
-  { key: 'days',        label: 'Freq',      desc: 'Number of drinking days over time'                },
-  { key: 'totalDrinks', label: 'Amt(all)',  desc: 'Total drinks consumed over time',
+  // (27 Nov) The old Freq tab (drinking days) is gone — the rest bands already
+  // carry it — and Rest took its place and its name.
+  { key: 'restDays',    label: 'Freq',      desc: 'Rest days distribution and average over time',
+    tip: 'Dry days immediately before each drinking day. A dashed line marks a stretch where no dry run ended.' },
+  { key: 'totalDrinks', label: 'Amt(sum)',  desc: 'Total drinks consumed over time',
     tip: '1 drink = 50 ml soju equivalent' },
-  { key: 'drinksPerDay',label: 'Amt(day)',  desc: 'Drinks per drinking day — distribution over time',
+  { key: 'drinksPerDay',label: 'Amt(ave)',  desc: 'Drinks per drinking day — average, max and min over time',
     tip: '1 drink = 50 ml soju equivalent' },
   { key: 'drinkType',   label: 'Type',      desc: 'Mix of drink types over time (100%)'              },
   { key: 'occasion',    label: 'Occasion',  desc: 'Mix of drinking occasions over time (100%)'       },
 	{ key: 'withWhom',    label: 'Relation',  desc: 'Mix of relation types over time (100%)'           },
   { key: 'topPeople',   label: 'People',    desc: 'How your top 7 drinking companions change over time' },
-  { key: 'restDays',    label: 'Rest',      desc: 'Rest days distribution and average over time',
-    tip: 'Dry days immediately before each drinking day. A dashed line marks a stretch where no dry run ended.' },
   { key: 'sessionTime', label: 'Session',   desc: 'Average session start, end and length over time',
     tip: '1 drink = 50 ml soju equivalent' },
 ];
@@ -264,9 +265,14 @@ function StatsTab({ data, isDark }: { data: DrinkingSummary; isDark: boolean }) 
     .sort((a, b) => companionData[b] - companionData[a]);
   const companionColors: Record<string, string> = { '혼자': grey, ...autoColorMap(relKeys, isDark) };
 
+  // People fill the right column alone (27 Nov): as many rows as the left
+  // column holds — its three lists plus the two extra titles (~2 rows) — at
+  // least 10. The server sends up to 20.
+  const rowsOf = (d: Record<string, number>) => Object.values(d).filter(v => v > 0).length;
+  const peopleRows = Math.max(10, rowsOf(data.drinkType ?? {}) + rowsOf(data.occasions) + rowsOf(companionData) + 2);
   const peopleData:   Record<string, number> = {};
   const peopleColors: Record<string, string> = {};
-  for (const p of data.companions.topPeople) {
+  for (const p of data.companions.topPeople.slice(0, peopleRows)) {
     peopleData[p.name]   = p.total;
     peopleColors[p.name] = companionColors[p.dominantCategory] ?? grey;
   }
@@ -319,16 +325,17 @@ function StatsTab({ data, isDark }: { data: DrinkingSummary; isDark: boolean }) 
 
       <div className="border-t border-stone-100 dark:border-zinc-800" />
 
-			{/* ── Row 2: two columns — left: Drink Type / Occasion · right: Relation / People ── */}
+			{/* ── Row 2 (27 Nov): left — Drink Type / Occasion / Relation; right — People
+			    alone, as many names as the left column has room for ── */}
       <div className="grid grid-cols-2 gap-4">
         {/* Left */}
         <div className="flex flex-col gap-3 min-w-0">
 					<BarSection title="Drink Type" data={data.drinkType ?? {}} isDark={isDark} />
           <BarSection title="Occasion"   data={data.occasions}       isDark={isDark} />
+          <BarSection title="Relation"   data={companionData} colorMap={companionColors} isDark={isDark} />
         </div>
         {/* Right */}
         <div className="flex flex-col gap-3 min-w-0">
-          <BarSection title="Relation" data={companionData} colorMap={companionColors} isDark={isDark} />
           <BarSection title="People"   data={peopleData}    colorMap={peopleColors}    isDark={isDark} />
         </div>
       </div>
@@ -462,23 +469,6 @@ function DrinkingTrendChart({
     [buckets],
   );
   const relation = useLiveFilter(allRelations);
-
-  if (metric === 'days') {
-    return (
-      <CssTrendChart
-        series={[{
-          values: buckets.map(b => b.drinkingDays),
-          color: isDark ? '#2dd4bf' : '#1d4ed8',
-          label: 'Days',
-        }]}
-        labels={labels}
-        formatY={v => String(Math.round(v))}
-        isDark={isDark}
-        alwaysShowLabels={alwaysShow}
-        {...lineProps}
-      />
-    );
-  }
 
   if (metric === 'totalDrinks') {
     return (
@@ -647,7 +637,7 @@ function DrinkingTrendChart({
 export function DrinkingWidget({ globalFilter }: WidgetProps) {
   const isDark = useIsDark();
   const [viewMode,    setViewMode]    = useState<WidgetViewMode>('summary');
-  const [trendMetric, setTrendMetric] = useState<TrendMetric>('days');
+  const [trendMetric, setTrendMetric] = useState<TrendMetric>('restDays');
   // Weight-style window: grain × count, count resetting to the grain's default
   // on a grain switch. The People tab keeps its own short count (3/6/12) so
   // flipping there and back never destroys a longer window.

@@ -69,7 +69,12 @@ interface ItemTrend {
   buckets:    string[];
   dayTotal:   ItemSeries;
   biggestSet: ItemSeries | null;
+  days?:      { date: string; sets: { amount: number; loadKg: number | null; unsplit: boolean }[] }[];
 }
+
+// (27 Nov) A tap on one cell opens that cell's own pop-up: the item by day,
+// over just that week / month (or the one day at Day grain).
+interface OpenCell { item: string; label: string; from: string; to: string }
 
 // ── Colours ───────────────────────────────────────────────────────────────────
 
@@ -143,12 +148,15 @@ function windowEnd(lastBucketStart: string, grain: Grain): string {
 
 const LABEL_W = 64;   // px — item name column
 
-function TimelineRow({ it, bucketDays, labels, isDark, onOpen }: {
+// (27 Nov) The name opens the item's pop-up over the whole window; a cell with
+// activity opens that cell's own pop-up (by day). Empty cells do nothing.
+function TimelineRow({ it, bucketDays, labels, isDark, onOpen, onOpenCell }: {
   it: TrendItem;
   bucketDays: number[];
   labels: string[];
   isDark: boolean;
   onOpen: () => void;
+  onOpenCell: (i: number) => void;
 }) {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const accent  = isDark ? ACCENT_DARK : ACCENT_LIGHT;
@@ -156,15 +164,17 @@ function TimelineRow({ it, bucketDays, labels, isDark, onOpen }: {
   const gap     = it.activeDays.length > 60 ? 1 : 2;   // long windows: thin cells need thin gaps
 
   return (
-    <div role="button" tabIndex={0} onClick={onOpen}
-      className="flex items-center gap-2 rounded p-0.5 -mx-0.5 cursor-pointer hover:bg-stone-50 dark:hover:bg-zinc-800 transition-colors">
-      <span className="shrink-0 truncate text-[10px] text-stone-600 dark:text-zinc-300"
+    <div className="flex items-center gap-2 rounded p-0.5 -mx-0.5">
+      <span role="button" tabIndex={0} onClick={onOpen}
+        className="shrink-0 truncate text-[10px] text-stone-600 dark:text-zinc-300 rounded cursor-pointer hover:bg-stone-100 dark:hover:bg-zinc-800 hover:underline transition-colors"
         style={{ width: LABEL_W }}>
         {it.item}
       </span>
       <div className="flex-1 flex" style={{ gap }}>
         {it.activeDays.map((n, i) => (
-          <div key={i} className="relative flex-1"
+          <div key={i} className={`relative flex-1 ${n > 0 ? 'cursor-pointer' : ''}`}
+            role={n > 0 ? 'button' : undefined}
+            onClick={n > 0 ? () => onOpenCell(i) : undefined}
             style={{ height: 14, zIndex: hoverIdx === i ? 10 : undefined }}
             onMouseEnter={() => setHoverIdx(i)}
             onMouseLeave={() => setHoverIdx(null)}>
@@ -209,6 +219,10 @@ export function ExerciseTrendView({ globalFilter, isDark }: Props) {
   const [itemData,    setItemData]    = useState<ItemTrend | null>(null);
   const [itemLoading, setItemLoading] = useState(false);
 
+  const [openCell,    setOpenCell]    = useState<OpenCell | null>(null);
+  const [cellData,    setCellData]    = useState<ItemTrend | null>(null);
+  const [cellLoading, setCellLoading] = useState(false);
+
   // Main view — refetched on filter or grain change.
   useEffect(() => {
     setLoading(true);
@@ -224,7 +238,22 @@ export function ExerciseTrendView({ globalFilter, isDark }: Props) {
   }, [globalFilter, grain, count]);
 
   // The modal's item may not exist under a new filter or grain — close it.
-  useEffect(() => { setOpenItem(null); setItemData(null); }, [globalFilter, grain, count]);
+  useEffect(() => { setOpenItem(null); setItemData(null); setOpenCell(null); setCellData(null); }, [globalFilter, grain, count]);
+
+  // One cell's pop-up — fetched on tap.
+  useEffect(() => {
+    if (!openCell) return;
+    setCellLoading(true);
+    setCellData(null);
+    const url = `/api/insights/stats?${buildParams(
+      { metric: 'exercise.itemTrend', item: openCell.item, cellFrom: openCell.from, cellTo: openCell.to },
+      globalFilter,
+    )}`;
+    fetch(url)
+      .then(r => r.json())
+      .then(d => { setCellData(d.itemTrend ?? null); setCellLoading(false); })
+      .catch(() => { setCellLoading(false); });
+  }, [openCell]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   // Per-item modal — fetched on tap, not up front.
   useEffect(() => {
@@ -327,6 +356,10 @@ export function ExerciseTrendView({ globalFilter, isDark }: Props) {
                     labels={labels}
                     isDark={isDark}
                     onOpen={() => setOpenItem(it.item)}
+                    onOpenCell={i => setOpenCell({
+                      item: it.item, label: labels[i],
+                      from: data!.buckets[i], to: windowEnd(data!.buckets[i], grain),
+                    })}
                   />
                 ))}
               </div>
@@ -425,6 +458,88 @@ export function ExerciseTrendView({ globalFilter, isDark }: Props) {
           )}
         </ModalShell>
       )}
+
+      {/* One cell's pop-up (27 Nov) */}
+      {openCell && (
+        <ModalShell
+          title={`${openCell.item} · ${openCell.from === openCell.to ? openCell.from : `${openCell.label} (${openCell.from} → ${openCell.to})`}`}
+          onClose={() => { setOpenCell(null); setCellData(null); }}>
+          {cellLoading && <p className="text-xs text-stone-400 dark:text-zinc-500">Loading…</p>}
+          {!cellLoading && cellData && (
+            <CellDetail d={cellData} oneDay={openCell.from === openCell.to}
+              accent={accent} loadColor={load} isDark={isDark} />
+          )}
+        </ModalShell>
+      )}
+    </div>
+  );
+}
+
+// ── One cell's pop-up body (27 Nov) ──────────────────────────────────────────
+// A week or month: the day-total chart by day (days off are gaps), the biggest
+// set where it differs, then each day's sets. One day: just the sets.
+
+const WEEKDAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+function dayLabel(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  return `${pad2(m)}/${pad2(d)} ${WEEKDAY[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]}`;
+}
+
+function CellDetail({ d, oneDay, accent, loadColor, isDark }: {
+  d: ItemTrend; oneDay: boolean; accent: string; loadColor: string; isDark: boolean;
+}) {
+  const days = d.days ?? [];
+  if (!days.length) return <p className="text-xs text-stone-400 dark:text-zinc-500">No data in this period.</p>;
+  const labels = d.buckets.map(b => shortLabel(b, 'day'));
+  const loadSeries = (s: ItemSeries) =>
+    s.load ? { values: s.load, color: loadColor, label: 'load (kg)' } : undefined;
+  const setText = (x: { amount: number; loadKg: number | null; unsplit: boolean }) =>
+    `${fmt(x.amount)}${x.loadKg ? ` × ${fmt(x.loadKg)}kg` : ''}${x.unsplit ? ' (total)' : ''}`;
+
+  return (
+    <div className="flex flex-col gap-3">
+      {!oneDay && (
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] uppercase tracking-wide text-stone-400 dark:text-zinc-500">
+            Day total ({d.unit})
+          </span>
+          <CssTrendChart
+            series={[{ values: d.dayTotal.value, color: accent, label: 'Day total' }]}
+            labels={labels} formatY={fmt} isDark={isDark} yAxis={{ min: 0 }}
+            maxXLabels={8} showValues={labels.length <= 16} compressXLabels={false} breakOnNull
+            rightSeries={loadSeries(d.dayTotal)} formatYRight={fmt} />
+        </div>
+      )}
+      {!oneDay && d.biggestSet && (
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] uppercase tracking-wide text-stone-400 dark:text-zinc-500">
+            Biggest set ({d.unit})
+          </span>
+          <CssTrendChart
+            series={[{ values: d.biggestSet.value, color: accent, label: 'Biggest set' }]}
+            labels={labels} formatY={fmt} isDark={isDark} yAxis={{ min: 0 }}
+            maxXLabels={8} showValues={labels.length <= 16} compressXLabels={false} breakOnNull
+            rightSeries={loadSeries(d.biggestSet)} formatYRight={fmt} />
+        </div>
+      )}
+      <div className="flex flex-col gap-1">
+        <span className="text-[10px] uppercase tracking-wide text-stone-400 dark:text-zinc-500">
+          {oneDay ? `Sets (${d.unit})` : `Days (${d.unit})`}
+        </span>
+        <div className="flex flex-col gap-0.5">
+          {days.map(day => {
+            const total = day.sets.reduce((t, x) => t + x.amount, 0);
+            return (
+              <div key={day.date} className="flex items-baseline gap-2 text-[11px] leading-snug">
+                <span className="w-20 shrink-0 tabular-nums text-stone-500 dark:text-zinc-400">{dayLabel(day.date)}</span>
+                <span className="w-10 shrink-0 text-right tabular-nums font-medium text-stone-800 dark:text-zinc-100">{fmt(total)}</span>
+                <span className="min-w-0 text-stone-500 dark:text-zinc-400">{day.sets.map(setText).join(' · ')}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

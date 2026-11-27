@@ -63,6 +63,8 @@ export interface ExerciseItemTrend {
   buckets:   string[];   // same bucketing as the main call, trimmed to this item
   dayTotal:  ExerciseItemTrendSeries;
   biggestSet: ExerciseItemTrendSeries | null;   // null when collapsed
+  /** (27 Nov) Only for one cell's pop-up (`whole`): each active day's sets, in record order. */
+  days?: { date: string; sets: { amount: number; loadKg: number | null; unsplit: boolean }[] }[];
 }
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
@@ -272,6 +274,9 @@ export async function computeExerciseItemTrend(
   periodEnd: Date,
   grain: ExerciseTrendGrain,
   crossActivities: string[],
+  // (27 Nov) One timeline cell's pop-up: keep every day of the window (no
+  // leading trim, so the x axis is the whole week / month) and list the sets.
+  whole = false,
 ): Promise<ExerciseItemTrend> {
 
   const dates = periodDates(periodStart, periodEnd);
@@ -328,7 +333,7 @@ export async function computeExerciseItemTrend(
   for (const date of dayFigs.keys()) {
     activePerBucket[frame.indexOf.get(bucketKey(date, grain))!].push(date);
   }
-  let firstIdx = activePerBucket.findIndex(a => a.length > 0);
+  let firstIdx = whole ? 0 : activePerBucket.findIndex(a => a.length > 0);
   if (firstIdx < 0) firstIdx = frame.keys.length;
 
   const buckets = frame.keys.slice(firstIdx);
@@ -352,6 +357,13 @@ export async function computeExerciseItemTrend(
     bestLoad.push(hasLoad && bests.length ? r2(mean(bests.map(b => b.load))) : null);
   }
 
+  const days = whole
+    ? [...byDate.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([date, rows]) => ({
+        date,
+        sets: rows.map(r => ({ amount: r.amount, loadKg: r.loadKg, unsplit: r.unsplit })),
+      }))
+    : undefined;
+
   return {
     item,
     unit,
@@ -359,5 +371,6 @@ export async function computeExerciseItemTrend(
     buckets,
     dayTotal: { value: dayTotalValue, load: hasLoad ? dayTotalLoad : null },
     biggestSet: collapsed ? null : { value: bestValue, load: hasLoad ? bestLoad : null },
+    ...(days && { days }),
   };
 }

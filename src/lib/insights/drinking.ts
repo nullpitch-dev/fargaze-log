@@ -449,7 +449,7 @@ export async function computeDrinkingSummary(
  
   const topPeople = Object.entries(personMap)
     .sort((a, b) => b[1].total - a[1].total)
-    .slice(0, 10)
+    .slice(0, 20)   // (27 Nov) the Summary shows as many as fit
     .map(([name, data]) => ({
       name,
       dominantCategory: dominantKey(data.categories),

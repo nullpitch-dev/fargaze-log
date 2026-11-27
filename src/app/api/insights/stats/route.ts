@@ -458,6 +458,17 @@ export async function GET(req: NextRequest) {
     if (metric === 'exercise.itemTrend') {
       const item = sp.get('item') ?? '';
       if (!item) return NextResponse.json({ error: 'item is required' }, { status: 400 });
+      // (27 Nov) One timeline cell: its own dates, by day, every day kept.
+      const cellFrom = sp.get('cellFrom'), cellTo = sp.get('cellTo');
+      const isDay = (v: string | null) => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
+      if (isDay(cellFrom) && isDay(cellTo)) {
+        const [fy, fm, fd] = cellFrom!.split('-').map(Number);
+        const [ty, tm, td] = cellTo!.split('-').map(Number);
+        const itemTrend = await computeExerciseItemTrend(
+          userId, item, new Date(Date.UTC(fy, fm - 1, fd)), new Date(Date.UTC(ty, tm - 1, td)),
+          'day', crossActivities, true);
+        return NextResponse.json({ itemTrend });
+      }
       const itemTrend = await computeExerciseItemTrend(userId, item, start, end, grain, crossActivities);
       return NextResponse.json({ itemTrend });
     }
