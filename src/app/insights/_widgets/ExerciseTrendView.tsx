@@ -476,7 +476,8 @@ export function ExerciseTrendView({ globalFilter, isDark }: Props) {
 }
 
 // ── One cell's pop-up body (27 Nov) ──────────────────────────────────────────
-// A week or month: the day-total chart by day (days off are gaps), the biggest
+// A week or month: the day-total chart by day (the line joins across days off,
+// which have no dot — Hyoje, 27 Nov), the biggest
 // set where it differs, then each day's sets. One day: just the sets.
 
 const WEEKDAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -507,7 +508,7 @@ function CellDetail({ d, oneDay, accent, loadColor, isDark }: {
           <CssTrendChart
             series={[{ values: d.dayTotal.value, color: accent, label: 'Day total' }]}
             labels={labels} formatY={fmt} isDark={isDark} yAxis={{ min: 0 }}
-            maxXLabels={8} showValues={labels.length <= 16} compressXLabels={false} breakOnNull
+            maxXLabels={8} showValues={labels.length <= 16} compressXLabels={false}
             rightSeries={loadSeries(d.dayTotal)} formatYRight={fmt} />
         </div>
       )}
@@ -519,7 +520,7 @@ function CellDetail({ d, oneDay, accent, loadColor, isDark }: {
           <CssTrendChart
             series={[{ values: d.biggestSet.value, color: accent, label: 'Biggest set' }]}
             labels={labels} formatY={fmt} isDark={isDark} yAxis={{ min: 0 }}
-            maxXLabels={8} showValues={labels.length <= 16} compressXLabels={false} breakOnNull
+            maxXLabels={8} showValues={labels.length <= 16} compressXLabels={false}
             rightSeries={loadSeries(d.biggestSet)} formatYRight={fmt} />
         </div>
       )}

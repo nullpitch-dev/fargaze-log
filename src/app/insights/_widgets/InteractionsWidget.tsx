@@ -9,7 +9,9 @@ import type { TrendGrain } from '@/lib/insights/trend-window';
 import { MultiSelectDropdown } from '../_components/MultiSelectDropdown';
 import { useIsDark } from '../_lib/hooks';
 import { chartColors, PERSON_COLORS_LIGHT, PERSON_COLORS_DARK, autoColorMap } from '../_lib/chart-colors';
-import { BarSection, BarRow, Title } from '../_components/charts/bars';
+import { Title } from '../_components/charts/bars';
+import { MetricPieBlock, type Seg } from './SleepWidget';
+import { formatDuration } from '../_lib/format';
 import { CssTrendChart, CssStackedAreaChart } from '../_components/charts/css-chart-components';
 import type { StackedAreaPoint, StackedAreaSegmentDef } from '../_components/charts/css-chart-components';
 import { CssRankFlowChart } from '../_components/charts/CssRankFlowChart';
@@ -95,51 +97,183 @@ function toArea(
   return { points, defs };
 }
 
-// ── Summary sub-components ────────────────────────────────────────────────────
+// ── Summary (rewritten 27 Nov, Design §15.11) ──────────────────────────────────
+// Two columns whose rows line up across: the figures, Relation type, Method and
+// By activity. The Interactions column counts RECORDS (Count) or their time
+// (Time); a record with 가족 and 친구 sits in one "가족 + 친구" slice, so each
+// pie adds up to the total. Unique people counts each person once, under their
+// most frequent relation type / method. People below: 15 names, no track.
 
-function BigStat({ value, label }: { value: number; label: string }) {
+type Measure = 'count' | 'time';
+interface M { count: number; seconds: number }
+interface Summary {
+  options: { methods: string[]; relations: string[] };
+  interactions: { total: M; byCategory: Record<string, M>; byMethod: Record<string, M> };
+  people: { total: number; byCategory: Record<string, number>; byMethod: Record<string, number> };
+  activities: { category: string; interactions: M; people: number; items: { name: string; interactions: M; people: number }[] }[];
+  topPeople: { name: string; dominantCategory: string; count: number; seconds: number }[];
+}
+
+// The right-hand cell of each row carries the dividing line, so the two
+// grids below read as one pair of columns.
+const SPLIT = '[&>*:nth-child(even)]:border-l [&>*:nth-child(even)]:border-stone-100 dark:[&>*:nth-child(even)]:border-zinc-800';
+const valueOf = (m: M, by: Measure) => (by === 'count' ? m.count : m.seconds);
+const showValue = (v: number, by: Measure) => (by === 'count' ? v.toLocaleString() : formatDuration(v));
+
+// Colours: single relation types / methods first (so a type keeps its colour in
+// both pies and in People), then the mixes.
+function mixColors(singles: string[], mixes: string[], isDark: boolean): Record<string, string> {
+  const extra = mixes.filter(k => !singles.includes(k));
+  return autoColorMap([...singles, ...extra], isDark);
+}
+
+function segsOf(data: Record<string, number>, colors: Record<string, string>): Seg[] {
+  return Object.entries(data).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1])
+    .map(([k, v]) => ({ key: k, label: k, value: v, color: colors[k] ?? '#a8a29e' }));
+}
+
+function BigStat({ value, label }: { value: string; label: string }) {
   return (
     <div className="flex flex-col">
-      <span className="text-2xl font-medium text-stone-800 dark:text-zinc-100 leading-none">
-        {value.toLocaleString()}
-      </span>
+      <span className="text-2xl font-medium text-stone-800 dark:text-zinc-100 leading-none tabular-nums">{value}</span>
       <span className="text-xs text-stone-400 dark:text-zinc-500 mt-0.5">{label}</span>
     </div>
   );
 }
 
-// Full-width People row: top 10 by interaction count, ranks 1–5 left / 6–10
-// right. Joint-normalised — every bar shares one max (#1) and one total — so the
-// two columns read as one honest ranking. Each bar inherits its person's
-// dominant-relation colour (same palette as the Relation Type section).
-function PeopleBars({ topPeople, colorMap, isDark }: {
-  topPeople: { name: string; dominantCategory: string; total: number }[];
-  colorMap: Record<string, string>;
-  isDark: boolean;
+// Bar row without the grey track; the value column keeps its width, so values
+// still line up down the list.
+// `pct`, when given, shows before the value only where the card is wide enough
+// (the narrow phone screen keeps just the value).
+function PlainBar({ label, value, pct, frac, color, labelW = 'w-14', valueW = 'w-14' }: {
+  label: string; value: string; pct?: string; frac: number; color: string; labelW?: string; valueW?: string;
 }) {
-  const people = topPeople.filter(p => p.total > 0).sort((a, b) => b.total - a.total).slice(0, 10);
-  if (!people.length) return null;
-  const sum = people.reduce((s, p) => s + p.total, 0);
-  const max = people[0].total;
-  const neutral = isDark ? '#52525b' : '#a8a29e';
-
-  const column = (slice: typeof people) => (
-    <div className="flex flex-col gap-1">
-      {slice.map(p => (
-        <BarRow key={p.name} label={p.name} count={p.total}
-          pct={Math.round((p.total / sum) * 100)} frac={p.total / max}
-          color={colorMap[p.dominantCategory] ?? neutral} />
-      ))}
+  return (
+    <div className="flex items-center gap-2 text-[11px] min-w-0">
+      <span className={`${labelW} shrink-0 truncate text-stone-600 dark:text-zinc-300`}>{label}</span>
+      <div className="flex-1 h-1.5 min-w-0">
+        <div className="h-full rounded-full" style={{ width: `${Math.max(2, frac * 100)}%`, background: color }} />
+      </div>
+      <span className={`${valueW} shrink-0 text-right tabular-nums whitespace-nowrap text-stone-500 dark:text-zinc-400`}>
+        {pct !== undefined ? <><span className="hidden @[34rem]:inline">{pct} (</span>{value}<span className="hidden @[34rem]:inline">)</span></> : value}
+      </span>
     </div>
   );
+}
+
+function SummaryView({ data, by, isDark }: { data: Summary; by: Measure; isDark: boolean }) {
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const neutral = isDark ? '#52525b' : '#a8a29e';
+  const accent  = isDark ? '#2dd4bf' : '#1d4ed8';
+
+  const relSingles = [...data.options.relations].sort((a, b) =>
+    (data.people.byCategory[b] ?? 0) - (data.people.byCategory[a] ?? 0));
+  const metSingles = [...data.options.methods].sort((a, b) =>
+    (data.people.byMethod[b] ?? 0) - (data.people.byMethod[a] ?? 0));
+  const relColors = mixColors(relSingles, Object.keys(data.interactions.byCategory), isDark);
+  const metColors = mixColors(metSingles, Object.keys(data.interactions.byMethod), isDark);
+
+  const measured = (rec: Record<string, M>) =>
+    Object.fromEntries(Object.entries(rec).map(([k, m]) => [k, by === 'count' ? m.count : Math.round(m.seconds / 60)]));
+  const detailOf = (rec: Record<string, M>) => (seg: Seg) => (rec[seg.key] ? showValue(valueOf(rec[seg.key], by), by) : '');
+  const unit = by === 'count' ? 'interaction' : 'min';
+
+  const pieRow = (title: string, left: Record<string, M>, right: Record<string, number>, colors: Record<string, string>) => (
+    <>
+      <div className="flex flex-col gap-1.5 min-w-0">
+        <Title>{title}</Title>
+        <MetricPieBlock title={title} isDark={isDark} unit={unit}
+          segments={segsOf(measured(left), colors)} legendDetail={detailOf(left)} />
+      </div>
+      <div className="flex flex-col gap-1.5 min-w-0 pl-4">
+        <Title>{title}</Title>
+        <MetricPieBlock title={title} isDark={isDark} unit="person" flip
+          segments={segsOf(right, colors)} legendDetail={seg => String(seg.value)} />
+      </div>
+    </>
+  );
+
+  // By activity: categories by the chosen measure, activities inside likewise.
+  const totalV = valueOf(data.interactions.total, by) || 1;
+  const cats = [...data.activities].sort((a, b) => valueOf(b.interactions, by) - valueOf(a.interactions, by));
+  const maxV = Math.max(1, ...cats.map(c => valueOf(c.interactions, by)));
+  const maxP = Math.max(1, ...cats.map(c => c.people));
+  const pct = (v: number, t: number) => `${Math.round((v / (t || 1)) * 100)}%`;
+  const toggle = (c: string) => setOpen(prev => {
+    const n = new Set(prev); if (n.has(c)) n.delete(c); else n.add(c); return n;
+  });
+
+  // People: 15 by the chosen measure.
+  const people = [...data.topPeople]
+    .sort((a, b) => (by === 'count' ? b.count - a.count || b.seconds - a.seconds : b.seconds - a.seconds || b.count - a.count))
+    .slice(0, 15);
+  const pMax = people.length ? (by === 'count' ? people[0].count : people[0].seconds) || 1 : 1;
 
   return (
-    <div className="flex flex-col gap-1.5 min-w-0">
-      <Title>People</Title>
-      <div className="grid grid-cols-2 gap-x-4">
-        {column(people.slice(0, 5))}
-        {column(people.slice(5, 10))}
+    <div className="@container flex flex-col gap-4">
+      {/* Rows line up across the two columns */}
+      <div className={`grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-4 gap-y-4 ${SPLIT}`}>
+        <BigStat value={data.interactions.total.count.toLocaleString()}
+          label={`interactions · ${formatDuration(data.interactions.total.seconds)}`} />
+        <div className="pl-4"><BigStat value={data.people.total.toLocaleString()} label="unique people" /></div>
+
+        {pieRow('Relation Type', data.interactions.byCategory, data.people.byCategory, relColors)}
+        {pieRow('Method', data.interactions.byMethod, data.people.byMethod, metColors)}
       </div>
+
+      {/* By activity — same two columns; tap a category for its activities */}
+      {cats.length > 0 && (
+      <div className={`grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-4 gap-y-1 -mt-1 ${SPLIT}`}>
+        <div className="min-w-0 pb-0.5"><Title>By activity</Title></div>
+        <div className="min-w-0 pb-0.5 pl-4"><Title>By activity</Title></div>
+        {cats.map(c => {
+          const isOpen = open.has(c.category);
+          const items = [...c.items].sort((a, b) => valueOf(b.interactions, by) - valueOf(a.interactions, by));
+          return [
+            <div key={`${c.category}-l`} role="button" tabIndex={0} onClick={() => toggle(c.category)}
+              className="min-w-0 cursor-pointer rounded hover:bg-stone-50 dark:hover:bg-zinc-800">
+              <PlainBar label={`${isOpen ? '▾' : '▸'} ${c.category}`} labelW="w-14 @[34rem]:w-20" valueW="w-14 @[34rem]:w-24"
+                pct={pct(valueOf(c.interactions, by), totalV)} value={showValue(valueOf(c.interactions, by), by)}
+                frac={valueOf(c.interactions, by) / maxV} color={accent} />
+            </div>,
+            <div key={`${c.category}-r`} role="button" tabIndex={0} onClick={() => toggle(c.category)}
+              className="min-w-0 pl-4 cursor-pointer rounded hover:bg-stone-50 dark:hover:bg-zinc-800">
+              <PlainBar label={c.category} labelW="w-14 @[34rem]:w-20" valueW="w-6 @[34rem]:w-16"
+                pct={pct(c.people, data.people.total)} value={String(c.people)}
+                frac={c.people / maxP} color={accent} />
+            </div>,
+            ...(isOpen ? items.flatMap(a => [
+              <div key={`${c.category}/${a.name}-l`} className="min-w-0 pl-3">
+                <PlainBar label={a.name} labelW="w-11 @[34rem]:w-[4.25rem]" valueW="w-14 @[34rem]:w-24"
+                  pct={pct(valueOf(a.interactions, by), totalV)} value={showValue(valueOf(a.interactions, by), by)}
+                  frac={valueOf(a.interactions, by) / maxV} color={neutral} />
+              </div>,
+              <div key={`${c.category}/${a.name}-r`} className="min-w-0 pl-7">
+                <PlainBar label={a.name} labelW="w-11 @[34rem]:w-[4.25rem]" valueW="w-6 @[34rem]:w-16"
+                  pct={pct(a.people, data.people.total)} value={String(a.people)}
+                  frac={a.people / maxP} color={neutral} />
+              </div>,
+            ]) : []),
+          ];
+        })}
+      </div>
+      )}
+
+      {/* People — 15 names: 3 columns of 5 when wide, 2 columns (8 + 7) when narrow */}
+      {people.length > 0 && (
+        <div className="flex flex-col gap-1.5 min-w-0">
+          <Title>People</Title>
+          <div className="grid grid-flow-col grid-rows-8 @[34rem]:grid-rows-5 gap-x-4 gap-y-1">
+            {people.map(p => {
+              const v = by === 'count' ? p.count : p.seconds;
+              return (
+                <PlainBar key={p.name} label={p.name} value={showValue(v, by)} frac={v / pMax}
+                  color={relColors[p.dominantCategory] ?? neutral} valueW={by === 'count' ? 'w-8' : 'w-14'} />
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -175,8 +309,13 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
   const [summaryMethodDraft, setSummaryMethodDraft]         = useState<string[]>([]);
   const [summaryMethodCommitted, setSummaryMethodCommitted] = useState<string[]>([]);
   const summaryMethodRef = useRef<string[]>([]);
+  // Summary Relation filter (27 Nov) — same pattern; applies to the whole Summary
+  const [summaryRelDraft, setSummaryRelDraft]         = useState<string[]>([]);
+  const [summaryRelCommitted, setSummaryRelCommitted] = useState<string[]>([]);
+  const summaryRelRef = useRef<string[]>([]);
+  const [measure, setMeasure] = useState<Measure>('count');
 
-  const [summaryData, setSummaryData] = useState<any>(null);
+  const [summaryData, setSummaryData] = useState<Summary | null>(null);
 	const [trendData, setTrendData]     = useState<TrendBucket[]>([]);
   const [dataGrain, setDataGrain]     = useState<TrendGrain>('month');
   const [loading, setLoading]         = useState(true);
@@ -185,15 +324,17 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
   // Full method universe (byMethod stays full in both modes), used both for the
   // dropdown options and to detect "all selected" so we can omit the param —
   // keeping the default view byte-identical to today.
-  const summaryAllMethods = summaryData
-    ? Object.keys(summaryData.interactions.byMethod).filter(s => s.trim())
-    : [];
+  // (27 Nov) The option lists come from every people group in the period,
+  // whatever is filtered — the Method pie now follows the filter.
+  const summaryAllMethods   = summaryData?.options.methods   ?? [];
+  const summaryAllRelations = summaryData?.options.relations ?? [];
   const trendAllMethods = [...new Set(trendData.flatMap(b => Object.keys(b.byMethod)))].filter(s => s.trim());
 
   const subsetParam = (sel: string[] | undefined, universe: string[]) =>
     sel && sel.length > 0 && sel.length < universe.length ? sel.join(',') : '';
 
   const summaryMethodParam = subsetParam(summaryMethodCommitted, summaryAllMethods);
+  const summaryRelParam    = subsetParam(summaryRelCommitted, summaryAllRelations);
   const pInteractions = subsetParam(tabMethodCommitted['interactions'], trendAllMethods);
   const pUnique       = subsetParam(tabMethodCommitted['people'],       trendAllMethods);
   const pRelation     = subsetParam(tabMethodCommitted['relationType'], trendAllMethods);
@@ -208,6 +349,7 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
           metric: 'interactions.summary',
           mode: 'summary',
           ...(summaryMethodParam && { method: summaryMethodParam }),
+          ...(summaryRelParam    && { relation: summaryRelParam }),
         }, globalFilter)}`
       : `/api/insights/stats?${buildParams({
           metric: 'interactions.trend',
@@ -230,13 +372,14 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
 				setLoading(false);
 			})
 			.catch(() => { setError('Failed to load data.'); setLoading(false); });
-	}, [globalFilter, viewMode, grain, effectiveBuckets, committedRelType, committedMethod, pInteractions, pUnique, pRelation, summaryMethodParam]);
+	}, [globalFilter, viewMode, grain, effectiveBuckets, committedRelType, committedMethod, pInteractions, pUnique, pRelation, summaryMethodParam, summaryRelParam]);
 
   // Keep refs in sync with draft state
   useEffect(() => { top7RelTypeRef.current = top7RelType; }, [top7RelType]);
   useEffect(() => { top7MethodRef.current  = top7Method;  }, [top7Method]);
   useEffect(() => { tabMethodRef.current   = tabMethodDraft; }, [tabMethodDraft]);
   useEffect(() => { summaryMethodRef.current = summaryMethodDraft; }, [summaryMethodDraft]);
+  useEffect(() => { summaryRelRef.current = summaryRelDraft; }, [summaryRelDraft]);
 
   // Initialise all Trend selections to all-selected when trend data first loads
   useEffect(() => {
@@ -261,9 +404,12 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
   // Initialise the Summary Method filter to all-selected when summary data loads
   useEffect(() => {
     if (!summaryData) return;
-    const all = Object.keys(summaryData.interactions.byMethod).filter(s => s.trim());
+    const all = summaryData.options.methods;
     setSummaryMethodDraft(prev     => prev.length === 0 ? all : prev);
     setSummaryMethodCommitted(prev => prev.length === 0 ? all : prev);
+    const rel = summaryData.options.relations;
+    setSummaryRelDraft(prev     => prev.length === 0 ? rel : prev);
+    setSummaryRelCommitted(prev => prev.length === 0 ? rel : prev);
   }, [summaryData]);
 
 	// Resolved range — the control states a count, this line states the span.
@@ -297,30 +443,20 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
   const relTypeOptions  = [...new Set(trendData.flatMap(b => Object.keys(b.byRelationType)))].filter(s => s.trim());
   const methodOptions   = trendAllMethods;
 
-  // Summary colour maps (relation type + method), shared across both columns and
-  // the People table dot so each category keeps one colour. Auto-assigned.
-  const catColors = autoColorMap(
-    summaryData
-      ? Array.from(new Set([
-          ...Object.keys(summaryData.interactions.byCategory),
-          ...Object.keys(summaryData.people.byCategory),
-        ])).sort((a, b) => (summaryData.interactions.byCategory[b] ?? 0) - (summaryData.interactions.byCategory[a] ?? 0))
-      : [],
-    isDark,
-  );
-  const methodColors = autoColorMap(
-    summaryData
-      ? Array.from(new Set([
-          ...Object.keys(summaryData.interactions.byMethod),
-          ...Object.keys(summaryData.people.byMethod),
-        ])).sort((a, b) => (summaryData.interactions.byMethod[b] ?? 0) - (summaryData.interactions.byMethod[a] ?? 0))
-      : [],
-    isDark,
-  );
-
   // Summary Method filter row — between the header line and the contents
+  // (27 Nov) Count / Time on the left; Relation and Method on the right.
   const summaryMethodRow = summaryAllMethods.length === 0 ? null : (
-    <div className="flex justify-end pb-2 -mt-1">
+    <div className="flex items-center justify-between gap-2 flex-wrap pb-2 -mt-1">
+      <Segmented<Measure> value={measure} onChange={setMeasure}
+        options={[['count', 'Count'], ['time', 'Time']]} />
+      <div className="flex items-center gap-2">
+      <MultiSelectDropdown
+        label="Relation"
+        options={summaryAllRelations}
+        selected={summaryRelDraft}
+        onChange={setSummaryRelDraft}
+        onClose={() => setSummaryRelCommitted([...summaryRelRef.current])}
+      />
       <MultiSelectDropdown
         label="Method"
         options={summaryAllMethods}
@@ -328,6 +464,7 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
         onChange={setSummaryMethodDraft}
         onClose={() => setSummaryMethodCommitted([...summaryMethodRef.current])}
       />
+      </div>
     </div>
   );
 
@@ -358,24 +495,7 @@ export function InteractionsWidget({ globalFilter }: WidgetProps) {
           {!summaryData ? (
             <p className="text-xs text-stone-400 dark:text-zinc-500">No data</p>
           ) : (
-            <div className="flex flex-col gap-4">
-              {/* Row 1: interactions (left) + unique people (right) */}
-              <div className="grid grid-cols-2 gap-x-4 divide-x divide-stone-100 dark:divide-zinc-800">
-                <div className="flex flex-col gap-3">
-                  <BigStat value={summaryData.interactions.total} label="interactions" />
-                  <BarSection title="Relation Type" data={summaryData.interactions.byCategory} colorMap={catColors}    isDark={isDark} />
-                  <BarSection title="Method"        data={summaryData.interactions.byMethod}   colorMap={methodColors} isDark={isDark} />
-                </div>
-                <div className="flex flex-col gap-3 pl-4">
-                  <BigStat value={summaryData.people.total} label="unique people" />
-                  <BarSection title="Relation Type" data={summaryData.people.byCategory} colorMap={catColors}    isDark={isDark} />
-                  <BarSection title="Method"        data={summaryData.people.byMethod}   colorMap={methodColors} isDark={isDark} />
-                </div>
-              </div>
-
-              {/* Row 2: full-width People — ranks 1–5 left, 6–10 right, joint-normalised */}
-              <PeopleBars topPeople={summaryData.topPeople ?? []} colorMap={catColors} isDark={isDark} />
-            </div>
+            <SummaryView data={summaryData} by={measure} isDark={isDark} />
           )}
         </>
       ) : (

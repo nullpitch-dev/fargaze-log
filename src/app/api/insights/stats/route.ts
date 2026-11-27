@@ -93,7 +93,8 @@ export async function GET(req: NextRequest) {
       filter['activity.crossActivity'] = { $in: crossActivities };
     }
 		const docs = await Log.find(filter).lean();
-    const summary = computeInteractionsSummary(docs, summaryMethod);
+    const summaryRelation = sp.get('relation')?.split(',').filter(Boolean) ?? [];
+    const summary = computeInteractionsSummary(docs, summaryMethod, summaryRelation);
     return NextResponse.json({ summary });
   }
 
