@@ -54,7 +54,7 @@ export interface Seg { key: string; label: string; value: number; color: string;
  * on top of the legend it is explaining.
  */
 // (27 Nov) Legend to the RIGHT of the pie, wrapping below it when the cell is
-// too narrow; legend text 11 px (was 9) and the pie 76 px (was 56) — for every
+// too narrow; legend text 10 px (was 9) and the pie 76 px (was 56) — for every
 // widget that uses it (Sleep, Bowel, Journeys, Interactions).
 export function MetricPieBlock({ segments, title, size = 76, isDark, flip = false, unit = 'day', legendCols = 1, legendDetail }: {
   segments: Seg[]; title: string; size?: number; isDark: boolean; flip?: boolean;
@@ -126,7 +126,7 @@ export function MetricPieBlock({ segments, title, size = 76, isDark, flip = fals
             }}
             onMouseEnter={() => setHoverKey(s.key)}>
             <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.color }} />
-            <span className="text-[11px] leading-tight text-stone-500 dark:text-zinc-400 whitespace-nowrap">
+            <span className="text-[10px] leading-tight text-stone-500 dark:text-zinc-400 whitespace-nowrap">
 						  {s.label} {total ? Math.round((s.value / total) * 100) : 0}%
               {legendDetail && <span className="text-stone-400 dark:text-zinc-500"> · {legendDetail(s)}</span>}
             </span>

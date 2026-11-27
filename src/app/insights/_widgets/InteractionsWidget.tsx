@@ -121,6 +121,7 @@ interface Summary {
 // The right-hand cell of each row carries the dividing line, so the two
 // grids below read as one pair of columns.
 const SPLIT = '[&>*:nth-child(even)]:border-l [&>*:nth-child(even)]:border-stone-100 dark:[&>*:nth-child(even)]:border-zinc-800';
+const SHOWN_ROWS = 6;
 const valueOf = (m: M, by: Measure) => (by === 'count' ? m.count : m.seconds);
 const showValue = (v: number, by: Measure) => (by === 'count' ? v.toLocaleString() : formatDuration(v));
 
@@ -170,6 +171,9 @@ function TrackBar({ label, value, pct, frac, color, isDark, labelW = 'w-14', val
 
 function SummaryView({ data, by, isDark }: { data: Summary; by: Measure; isDark: boolean }) {
   const [open, setOpen] = useState<Set<string>>(new Set());
+  // By activity shows its first 6 lines (categories and opened activities
+  // alike); the arrow by either title unfolds the rest (27 Nov).
+  const [allRows, setAllRows] = useState(false);
   const neutral = isDark ? '#52525b' : '#a8a29e';
   const accent  = isDark ? '#2dd4bf' : '#1d4ed8';
 
@@ -210,30 +214,7 @@ function SummaryView({ data, by, isDark }: { data: Summary; by: Measure; isDark:
     const n = new Set(prev); if (n.has(c)) n.delete(c); else n.add(c); return n;
   });
 
-  // People: 15 by the chosen measure.
-  const people = [...data.topPeople]
-    .sort((a, b) => (by === 'count' ? b.count - a.count || b.seconds - a.seconds : b.seconds - a.seconds || b.count - a.count))
-    .slice(0, 15);
-  const pMax = people.length ? (by === 'count' ? people[0].count : people[0].seconds) || 1 : 1;
-
-  return (
-    <div className="@container flex flex-col gap-4">
-      {/* Rows line up across the two columns */}
-      <div className={`grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-4 gap-y-4 ${SPLIT}`}>
-        <BigStat value={data.interactions.total.count.toLocaleString()}
-          label={`interactions · ${formatDuration(data.interactions.total.seconds)}`} />
-        <div className="pl-4"><BigStat value={data.people.total.toLocaleString()} label="unique people" /></div>
-
-        {pieRow('Relation Type', data.interactions.byCategory, data.people.byCategory, relColors)}
-        {pieRow('Method', data.interactions.byMethod, data.people.byMethod, metColors)}
-      </div>
-
-      {/* By activity — same two columns; tap a category for its activities */}
-      {cats.length > 0 && (
-      <div className={`grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-4 gap-y-1 -mt-1 ${SPLIT}`}>
-        <div className="min-w-0 pb-0.5"><Title>By activity</Title></div>
-        <div className="min-w-0 pb-0.5 pl-4"><Title>By activity</Title></div>
-        {cats.map(c => {
+  const activityRows = cats.flatMap(c => {
           const isOpen = open.has(c.category);
           const items = [...c.items].sort((a, b) => valueOf(b.interactions, by) - valueOf(a.interactions, by));
           return [
@@ -262,7 +243,43 @@ function SummaryView({ data, by, isDark }: { data: Summary; by: Measure; isDark:
               </div>,
             ]) : []),
           ];
-        })}
+  });
+  const rowCount = activityRows.length / 2;   // two cells per line
+
+  // People: 15 by the chosen measure.
+  const people = [...data.topPeople]
+    .sort((a, b) => (by === 'count' ? b.count - a.count || b.seconds - a.seconds : b.seconds - a.seconds || b.count - a.count))
+    .slice(0, 15);
+  const pMax = people.length ? (by === 'count' ? people[0].count : people[0].seconds) || 1 : 1;
+
+  return (
+    <div className="@container flex flex-col gap-4">
+      {/* Rows line up across the two columns */}
+      <div className={`grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-4 gap-y-4 ${SPLIT}`}>
+        <BigStat value={data.interactions.total.count.toLocaleString()}
+          label={`interactions · ${formatDuration(data.interactions.total.seconds)}`} />
+        <div className="pl-4"><BigStat value={data.people.total.toLocaleString()} label="unique people" /></div>
+
+        {pieRow('Relation Type', data.interactions.byCategory, data.people.byCategory, relColors)}
+        {pieRow('Method', data.interactions.byMethod, data.people.byMethod, metColors)}
+      </div>
+
+      {/* By activity — same two columns; tap a category for its activities */}
+      {cats.length > 0 && (
+      <div className={`grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-4 gap-y-1 -mt-1 ${SPLIT}`}>
+        {[0, 1].map(side => (
+          <div key={`head-${side}`} className={`min-w-0 pb-0.5 flex items-center gap-1 ${side ? 'pl-4' : ''}`}>
+            <Title>By activity</Title>
+            {rowCount > SHOWN_ROWS && (
+              <button type="button" onClick={() => setAllRows(v => !v)}
+                aria-label={allRows ? 'Show fewer' : 'Show all'}
+                className="text-[10px] leading-none px-1 rounded text-stone-400 dark:text-zinc-500 hover:bg-stone-100 dark:hover:bg-zinc-800">
+                {allRows ? '▴' : '▾'}
+              </button>
+            )}
+          </div>
+        ))}
+        {activityRows.slice(0, allRows ? undefined : SHOWN_ROWS * 2)}
       </div>
       )}
 
