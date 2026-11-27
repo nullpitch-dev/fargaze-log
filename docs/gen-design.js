@@ -16,7 +16,7 @@ const C = (...xs) => xs.forEach(x => children.push(x));
 C(
   new Paragraph({ children: [new TextRun({ text: "FarGaze Log", bold: true, size: 48 })], spacing: { after: 120 } }),
   new Paragraph({ children: [new TextRun({ text: "Data Design & Requirements Document", size: 32 })], spacing: { after: 60 } }),
-  new Paragraph({ children: [new TextRun({ text: "Version 4.37  |  25 November 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
+  new Paragraph({ children: [new TextRun({ text: "Version 4.39  |  27 November 2026  |  Hyoje / Claude", size: 24 })], spacing: { after: 240 } }),
 );
 C(p([new TextRun({ text: "Structure: ", bold: true }), new TextRun("Part I Foundations · Part II Data · Part III Features · Part IV Operations · Appendices. The body is the complete, always-current source of truth; the changelog below carries one line per version. Work status, open questions and the backlog live in the separate WBS, not here.")]));
 
@@ -75,6 +75,8 @@ C(table(
     ["4.28","7 Nov 2026","67.8 PLACE DETAILS “A - B” DONE (pushed 7 Nov, §15.5.9) and PLACE POINTS PAGE TOOLS (§15.5.10), shaped by Hyoje’s testing the same day. A name uses the point of the longest name that has one (src/lib/places/details.ts); Place points counts each record once under the point it uses, ‘12 (5 with details)’, and the detail names open under the row; renaming a point carries everything under it — records, favourite periods and child points — with a regular-expression sheet step; refused: a child point landing on a name already taken (merge too) and a new name that starts with the old one and “ - ”. Journeys joins legs and finds workplaces by the point’s place. The page: Note out of the table, a Changed column, foldable parts (Places open, the rest folded, remembered per browser), Missing points (3 / 6 / 12 months or all; names with no point listed under A; + Add point, Exclude, Rename) and Excluded with Put back (admin_settings.pointExcluded, §6.13). Rename a name with no point: exact text in Place / From / To and favourite periods, preview, Undo (e.g. ‘Brooklands College 302’ → ‘Brooklands College - 302’). Hyoje does not want Location filled automatically for 이동 records"],
     ["4.29","8 Nov 2026","#70 DONE: STEP 4, THE FIND & REPLACE PAGE (§15.6.3), tested by Hyoje on fargaze-log-test and pushed (15b643a). /records/replace in the gear menu: field, match, Find with values already used, Replace with, optional dates and activity, a Preview button; rows show date · activity · before → after and open the record pane; a Saved screen with Mark repeated and Undo. Items (purchase item and unit, food and drink item) can now be replaced as part of the text; a food or drink part replace is refused when the text appears in any record’s ingredients, which the sheet cell also holds. The step-2 routes had not been saved as built (the preview code sat at /api/records/replace, apply was not routed); now /api/records/replace (fields, used values, apply) and /preview. SHEET STEPS everywhere: the counts to expect in bold, the text to find and to put copied with a click (src/app/_components/SheetSteps.tsx). THE MIDDAY RULE: all-day records resolve 집 / 회사 / 사이트 / 내차 at 12:00 on their date (§15.5.6). Place points Delete now counts records as the list does (a favourite label with the point’s own name no longer blocks it)"],
     ["4.30","8 Nov 2026","#67.5 RENAME AND MERGE FOR THE REFERENCE LISTS (new §15.5.11), asked for by Hyoje on 8 Nov for his People-type clean-up (from an activity perspective to a person perspective: 친목 → 친구, 업무친목 → 업무친구, 업무지인 merged into 업무친구; 경조사 to be split record by record later). The nine reference lists now follow like activities: a new value renames, a value the list already has merges (the old row is deleted, records take the kept value — records are changed, never deleted); preview, one change-list entry, Undo until the next migration (a merge only before the tick). People lists: the dropdown combinations (가족|친목, no records) follow the rename; sheet steps for BB / BC are a regular expression matching the value as a whole | part, run twice; groups that end up side by side with the same method and type (업무친구|업무친구) are left as they are, because the migration reads them as the same people. Undo keeps, per record, exactly which fields changed (extra.hits). Values the code looks for are locked both ways. New src/lib/admin/renameRef.ts. Tested by Hyoje on fargaze-log-test and in production 8 Nov (92a2139). Ingredients, alcohol items and bowel values: after cutover (WBS 67.9). The #71 entry-app design was started and parked the same morning"],
+    ["4.39","27 Nov 2026","VERCEL CPU (new §15.9.7): the free plan’s 4 hours of Active CPU ran short after daily use began (10–18 min a day); Pro taken; Today’s links no longer prefetch, the offline warm-ups are rarer and skip fresh copies, the middleware no longer runs for /api (every route checks the sign-in itself; the old debug routes too), the Google library loads only when an event is sent. DAILY-USE FIXES (§15.7.15): the Repeat number boxes can be cleared; on a copy, Start’s Now is red when the copied start has passed and blue when it is still to come. SWIPE (new §15.10.2): on a phone, Day / 3 days / Week / Month, search’s Month mode and Today’s side calendar move to the next or previous period with a sideways swipe. THE SIDE CALENDAR: the right height when Today is scrolled, and ☰ for the Calendar’s filters."],
+    ["4.38","26 Nov 2026","GOOGLE CALENDAR SYNC FROM THE APP (new §15.9; §13’s Apps Script retired): a ‘Google Calendar · Family’ tick on the form; one way, the app → Google, in the background after each save, on Today / Calendar loads and nightly (Vercel Cron); a plan’s event moves to its record; old Apps Script events taken over when their record changes; exact times with each point’s own zone. THE CALENDAR’S HIDE LIST (new §15.10): the category ticks replaced by entries ‘category – activity | All’ for records, plans or both, with the fixed switches, ticked = hidden; hidden activity names and category colours moved to /admin/calendar-settings. A refused press settled elsewhere leaves Waiting to send (§15.7.15). The build’s type check kept under its memory limit (§15.9.6)."],
     ["4.37","25 Nov 2026","RENAME AND MERGE FOR INGREDIENTS, ALCOHOL ITEMS AND BOWEL VALUES (WBS 67.9, new §15.5.12): as for the reference lists — type a new name (rename) or another row’s name (merge), preview, past records and open plans follow, Undo; no sheet steps. SPEED AND A WEAK SIGNAL (new §15.7.14): a tap on an in-app link no longer hangs with a weak signal (the service worker gives up on the RSC request after 2.5 s / 0.4 s, so the page loads itself from the saved copy); Copy recent’s search results are saved for offline; the form’s suggestion lists are kept in the database (entry_cache) and on the phone, so New / Edit open at once; Today’s reads run together, with two new indexes on log; [timing] lines in the server log."],
     ["4.36","25 Nov 2026","REPEATS COMPLETE (§15.7.12). A record’s edit form has the repeat field: a record made to repeat starts the repeat on its date and counts as that day’s occurrence (doneAs); it can be saved with nothing else changed. A record that came from a repeat shows the repeat greyed, with ‘change or stop it from one of its plans’ (GET /api/entry/repeats?record=<id> → ruleOfRecord). Today’s long press on a repeating plan offers Delete this event / Delete this and following events / Delete all events (Today’s items carry repeatId and occurrence). Fixes: Custom… ‘After 10 times’ left as shown saved 1 time; every 2+ weeks now made about 13 months ahead too (every 4 weeks looked as if it stopped)."],
     ["4.35","25 Nov 2026","REPEATS AS GOOGLE CALENDAR DOES THEM (new §15.7.12), built 24–25 Nov. ‘Does not repeat ▾’ under Start / End on the New form and a plan’s form: Daily, Weekly on (the day), Monthly on day N, Monthly on the Nth / last (weekday), Annually on (the date), Annually on 음력 (the lunar date), Every weekday, Custom… (every N days / weeks / months / years, weekday chips, monthly by day or by weekday, Ends never / on / after N times). Two things Google lacks: yearly on a LUNAR date (Korean lunar calendar from Intl ‘dangi’; birthdays, 제사, 설, 추석) and monthly on day N moved off a weekend to the Friday before or the Monday after (salary, a bill); plus Count as done. Changing or deleting a repeating plan asks This event / This and following events / All events. Repeats two weeks or more apart are made about 13 months ahead (closer ones 60 days). Fixes: repeat actions opened from the Calendar did nothing (24 Nov); an end date now removes plans after it. CALENDAR (§14.5, §15.7.13): Day / 3 days / Week rewritten as Google Calendar draws overlaps — columns, a piece layered only when its titles would not clash, widened over free columns; Back no longer returns to a saved form; Calendar search results as Schedule or Month, with matching open plans under Coming up, counted apart."],
@@ -2067,6 +2069,7 @@ C(
 
 // ===== 13. GOOGLE CALENDAR SYNC =====
 C(h1("13. Google Calendar Sync"));
+C(note("Retired: Hyoje stopped this Apps Script when the sheet was frozen (14 Nov 2026). Since 26 Nov the app itself sends records and plans to Google Calendar — see §15.9. The section is kept as the record of how the old events were made (their IDs are in sync.eventId)."));
 C(p("A Google Apps Script pushes selected Active and Future rows into a Google Calendar. It predates the FarGaze Log project and is documented here from v4.3 because it reads and writes source-sheet columns by position, which makes it sensitive to any column insertion. It is independent of MongoDB \u2014 nothing in this section affects migration or the dashboards."));
 
 C(h2("13.1 Where the Script Lives"));
@@ -2670,6 +2673,13 @@ C(
   bullet("Timings in the server log: ‘[timing] home N ms: repeats …, reads …, planned ends …’ and ‘[timing] form values worked out in N ms’. A slow first open after a quiet spell can still be the server waking"),
 );
 
+C(h3("15.7.15 Fixes from Daily Use (26 Nov, v4.38)"));
+C(
+  bullet("Repeat → Custom (Hyoje, 27 Nov): ‘Repeat every’, ‘After … times’, the day of the month and the 음력 month / day could not be emptied — every key put 1 back, so 1 → 2 meant typing 12 and deleting the 1. Each is now a NumField (RepeatPicker.tsx): it holds what is typed, even empty, passes on each valid number, and on leaving puts back the nearest allowed number (empty → the last valid one)"),
+  bullet("Copy recent’s Now (Hyoje, 27 Nov): a copy keeps the source’s start time, and he often changes it to Now. On a copied record Start’s Now button is red (solid border) while the start has passed — a plan would need a later date — blue while it is still to come, and plain in the current minute or once pressed. Checked every 20 s; an all-day copy compares the date (RecordEditor startVsNow)"),
+  bullet("Waiting to send (Hyoje, 26 Nov): End now on 식사 was refused (Foods missing) and kept in Waiting to send; he then filled the record in and ended it on its form, but the refused press stayed. Now, when Today loads fresh (not the saved copy), a REFUSED press that something else has settled is dropped: an End for a record no longer open (not In progress or Ongoing), a Start for a plan no longer in Coming up. A press still waiting to be sent is never touched (entry/page.tsx dropSettled)"),
+);
+
 C(h2("15.8 Export (WBS #72) and the Freeze (#74), v4.33"));
 C(p("Designed 12 Nov, built and proven 13 Nov, the sheet frozen 14 Nov. With it Hyoje stopped repeating his records in the sheet: the app is fully running and the database is the only place records are entered."));
 C(h3("15.8.1 Decisions (Hyoje, 12–13 Nov)"));
@@ -2721,6 +2731,85 @@ C(
 C(new Paragraph({ children: [new TextRun({ text: "Appendices", bold: true, size: 28 })], spacing: { before: 280, after: 140 } }));
 
 // ===== APPENDICES =====
+C(h2("15.9 Google Calendar Sync from the App (WBS #75, v4.38)"));
+C(p("Designed with Hyoje and built on 26 Nov 2026, tested by him on production the same day (a plan made, edited, started and unticked). It replaces the Apps Script of §13, which he stopped when the sheet was frozen. Not mission critical, so tried on production rather than the test site."));
+C(h3("15.9.1 Decisions (Hyoje, 26 Nov)"));
+C(
+  bullet("One way only: the app → Google. The app never reads Google back; an event changed in Google is put back by the app’s next save. Only events the app made or took over are touched — other family events never"),
+  bullet("A tick on the form: ‘Google Calendar · Family’ (New, plan and edit forms; Time section). Family only for now; the calendar is chosen per record (sync.calendar), so more can be added later (calendars.ts) without a data change. Copy keeps the tick"),
+  bullet("The event: title = the title, else the activity name; Location = the place, or Someone else’s place when the place is empty or ‘na’; Description = ‘People: 윤희, 윤지 (대면) · 철수 (웹콜)’ (names with the same method together, the relationship type dropped; not guests — Google needs email addresses) then the notes"),
+  bullet("Time zones (the trouble with the Apps Script): each point is the record’s own wall-clock time written with its own offset (2026-07-01T09:30:00+01:00), so the moment is exact; timeZone is the zone code’s IANA zone, which only decides how Google shows it. Start and end carry their own zones (a London → Seoul flight). All day → an all-day event, Google’s end date the day after the last day. Still going with no planned end, a moment (end = start) or a broken old end: 30 minutes (Google refuses an empty range). A plan’s end is its planned end"),
+  bullet("Repeats: the tick belongs to the repeat; changing it asks This / Following / All like any change. Each plan is its own Google event (not a Google series: 음력 and the weekend shift can’t be one), so repeats are changed in the app. ‘All events’ leaves plans changed by hand alone, as for every field"),
+  bullet("Old events (232 records and 31 open plans held Apps Script event IDs on 26 Nov): taken over the first time their record changes, never before; then they get the new title and description. An unticked record holding an old event ID loses that event when it is next edited"),
+  bullet("Access: the service account the export uses, with ‘Make changes to events’ on the shared calendar; no Google sign-in"),
+);
+C(h3("15.9.2 How It Works"));
+C(table(["Part","What it does"],[
+  ["src/lib/gcal/event.ts","eventOf(doc, zones) — pure: the event (summary, location, description, start, end) or why not (no start date, no offset for the zone). calendarOf(doc): the calendar key when sync.export is ‘Y’. peopleText, offsetText (+5.5 → +05:30)"],
+  ["src/lib/gcal/google.ts","The Calendar API (googleapis’ Calendar part only, §15.9.6): insertEvent, patchEvent (old events too; a gone one → 404 / 410, then a new one), removeEvent (gone already is fine), canReach. Busy answers tried twice more. Settings: GCAL_FAMILY_ID; the key from GOOGLE_SERVICE_ACCOUNT_JSON (Vercel) or GOOGLE_SERVICE_ACCOUNT_FILE (scripts). A calendar with no ID is not synced (test.log)"],
+  ["src/lib/gcal/sync.ts","syncCalendar(userId): a lock (gcal_state, 2 minutes; a second run asks the first to go round again); looks at records and plans changed since the cursor (updatedAt, new index), the trash, failed rows and every plan with an event; for each: wanted (ticked; a record, or an open plan) → insert, take over or patch (skipped when the sha1 of what was sent is the same); not wanted → remove. Wanted ones go first, so an event a document is leaving is taken over, not removed. At most 30 Google calls or 20 s a run; the rest waits for the next run. syncAfter (after each write route, next/server after()), syncSoon (Today / Calendar loads, every 30 s at most)"],
+  ["gcal_events, gcal_state","One row per document with an event: docId, kind, calendar, eventId, hash, repeatId / occurrence, error / tries (retried until 8). The record’s sync.eventId is only a hint written beside it — the sync never rewrites a record, so it can’t race an edit"],
+  ["/api/cron/gcal","Nightly at 03:17 UTC (vercel.json crons; Vercel sends CRON_SECRET; not behind the sign-in): the last 3 days again and every event’s document, so a record gone for good loses its event. Not in the export Action: that uses the read-only database user"],
+  ["scripts/gcal.ts","npm run gcal: set up?, can the service account reach the calendar, how many records / plans are ticked or hold an event ID, the last run and failures; writes nothing. --run (one run now), --run --days 3 (as the nightly)"],
+  ["Form","RecordForm.calendar ('family' | ''); fromRecord ticks it from sync.export ‘Y’; buildRecord writes sync.export / sync.calendar and keeps status and eventId; a form without the field (old presets, repeats) leaves the record as it was; an edit that only changes the tick is a change (calendarChanged). Undo of a delete puts the record back with updatedAt now, so the sync sees it"],
+],[2400,6960]));
+C(spacer());
+C(h3("15.9.3 How an Event Follows Its Record"));
+C(table(["What happens","The event"],[
+  ["A plan starts or is done","Its record takes the plan’s event (the copied sync.eventId, or plan.recordId); patched, not made again"],
+  ["A record goes back to Coming up","The plan takes the record’s event"],
+  ["A repeat’s plan dropped and made again for the same day","The new plan takes the old one’s event (repeatId + occurrence)"],
+  ["Unticked, deleted, a plan deleted","Removed. Undo or restore makes a new one"],
+  ["A copy","Its own event"],
+  ["A Google failure","Kept on the row and tried again on the next runs"],
+],[3400,5960]));
+C(spacer());
+C(h3("15.9.4 Setting Up (done 26 Nov)"));
+C(
+  num("Google Cloud: the Google Calendar API turned on in the service account’s project"),
+  num("Google Calendar (on a computer): Family → Settings and sharing → Share with specific people → the service account’s client_email, ‘Make changes to events’; the Calendar ID from Integrate calendar"),
+  num("Vercel, the log.fargaze.co project only: GCAL_FAMILY_ID, GOOGLE_SERVICE_ACCOUNT_JSON (the whole key file), CRON_SECRET. Settings take effect at the next deployment"),
+  num(".env.local: GCAL_FAMILY_ID; npm run gcal → ‘reach the calendar: ok (Family …)’"),
+);
+C(h3("15.9.5 Tested"));
+C(
+  bullet("event.ts: 35 checks through the real form builder — BST, GMT, KST, IST +5:30, a London → Seoul flight, both summer-time change days, all-day over the new year and on 29 Feb, still going, planned ends, place / someone else’s place, people, untick, old records"),
+  bullet("sync.ts on a copy against in-memory stand-ins for the database and Google: 38 checks — every row of §15.9.3, old events, 40 at once (30 then 10, no duplicates), the lock, not set up, the nightly clean-up"),
+  bullet("By Hyoje on production (26 Nov): a plan made with the tick, edited, started, unticked. Not tried: editing an old Apps Script record"),
+);
+C(h3("15.9.6 The Build’s Memory (26 Nov)"));
+C(p("npm run build stopped with ‘JavaScript heap out of memory’ on Hyoje’s WSL machine: the type check had used about 1.6 GB, and importing the whole googleapis library for the Calendar types took it to about 2.0 GB, Node’s limit there. google.ts imports googleapis/build/src/apis/calendar only (back to 1.6 GB), and the build script gives Node 4 GB (NODE_OPTIONS=--max-old-space-size=4096 in package.json). Even the code before 26 Nov failed a build held to 2 GB, so the margin was already thin."));
+
+C(h3("15.9.7 Vercel’s CPU and the Pro Plan (26 Nov, v4.39)"));
+C(p("Vercel warned that the free plan’s 4 hours of Fluid Active CPU (30 days) were 90 % used. Daily use since 10–12 Nov ran at 10–18 minutes a day, so the free plan could not carry it (5–9 hours a month); about a quarter was the middleware. Hyoje took Pro the same day ($20 a month with $20 of usage credit; billed on the 26th; a spend limit set). Observability (12 hours) showed the background work as the largest part, and it was cut:"));
+C(
+  bullet("Today’s links (plans → /entry/plan/<id>, records → /records/<id>, + New, presets) have prefetch={false}: Next.js had been asking the server for every plan’s page in the background (352 times in 12 hours)"),
+  bullet("Offline warm-ups: Today’s item warm-up every 2 hours (was 20 minutes), records still going + 8 recent (no Done list); the page-change refresh every 30 minutes (was 5) and no longer fetches again what the page has just loaded; Copy recent saves its top 6 results (was 12); sw.js skips a copy saved within 6 hours (one record, plan or stamp; pages) or 30 minutes (lists) — x-offline-saved"),
+  bullet("The middleware’s matcher leaves out /api/: every API handler checks the session itself (requireUser / auth(); checked one by one); the old debug routes db-stats, data-check, test-sheets and health got their own check (db-stats returned a sample record). Pages still redirect to the sign-in"),
+  bullet("The Google Calendar sync: src/lib/gcal/config.ts holds the settings; googleapis is imported only when an event is sent; syncSoon at most every 2 minutes"),
+  bullet("Tested: a production build run without a sign-in — every API route 403, /entry redirected; the sync’s 38 checks again. Building itself does not count: Active CPU is the functions’ CPU only"),
+);
+
+C(h2("15.10 The Calendar’s Hide List (v4.38)"));
+C(p("Asked for by Hyoje on 26 Nov: the category list was long and rarely used, and he wanted to hide at the activity level, records and plans apart (아침 준비 means something as a record, not as a repeated plan)."));
+C(
+  bullet("The filter panel: Time zone, Activity type, then Hide — the fixed switches first (Reading & study, 평일 업무, 음료 @ 집, 회사, 사이트, 2단지; the old ‘Rows’), then his own entries ‘category – activity’ or ‘category – All’, each for Records, Plans or Both. In Hide a tick means hidden (the Rows ticks meant shown before). An entry keeps its tick (switched off for a while) and a × to remove it. Add: category → activity or All → Both / Records / Plans → Hide; adding one already there ticks it again"),
+  bullet("Where it applies: every Calendar view, the Year counts, Calendar search (records and plans each by their own entries) and the side calendar. Today’s Coming up never uses it — a hidden plan still shows there"),
+  bullet("Carried over: categories ticked off before became ‘<category> – All · Both’ entries (until the list is first saved, the API makes them from hiddenCategories, which is kept for that only)"),
+  bullet("Moved to /admin/calendar-settings (linked under ‘Calendar’ at the bottom of /admin): Hidden activities (exact names, records and plans, every view and search; Today not affected) and Category colours. The Calendar now saves only the fields changed in its panel, so an open Calendar can’t put back old colours or names"),
+  bullet("Code: src/lib/calendar/hides.ts (HideEntry { category, name | null, scope, on }; isHiddenBy, hidesFrom, parseHides, hidesParam); calendar_settings.hides; EventFilters.hides / plans (buildPlanEvents sets plans); applyFilters(events, hides, …); /api/calendar and /api/calendar/search take hides=[[category, name, scope], …]; /api/calendar/options adds activities (the Activities list) for the picker"),
+  bullet("Tested: 14 checks of the rules on the page and server paths; rendered at 344 px and 1280 px; saving sends only the Hide list"),
+);
+
+C(h3("15.10.2 Swipe and the Side Calendar (27 Nov, v4.39)"));
+C(
+  bullet("Swipe (Hyoje, 27 Nov: ‘A for now’ — a simple swipe, not Google’s follow-the-finger): on a phone, a mostly sideways slide of at least 60 px within 0.8 s moves Day, 3 days, Week, Month and search’s Month mode to the next period (finger to the left) or the previous one (to the right), and the new period slides in. Not Year, Schedule or the search list; not while a pop-up is open. Up-and-down scrolling and short slides are left alone; a tap on an event still opens it (a moved finger makes no click; one just after a swipe is swallowed)"),
+  bullet("How: src/app/calendar/_lib/useSwipe.ts on a wrapper around the view — touch events, not pointer events (the browser cancels pointer events once it scrolls the hours). The area and everything inside it is touch-action: pan-y pinch-zoom: without it a slide to the right was taken by the browser as its own gesture and its end never arrived. Tested with simulated touches in every view, both ways"),
+  bullet("Today’s side calendar swipes by day the same way (not while the day picker or the filters are open)"),
+  bullet("Side calendar height (bug, 27 Nov): TimeGridView measured its room from the top of the page; in the side calendar, which stays put while Today scrolls, a change on the page while scrolled cut it short. pinned (SideCalendar) measures from the top of the screen and again on scroll"),
+  bullet("☰ on the side calendar (Hyoje, 27 Nov): the Calendar’s Activity type and Hide list in a small panel, with a count of what is hidden; changes show at once and are saved for the Calendar too (only the fields changed). No Time zone there: the side calendar uses the phone’s (CalendarFilters onTz optional)"),
+);
+
 C(h1("Appendix A — Conventions & Patterns"));
 C(p("Durable engineering conventions distilled from across the project. New work should follow these."));
 
@@ -2939,7 +3028,7 @@ C(table(["Path","Purpose"],[
 C(spacer());
 
 // ===== FOOTER =====
-C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.37 — 25 November 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
+C(new Paragraph({ children: [new TextRun({ text: "FarGaze Log — Data Design & Requirements v4.39 — 27 November 2026", italics: true })], spacing: { before: 240 }, alignment: AlignmentType.CENTER }));
 
 
 // ===== DOCUMENT ASSEMBLY =====
@@ -2976,6 +3065,6 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then(buffer => {
-  fs.writeFileSync("FarGaze-Log-Data-Design-v4.37.docx", buffer);
-  console.log("Wrote FarGaze-Log-Data-Design-v4.37.docx (" + buffer.length + " bytes), " + children.length + " elements");
+  fs.writeFileSync("FarGaze-Log-Data-Design-v4.39.docx", buffer);
+  console.log("Wrote FarGaze-Log-Data-Design-v4.39.docx (" + buffer.length + " bytes), " + children.length + " elements");
 });
