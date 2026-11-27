@@ -36,6 +36,7 @@ import {
 import { MonthView, DayList } from './_components/MonthView';
 import { CalendarFilters, type FilterState } from './_components/CalendarFilters';
 import { hidesParam } from '@/lib/calendar/hides';
+import { useSwipe } from './_lib/useSwipe';
 import { MonthPicker } from './_components/MonthPicker';
 import { DayPicker } from './_components/DayPicker';
 import { TimeGridView } from './_components/TimeGridView';
@@ -402,6 +403,10 @@ function CalendarInner() {
     setCursor(new Date(Date.UTC(y, m - 1 + n, 1)).toISOString().slice(0, 10));
   };
   overlayOpen.current = !!openDay || !!record;
+  // Swipe (27 Nov): Day, 3 days, Week, Month and search's Month mode; not Year, Schedule or the
+  // search list. Not while a pop-up is open.
+  const swipeable = !openDay && !record && (view === 'day' || view === '3day' || view === 'week' || view === 'month' || searchMonth);
+  const swipe = useSwipe(swipeable ? shift : null);
 
   const unit = view === 'day' || view === '3day' ? 'day' : view === 'week' ? 'week' : view === 'year' ? 'year' : 'month';
   const title = view === 'search' ? 'Search' : view === 'year' ? String(year)
@@ -619,14 +624,14 @@ function CalendarInner() {
               {filterPanel}
             </div>
           )}
-          {mainView(true)}
+          <div {...swipe}>{mainView(true)}</div>
         </>
       ) : (
         <div className="grid gap-4" style={{ gridTemplateColumns: sidebarOpen ? '220px minmax(0, 1fr)' : 'minmax(0, 1fr)' }}>
           {sidebarOpen && (
             <aside className="overflow-y-auto pr-1" style={{ maxHeight: 'calc(100dvh - 110px)' }}>{filterPanel}</aside>
           )}
-          {mainView(false)}
+          <div {...swipe} className={`min-w-0 ${swipe.className}`}>{mainView(false)}</div>
         </div>
       )}
 

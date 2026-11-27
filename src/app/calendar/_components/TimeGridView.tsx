@@ -34,8 +34,11 @@ const COMPACT: Metrics = { hourH: 40, gutter: 30, laneH: 17, readingH: 17 };
 
 export function TimeGridView({
   dates, events, reading, showReading, today, tz, colors, isDark, compact,
-  onOpenDay, onOpenDate, onOpenEvent,
+  onOpenDay, onOpenDate, onOpenEvent, pinned = false,
 }: {
+  /** In a panel that stays put while the page scrolls (Today's side calendar): measured from
+   *  the top of the screen, not of the page (27 Nov: scrolled, the grid was cut short). */
+  pinned?: boolean;
   dates: string[];
   events: CalendarEvent[];     // filtered, reading excluded
   reading: CalendarEvent[];
@@ -62,14 +65,22 @@ export function TimeGridView({
     if (!el) return;
     const measure = () => {
       const r = el.getBoundingClientRect();
-      setAvail(Math.floor(window.innerHeight - (r.top + window.scrollY) - BOTTOM_GAP));
+      setAvail(Math.floor(window.innerHeight - (pinned ? r.top : r.top + window.scrollY) - BOTTOM_GAP));
     };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(document.body);
     window.addEventListener('resize', measure);
-    return () => { ro.disconnect(); window.removeEventListener('resize', measure); };
-  }, []);
+    // Pinned: its top moves while the page scrolls until it sticks, so measure on scroll too.
+    let raf = 0;
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; measure(); }); };
+    if (pinned) window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      ro.disconnect(); window.removeEventListener('resize', measure);
+      if (pinned) window.removeEventListener('scroll', onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [pinned]);
 
   // ── Now, refreshed every minute ──
   const [nowMs, setNowMs] = useState(() => Date.now());

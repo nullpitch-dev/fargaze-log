@@ -38,7 +38,8 @@ export function CalendarFilters({
 }: {
   tz: string;
   deviceTz: string;
-  onTz: (tz: string) => void;
+  /** Absent: no Time zone section (Today's side calendar, which uses the phone's zone). */
+  onTz?: (tz: string) => void;
   categories: { name: string; count: number }[];
   activities: { name: string; category: string }[];
   crossActivities: string[];
@@ -53,7 +54,7 @@ export function CalendarFilters({
 
   return (
     <div className="flex flex-col gap-4 text-xs">
-      <Section title="Time zone">
+      {onTz && <Section title="Time zone">
         <select value={tz} onChange={e => onTz(e.target.value)}
           className="w-full border border-stone-200 dark:border-zinc-700 rounded px-2 py-1 text-[11px] bg-white dark:bg-zinc-900 text-stone-700 dark:text-zinc-200">
           <optgroup label="Quick">
@@ -65,7 +66,7 @@ export function CalendarFilters({
             </optgroup>
           )}
         </select>
-      </Section>
+      </Section>}
 
       {crossActivities.length > 0 && (
         <Section title="Activity type">

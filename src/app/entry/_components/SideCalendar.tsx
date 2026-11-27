@@ -6,17 +6,19 @@
 // pushes Today aside; on a narrow screen (the outer screen) it covers Today, with ×.
 //   ‹ ›, the date title   another day; the title opens the day picker (DayPicker)
 //   a record              the record pane (Today's)
+//   ☰                     the Calendar's filters (Hyoje, 27 Nov): the same Activity type and
+//                         Hide list as the Calendar, saved for both; no time zone here
 // Uses the Calendar's saved filters (the Hide list, Hide's fixed switches …) and colours. Loads again
 // whenever Today does (after Start / End). Needs a signal: the Calendar isn't kept offline.
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { CalendarEvent } from '@/lib/calendar/calendar';
 import { addDays, zonedDate } from '@/lib/calendar/calendar';
 import { useIsDark } from '@/app/insights/_lib/hooks';
 import { TimeGridView } from '@/app/calendar/_components/TimeGridView';
 import { DayPicker } from '@/app/calendar/_components/DayPicker';
 import { applyFilters, isReading } from '@/app/calendar/_lib/month-layout';
-import type { FilterState } from '@/app/calendar/_components/CalendarFilters';
+import { CalendarFilters, type FilterState } from '@/app/calendar/_components/CalendarFilters';
 
 /** The picker's first year (the history starts in 2010). */
 const FIRST_YEAR = 2010;
@@ -39,6 +41,29 @@ export function SideCalendar({ reloadKey, onOpen, onClose, overlay }: {
   useEffect(() => {
     fetch('/api/calendar/settings').then(r => r.json()).then(s => { if (s && !s.error) setFilters(s); }).catch(() => {});
   }, []);
+
+  // ☰ The filters (27 Nov). The lists they choose from load the first time it opens; changes
+  // show at once and are saved — only the fields changed, as the Calendar does.
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [opts, setOpts] = useState<{ categories: { name: string; count: number }[]; activities: { name: string; category: string }[]; crossActivities: string[] } | null>(null);
+  useEffect(() => {
+    if (!filtersOpen || opts) return;
+    fetch('/api/calendar/options').then(r => r.json())
+      .then(o => setOpts({ categories: o.categories ?? [], activities: o.activities ?? [], crossActivities: o.crossActivities ?? [] }))
+      .catch(() => {});
+  }, [filtersOpen, opts]);
+  const unsaved = useRef<Partial<FilterState>>({});
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const changeFilters = (patch: Partial<FilterState>) => {
+    setFilters(prev => (prev ? { ...prev, ...patch } : prev));
+    unsaved.current = { ...unsaved.current, ...patch };
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      const body = unsaved.current; unsaved.current = {};
+      fetch('/api/calendar/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).catch(() => {});
+    }, 400);
+  };
+  const hiddenCount = filters ? filters.hides.filter(h => h.on).length + filters.hiddenCrossActivities.length : 0;
 
   const [events, setEvents] = useState<CalendarEvent[] | null>(null);
   const [error, setError] = useState('');
@@ -73,8 +98,22 @@ export function SideCalendar({ reloadKey, onOpen, onClose, overlay }: {
           <span className="text-[9px] text-stone-400 dark:text-zinc-500">▼</span>
         </button>
         {date !== today && <button onClick={() => setDate(today)} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">Today</button>}
+        <button onClick={() => setFiltersOpen(o => !o)} disabled={!filters} aria-expanded={filtersOpen}
+          aria-label="Filters" title="Filters"
+          className={`ml-auto relative w-7 h-7 rounded-full text-base leading-none hover:bg-stone-100 dark:hover:bg-zinc-800 ${filtersOpen ? 'bg-stone-200 dark:bg-zinc-800 text-stone-900 dark:text-zinc-50' : 'text-stone-500 dark:text-zinc-400'}`}>
+          ☰
+          {hiddenCount > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-0.5 rounded-full bg-blue-600 text-white text-[9px] leading-[14px]">{hiddenCount}</span>}
+        </button>
         <button onClick={onClose} aria-label="Close the calendar" title="Close"
-          className="ml-auto w-7 h-7 rounded-full text-stone-500 dark:text-zinc-400 hover:bg-stone-100 dark:hover:bg-zinc-800">×</button>
+          className="w-7 h-7 rounded-full text-stone-500 dark:text-zinc-400 hover:bg-stone-100 dark:hover:bg-zinc-800">×</button>
+        {filtersOpen && filters && (
+          <div className="absolute right-0 top-full mt-1 z-40 w-[260px] max-w-[calc(100vw-24px)] max-h-[70vh] overflow-y-auto rounded-lg border border-stone-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg p-3">
+            {opts ? (
+              <CalendarFilters tz={tz} deviceTz={tz} categories={opts.categories} activities={opts.activities}
+                crossActivities={opts.crossActivities} state={filters} onChange={changeFilters} />
+            ) : <p className="text-xs text-stone-400 dark:text-zinc-500">Loading…</p>}
+          </div>
+        )}
         {pickerOpen && (
           <DayPicker cursor={date} today={today} shown={[date]} firstYear={FIRST_YEAR}
             onPick={d => { setDate(d); setPickerOpen(false); }} onClose={() => setPickerOpen(false)} />
@@ -85,7 +124,7 @@ export function SideCalendar({ reloadKey, onOpen, onClose, overlay }: {
         : (
           <div className="flex-1 min-h-0 flex flex-col">
             <TimeGridView key={date} dates={[date]} events={others} reading={reading} showReading={filters?.showReading ?? true}
-              today={today} tz={tz} colors={filters?.colors ?? {}} isDark={isDark} compact
+              today={today} tz={tz} colors={filters?.colors ?? {}} isDark={isDark} compact pinned
               onOpenDay={() => {}} onOpenDate={setDate} onOpenEvent={onOpen} />
           </div>
         )}
