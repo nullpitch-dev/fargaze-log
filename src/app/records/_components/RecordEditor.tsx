@@ -255,6 +255,13 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
   // phone's own checks; the server checks it again when it is sent.
   const [checkOffline, setCheckOffline] = useState(false);
   const [entryOpts, setEntryOpts] = useState<EntryOptions | null>(null);
+  // A clock for the Now button's colour on a copy (27 Nov): moves on every 20 s.
+  const [clock, setClock] = useState(() => Date.now());
+  useEffect(() => {
+    if (mode !== 'new' || !copied) return;
+    const t = setInterval(() => setClock(Date.now()), 20_000);
+    return () => clearInterval(t);
+  }, [mode, copied]);
   const [laterOpen, setLaterOpen] = useState(false);
   // Planned end (Hyoje, 10 Nov): shown read-only ("Planned until 12:00 ✎ ×") until ✎.
   const [plannedOpen, setPlannedOpen] = useState(false);
@@ -888,6 +895,26 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
   };
 
   // Now / Later / End now (Hyoje, 9 Nov): the phone's time, in the list's zone code for it.
+  // Copy recent (Hyoje, 27 Nov): the copied start keeps the source's time, so Start's Now
+  // stands out until the start is now — red when that time has passed (a plan needs a later
+  // date), blue when it is still to come (fine for a plan). The same minute as now: plain.
+  const startVsNow = ((): 'past' | 'future' | null => {   // not a hook: after the early returns
+    if (mode !== 'new' || !copied || !form?.start?.date) return null;
+    const [y, mo, d] = form.start.date.split('-').map(Number);
+    if (!y || !mo || !d) return null;
+    const hm = /^(\d{1,2}):(\d{2})/.exec(form.start.hour ?? '');
+    if (!hm) {   // all day: by the date alone
+      const today = localNow(Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London', Date.now()).date;
+      return form.start.date < today ? 'past' : form.start.date > today ? 'future' : null;
+    }
+    const zoneOff = entryOpts?.zones.find(z => z.code === form.start.timezone)?.offsetUTC;
+    const off = typeof zoneOff === 'number' ? zoneOff : -new Date().getTimezoneOffset() / 60;
+    const startMin = Math.floor((Date.UTC(y, mo - 1, d, Number(hm[1]), Number(hm[2])) - off * 3_600_000) / 60_000);
+    const nowMin = Math.floor(clock / 60_000);
+    return startMin < nowMin ? 'past' : startMin > nowMin ? 'future' : null;
+  })();
+  const startNowCls = startVsNow === 'past' ? '!border-solid !border-red-500 !text-red-600 dark:!border-red-400 dark:!text-red-400'
+    : startVsNow === 'future' ? '!border-solid !border-blue-500 !text-blue-600 dark:!border-blue-400 dark:!text-blue-400' : '';
   const nowPoint = (plusMinutes = 0): RecordForm['start'] => {
     const iana = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London';
     const l = localNow(iana, Date.now() + plusMinutes * 60_000);
@@ -989,7 +1016,10 @@ export function RecordEditor({ id, mode = 'edit', initial, presetId, copied, sta
           onClick={() => patch('end', { date: f.start.date, hour: f.start.hour, timezone: f.start.timezone })}
           aria-label="End at the start time (no duration)" title="End at the start time (no duration)">= Start</button>
       )}
-      <button type="button" className={addBtn} onClick={() => (which === 'start' ? setStart(nowPoint()) : setPoint('end', nowPoint()))}>Now</button>
+      <button type="button" className={which === 'start' ? `${addBtn} ${startNowCls}` : addBtn}
+        title={which === 'start' && startVsNow === 'past' ? 'The copied start has passed: Now starts it now; a plan needs a later date'
+          : which === 'start' && startVsNow === 'future' ? 'The copied start is still to come: Now starts it now' : undefined}
+        onClick={() => (which === 'start' ? setStart(nowPoint()) : setPoint('end', nowPoint()))}>Now</button>
       {which === 'start' && (
         <span className="relative">
           <button type="button" className={addBtn} aria-expanded={laterOpen} onClick={() => setLaterOpen(v => !v)}>Later ▾</button>

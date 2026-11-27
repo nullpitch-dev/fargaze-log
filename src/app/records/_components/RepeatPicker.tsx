@@ -12,7 +12,7 @@
 // birthdays, 제사, 설, 추석); monthly on day N moved off a weekend — the Friday before or
 // the Monday after (25 Nov: salary, phone bill).
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useBackToClose } from '@/app/_components/useBackToClose';
 import { inputCls } from './fields';
@@ -186,7 +186,7 @@ function RepeatSheet({ value, date, onPick, onClose }: { value: Schedule | null;
               <h3 className="font-semibold">Custom recurrence</h3>
               <div className="flex items-center gap-2">
                 <span>Repeat every</span>
-                <input type="number" min={1} max={52} value={c.interval} onChange={e => setC({ interval: Math.max(1, Math.min(52, Number(e.target.value) || 1)) })}
+                <NumField min={1} max={52} value={c.interval} onValue={v => setC({ interval: v })}
                   className={`${inputCls} !w-16`} />
                 <select value={c.freq} onChange={e => setC({ freq: e.target.value as Freq })} className={`${inputCls} !w-auto`}>
                   {(['daily', 'weekly', 'monthly', 'yearly'] as Freq[]).map(f => (
@@ -209,8 +209,8 @@ function RepeatSheet({ value, date, onPick, onClose }: { value: Schedule | null;
               {c.freq === 'monthly' && (
                 <div className="flex flex-col gap-1.5">
                   <label className="flex items-center gap-2"><input type="radio" checked={c.monthWeek == null} onChange={() => setC({ monthWeek: null, monthWeekday: null, monthDay: c.monthDay ?? p.d })} />Monthly on day
-                    <input type="number" min={1} max={31} value={c.monthDay ?? p.d} aria-label="Day of the month"
-                      onChange={e => setC({ monthWeek: null, monthWeekday: null, monthDay: Math.max(1, Math.min(31, Number(e.target.value) || 1)) })}
+                    <NumField min={1} max={31} value={c.monthDay ?? p.d} aria-label="Day of the month"
+                      onValue={v => setC({ monthWeek: null, monthWeekday: null, monthDay: v })}
                       className={`${inputCls} !w-16`} /></label>
                   {c.monthWeek == null && (
                     <label className="flex items-center gap-2 pl-6">At a weekend
@@ -229,10 +229,10 @@ function RepeatSheet({ value, date, onPick, onClose }: { value: Schedule | null;
                   <label className="flex items-center gap-2"><input type="radio" checked={!c.lunar} onChange={() => setC({ lunar: false })} />On {p.d} {MONTH[p.m - 1]}</label>
                   {lun && (
                     <label className="flex items-center gap-2 flex-wrap"><input type="radio" checked={c.lunar} onChange={() => setC({ lunar: true })} />On 음력
-                      <input type="number" min={1} max={12} value={c.lunarMonth ?? ''} aria-label="Lunar month"
-                        onChange={e => setC({ lunar: true, lunarMonth: Math.max(1, Math.min(12, Number(e.target.value) || 1)) })} className={`${inputCls} !w-14`} />월
-                      <input type="number" min={1} max={30} value={c.lunarDay ?? ''} aria-label="Lunar day"
-                        onChange={e => setC({ lunar: true, lunarDay: Math.max(1, Math.min(30, Number(e.target.value) || 1)) })} className={`${inputCls} !w-14`} />일</label>
+                      <NumField min={1} max={12} value={c.lunarMonth ?? null} aria-label="Lunar month"
+                        onValue={v => setC({ lunar: true, lunarMonth: v })} className={`${inputCls} !w-14`} />월
+                      <NumField min={1} max={30} value={c.lunarDay ?? null} aria-label="Lunar day"
+                        onValue={v => setC({ lunar: true, lunarDay: v })} className={`${inputCls} !w-14`} />일</label>
                   )}
                 </div>
               )}
@@ -245,7 +245,7 @@ function RepeatSheet({ value, date, onPick, onClose }: { value: Schedule | null;
                 </label>
                 <label className="flex items-center gap-2">
                   <input type="radio" checked={ends === 'after'} onChange={() => setEnds('after')} />After
-                  <input type="number" min={1} value={c.count ?? 10} disabled={ends !== 'after'} onChange={e => setC({ count: Math.max(1, Number(e.target.value) || 1) })} className={`${inputCls} !w-16`} />
+                  <NumField min={1} max={999} value={c.count ?? 10} disabled={ends !== 'after'} onValue={v => setC({ count: v })} className={`${inputCls} !w-16`} />
                   times
                 </label>
               </div>
@@ -284,5 +284,35 @@ export function ScopeDialog({ title, withOne, onPick, onClose }: {
       </div>
     </div>,
     document.body,
+  );
+}
+
+/** A whole number box (Hyoje, 27 Nov: '1' could not be cleared to type '2' — the old boxes
+ *  put 1 back on every key). It holds what is typed, even empty, and passes on each valid
+ *  number; leaving the box puts back the nearest allowed number (or the last valid one). */
+function NumField({ value, min, max, onValue, disabled, className, ...rest }: {
+  value: number | null; min: number; max: number; onValue: (v: number) => void; disabled?: boolean; className?: string;
+  'aria-label'?: string;
+}) {
+  const [text, setText] = useState(value == null ? '' : String(value));
+  const [focused, setFocused] = useState(false);
+  useEffect(() => { if (!focused) setText(value == null ? '' : String(value)); }, [value, focused]);
+  return (
+    <input type="text" inputMode="numeric" pattern="[0-9]*" disabled={disabled} value={text} className={className} {...rest}
+      onFocus={() => setFocused(true)}
+      onChange={e => {
+        const t = e.target.value.replace(/[^0-9]/g, '').slice(0, 3);
+        setText(t);
+        const n = Number(t);
+        if (t && n >= min && n <= max) onValue(n);
+      }}
+      onBlur={() => {
+        setFocused(false);
+        const n = Number(text);
+        if (!text || !Number.isFinite(n)) { setText(value == null ? '' : String(value)); return; }
+        const v = Math.max(min, Math.min(max, n));
+        setText(String(v));
+        if (v !== value) onValue(v);
+      }} />
   );
 }
