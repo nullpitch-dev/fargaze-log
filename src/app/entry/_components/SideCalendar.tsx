@@ -6,6 +6,7 @@
 // pushes Today aside; on a narrow screen (the outer screen) it covers Today, with ×.
 //   ‹ ›, the date title   another day; the title opens the day picker (DayPicker)
 //   a record              the record pane (Today's)
+//   swipe                 on a phone, the next day (left) or the one before (right) — 27 Nov
 //   ☰                     the Calendar's filters (Hyoje, 27 Nov): the same Activity type and
 //                         Hide list as the Calendar, saved for both; no time zone here
 // Uses the Calendar's saved filters (the Hide list, Hide's fixed switches …) and colours. Loads again
@@ -19,6 +20,7 @@ import { TimeGridView } from '@/app/calendar/_components/TimeGridView';
 import { DayPicker } from '@/app/calendar/_components/DayPicker';
 import { applyFilters, isReading } from '@/app/calendar/_lib/month-layout';
 import { CalendarFilters, type FilterState } from '@/app/calendar/_components/CalendarFilters';
+import { useSwipe } from '@/app/calendar/_lib/useSwipe';
 
 /** The picker's first year (the history starts in 2010). */
 const FIRST_YEAR = 2010;
@@ -45,6 +47,8 @@ export function SideCalendar({ reloadKey, onOpen, onClose, overlay }: {
   // ☰ The filters (27 Nov). The lists they choose from load the first time it opens; changes
   // show at once and are saved — only the fields changed, as the Calendar does.
   const [filtersOpen, setFiltersOpen] = useState(false);
+  // Swipe (27 Nov), as in the Calendar; not while the day picker or the filters are open.
+  const swipe = useSwipe(pickerOpen || filtersOpen ? null : (dir: 1 | -1) => setDate(d => addDays(d, dir)));
   const [opts, setOpts] = useState<{ categories: { name: string; count: number }[]; activities: { name: string; category: string }[]; crossActivities: string[] } | null>(null);
   useEffect(() => {
     if (!filtersOpen || opts) return;
@@ -122,7 +126,7 @@ export function SideCalendar({ reloadKey, onOpen, onClose, overlay }: {
       {error ? <p className="text-xs text-stone-500 dark:text-zinc-400">{error}</p>
         : events === null ? <p className="text-xs text-stone-400 dark:text-zinc-500">Loading…</p>
         : (
-          <div className="flex-1 min-h-0 flex flex-col">
+          <div {...swipe} className={`flex-1 min-h-0 flex flex-col ${swipe.className}`}>
             <TimeGridView key={date} dates={[date]} events={others} reading={reading} showReading={filters?.showReading ?? true}
               today={today} tz={tz} colors={filters?.colors ?? {}} isDark={isDark} compact pinned
               onOpenDay={() => {}} onOpenDate={setDate} onOpenEvent={onOpen} />
