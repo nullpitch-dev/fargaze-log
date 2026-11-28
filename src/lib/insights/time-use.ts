@@ -6,16 +6,19 @@
 // Rules (agreed 28 Nov):
 //   • Left out: every activity whose name ends in "(기간)"; 음료 done 혼자 at
 //     집 / 회사 / 사이트 / 2단지 (the Calendar's quiet-row rule, always applied,
-//     whatever the Calendar switch says); records with no end; zero-length ones.
+//     whatever the Calendar switch says); records whose Relationship is 타인
+//     (someone else's doing, not Hyoje's — 28 Nov); records with no end;
+//     zero-length ones.
+//   • Sleep switch (28 Nov): with 수면 off, the time any 수면 record covers is
+//     taken out of the period as well — the figures are then of waking hours.
 //   • Recorded = time covered by at least one record (overlaps not counted twice).
 //   • Overlaps split evenly, moment by moment: 저녁 준비 18:00–19:00 with
 //     공부 봐주기 18:30–19:15 → 45 min and 30 min.
 //   • 평일 업무 and 휴일 근무 are BACKGROUND: whenever anything else runs, the
 //     others take that time in full (sharing evenly among themselves) and the
 //     work record gets none. What is left of the work record is "일상 업무".
-//   • 식사 / 음료 / 음주 are split by cross activity ("식사 · 업무", "식사 · 평시");
-//     출장 and 여행 aren't split (a trip is looked at through the global
-//     Activity type filter instead).
+//   • 식사 / 음료 / 음주 are split by EVERY cross activity, no exceptions
+//     ("식사 · 업무", "식사 · 평시", "식사 · 여행" … — Hyoje, 28 Nov).
 //   • Times: each record is cut to the period by its own wall clock, then the
 //     pieces are laid on real time (datetime − offset) so records logged in
 //     different zones only overlap when they really did. The current period
@@ -27,7 +30,7 @@ import { placeOf } from '@/lib/calendar/quietRows';
 export const BACKGROUND_NAMES = new Set(['평일 업무', '휴일 근무']);
 export const ROUTINE_WORK = '일상 업무';
 const MEAL_WORDS = new Set(['식사', '음료', '음주']);
-const UNSPLIT_CROSS = new Set(['출장', '여행']);
+const SLEEP_NAME = '수면';
 const QUIET_DRINK_PLACES = new Set(['집', '회사', '사이트', '2단지']);
 
 export interface TimeUseItem { name: string; seconds: number }
@@ -37,6 +40,7 @@ export interface TimeUseSummary {
   to: string;              // last day counted (today when the period runs to now)
   totalSeconds: number;    // the period's length up to now
   recordedSeconds: number; // covered by at least one record
+  sleepSeconds: number;    // 수면 time taken out (0 when 수면 is in)
   days: number;            // totalSeconds / 86 400 (for "per day")
   records: number;         // records that added time
   categories: TimeUseCategory[];
@@ -47,6 +51,7 @@ export interface TimeUseRecord {
   category: string;
   name: string;
   background: boolean;
+  sleep: boolean;
   /** naive wall clock, ms (datetime as stored) */
   startWall: number;
   endWall: number;
@@ -60,6 +65,7 @@ export interface TimeUseRecord {
 export function isExcluded(doc: any): boolean {
   const name = String(doc.activity?.name ?? '').trim();
   if (name.endsWith('(기간)')) return true;
+  if (String(doc.activity?.relationship ?? '').trim() === '타인') return true;
   if (name === '음료'
     && String(doc.activity?.relationship ?? '').trim() === '혼자'
     && QUIET_DRINK_PLACES.has(placeOf(doc.location?.activity))) return true;
@@ -71,7 +77,7 @@ export function categoryLabel(doc: any): string {
   const name = String(doc.activity?.name ?? '').trim();
   if (!MEAL_WORDS.has(category) && !MEAL_WORDS.has(name)) return category;
   const cross = String(doc.activity?.crossActivity ?? '').trim() || '평시';
-  return UNSPLIT_CROSS.has(cross) ? category : `${category} · ${cross}`;
+  return `${category} · ${cross}`;
 }
 
 export function toRecord(doc: any): TimeUseRecord | null {
@@ -84,6 +90,7 @@ export function toRecord(doc: any): TimeUseRecord | null {
     category: categoryLabel(doc),
     name,
     background: BACKGROUND_NAMES.has(name),
+    sleep: name === SLEEP_NAME || String(doc.activity?.category ?? '').trim() === SLEEP_NAME,
     startWall, endWall,
     startOffset: Number(doc.start?.timezoneOffset) || 0,
     endOffset: Number(doc.end?.timezoneOffset ?? doc.start?.timezoneOffset) || 0,
@@ -98,8 +105,11 @@ const H = 3_600_000;
  * `fromWall` / `toWall`: the period as naive wall clock (ms), `toWall`
  * exclusive and already cut at now.
  */
-export function computeTimeUse(records: TimeUseRecord[], fromWall: number, toWall: number): Omit<TimeUseSummary, 'from' | 'to'> {
-  const totalSeconds = Math.max(0, (toWall - fromWall) / 1000);
+export function computeTimeUse(
+  records: TimeUseRecord[], fromWall: number, toWall: number, withSleep = true,
+): Omit<TimeUseSummary, 'from' | 'to'> {
+  const periodSeconds = Math.max(0, (toWall - fromWall) / 1000);
+  let slept = 0;
 
   // Cut each record to the period by its own wall clock, then place it on
   // real time. The offset used at each cut edge is the one of the nearer end.
@@ -131,8 +141,16 @@ export function computeTimeUse(records: TimeUseRecord[], fromWall: number, toWal
   for (const ev of events) {
     const len = ev.t - prev;
     if (len > 0 && running.size) {
-      covered += len;
       const active = [...running.keys()];
+      // 수면 off: the time is taken out of the period, whatever else ran then.
+      if (!withSleep && active.some(i => records[i].sleep)) {
+        slept += len;
+        prev = ev.t;
+        const n0 = (running.get(ev.r) ?? 0) + ev.d;
+        if (n0 > 0) running.set(ev.r, n0); else running.delete(ev.r);
+        continue;
+      }
+      covered += len;
       const front = active.filter(i => !records[i].background);
       const takers = front.length ? front : active;
       const each = len / takers.length;
@@ -154,9 +172,12 @@ export function computeTimeUse(records: TimeUseRecord[], fromWall: number, toWal
   }).filter(c => c.seconds > 0).sort((a, b) => b.seconds - a.seconds);
 
   return {
-    totalSeconds,
+    totalSeconds: Math.max(0, periodSeconds - slept / 1000),
     recordedSeconds: covered / 1000,
-    days: totalSeconds / 86_400,
+    sleepSeconds: slept / 1000,
+    // Per day stays per CALENDAR day, so a day's figures add up to the day's
+    // hours without sleep.
+    days: periodSeconds / 86_400,
     records: used.size,
     categories,
   };
@@ -172,11 +193,12 @@ const ymd = (ms: number) => new Date(ms).toISOString().slice(0, 10);
  */
 export async function computeTimeUseSummary(
   userId: string, start: Date, end: Date, nowWall: number, crossActivities: string[],
+  withSleep = true,
 ): Promise<TimeUseSummary> {
   const fromWall = start.getTime();
   const toWall = Math.min(end.getTime() + 1, nowWall);
   if (toWall <= fromWall) {
-    return { from: ymd(fromWall), to: ymd(fromWall), totalSeconds: 0, recordedSeconds: 0, days: 0, records: 0, categories: [] };
+    return { from: ymd(fromWall), to: ymd(fromWall), totalSeconds: 0, recordedSeconds: 0, sleepSeconds: 0, days: 0, records: 0, categories: [] };
   }
 
   // Records that touch the period by wall clock (a day either side for zones).
@@ -194,6 +216,6 @@ export async function computeTimeUseSummary(
 
   const records = (docs as any[]).filter(d => !isExcluded(d)).map(toRecord)
     .filter((r): r is TimeUseRecord => r !== null);
-  const result = computeTimeUse(records, fromWall, toWall);
+  const result = computeTimeUse(records, fromWall, toWall, withSleep);
   return { from: ymd(fromWall), to: ymd(toWall - 1), ...result };
 }

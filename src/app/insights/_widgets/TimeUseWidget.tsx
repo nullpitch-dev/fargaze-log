@@ -5,6 +5,10 @@
 //
 // Header   recorded hours of the period (to now), coverage %, per day
 // Bar      one 100% stacked bar: categories in colour, unrecorded grey at the end
+// Switches (28 Nov) Category | Activity — the list grouped, or every activity
+//          on its own (a meal keeps its cross activity: "점심 · 업무"), each
+//          row in its category's colour; 수면 on / off — off takes the sleep
+//          time out of the period too, so the figures are of waking hours.
 // List     one row per category: hours, % of recorded, per day; tap a category
 //          for its activities; the first 6 lines show, the arrow by the title
 //          unfolds the rest (as Interactions' By activity)
@@ -19,6 +23,7 @@ import { useIsDark } from '../_lib/hooks';
 import { buildParams } from '../_lib/date-helpers';
 import { autoColorMap } from '../_lib/chart-colors';
 import { formatDuration } from '../_lib/format';
+import { Segmented } from '../_components/Segmented';
 import type { WidgetProps } from '../_lib/types';
 
 interface Item { name: string; seconds: number }
@@ -28,6 +33,7 @@ interface Summary {
   to: string;
   totalSeconds: number;
   recordedSeconds: number;
+  sleepSeconds: number;
   days: number;
   records: number;
   categories: Category[];
@@ -65,7 +71,26 @@ function Row({ label, seconds, recorded, days, frac, color, isDark, indent, onCl
   );
 }
 
-function TimeUseSummaryView({ data, isDark }: { data: Summary; isDark: boolean }) {
+type ListBy = 'category' | 'activity';
+
+/** Every activity on its own; a split category ("식사 · 업무") passes its cross
+ *  activity on to the name, and the row keeps the category's colour. */
+function flatItems(cats: Category[]): { name: string; seconds: number; category: string }[] {
+  const by = new Map<string, { name: string; seconds: number; category: string }>();
+  for (const c of cats) {
+    const cut = c.category.indexOf(' · ');
+    const suffix = cut >= 0 ? c.category.slice(cut) : '';
+    for (const i of c.items) {
+      const name = `${i.name}${suffix}`;
+      const row = by.get(name);
+      if (row) row.seconds += i.seconds;
+      else by.set(name, { name, seconds: i.seconds, category: c.category });
+    }
+  }
+  return [...by.values()].sort((a, b) => b.seconds - a.seconds);
+}
+
+function TimeUseSummaryView({ data, isDark, listBy }: { data: Summary; isDark: boolean; listBy: ListBy }) {
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [allRows, setAllRows] = useState(false);
   const [hover, setHover] = useState<string | null>(null);
@@ -88,7 +113,14 @@ function TimeUseSummaryView({ data, isDark }: { data: Summary; isDark: boolean }
   ];
   const hovered = segs.find(s => s.key === hover);
 
-  const lines = data.categories.flatMap(c => {
+  const flat = listBy === 'activity' ? flatItems(data.categories) : [];
+  const flatMax = Math.max(1, ...flat.map(f => f.seconds));
+  const lines = listBy === 'activity'
+    ? flat.map(f => (
+        <Row key={f.name} label={f.name} seconds={f.seconds} recorded={data.recordedSeconds}
+          days={data.days} frac={f.seconds / flatMax} color={colors[f.category]} isDark={isDark} />
+      ))
+    : data.categories.flatMap(c => {
     const isOpen = open.has(c.category);
     return [
       <Row key={c.category} label={`${isOpen ? '▾' : '▸'} ${c.category}`} seconds={c.seconds}
@@ -111,10 +143,10 @@ function TimeUseSummaryView({ data, isDark }: { data: Summary; isDark: boolean }
             {formatDuration(data.recordedSeconds)}
           </span>
           <span className="text-xs text-stone-400 dark:text-zinc-500 mt-0.5">
-            recorded of {formatDuration(data.totalSeconds)} · {pctText(data.recordedSeconds, data.totalSeconds)}
+            recorded of {formatDuration(data.totalSeconds)}{data.sleepSeconds > 0 ? ' awake' : ''} · {pctText(data.recordedSeconds, data.totalSeconds)}
           </span>
         </div>
-        <div className="flex flex-col items-end">
+        <div className="flex flex-col items-start @[34rem]:items-end">
           <span className="text-sm font-medium text-stone-700 dark:text-zinc-200 tabular-nums">
             {data.days > 0 ? formatDuration(data.recordedSeconds / data.days) : '–'} / day
           </span>
@@ -166,16 +198,34 @@ function TimeUseSummaryView({ data, isDark }: { data: Summary; isDark: boolean }
   );
 }
 
+// The two switches are remembered on this device.
+const KEEP = 'fg-time-use-view';
+function kept(): { listBy: ListBy; sleep: boolean } {
+  try {
+    const v = JSON.parse(localStorage.getItem(KEEP) ?? '{}');
+    return { listBy: v.listBy === 'activity' ? 'activity' : 'category', sleep: v.sleep !== false };
+  } catch { return { listBy: 'category', sleep: true }; }
+}
+
 export function TimeUseWidget({ globalFilter }: WidgetProps) {
   const isDark = useIsDark();
+  const [listBy, setListBy] = useState<ListBy>('category');
+  const [withSleep, setWithSleep] = useState(true);
+  const [ready, setReady] = useState(false);
+  useEffect(() => { const k = kept(); setListBy(k.listBy); setWithSleep(k.sleep); setReady(true); }, []);
+  useEffect(() => {
+    if (!ready) return;
+    try { localStorage.setItem(KEEP, JSON.stringify({ listBy, sleep: withSleep })); } catch { /* private mode */ }
+  }, [listBy, withSleep, ready]);
   const [data, setData] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!ready) return;
     setLoading(true);
     setError(null);
-    fetch(`/api/insights/stats?${buildParams({ metric: 'timeUse.summary', now: nowLocal() }, globalFilter)}`)
+    fetch(`/api/insights/stats?${buildParams({ metric: 'timeUse.summary', now: nowLocal(), ...(!withSleep && { sleep: '0' }) }, globalFilter)}`)
       .then(r => r.json())
       .then(d => {
         if (d.error) { setError(d.error); setLoading(false); return; }
@@ -183,11 +233,24 @@ export function TimeUseWidget({ globalFilter }: WidgetProps) {
         setLoading(false);
       })
       .catch(() => { setError('Failed to load'); setLoading(false); });
-  }, [globalFilter]);
+  }, [globalFilter, withSleep, ready]);
 
   return (
     <WidgetCard title="Time Use" floor={1} loading={loading} error={error}>
-      {data && <TimeUseSummaryView data={data} isDark={isDark} />}
+      {data && (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-2 flex-wrap -mt-1">
+            <Segmented<ListBy> value={listBy} onChange={setListBy}
+              options={[['category', 'Category'], ['activity', 'Activity']]} />
+            <label className="flex items-center gap-1.5 text-xs text-stone-600 dark:text-zinc-300 cursor-pointer select-none">
+              <input type="checkbox" checked={withSleep} onChange={e => setWithSleep(e.target.checked)}
+                className="accent-stone-700 dark:accent-zinc-300" />
+              수면
+            </label>
+          </div>
+          <TimeUseSummaryView data={data} isDark={isDark} listBy={listBy} />
+        </div>
+      )}
     </WidgetCard>
   );
 }
