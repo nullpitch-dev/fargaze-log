@@ -389,7 +389,8 @@ export async function GET(req: NextRequest) {
     const nowParam = sp.get('now') ?? '';
     const nowWall = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(nowParam)
       ? new Date(`${nowParam}:00Z`).getTime() : end.getTime() + 1;
-    const summary = await computeTimeUseSummary(userId, start, end, nowWall, crossActivities, sp.get('sleep') !== '0');
+    const summary = await computeTimeUseSummary(userId, start, end, nowWall, crossActivities,
+      sp.get('sleep') !== '0', sp.get('work') !== '0');
     return NextResponse.json({ summary });
   }
 
