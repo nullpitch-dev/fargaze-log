@@ -21,6 +21,7 @@ import type { ExerciseTrendGrain } from '@/lib/insights/exercise-trend';
 import { computeBowelSummary, computeBowelTrend } from '@/lib/insights/bowel';
 import { computeTransportSummary } from '@/lib/insights/transport';
 import { computeTransportTrend } from '@/lib/insights/transport-trend';
+import { computeTimeUseSummary } from '@/lib/insights/time-use';
 
 // ── Main route ────────────────────────────────────────────────────────────────
 
@@ -378,6 +379,18 @@ export async function GET(req: NextRequest) {
 
     const trend = await computeBowelTrend(userId, grain, start, end);
     return NextResponse.json(trend);
+  }
+
+	// ── timeUse.summary (28 Nov) ──────────────────────────────────────────────
+  // The period runs to the viewer's now: `now` = local wall clock
+  // (YYYY-MM-DDTHH:mm) from the page; without it, the period's end.
+  if (metric === 'timeUse.summary') {
+    const { start, end } = buildDateRange(timeMode, timePeriod, dateFrom, dateTo);
+    const nowParam = sp.get('now') ?? '';
+    const nowWall = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(nowParam)
+      ? new Date(`${nowParam}:00Z`).getTime() : end.getTime() + 1;
+    const summary = await computeTimeUseSummary(userId, start, end, nowWall, crossActivities);
+    return NextResponse.json({ summary });
   }
 
 	// ── transport.summary ─────────────────────────────────────────────────────

@@ -18,6 +18,7 @@ import { WeightWidget } from './_widgets/WeightWidget';
 import { ExerciseWidget } from './_widgets/ExerciseWidget';
 import { BowelWidget } from './_widgets/BowelWidget';
 import { JourneysWidget } from './_widgets/JourneysWidget';
+import { TimeUseWidget } from './_widgets/TimeUseWidget';
 
 // ── Widget registry ───────────────────────────────────────────────────────────
 
@@ -43,7 +44,6 @@ interface GroupConfig {
 //   Hobbies & Interests (Reading, Study, Movies, Golf)
 //   Finances (Interest, Real-estate tax, Income, Income tax)
 //   Everyday Life (Bath, Haircut, Nail trim, Fuel, Purchases)
-//   Time Use (logged vs unlogged time, what logged time goes on)
 const GROUPS: GroupConfig[] = [
   {
     id: 'health',
@@ -85,6 +85,17 @@ const GROUPS: GroupConfig[] = [
       {
         widgets: [
           { id: 'journeys', label: 'Journeys', size: 'md', component: JourneysWidget },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'time-use',
+    title: 'Time Use',
+    subgroups: [
+      {
+        widgets: [
+          { id: 'time-use', label: 'Time Use', size: 'md', component: TimeUseWidget },
         ],
       },
     ],
